@@ -13,6 +13,14 @@ export BUCKET=s3://my-bucket
 export BUCKET_REGION=us-east-1
 ```
 
+## From our helm repo
+
+```shell
+helm upgrade --namespace=wandb --create-namespace --install wandb oci://us-central1-docker.pkg.dev/wandb-production/charts/wandb --version 0.1.0 --set license=$LICENSE --set bucket=$BUCKET --set bucketRegion=$BUCKET_REGION
+```
+
+## From source
+
 Then provision your instance with:
 
 ```shell
