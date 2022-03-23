@@ -1,0 +1,150 @@
+{{- if .Values.mysql.managed }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wandb.fullname" . }}-mysql
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mysql
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "wandb.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+      {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+        checksum/config: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
+      labels:
+        {{- include "wandb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mysql
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "wandb.serviceAccountName" . }}
+      # TODO: security context
+      initContainers:
+      - name: "remove-lost-found"
+        image: "busybox"
+        imagePullPolicy: {{ .Values.mysql.image.pullPolicy | quote }}
+        command:  ["rm", "-fr", "/var/lib/mysql/lost+found"]
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          {{- if .Values.mysql.persistence.subPath }}
+          subPath: {{ .Values.mysql.persistence.subPath }}
+          {{- end }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+      {{- end }}
+      containers:
+      - name: {{ template "wandb.fullname" . }}-mysql
+        image: "{{ .Values.mysql.image.repository }}:{{ .Values.mysql.image.tag }}"
+        imagePullPolicy: {{ .Values.mysql.image.pullPolicy | quote }}
+        resources:
+{{ toYaml .Values.mysql.resources | indent 10 }}
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: wandb-secrets
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: wandb-secrets
+              key: MYSQL_PASSWORD
+        - name: MYSQL_USER
+          value: {{ default "wandb_local" .Values.mysql.user | quote }}
+        - name: MYSQL_DATABASE
+          value: {{ default "wandb_local" .Values.mysql.database | quote }}
+        {{- if .Values.mysql.command }}
+        command: {{ .Values.mysql.command }}
+        {{- else }}
+        command: ["/entrypoint.sh", "mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"] 
+        {{- end }}
+        ports:
+        - name: mysql
+          containerPort: 3306
+          protocol: TCP
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "mysqladmin ping -u root -p${MYSQL_ROOT_PASSWORD}"
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - "mysqladmin ping -u root -p${MYSQL_ROOT_PASSWORD}"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          {{- if .Values.mysql.persistence.subPath }}
+          subPath: {{ .Values.mysql.persistence.subPath }}
+          {{- end }}
+      volumes:
+      - name: data
+      {{- if .Values.mysql.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ .Values.mysql.persistence.existingClaim | default (include "wandb.fullname" .) }}
+      {{- else }}
+        emptyDir: {}
+      {{- end }}
+---
+{{- if and .Values.mysql.persistence.enabled (not .Values.mysql.persistence.existingClaim) }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ template "wandb.fullname" . }}
+  annotations:
+    "helm.sh/resource-policy": keep
+{{- with .Values.mysql.persistence.annotations  }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mysql
+spec:
+  accessModes:
+    - {{ .Values.mysql.persistence.accessMode | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.mysql.persistence.size | quote }}
+{{- if .Values.mysql.persistence.storageClass }}
+{{- if (eq "-" .Values.mysql.persistence.storageClass) }}
+  storageClassName: ""
+{{- else }}
+  storageClassName: "{{ .Values.mysql.persistence.storageClass }}"
+{{- end }}
+{{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "wandb.fullname" . }}-mysql
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.mysql.service.type }}
+  ports:
+  - name: mysql
+    port: {{ .Values.mysql.service.port }}
+    targetPort: mysql
+    protocol: TCP
+    {{- if .Values.mysql.service.nodePort }}
+    nodePort: {{ .Values.mysql.service.nodePort }}
+    {{- end }}
+  selector:
+    app.kubernetes.io/component: mysql
+{{- end }}
