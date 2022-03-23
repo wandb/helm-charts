@@ -1,6 +1,6 @@
 # Getting Started
 
-First download a license from https://deployer.wandb.ai and set it in your environment:
+First download a license from https://deploy.wandb.ai and set it in your environment:
 
 ```shell
 export LICENSE=XXXXXXX
