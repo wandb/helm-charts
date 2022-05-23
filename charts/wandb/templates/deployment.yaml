@@ -64,7 +64,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: wandb-secrets
-                  key: license
+                  key: LICENSE
             - name: WANDB_HELM_CHART
               value: {{ include "wandb.fullname" . }}:{{ .Chart.Version }}
             {{- if .Values.smtpServer }}
@@ -76,7 +76,10 @@ spec:
             {{- end }}
             {{- if .Values.bucket }}
             - name: BUCKET
-              value: {{ .Values.bucket }}
+              valueFrom:
+                secretKeyRef:
+                  name: wandb-secrets
+                  key: BUCKET
             - name: AWS_REGION
               value: {{ .Values.bucketRegion | default .Release.Namespace }}
             - name: AWS_S3_KMS_ID
@@ -112,6 +115,11 @@ spec:
               path: /ready
               port: http
             failureThreshold: 60
+          {{- if not .Values.bucket }}
+          volumeMounts:
+            - name: wandb-data
+              mountPath: /vol
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
@@ -125,4 +133,10 @@ spec:
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if not .Values.bucket }}
+      volumes:
+        - name: wandb-data
+          hostPath:
+            path: /wandb
       {{- end }}
