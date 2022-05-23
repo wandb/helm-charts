@@ -18,6 +18,7 @@ spec:
       {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
+        # TODO: ideally only create the checksum when the DB password is rotated
         checksum/config: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
       labels:
         {{- include "wandb.selectorLabels" . | nindent 8 }}
@@ -92,7 +93,12 @@ spec:
           {{- if .Values.mysql.persistence.subPath }}
           subPath: {{ .Values.mysql.persistence.subPath }}
           {{- end }}
+        - name: mysql-initdb
+          mountPath: /docker-entrypoint-initdb.d
       volumes:
+      - name: mysql-initdb
+        configMap:
+          name: mysql-initdb-config
       - name: data
       {{- if .Values.mysql.persistence.enabled }}
         persistentVolumeClaim:
@@ -100,6 +106,15 @@ spec:
       {{- else }}
         emptyDir: {}
       {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-initdb-config
+data:
+  # We need RELOAD for making backups
+  initdb.sql: |
+    GRANT RELOAD ON *.* TO `wandb_local`@`%`;
 ---
 {{- if and .Values.mysql.persistence.enabled (not .Values.mysql.persistence.existingClaim) }}
 kind: PersistentVolumeClaim

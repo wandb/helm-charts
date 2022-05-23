@@ -24,9 +24,9 @@ helm upgrade --namespace=wandb --create-namespace --install wandb oci://us-centr
 Then provision your instance with:
 
 ```shell
-git clone https://github.com/wandb/charts.git
-cd charts/wandb
-helm upgrade --namespace=wandb --create-namespace --install wandb . --set license=$LICENSE --set bucket=$BUCKET --set bucketRegion=$BUCKET_REGION
+git clone https://github.com/wandb/helm-charts.git
+cd helm-charts
+helm upgrade --namespace=wandb --create-namespace --install wandb ./charts/wandb --set license=$LICENSE --set bucket=$BUCKET --set bucketRegion=$BUCKET_REGION
 ```
 
 ## Releasing
