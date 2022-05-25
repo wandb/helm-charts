@@ -35,12 +35,17 @@ jobs:
           if [[ -n "$changed" ]]; then
             echo "::set-output name=changed::true"
           fi
+
+      - name: Temporary yaml patching (can be removed when --helm-extra-set-args is added post v3.5.1)
+        run:
+          echo "license: $LICENSE" >> charts/wandb/ci/basic-values.yaml
+
       - name: Run chart-testing  (lint)
         run: ct lint --config ct.yaml
 
       - name: Create kind cluster
         uses: helm/kind-action@v1.2.0
-        # if: steps.list-changed.outputs.changed == 'true'
+        if: steps.list-changed.outputs.changed == 'true'
 
       - name: Run chart-testing (install)
-        run: ct install --config ct.yaml --all
+        run: ct install --config ct.yaml
