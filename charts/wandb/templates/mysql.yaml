@@ -1,14 +1,13 @@
 {{- if .Values.mysql.managed }}
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "wandb.fullname" . }}-mysql
   labels:
     {{- include "wandb.labels" . | nindent 4 }}
     app.kubernetes.io/component: mysql
 spec:
-  strategy:
-    type: Recreate
+  serviceName: {{ template "wandb.fullname" . }}-mysql
   selector:
     matchLabels:
       {{- include "wandb.selectorLabels" . | nindent 6 }}
@@ -29,12 +28,21 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "wandb.serviceAccountName" . }}
-      # TODO: security context
+      # TODO: flexible security context
+      securityContext:
+        runAsUser: 27
+        fsGroup: 0
+        fsGroupChangePolicy: "OnRootMismatch"
       initContainers:
-      - name: "remove-lost-found"
+      - name: "ensure-volume-permissions"
         image: "busybox"
         imagePullPolicy: {{ .Values.mysql.image.pullPolicy | quote }}
-        command:  ["rm", "-fr", "/var/lib/mysql/lost+found"]
+        command:
+          - sh
+          - -c
+          - "rm -fr /var/lib/mysql/lost+found && chown -R 27:0 /var/lib/mysql"
+        securityContext:
+          runAsUser: 0
         volumeMounts:
         - name: data
           mountPath: /var/lib/mysql
@@ -55,12 +63,12 @@ spec:
         - name: MYSQL_ROOT_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: wandb-secrets
+              name: {{ include "wandb.fullname" . }}-secrets
               key: MYSQL_ROOT_PASSWORD
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: wandb-secrets
+              name: {{ include "wandb.fullname" . }}-secrets
               key: MYSQL_PASSWORD
         - name: MYSQL_USER
           value: {{ default "wandb_local" .Values.mysql.user | quote }}
