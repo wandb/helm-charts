@@ -29,13 +29,14 @@ CREATE DATABASE wandb CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 GRANT ALL ON wandb.* TO 'wandb'@'%' WITH GRANT OPTION;
 ```
 
-## From our helm repo
+## Install from our helm repo
 
 ```shell
-helm upgrade --namespace=wandb --create-namespace --install wandb oci://us-central1-docker.pkg.dev/wandb-production/charts/wandb --version 0.1.1 --set license=$LICENSE --set bucket=$BUCKET --set bucketRegion=$BUCKET_REGION
+helm repo add wandb https://wandb.github.io/helm-charts
+helm upgrade --namespace=wandb --create-namespace --install wandb wandb/wandb --version 0.1.3 --set license=$LICENSE --set bucket=$BUCKET --set bucketRegion=$BUCKET_REGION
 ```
 
-## From source
+## Install from source
 
 Then provision your instance with:
 
