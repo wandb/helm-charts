@@ -114,7 +114,7 @@ spec:
             httpGet:
               path: /ready
               port: http
-            failureThreshold: 60
+            failureThreshold: 120
           {{- if not .Values.bucket }}
           volumeMounts:
             - name: wandb-data
@@ -134,8 +134,27 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if not .Values.bucket }}
+      {{- if or (not .Values.bucket) .Values.existingClaim }}
       volumes:
         - name: wandb-data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: {{ .Values.existingClaim | default (include "wandb.volumeClaim" .) }}
       {{- end }}
+---
+{{- if and (not .Values.bucket) (not .Values.existingClaim)  }}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "wandb.volumeClaim" . }}
+  annotations:
+    "helm.sh/resource-policy": keep
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: local
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 64Gi
+{{- end }}
