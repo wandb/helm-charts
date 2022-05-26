@@ -3,6 +3,8 @@ We make use of Github actions and [chart-testing](https://github.com/helm/chart-
 ## Releasing
 
 ```shell
-helm package wandb
-helm push wandb/wandb-$VERSION.tgz oci://us-central1-docker.pkg.dev/wandb-production/charts/wandb
+git checkout -b feature/bump_version
+# update versions in charts/wandb/Chart.yaml
+git push origin feature/bump_version
+# merge PR after checks pass
 ```
