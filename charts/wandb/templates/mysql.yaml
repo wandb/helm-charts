@@ -31,14 +31,19 @@ spec:
       serviceAccountName: {{ include "wandb.serviceAccountName" . }}
       # TODO: flexible security context
       securityContext:
-        runAsNonRoot: false
-        fsGroup: 27
+        runAsUser: 27
+        fsGroup: 0
         fsGroupChangePolicy: "OnRootMismatch"
       initContainers:
-      - name: "remove-lost-found"
+      - name: "ensure-volume-permissions"
         image: "busybox"
         imagePullPolicy: {{ .Values.mysql.image.pullPolicy | quote }}
-        command:  ["rm", "-fr", "/var/lib/mysql/lost+found"]
+        command:
+          - sh
+          - -c
+          - "rm -fr /var/lib/mysql/lost+found && chown -R 27:0 /var/lib/mysql"
+        securityContext:
+          runAsUser: 0
         volumeMounts:
         - name: data
           mountPath: /var/lib/mysql
