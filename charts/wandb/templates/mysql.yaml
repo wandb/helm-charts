@@ -18,6 +18,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
         # TODO: ideally only create the checksum when the DB password is rotated
+        # TODO: add the config map to this calculation / put it in a helper
         checksum/config: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
       labels:
         {{- include "wandb.selectorLabels" . | nindent 8 }}
@@ -74,6 +75,8 @@ spec:
           value: {{ default "wandb_local" .Values.mysql.user | quote }}
         - name: MYSQL_DATABASE
           value: {{ default "wandb_local" .Values.mysql.database | quote }}
+        - name: MYSQL
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@localhost/$(MYSQL_DATABASE)"
         {{- if .Values.mysql.command }}
         command: {{ .Values.mysql.command }}
         {{- else }}
@@ -103,6 +106,11 @@ spec:
           {{- end }}
         - name: mysql-initdb
           mountPath: /docker-entrypoint-initdb.d
+        - name: mysql-initdb
+          mountPath: /etc/mysql/
+      {{- if .Values.mysql.persistence.extraVolumeMounts }}
+        {{ toYaml .Values.mysql.persistence.extraVolumeMounts | nindent 8 }}
+      {{- end }}
       volumes:
       - name: mysql-initdb
         configMap:
@@ -114,15 +122,30 @@ spec:
       {{- else }}
         emptyDir: {}
       {{- end }}
+    {{- if .Values.mysql.persistence.extraVolumes }}
+      {{ toYaml .Values.mysql.persistence.extraVolumes | nindent 6 }}
+    {{- end }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mysql-initdb-config
 data:
-  # We need RELOAD for making backups
+  my.cnf: |
+    [mysqld]
+    binlog_format = 'ROW'
+    innodb_online_alter_log_max_size = 268435456
+    sync_binlog = 1
+    innodb_flush_log_at_trx_commit = 1
+    binlog_row_image = 'MINIMAL'
+    local-infile = 1
+    {{- if eq (include "wandb.mysqlVersion" .) "8" }}
+    sort_buffer_size = 33554432
+    {{- end }}
+    # TODO wire through user settings
+  # We need RELOAD, SELECT, and LOCK TABLES for making backups
   initdb.sql: |
-    GRANT RELOAD ON *.* TO `wandb_local`@`%`;
+    GRANT {{ include "wandb.extraMysqlGrants" . }}RELOAD,SELECT,LOCK TABLES ON *.* TO `{{ default "wandb_local" .Values.mysql.user }}`@`%`;
 ---
 {{- if and .Values.mysql.persistence.enabled (not .Values.mysql.persistence.existingClaim) }}
 kind: PersistentVolumeClaim
