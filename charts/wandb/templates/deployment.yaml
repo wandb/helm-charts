@@ -78,10 +78,9 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.fullname" . }}-secrets
                   key: CLIENT_SECRET
-              value: {{ .Values.sso.clientSecret }}
             {{- end }}
             - name: GORILLA_DISABLE_SSO_PROVISIONING
-              value: {{ not .Values.sso.autoProvision }}
+              value: "{{ not .Values.sso.autoProvision }}"
             {{- end}}
             {{- if .Values.enableAdminApi }}
             - name: GLOBAL_ADMIN_API_KEY
@@ -146,16 +145,25 @@ spec:
               path: /ready
               port: http
             failureThreshold: 120
-          {{- if not .Values.bucket }}
           volumeMounts:
+          {{- if not .Values.bucket }}
             - name: wandb-data
               mountPath: /vol
               {{- if .Values.subPath }}
               subPath: {{ .Values.subPath }}
               {{- end }}
           {{- end }}
+          {{- range $index, $v := .Values.customCACerts }}
+            - name: wandb-ca-certs
+              mountPath: /usr/local/share/ca-certificates/customCA{{$index}}.crt
+              subPath: customCA{{$index}}.crt
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      hostAliases:
+      {{- with .Values.hostAliases }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -168,11 +176,16 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if or (not .Values.bucket) .Values.existingClaim }}
       volumes:
+      {{- if or (not .Values.bucket) .Values.existingClaim }}
         - name: wandb-data
           persistentVolumeClaim:
             claimName: {{ .Values.existingClaim | default (include "wandb.volumeClaim" .) }}
+      {{- end }}
+      {{- if .Values.customCACerts }}
+        - name: wandb-ca-certs
+          configMap:
+            name: {{ include "wandb.fullname" . }}-ca-certs
       {{- end }}
 ---
 {{- if and (not .Values.bucket) (not .Values.existingClaim)  }}
