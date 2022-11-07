@@ -7,6 +7,8 @@ image:
 
 # Required for production environments
 license:
+# If set to true we'll provision an admin user and allow admin api access
+enableAdminApi: false
 # If using S3 be sure the pod has valid IAM creds, if using minio
 # you can include the creds in the bucket url, i.e.
 # !!! Be sure to use the externally accessible host / ingress,
@@ -32,6 +34,12 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+# dns hostAliases, generally only used in development
+hostAliases: []
+# Custom CA's to make SSL verification work for self signed certs
+# You'll likely want to use `--set-file customCACerts={/path/to/rootCA.crt}`
+customCACerts: []
+
 serviceAccount:
   create: true
   annotations: {}
@@ -53,6 +61,17 @@ securityContext:
 service:
   type: ClusterIP
   port: 8080
+
+sso:
+  enabled: false
+  # Automatically provision a user if SSO auth succeeds
+  autoProvision: true
+  issuer:
+  # Can be implicit or pkce
+  method: implicit
+  clientId:
+  # Optional, only if your IDP requires it
+  clientSecret:
 
 ingress:
   enabled: false
@@ -94,7 +113,7 @@ mysql:
   image:
     pullPolicy: IfNotPresent
     repository: mysql/mysql-server
-    tag: latest
+    tag: "8.0"
   resources:
     requests:
       cpu: 1000m
