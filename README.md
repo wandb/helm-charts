@@ -80,6 +80,26 @@ helm upgrade --namespace=wandb wandb ./charts/wandb --set license=$LICENSE --set
 
 Now, your wandb deployment will use the mounted SSL certificate for securing communication over HTTPS.
 
+### Configuring the wandb SDK to Leverage the SSL Certificates
+
+To configure the wandb SDK to use the SSL certificates, follow these steps:
+
+1. Set the `REQUESTS_CA_BUNDLE` and `SSL_CERT_FILE` environment variables to the path of the certificate file:
+
+```python
+import os
+os.environ['REQUESTS_CA_BUNDLE'] = '/path/to/cert.pem'
+os.environ['SSL_CERT_FILE'] = '/path/to/cert.pem'
+```
+
+2. Append your self-signed certificate to the default CA bundle to allow both self-signed and default certificates to be used:
+
+```bash
+cat /path/to/selfsigned.cer >> /path/to/cacert.pem
+```
+
+Now, the wandb SDK will be able to use the SSL certificates for HTTPS communication.
+
 # Upgrade Guide
 
 For information on upgrading the Helm module and wandb server version, please refer to the [upgrade guide](./upgrade.md).
