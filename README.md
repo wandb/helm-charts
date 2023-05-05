@@ -45,3 +45,7 @@ git clone https://github.com/wandb/helm-charts.git
 cd helm-charts
 helm upgrade --namespace=wandb --create-namespace --install wandb ./charts/wandb --set license=$LICENSE --set bucket=$BUCKET --set bucketRegion=$BUCKET_REGION
 ```
+
+# Upgrade Guide
+
+For information on upgrading the Helm module and wandb server version, please refer to the [upgrade guide](./upgrade.md).
