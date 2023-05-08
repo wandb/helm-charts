@@ -48,7 +48,9 @@ helm upgrade --namespace=wandb --create-namespace --install wandb ./charts/wandb
 
 # Mounting SSL Certificates to the Deployment
 
-To mount SSL certificates to your wandb deployment, follow these steps:
+Important Note: W&B strongly recommends against using a self-signed certificate and would suggest getting a CA certificate that works best with all network configurations and doesn't need any extra work to setup.
+
+To mount self-signed SSL certificates to your wandb deployment, follow these steps:
 
 1. Create a Kubernetes secret containing the SSL certificate and private key:
 
@@ -80,7 +82,7 @@ helm upgrade --namespace=wandb wandb ./charts/wandb --set license=$LICENSE --set
 
 Now, your wandb deployment will use the mounted SSL certificate for securing communication over HTTPS.
 
-### Configuring the wandb SDK to Leverage the SSL Certificates
+### Configuring the wandb python SDK to leverage the self-signed SSL Certificates
 
 To configure the wandb SDK to use the SSL certificates, follow these steps:
 
