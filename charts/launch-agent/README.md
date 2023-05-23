@@ -9,7 +9,9 @@ To deploy an agent, you will need to specify the following values:
 - `agent.apiKey`: Your W&B API key
 - `launchConfig`: The literal contents of a launch agent config file that will be used to configure the agent. See the [launch agent docs](https://docs.wandb.ai/guides/launch/agent) for more information.
 
-You can provide these values by modifying the contents of `values.yaml` or by passing them in as command line arguments to `helm install`, e.g.
+You will likely want to modify the variable `agent.resources.limits.{cpu,mem}`, which default to `1000m`, and `1Gi` respectively.
+
+You can provide these values by modifying the contents of [`values.yaml`](values.yaml) or by passing them in as command line arguments to `helm install`, e.g.
 
 ```bash
 helm install <package-name> <launch-agent-chart-path> --set agent.apiKey=<your-api-key> --set-file launchConfig=<path-to-launch-config.yaml>
