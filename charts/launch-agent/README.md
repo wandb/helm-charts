@@ -13,6 +13,8 @@ You will likely want to modify the variable `agent.resources.limits.{cpu,mem}`, 
 
 You can provide these values by modifying the contents of [`values.yaml`](values.yaml) or by passing them in as command line arguments to `helm install`, e.g.
 
+By default, this chart will also install [volcano](https://volcano.sh), but this can be disabled by setting `volcano=false`.
+
 ```bash
 helm install <package-name> <launch-agent-chart-path> --set agent.apiKey=<your-api-key> --set-file launchConfig=<path-to-launch-config.yaml>
 ```
