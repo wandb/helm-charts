@@ -1,0 +1,2070 @@
+NAME: wandb
+LAST DEPLOYED: Sat May 27 21:48:30 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservce/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservce-test-connection"
+  labels:
+    helm.sh/chart: webservce-0.1.0
+    app.kubernetes.io/name: webservce
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservce:80']
+  restartPolicy: Never
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservce/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservce
+  labels:
+    helm.sh/chart: webservce-0.1.0
+    app.kubernetes.io/name: webservce
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservce/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservce
+  labels:
+    helm.sh/chart: webservce-0.1.0
+    app.kubernetes.io/name: webservce
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservce
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservce/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservce
+  labels:
+    helm.sh/chart: webservce-0.1.0
+    app.kubernetes.io/name: webservce
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservce
+      app.kubernetes.io/instance: wandb
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservce-0.1.0
+        app.kubernetes.io/name: webservce
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: webservce
+        app.kubernetes.io/instance: wandb
+      annotations:
+    spec:
+      imagePullSecrets:
+        []
+      serviceAccountName: wandb-webservce
+      securityContext:
+        {}
+      containers:
+        - name: webservce
+          securityContext:
+            null
+          image: "wandb/local:0.33.0"
+          imagePullPolicy: Always
+          env:
+            - name: TESTING
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+          resources:
+            {}
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+      annotations:
+    spec:
+      imagePullSecrets:
+        []
+      serviceAccountName: wandb-webservice
+      securityContext:
+        {}
+      containers:
+        - name: webservice
+          securityContext:
+            null
+          image: "wandb/local:0.33.0"
+          imagePullPolicy: Always
+          env:
+            - name: TESTING
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+          resources:
+            {}
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 21:49:18 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+      annotations:
+    spec:
+      imagePullSecrets:
+        []
+      serviceAccountName: wandb-webservice
+      securityContext:
+        {}
+      containers:
+        - name: webservice
+          securityContext:
+            null
+          image: "wandb/local:0.33.0"
+          imagePullPolicy: Always
+          env:
+            - name: TESTING
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+          resources:
+            {}
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 21:51:38 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+      annotations:
+    spec:
+      imagePullSecrets:
+        []
+      serviceAccountName: wandb-webservice
+      securityContext:
+        {}
+      containers:
+        - name: webservice
+          securityContext:
+            null
+          image: "wandb/local:0.33.0"
+          imagePullPolicy: Always
+          env:
+            - name: TESTING
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+          resources:
+            {}
+      nodeSelector:
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 22:00:00 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      helm.sh/chart: webservice-0.1.0
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      app.kubernetes.io/version: "0.33.0"
+      app.kubernetes.io/managed-by: Helm
+
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+      annotations:
+    spec:
+      imagePullSecrets:
+        []
+      serviceAccountName: wandb-webservice
+      securityContext:
+        {}
+      containers:
+        - name: webservice
+          securityContext:
+            null
+          image: "wandb/local:0.33.0"
+          imagePullPolicy: Always
+          env:
+            - name: TESTING
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+          resources:
+            {}
+      nodeSelector:
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 22:06:49 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      helm.sh/chart: webservice-0.1.0
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/webservice-name: webservice-0.1.0
+      app.kubernetes.io/managed-by: Helm
+
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/webservice-name: webservice-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        
+        
+        
+
+      annotations:
+    spec:
+      imagePullSecrets:
+        []
+      serviceAccountName: wandb-webservice
+      securityContext:
+        {}
+      containers:
+        - name: webservice
+          securityContext:
+            null
+          image: "wandb/local:0.33.0"
+          imagePullPolicy: Always
+          env:
+            - name: TESTING
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+          resources:
+            {}
+      nodeSelector:
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 22:24:51 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      helm.sh/chart: webservice-0.1.0
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/webservice-name: webservice-0.1.0
+      app.kubernetes.io/managed-by: Helm
+
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/webservice-name: webservice-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        
+        
+        
+
+      annotations:
+
+    spec:
+      
+      
+      
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+      
+      imagePullSecrets:
+        []
+
+      containers:
+        - name: webservice
+          securityContext:
+            null
+          image: "wandb/local:0.33.0"
+          imagePullPolicy: Always
+          env:
+            - name: TESTING
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+          resources:
+            {}
+      nodeSelector:
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 22:42:33 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      helm.sh/chart: webservice-0.1.0
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/webservice-name: webservice-0.1.0
+      app.kubernetes.io/managed-by: Helm
+
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/webservice-name: webservice-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        
+        
+        
+
+      annotations:
+
+    spec:
+      
+      
+      
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000      
+
+      containers:
+        - name: webservice
+          
+          image: "wandb/local:0.33.0"          
+          imagePullPolicy: "Always"          
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          
+          env:
+            
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+
+          resources:
+            {}
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 22:43:46 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      helm.sh/chart: webservice-0.1.0
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/webservice-name: webservice-0.1.0
+      app.kubernetes.io/managed-by: Helm
+
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/webservice-name: webservice-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        
+        
+        
+
+      annotations:
+
+    spec:
+      
+      
+      
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000      
+
+      containers:
+        - name: webservice
+          
+          image: "wandb/local:0.33.0"          
+          imagePullPolicy: "Always"          
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          
+          env:
+            
+            
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+
+          resources:
+            {}
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 22:48:34 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      helm.sh/chart: webservice-0.1.0
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/webservice-name: webservice-0.1.0
+      app.kubernetes.io/managed-by: Helm
+
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/webservice-name: webservice-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        
+        
+        
+
+      annotations:
+
+    spec:
+      
+      
+      
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000      
+
+      containers:
+        - name: webservice
+          
+          image: "wandb/local:0.33.0"          
+          imagePullPolicy: "Always"          
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          
+          env:
+
+            - name: MYSQL
+              value: mysql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST)/$(DB)
+            - name: HOST
+              value: http://localhost:8080
+            
+            
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+
+          resources:
+            {}
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 22:51:17 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      helm.sh/chart: webservice-0.1.0
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/webservice-name: webservice-0.1.0
+      app.kubernetes.io/managed-by: Helm
+
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/webservice-name: webservice-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        
+        
+        
+
+      annotations:
+
+    spec:
+      
+      
+      
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000      
+
+      containers:
+        - name: webservice
+          
+          image: "wandb/local:0.33.0"          
+          imagePullPolicy: "Always"          
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          
+          env:
+
+            - name: MYSQL
+              value: mysql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST)/$(DB)
+            - name: HOST
+              value: http://localhost:8080
+            
+            
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+
+          resources:
+            {}
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 23:01:29 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  type: ClusterIP
+
+  ports:
+    - port: 8080
+      targetPort: http-ws
+      protocol: TCP
+      name: http-ws
+    - port: 8181
+      targetPort: http-ws-prometheus
+      protocol: TCP
+      name: http-ws-prometheus
+
+  selector:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      helm.sh/chart: webservice-0.1.0
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/webservice-name: webservice-0.1.0
+      app.kubernetes.io/managed-by: Helm
+
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/webservice-name: webservice-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        
+        
+        
+
+      annotations:
+
+    spec:
+      
+      
+      
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000      
+
+      containers:
+        - name: webservice
+          
+          image: "wandb/local:0.33.0"          
+          imagePullPolicy: "Always"          
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          
+          env:
+
+            - name: MYSQL
+              value: mysql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST)/$(DB)
+            - name: HOST
+              value: http://localhost:8080
+            
+            
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+
+          resources:
+            {}
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 23:01:45 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-webservice
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  type: ClusterIP
+
+  ports:
+    - port: 8080
+      targetPort: http-ws
+      protocol: TCP
+      name: http-ws
+    - port: 8181
+      targetPort: http-ws-prometheus
+      protocol: TCP
+      name: http-ws-prometheus
+
+  selector:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      helm.sh/chart: webservice-0.1.0
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/webservice-name: webservice-0.1.0
+      app.kubernetes.io/managed-by: Helm
+
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/webservice-name: webservice-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        
+        
+        
+
+      annotations:
+
+    spec:
+      
+      
+      
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000      
+
+      containers:
+        - name: webservice
+          
+          image: "wandb/local:0.33.0"          
+          imagePullPolicy: "Always"          
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          
+          env:
+
+            - name: MYSQL
+              value: mysql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST)/$(DB)
+            - name: HOST
+              value: http://localhost:8080
+            
+            
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+
+          resources:
+            {}
+
+NAME: wandb
+LAST DEPLOYED: Sat May 27 23:05:54 2023
+NAMESPACE: default
+STATUS: pending-install
+REVISION: 1
+HOOKS:
+---
+# Source: wandb/charts/webservice/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "wandb-webservice-test-connection"
+  labels:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['wandb-webservice:8080']
+  restartPolicy: Never
+MANIFEST:
+---
+# Source: wandb/charts/webservice/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  type: ClusterIP
+
+  ports:
+    - port: 8080
+      targetPort: http-ws
+      protocol: TCP
+      name: http-ws
+    - port: 8181
+      targetPort: http-ws-prometheus
+      protocol: TCP
+      name: http-ws-prometheus
+
+  selector:
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb/charts/webservice/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wandb-webservice
+  labels:
+    
+    helm.sh/chart: webservice-0.1.0
+    app.kubernetes.io/name: webservice
+    app.kubernetes.io/instance: wandb
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/webservice-name: webservice-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      helm.sh/chart: webservice-0.1.0
+      app.kubernetes.io/name: webservice
+      app.kubernetes.io/instance: wandb
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/webservice-name: webservice-0.1.0
+      app.kubernetes.io/managed-by: Helm
+
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: webservice-0.1.0
+        app.kubernetes.io/name: webservice
+        app.kubernetes.io/instance: wandb
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/webservice-name: webservice-0.1.0
+        app.kubernetes.io/managed-by: Helm
+        
+        
+        
+
+      annotations:
+
+    spec:
+      
+      
+      
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000      
+
+      containers:
+        - name: webservice
+          
+          image: "wandb/local:0.33.0"          
+          imagePullPolicy: "Always"          
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          
+          env:
+
+            - name: MYSQL
+              value: mysql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST)/$(DB)
+            - name: HOST
+              value: http://localhost:8080
+            
+            
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+
+          resources:
+            {}
+

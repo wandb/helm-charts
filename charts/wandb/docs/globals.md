@@ -1,3 +1,16 @@
+# Configure chart globals
+
+To reduce configuration duplication when installing our wrapper Helm chart,
+several configuration settings are available to be set in the global section of
+values.yaml. These global settings are used across several charts, while all
+other settings are scoped within their chart. See the Helm documentation on
+globals for more information on how the global variables work.
+
+- [Configure chart globals](#configure-chart-globals)
+  - [Hosts](#hosts)
+  - [Redis](#redis)
+  - [MySQL](#mysql)
+
 ## Hosts
 
 The W&B Server global host settings are located under the `global.hosts` key.
