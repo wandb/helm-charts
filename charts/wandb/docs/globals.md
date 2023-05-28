@@ -27,7 +27,7 @@ The W&B Server global Redis settings are located under the `global.redis` key.
 
 By default we use an single, non-replicated Redis instance. If desired, a highly
 available Redis can be deployed instead. To install an HA Redis cluster one
-needs to set redis.cluster.enabled=true when the GitLab chart is installed.
+needs to set redis.cluster.enabled=true when the W&B chart is installed.
 
 ```yaml
 global:
