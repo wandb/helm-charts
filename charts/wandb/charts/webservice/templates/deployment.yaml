@@ -76,9 +76,21 @@ spec:
             - name: GORILLA_CORS_ORIGINS
               value: {{ .Values.extraCors }}
             {{- end }}
-
+            - name: DATABASE_PORT
+              value: "{{- template "wandb.mysql.port" }}"
+            - name: DATABASE_HOST
+              value: "{{ template "wandb.mysql.host" }}"
+            - name: DATABASE
+              value: "{{ template "wandb.mysql.database" }}"
+            - name: DATABASE_USER
+              value: "{{ template "wandb.mysql.user" }}"
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ template "wandb.mysql.password.secret" }}"
+                  key:  MYSQL_PASSWORD
             - name: MYSQL
-              value: {{ "mysql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST)/$(DB)" }}
+              value: "mysql://$(DATABASE_USER):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE)"
             - name: HOST
               value: {{ .Values.host  | default "http://localhost:8080" }}
             {{- include "webservice.extraEnv" (dict "global" .Values.global "local" .) | nindent 12 }}

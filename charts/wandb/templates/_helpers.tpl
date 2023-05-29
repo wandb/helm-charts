@@ -23,14 +23,6 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 {{- end }}
 
-{{- define "wandb.volumeClaim" -}}
-{{- printf "%s-vol" (include "wandb.fullname" .) -}}
-{{- end }}
-
-{{- define "wandb.mysqlHost" -}}
-{{- printf "%s-mysql.%s.svc.cluster.local" (include "wandb.fullname" .) .Release.Namespace }}
-{{- end }}
-
 {{/*
 Create chart name and version as used by the chart label.
 */}}
