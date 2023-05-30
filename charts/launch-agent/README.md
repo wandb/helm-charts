@@ -8,25 +8,27 @@ To deploy an agent, you will need to specify the following values in [`values.ya
 
 - `agent.apiKey`: Your W&B API key
 - `agent.image`: The container image to use for the agent (default: `wandb/launch-agent-dev:latest`)
-- `agent.imagePullPolicy`: The image pull policy for the agent image (default: `Always`)
-- `agent.resources`: Resources (CPU and memory) limits for the agent (default: 1 CPU, 1Gi RAM)
 - `namespace`: The namespace to deploy the agent into (default: `wandb-launch`)
 - `launchConfig.base_url`: URL of your W&B server (default: `https://api.wandb.ai`)
 - `launchConfig.entity`: W&B entity (user or team) name (default: `"entity-name"`)
-- `launchConfig.max_jobs`: Max number of concurrent runs to perform (-1 = no limit) (default: `-1`)
 - `launchConfig.queues`: List of queues to poll (default: `["default"]`)
-- `launchConfig.environment.type`: Cloud environment config (`aws` or `gcp`) (default: `local`)
-- `launchConfig.registry.type`: Container registry config (`ecr` or `gcr`) (default: `local`)
 - `launchConfig.builder.type`: Container build config (`kaniko` or `noop`) (default: `docker`)
+
+By default, this chart will also install [volcano](https://volcano.sh)
 - `volcano`: Set to `false` to disable volcano install (default: `true`)
-- `gitCreds`: Contents of a git credentials file (optional)
-- `serviceAccount.annotations`: Annotations for the wandb service account (optional)
 
 You can modify the values directly in the `values.yaml` file or provide them as command line arguments when running `helm install`, for example:
 
 ```bash
 helm install <package-name> <launch-agent-chart-path> --set agent.apiKey=<your-api-key>
 ```
+
+Here is an example with a `values.yaml`
+
+```bash
+helm upgrade --namespace=wandb --create-namespace --install wandb-launch wandb/launch-agent -f ./values.yaml --namespace=wandb-launch
+```
+
 
 The table below describes all the available variables in the chart:
 
