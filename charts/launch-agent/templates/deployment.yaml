@@ -4,6 +4,8 @@ kind: Deployment
 metadata:
   name: launch-agent
   namespace: {{ .Values.namespace }}
+  annotations:
+    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
 spec:
   replicas: 1
   selector:
@@ -39,6 +41,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.serviceAccountName
+            - name: WANDB_BASE_URL
+              value: {{ .Values.launchConfig.base_url }}
           volumeMounts:
             - name: wandb-launch-config
               mountPath: /home/launch_agent/.config/wandb
