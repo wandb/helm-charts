@@ -1,8 +1,22 @@
+---
 apiVersion: v1
 data:
   launch-config.yaml: |
-    {{ required "Please set launchConfig to the contents of your agent config file" .Values.launchConfig | nindent 4 }}
+    base_url: {{ required "Please set base_url to the URL of your W&B server" .Values.launchConfig.base_url }}
+    entity: {{ required "Please set entity to the W&B entity name" .Values.launchConfig.entity }}
+    max_jobs: {{ required "Please set max_jobs to the maximum number of concurrent runs to perform" .Values.launchConfig.max_jobs | toString }}
+    queues:
+    {{- range $queue := .Values.launchConfig.queues }}
+    - {{ $queue }}
+    {{- end }}
+    environment:
+      type: {{ default "local" .Values.launchConfig.environment.type }}
+    registry:
+      type: {{ default "local" .Values.launchConfig.registry.type }}
+    builder:
+      type: {{ default "docker" .Values.launchConfig.builder.type }}
 kind: ConfigMap
 metadata:
   name: wandb-launch-configmap
-  namespace: wandb
+  namespace: {{ .Values.namespace }}
+...
