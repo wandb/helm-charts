@@ -4,31 +4,50 @@ This chart deploys the W&B Launch Agent to your Kubernetes cluster.
 
 The launch agent is a Kubernetes Deployment that runs a container that connects to the W&B API and watches for new runs in one or more launch queues. When the agent pops a run off the queue(s), it will launch a Kubernetes Job to execute the run on the W&B user's behalf.
 
-To deploy an agent, you will need to specify the following values:
+To deploy an agent, you will need to specify the following values in [`values.yaml`](values.yaml):
 
 - `agent.apiKey`: Your W&B API key
-- `launchConfig`: The literal contents of a launch agent config file that will be used to configure the agent. See the [launch agent docs](https://docs.wandb.ai/guides/launch/run-agent) for more information.
+- `agent.image`: The container image to use for the agent (default: `wandb/launch-agent-dev:latest`)
+- `agent.imagePullPolicy`: The image pull policy for the agent image (default: `Always`)
+- `agent.resources`: Resources (CPU and memory) limits for the agent (default: 1 CPU, 1Gi RAM)
+- `namespace`: The namespace to deploy the agent into (default: `wandb-launch`)
+- `launchConfig.base_url`: URL of your W&B server (default: `https://api.wandb.ai`)
+- `launchConfig.entity`: W&B entity (user or team) name (default: `"entity-name"`)
+- `launchConfig.max_jobs`: Max number of concurrent runs to perform (-1 = no limit) (default: `-1`)
+- `launchConfig.queues`: List of queues to poll (default: `["default"]`)
+- `launchConfig.environment.type`: Cloud environment config (`aws` or `gcp`) (default: `local`)
+- `launchConfig.registry.type`: Container registry config (`ecr` or `gcr`) (default: `local`)
+- `launchConfig.builder.type`: Container build config (`kaniko` or `noop`) (default: `docker`)
+- `volcano`: Set to `false` to disable volcano install (default: `true`)
+- `gitCreds`: Contents of a git credentials file (optional)
+- `serviceAccount.annotations`: Annotations for the wandb service account (optional)
 
-You will likely want to modify the variable `agent.resources.limits.{cpu,mem}`, which default to `1000m`, and `1Gi` respectively.
-
-You can provide these values by modifying the contents of [`values.yaml`](values.yaml) or by passing them in as command line arguments to `helm install`, e.g.
-
-By default, this chart will also install [volcano](https://volcano.sh), but this can be disabled by setting `volcano=false`.
+You can modify the values directly in the `values.yaml` file or provide them as command line arguments when running `helm install`, for example:
 
 ```bash
-helm install <package-name> <launch-agent-chart-path> --set agent.apiKey=<your-api-key> --set-file launchConfig=<path-to-launch-config.yaml>
+helm install <package-name> <launch-agent-chart-path> --set agent.apiKey=<your-api-key>
 ```
 
-## Chart variables
+The table below describes all the available variables in the chart:
 
-Below is a table describing chart variables, their type, whether the user is required to provide a value, the default value, and a description of how the variable is used.
+| Variable                      | Type   | Required | Default                           | Description                                                                                                                                    |
+| ----------------------------- | ------ | -------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent.apiKey`                | string | **Yes**  | n/a                               | W&B API key to be used by the agent.                                                                                                            |
+| `agent.image`                 | string | No       | `wandb/launch-agent-dev:latest`   | Container image for the agent.                                                                                                                  |
+| `agent.imagePullPolicy`       | string | No       | `Always`                          | Pull policy for the agent container image.                                                                                                      |
+| `agent.resources`             | object | No       | Limit to 1 CPU, 1Gi RAM          | Pod spec resources block for the agent.                                                                                                         |
+| `namespace`                   | string | No       | `wandb-launch`                    | The namespace to deploy the agent into.                                                                                                         |
+| `launchConfig.base_url`       | string | **Yes**  | `https://api.wandb.ai`           | URL of your W&B server.                                                                                                                         |
+| `launchConfig.entity`         | string | **Yes**  | `"entity-name"`                   | W&B entity (user or team) name
 
-| Variables | Type | Required | Default | Description |
-|--------|-----|------|--|-------|
-| `agent.apiKey` | string | **Yes** | n/a | W&B API key to be used by the agent. |
-| `agent.Image` | string | No | `wandb/launch-agent-dev:latest` | Container image for the agent.
-| `agent.imagePullPolicy` | string | No | Always | Pull policy for the agent container image.
-| `agent.resources` | object | No | Limit to 1 CPU, 1Gi RAM. | [Pod spec resources block](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/) for the agent.
-| `launchConfig` | string | **Yes** | n/a | Launch agent configuration file contents. This config will be mounted at `/home/launch_agent/.config/wandb` in the agent container. For more details on how this config is structured, see [these docs](https://docs.wandb.ai/guides/launch/run-agent).
-| `gitCreds` | string | No | `null` | If set, the conents of this string will be stored in a k8s secret and then mounted in the agent container at `~/.git-credentials` and used to grant the agent permission to clone private repositories via https. For more information on what the contents of this file should look like, see the [official git documentation](https://git-scm.com/docs/git-credential-store#_storage_format).
-| `volcano` | bool | No | `true` | Controls whether the volcano scheduler should be installed in your cluster along with the agent. Set to `false` to disable volcano install.
+.                                                                                                                 |
+| `launchConfig.max_jobs`       | int    | **Yes**  | `-1`                              | Max number of concurrent runs to perform.                                                                                                       |
+| `launchConfig.queues`         | list   | **Yes**  | `["default"]`                     | List of queues to poll.                                                                                                                         |
+| `launchConfig.environment.type` | string | No      | `local`                           | Cloud environment config (`aws` or `gcp`).                                                                                                      |
+| `launchConfig.registry.type`   | string | No      | `local`                           | Container registry config (`ecr` or `gcr`).                                                                                                     |
+| `launchConfig.builder.type`    | string | No      | `docker`                          | Container build config (`kaniko` or `noop`).                                                                                                    |
+| `volcano`                     | bool   | No       | `true`                            | Controls whether the volcano scheduler should be installed in your cluster along with the agent. Set to `false` to disable volcano installation. |
+| `gitCreds`                    | string | No       | `null`                            | Contents of a git credentials file.                                                                                                             |
+| `serviceAccount.annotations`  | object | No       |                                   | Annotations for the wandb service account.                                                                                                      |
+
+Make sure to update the values according to your specific requirements.
