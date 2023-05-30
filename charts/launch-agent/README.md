@@ -14,6 +14,8 @@ To deploy an agent, you will need to specify the following values in [`values.ya
 - `launchConfig.queues`: List of queues to poll (default: `["default"]`)
 - `launchConfig.builder.type`: Container build config (`kaniko` or `noop`) (default: `docker`)
 
+You will likely want to modify the variable `agent.resources.limits.{cpu,mem}`, which default to `1000m`, and `1Gi` respectively.
+
 By default, this chart will also install [volcano](https://volcano.sh)
 - `volcano`: Set to `false` to disable volcano install (default: `true`)
 
@@ -29,7 +31,7 @@ Here is an example with a `values.yaml`
 helm upgrade --namespace=wandb --create-namespace --install wandb-launch wandb/launch-agent -f ./values.yaml --namespace=wandb-launch
 ```
 
-
+## Chart variables
 The table below describes all the available variables in the chart:
 
 | Variable                      | Type   | Required | Default                           | Description                                                                                                                                    |
