@@ -8,6 +8,25 @@ metadata:
     kubernetes.io/metadata.name: volcano-system
 ---
 apiVersion: v1
+kind: ResourceQuota
+metadata:
+  # annotations:
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+  name: volcano-quota
+  namespace: volcano-system
+spec:
+  hard:
+    pods: 1G
+  scopeSelector:
+    matchExpressions:
+    - operator: In
+      scopeName: PriorityClass
+      values:
+      - system-node-critical
+      - system-cluster-critical
+---
+apiVersion: v1
 kind: Namespace
 metadata:
   name: volcano-monitoring
@@ -8560,6 +8579,9 @@ rules:
   - apiGroups: ["scheduling.incubator.k8s.io", "scheduling.volcano.sh"]
     resources: ["podgroups", "queues", "queues/status"]
     verbs: ["get", "list", "watch", "create", "delete", "update"]
+  - apiGroups: ["flow.volcano.sh"]
+    resources: ["jobflows", "jobtemplates"]
+    verbs: ["get", "list", "watch", "create", "delete", "update"]
   - apiGroups: ["scheduling.k8s.io"]
     resources: ["priorityclasses"]
     verbs: ["get", "list", "watch", "create", "delete"]
@@ -8575,6 +8597,9 @@ rules:
   - apiGroups: ["batch"]
     resources: ["jobs"]
     verbs: ["get"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "create", "update", "watch"]
 ---
 # Source: volcano/templates/controllers.yaml
 kind: ClusterRoleBinding
@@ -8616,6 +8641,7 @@ spec:
             args:
               - --logtostderr
               - --enable-healthz=true
+              - --leader-elect=false
               - -v=4
               - 2>&1
             imagePullPolicy: Always
@@ -8717,6 +8743,9 @@ rules:
   - apiGroups: ["apps"]
     resources: ["daemonsets", "replicasets", "statefulsets"]
     verbs: ["list", "watch", "get"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "create", "update", "watch"]
 ---
 # Source: volcano/templates/scheduler.yaml
 kind: ClusterRoleBinding
@@ -8782,6 +8811,7 @@ spec:
             - --scheduler-conf=/volcano.scheduler/volcano-scheduler.conf
             - --enable-healthz=true
             - --enable-metrics=true
+            - --leader-elect=false
             - -v=3
             - 2>&1
           imagePullPolicy: Always
