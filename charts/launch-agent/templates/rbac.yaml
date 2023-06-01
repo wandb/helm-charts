@@ -53,18 +53,21 @@ roleRef:
   name: wandb-launch-agent
   apiGroup: rbac.authorization.k8s.io
 ...
+{{- $root := . -}}
+{{- range $ns := append .Values.additionalTargetNamespaces .Values.namespace }}
 ---
-# role binding to create ML jobs in another namespace (could use cluster role binding if we want to launch cluster wide)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: wandb-launch-cluster-role-binding
+  namespace: {{ $ns }}
 subjects:
   - kind: ServiceAccount
     name: wandb-launch-serviceaccount
-    namespace: {{ .Values.namespace }}
+    namespace: {{ $root.Values.namespace }}
 roleRef:
   kind: ClusterRole
   name: job-creator
   apiGroup: rbac.authorization.k8s.io
 ...
+{{- end }}
