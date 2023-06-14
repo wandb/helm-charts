@@ -42,9 +42,7 @@ The table below describes all the available variables in the chart:
 | `agent.resources`             | object | No       | Limit to 1 CPU, 1Gi RAM          | Pod spec resources block for the agent.                                                                                                         |
 | `namespace`                   | string | No       | `wandb-launch`                    | The namespace to deploy the agent into.                                                                                                         |
 | `launchConfig.base_url`       | string | **Yes**  | `https://api.wandb.ai`           | URL of your W&B server.                                                                                                                         |
-| `launchConfig.entity`         | string | **Yes**  | `"entity-name"`                   | W&B entity (user or team) name
-
-.                                                                                                                 |
+| `launchConfig.entity`         | string | **Yes**  | `"entity-name"`                   | W&B entity (user or team) name.                                                                                                                 |
 | `launchConfig.max_jobs`       | int    | **Yes**  | `-1`                              | Max number of concurrent runs to perform.                                                                                                       |
 | `launchConfig.queues`         | list   | **Yes**  | `["default"]`                     | List of queues to poll.                                                                                                                         |
 | `launchConfig.environment.type` | string | No      | `local`                           | Cloud environment config (`aws` or `gcp`).                                                                                                      |
@@ -53,5 +51,4 @@ The table below describes all the available variables in the chart:
 | `volcano`                     | bool   | No       | `true`                            | Controls whether the volcano scheduler should be installed in your cluster along with the agent. Set to `false` to disable volcano installation. |
 | `gitCreds`                    | string | No       | `null`                            | Contents of a git credentials file.                                                                                                             |
 | `serviceAccount.annotations`  | object | No       |                                   | Annotations for the wandb service account.                                                                                                      |
-
-Make sure to update the values according to your specific requirements.
+| `azureStorageAccessKey`       | string | No       | ""                                | Azure storage access key required for kaniko to acces build contexts in azure blob storage.                                                     |
