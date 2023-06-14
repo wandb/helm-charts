@@ -7,12 +7,7 @@ The launch agent is a Kubernetes Deployment that runs a container that connects 
 To deploy an agent, you will need to specify the following values in [`values.yaml`](values.yaml):
 
 - `agent.apiKey`: Your W&B API key
-- `agent.image`: The container image to use for the agent (default: `wandb/launch-agent-dev:latest`)
-- `namespace`: The namespace to deploy the agent into (default: `wandb-launch`)
-- `launchConfig.base_url`: URL of your W&B server (default: `https://api.wandb.ai`)
-- `launchConfig.entity`: W&B entity (user or team) name (default: `"entity-name"`)
-- `launchConfig.queues`: List of queues to poll (default: `["default"]`)
-- `launchConfig.builder.type`: Container build config (`kaniko` or `noop`) (default: `docker`)
+- `launchConfig`: The literal contents of a launch agent config file that will be used to configure the agent. See the [launch agent docs](https://docs.wandb.ai/guides/launch/run-agent) for more information.
 
 You will likely want to modify the variable `agent.resources.limits.{cpu,mem}`, which default to `1000m`, and `1Gi` respectively.
 
