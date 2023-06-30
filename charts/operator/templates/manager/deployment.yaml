@@ -4,7 +4,7 @@ metadata:
   labels:
     control-plane: controller-manager
   name: {{ include "name" . }}-controller-manager
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ .Values.namespace }}
 spec:
   replicas: 1
   selector:
@@ -17,9 +17,8 @@ spec:
         control-plane: controller-manager
     spec:
       securityContext:
-        runAsNonRoot: true
-          seccompProfile:
-            type: RuntimeDefault
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: manager
         command:
@@ -42,7 +41,7 @@ spec:
         - name: WANDB_MANAGER_CONSOLE_SERVICE_NAME
           value: {{ include "name" . }}-controller-manager-console-service
         - name: WANDB_MANAGER_CONSOLE_SERVICE_NAMESPACE
-          value: {{ .Release.Namespace }}
+          value: {{ .Values.namespace }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -56,10 +55,6 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.resources | nindent 10 }}
-        volumeMounts:
-        - mountPath: /tmp/k8s-webhook-server/serving-certs
-          name: cert
-          readOnly: true
       - args:
         - --secure-listen-address=0.0.0.0:8443
         - --upstream=http://127.0.0.1:8080/
