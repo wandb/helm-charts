@@ -6,7 +6,7 @@
 
 ```
 helm repo add wandb https://wandb.github.io/helm-charts
-helm upgrade --install wandb wandb/operator
+helm upgrade --install operator wandb/operator
 ```
 
 ## Install from source
@@ -14,5 +14,5 @@ helm upgrade --install wandb wandb/operator
 ```
 git clone https://github.com/wandb/helm-charts.git
 cd helm-charts
-helm upgrade --install wandb ./charts/operator
+helm upgrade --namespace=wandb --create-namespace --install operator .
 ```
