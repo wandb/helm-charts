@@ -2,6 +2,11 @@
 
 This chart deploys the W&B Launch Agent to your Kubernetes cluster.
 
+If you have not added `wandb` as a helm repo, please run: 
+```bash
+helm repo add wandb https://wandb.github.io/helm-charts
+```
+
 The launch agent is a Kubernetes Deployment that runs a container that connects to the W&B API and watches for new runs in one or more launch queues. When the agent pops a run off the queue(s), it will launch a Kubernetes Job to execute the run on the W&B user's behalf.
 
 To deploy an agent, you will need to specify the following values in [`values.yaml`](values.yaml):
