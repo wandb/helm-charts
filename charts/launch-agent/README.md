@@ -23,7 +23,7 @@ helm install <package-name> <launch-agent-chart-path> --set agent.apiKey=<your-a
 Here is an example with a `values.yaml`
 
 ```bash
-helm upgrade --namespace=wandb --create-namespace --install wandb-launch wandb/launch-agent -f ./values.yaml --namespace=wandb-launch
+helm upgrade --namespace=wandb --create-namespace --install wandb-launch wandb/launch-agent -f ./values.yaml
 ```
 
 ## Chart variables
