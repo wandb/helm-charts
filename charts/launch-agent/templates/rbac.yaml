@@ -4,11 +4,10 @@ kind: ServiceAccount
 metadata:
   name: wandb-launch-serviceaccount
   namespace: {{ .Values.namespace }}
-{{ if .Values.serviceAccount.annotations }}
+{{- if .Values.serviceAccount.annotations }}
   annotations:
-{{ toYaml .Values.serviceAccount.annotations | indent 4 }}
-{{ end }}
-...
+{{- toYaml .Values.serviceAccount.annotations | nindent 4 }}
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -53,8 +52,10 @@ roleRef:
   name: wandb-launch-agent
   apiGroup: rbac.authorization.k8s.io
 ...
+{{- define "unique.namespaces" }}
 {{- $root := . -}}
-{{- range $ns := append .Values.additionalTargetNamespaces .Values.namespace }}
+{{- $unique := uniq (append .Values.additionalTargetNamespaces .Values.namespace) }}
+{{- range $ns := $unique }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -71,3 +72,6 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ...
 {{- end }}
+{{- end }}
+
+{{ include "unique.namespaces" . }}
