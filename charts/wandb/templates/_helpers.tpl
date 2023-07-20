@@ -27,6 +27,10 @@ If release name contains chart name it will be used as a full name.
 {{- printf "%s-vol" (include "wandb.fullname" .) -}}
 {{- end }}
 
+{{- define "wandb.weave.volumeClaim" -}}
+{{- printf "%s-cache" (include "wandb.fullname" .) -}}
+{{- end }}
+
 {{- define "wandb.mysqlHost" -}}
 {{- printf "%s-mysql.%s.svc.cluster.local" (include "wandb.fullname" .) .Release.Namespace }}
 {{- end }}

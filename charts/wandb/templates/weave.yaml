@@ -1,0 +1,148 @@
+{{- if .Values.weave.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wandb.fullname" . }}-weave
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: weave
+spec:
+  replicas: {{ .Values.weave.replicas }}
+  selector:
+    matchLabels:
+      {{- include "wandb.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+      {{- with .Values.weave.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "wandb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: weave
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "wandb.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-weave
+          env:
+            - name: ONLY_SERVICE
+              value: weave
+            - name: WEAVE_SERVER_URL
+              value: {{ .Values.host | default "http://localhost:8080" }}
+            - name: WANDB_BASE_URL
+              value: http://{{ include "wandb.fullname" . }}:8080
+            - name: WEAVE_AUTH_GRAPHQL_URL
+              value: http://{{ include "wandb.fullname" . }}:8080/graphql
+            - name: WANDB_HELM_CHART
+              value: {{ include "wandb.fullname" . }}:{{ .Chart.Version }}
+            - name: LICENSE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.fullname" . }}-secrets
+                  key: LICENSE
+            {{- if .Values.bucket }}
+            - name: BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.fullname" . }}-secrets
+                  key: BUCKET
+            - name: AWS_REGION
+              value: {{ .Values.bucketRegion | default .Release.Namespace }}
+            - name: AWS_S3_KMS_ID
+              value: {{ .Values.bucketKmsKeyArn }}
+            - name: BUCKET_QUEUE
+              value: {{ default "internal://" .Values.bucketQueue }}
+            {{- end }}
+            {{- if .Values.weave.extraEnv }}
+            {{- toYaml .Values.weave.extraEnv | nindent 12 }}
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 9994
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /__weave/hello
+              port: http
+            timeoutSeconds: 2
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /__weave/hello
+              port: http
+            timeoutSeconds: 2
+            failureThreshold: 5
+          startupProbe:
+            httpGet:
+              path: /__weave/hello
+              port: http
+            failureThreshold: 60
+            periodSeconds: 1
+          volumeMounts:
+          {{- if .Values.weave.nfs.enabled }}
+            - name: weave-cache
+              mountPath: /vol/cache
+          {{- end }}
+          {{- range $index, $v := .Values.customCACerts }}
+            - name: wandb-ca-certs
+              mountPath: /usr/local/share/ca-certificates/customCA{{$index}}.crt
+              subPath: customCA{{$index}}.crt
+          {{- end }}
+          resources:
+            {{- toYaml .Values.weave.resources | nindent 12 }}
+      hostAliases:
+      {{- with .Values.hostAliases }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.weave.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.weave.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.weave.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      {{ if .Values.weave.nfs.enabled }}
+        - name: weave-cache
+          persistentVolumeClaim:
+            claimName: {{ .Values.weave.existingClaim | default (include "wandb.weave.volumeClaim" .) }}
+      {{- end }}
+      {{- if .Values.customCACerts }}
+        - name: wandb-ca-certs
+          configMap:
+            name: {{ include "wandb.fullname" . }}-ca-certs
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "wandb.fullname" . }}-weave
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: weave
+spec:
+  type: {{ .Values.weave.service.type }}
+  ports:
+    - port: {{ .Values.weave.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "wandb.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: weave
+{{- end }}
