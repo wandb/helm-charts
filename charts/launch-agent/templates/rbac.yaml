@@ -1,13 +1,18 @@
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: wandb-launch-serviceaccount
-  namespace: wandb
+  namespace: {{ .Values.namespace }}
+{{- if .Values.serviceAccount.annotations }}
+  annotations:
+{{- toYaml .Values.serviceAccount.annotations | nindent 4 }}
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  namespace: wandb
+  namespace: {{ .Values.namespace }}
   name: wandb-launch-agent
 rules:
   - apiGroups: [""]
@@ -16,6 +21,7 @@ rules:
   - apiGroups: ["batch"]
     resources: ["jobs", "jobs/status"]
     verbs: ["create", "get", "watch", "list", "update", "delete", "patch"]
+...
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -36,26 +42,36 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: wandb-launch-role-binding
-  namespace: wandb
+  namespace: {{ .Values.namespace }}
 subjects:
   - kind: ServiceAccount
     name: wandb-launch-serviceaccount
-    namespace: wandb
+    namespace: {{ .Values.namespace }}
 roleRef:
   kind: Role
   name: wandb-launch-agent
   apiGroup: rbac.authorization.k8s.io
+...
+{{- define "unique.namespaces" }}
+{{- $root := . -}}
+{{- $unique := uniq (append .Values.additionalTargetNamespaces .Values.namespace) }}
+{{- range $ns := $unique }}
 ---
-# role binding to create ML jobs in another namespace (could use cluster role binding if we want to launch cluster wide)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: wandb-launch-cluster-role-binding
+  namespace: {{ $ns }}
 subjects:
   - kind: ServiceAccount
     name: wandb-launch-serviceaccount
-    namespace: wandb
+    namespace: {{ $root.Values.namespace }}
 roleRef:
   kind: ClusterRole
   name: job-creator
   apiGroup: rbac.authorization.k8s.io
+...
+{{- end }}
+{{- end }}
+
+{{ include "unique.namespaces" . }}

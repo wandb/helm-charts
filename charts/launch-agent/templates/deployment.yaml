@@ -1,10 +1,15 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: launch-agent
-  namespace: wandb
+  namespace: {{ .Values.namespace }}
+  annotations:
+    checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: launch-agent
@@ -12,6 +17,9 @@ spec:
     metadata:
       labels:
         app: launch-agent
+{{- if .Values.agent.labels }}
+{{- toYaml .Values.agent.labels | trim | nindent 8 }}
+{{- end }}
     spec:
       serviceAccountName: wandb-launch-serviceaccount
       containers:
@@ -38,6 +46,13 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.serviceAccountName
+            - name: WANDB_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: wandb-launch-configmap
+                  key: wandb-base-url
+            - name: CM_CHECKSUM
+              value: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
           volumeMounts:
             - name: wandb-launch-config
               mountPath: /home/launch_agent/.config/wandb
@@ -62,3 +77,4 @@ spec:
           secret:
             secretName: git-config
         {{ end}}
+...
