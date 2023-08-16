@@ -1,0 +1,25 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mysql.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "mysql.labels" . | nindent 4 }}
+    {{- include "mysql.commonLabels" . | nindent 4 }}
+    {{- if .Values.service.labels -}}
+    {{-   toYaml .Values.service.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.service.annotations -}}
+    {{-   toYaml .Values.service.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ include "wandb.mysql.port" . }}
+      protocol: TCP
+      targetPort: mysql
+  selector:
+    {{- include "mysql.labels" . | nindent 4 }}
+{{- end }}

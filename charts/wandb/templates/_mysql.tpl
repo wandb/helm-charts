@@ -1,3 +1,9 @@
+{{/*
+Return name of secret where information is stored
+*/}}
+{{- define "wandb.mysql.passwordSecret" -}}
+{{- print .Release.Name "-mysql" -}}
+{{- end -}}
 
 {{/*
 Return the db port
@@ -28,16 +34,10 @@ Return the db user
 {{- end -}}
 
 {{/*
-Return the db password secret name
-
-TODO figure out why $name := include "wandb.fullname" $ doesnt work
+Return the db password
 */}}
-{{- define "wandb.mysql.password.secret" -}}
-{{- if (eq $.Values.global.mysql.auth.existingSecret "") -}}
-{{- printf "%s-%s" .Release.Name "mysql-passwords" -}}
-{{- else -}}
-{{- print $.Values.global.mysql.auth.existingSecret -}}
-{{- end -}}
+{{- define "wandb.mysql.password" -}}
+{{- print $.Values.global.mysql.auth.password -}}
 {{- end -}}
 
 

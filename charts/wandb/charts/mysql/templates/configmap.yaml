@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mysql.fullname" . }}-initdb
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "mysql.commonLabels" . | nindent 4 }}
+    {{- include "mysql.labels" . | nindent 4 }}
+data:
+  my.cnf: |
+    [mysqld]
+    binlog_format = 'ROW'
+    innodb_online_alter_log_max_size = 268435456
+    sync_binlog = 1
+    innodb_flush_log_at_trx_commit = 1
+    binlog_row_image = 'MINIMAL'
+    local-infile = 1
+    sort_buffer_size = 33554432
+  # We need RELOAD, SELECT, and LOCK TABLES for making backups
+  initdb.sql: |
+    GRANT SESSION_VARIABLES_ADMIN,RELOAD,SELECT,LOCK TABLES ON *.* TO `{{ include "wandb.mysql.user" . }}`@`%`;

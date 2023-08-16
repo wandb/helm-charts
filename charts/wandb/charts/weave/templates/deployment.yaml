@@ -3,11 +3,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "app.fullname" . }}
+  name: {{ include "weave.fullname" . }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "app.commonLabels" . | nindent 4 }}
-    {{- include "app.labels" . | nindent 4 }}
+    {{- include "weave.commonLabels" . | nindent 4 }}
+    {{- include "weave.labels" . | nindent 4 }}
     {{- if .Values.deployment.labels -}}
     {{-   toYaml .Values.deployment.labels | nindent 4 }}
     {{- end }}
@@ -21,14 +21,14 @@ spec:
   selector:
     matchLabels:
       {{- include "wandb.selectorLabels" $ | nindent 6 }}
-      {{- include "app.labels" . | nindent 6 }}
+      {{- include "weave.labels" . | nindent 6 }}
   template:
     metadata:
       labels:
         {{- include "wandb.podLabels" . | nindent 8 }}
-        {{- include "app.commonLabels" . | nindent 8 }}
-        {{- include "app.podLabels" . | nindent 8 }}
-        {{- include "app.labels" . | nindent 8 }}
+        {{- include "weave.commonLabels" . | nindent 8 }}
+        {{- include "weave.podLabels" . | nindent 8 }}
+        {{- include "weave.labels" . | nindent 8 }}
       annotations:
         {{- if .Values.pod.annotations -}}
         {{-   toYaml .Values.pod.annotations | nindent 4 }}
@@ -46,50 +46,35 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           ports:
             - name: http
-              containerPort: 8080
-              protocol: TCP
-            - name: prometheus
-              containerPort: 8181
+              containerPort: 9994
               protocol: TCP
           env:
-            {{- if .Values.extraCors }}
-            - name: GORILLA_CORS_ORIGINS
-              value: "{{ join "," .Values.extraCors }}"
-            {{- end }}
-            - name: MYSQL_PORT
-              value: "{{ include "wandb.mysql.port" . }}"
-            - name: MYSQL_HOST
-              value: "{{ include "wandb.mysql.host" . }}"
-            - name: MYSQL_DATABASE
-              value: "{{ include "wandb.mysql.database" . }}"
-            - name: MYSQL_USER
-              value: "{{ include "wandb.mysql.user" . }}"
-            - name: MYSQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "wandb.mysql.passwordSecret" . }}
-                  key:  MYSQL_PASSWORD
-            # - name: MYSQL
-            #   value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
-            - name: HOST
-              value: {{ .Values.host }}
-            - name: WEAVE_SERVICE
-              value: {{ .Release.Name }}-weave:9994
-            {{- include "app.extraEnv" (dict "global" .Values.global "local" .) | nindent 12 }}
+            - name: ONLY_SERVICE
+              value: weave
+            - name: WANDB_BASE_URL
+              value: {{ .Values.global.host }}
+            - name: WEAVE_LOG_FORMA
+              value: json
+            - name: WEAVE_AUTH_GRAPHQL_URL
+              value: {{ .Values.global.host }}/graphql
+            - name: WEAVE_SERVER_ENABLE_LOGGING
+              value: 'true'
+            {{- include "weave.extraEnv" (dict "global" .Values.global "local" .) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /__weave/hello
               port: http
           readinessProbe:
             httpGet:
-              path: /ready
+              path: /__weave/hello
               port: http
           startupProbe:
             httpGet:
-              path: /ready
+              path: /__weave/hello
               port: http
-            failureThreshold: 120
+            failureThreshold: 12
+            periodSeconds: 10
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

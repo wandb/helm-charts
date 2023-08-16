@@ -1,13 +1,16 @@
-{{- if and (eq .Values.mysql.install false) (eq $.Values.global.mysql.auth.existingSecret "") }}
-# Password was passed into the values.yaml as plain text.
+{{- $secretName := (include "wandb.mysql.passwordSecret" .)  }}
+{{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "wandb.fullname" . }}-mysql
+  name: {{ $secretName }}
   labels:
-    {{- include "wandb.labels" . | nindent 4}}
     {{- include "wandb.commonLabels" . | nindent 4 }}
-type: Opaque
 data:
-  mysql-password: {{ .Values.mysql.global.mysql.auth.password | b64enc | quote }}
+{{- if $secret }}
+  MYSQL_ROOT_PASSWORD: {{ $secret.data.MYSQL_ROOT_PASSWORD }}
+  MYSQL_PASSWORD: {{ default ($secret.data.MYSQL_PASSWORD) (include "wandb.mysql.password" . | b64enc) }}
+{{- else }}
+  MYSQL_ROOT_PASSWORD: {{ randAlphaNum 10 | b64enc }}
+  MYSQL_PASSWORD: {{ default (randAlphaNum 10) (include "wandb.mysql.password" .) | b64enc }}
 {{- end }}

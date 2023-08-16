@@ -1,0 +1,89 @@
+{{- if .Values.enabled }}
+{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mysql.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "mysql.commonLabels" . | nindent 4 }}
+    {{- include "mysql.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "wandb.selectorLabels" $ | nindent 6 }}
+      {{- include "mysql.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wandb.podLabels" . | nindent 8 }}
+        {{- include "mysql.commonLabels" . | nindent 8 }}
+        {{- include "mysql.podLabels" . | nindent 8 }}
+        {{- include "mysql.labels" . | nindent 8 }}
+    spec:
+      {{- if .tolerations }}
+      tolerations:
+        {{- toYaml .tolerations | nindent 8 }}
+      {{- end }}
+      {{- include "wandb.nodeSelector" . | nindent 6 }}
+      {{- include "wandb.priorityClassName" . | nindent 6 }}
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      containers:
+        - name: mysql
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+          - name: mysql
+            containerPort: 3306
+            protocol: TCP
+          env:
+            - name: MYSQL_PORT
+              value: "{{ include "wandb.mysql.port" . }}"
+            - name: MYSQL_HOST
+              value: "{{ include "wandb.mysql.host" . }}"
+            - name: MYSQL_DATABASE
+              value: "{{ include "wandb.mysql.database" . }}"
+            - name: MYSQL_USER
+              value: "{{ include "wandb.mysql.user" . }}"
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . }}
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . }}
+                  key: MYSQL_PASSWORD
+            {{- include "mysql.extraEnv" (dict "global" .Values.global "local" .) | nindent 12 }}
+            {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+          livenessProbe:
+            exec:
+              command:
+              - sh
+              - -c
+              - "mysqladmin ping -u root -p${MYSQL_ROOT_PASSWORD}"
+          readinessProbe:
+            exec:
+              command:
+              - sh
+              - -c
+              - "mysqladmin ping -u root -p${MYSQL_ROOT_PASSWORD}"
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+            - name: initdb
+              configMap:
+                name: {{ include "mysql.fullname" . }}-initdb
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: initdb
+          configMap:
+            name: {{ include "mysql.fullname" . }}-initdb
+        - name: data
+          configMap:
+            name: {{ include "mysql.fullname" . }}-data
+{{- end }}
