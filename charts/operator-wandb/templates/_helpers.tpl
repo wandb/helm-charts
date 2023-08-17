@@ -23,14 +23,6 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 {{- end }}
 
-{{- define "wandb.volumeClaim" -}}
-{{- printf "%s-vol" (include "wandb.fullname" .) -}}
-{{- end }}
-
-{{- define "wandb.mysqlHost" -}}
-{{- printf "%s-mysql.%s.svc.cluster.local" (include "wandb.fullname" .) .Release.Namespace }}
-{{- end }}
-
 {{/*
 Create chart name and version as used by the chart label.
 */}}
@@ -66,25 +58,5 @@ Create the name of the service account to use
 {{- default (include "wandb.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
-{{- end }}
-{{- end }}
-
-{{/*
-MySQL version guess
-*/}}
-{{- define "wandb.mysqlVersion" -}}
-{{- if or (eq .Values.mysql.image.tag "latest") (hasPrefix "8" .Values.mysql.image.tag) }}
-{{- default "8" .Values.mysql.version }}
-{{- else }}
-{{- default "5" .Values.mysql.version }}
-{{- end }}
-{{- end }}
-
-{{/*
-SQL configuration helpers, MySQL 8 needs session variable permissions
-*/}}
-{{- define "wandb.extraMysqlGrants" -}}
-{{- if eq (include "wandb.mysqlVersion" .) "8" }}
-{{- printf "SESSION_VARIABLES_ADMIN," -}}
 {{- end }}
 {{- end }}

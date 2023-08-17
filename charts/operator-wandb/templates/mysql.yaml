@@ -1,0 +1,16 @@
+{{- $secretName := (include "wandb.mysql.passwordSecret" .)  }}
+{{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+{{- if $secret }}
+  MYSQL_ROOT_PASSWORD: {{ $secret.data.MYSQL_ROOT_PASSWORD }}
+  MYSQL_PASSWORD: {{ default ($secret.data.MYSQL_PASSWORD) (include "wandb.mysql.password" . | b64enc) }}
+{{- else }}
+  MYSQL_ROOT_PASSWORD: {{ randAlphaNum 64 | b64enc }}
+  MYSQL_PASSWORD: {{ default (randAlphaNum 64) (include "wandb.mysql.password" .) | b64enc }}
+{{- end }}
