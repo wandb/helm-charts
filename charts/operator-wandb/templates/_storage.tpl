@@ -1,6 +1,6 @@
 {{- define "wandb.storageClass" -}}
-{{- if .Values.local.storageClass -}}
-{{-   .Values.local.storageClass -}}
+{{- if .Values.storageClass -}}
+{{-   .Values.storageClass -}}
 {{- else if .Values.global.storageClass -}}
 {{-   .Values.global.storageClass -}}
 {{- end -}}
