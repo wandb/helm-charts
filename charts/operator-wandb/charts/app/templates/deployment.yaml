@@ -1,0 +1,114 @@
+{{- if .Values.enabled }}
+{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "app.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "app.commonLabels" . | nindent 4 }}
+    {{- include "app.labels" . | nindent 4 }}
+    {{- if .Values.deployment.labels -}}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
+    {{- if .Values.deployment.annotations -}}
+    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "wandb.selectorLabels" $ | nindent 6 }}
+      {{- include "app.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wandb.podLabels" . | nindent 8 }}
+        {{- include "app.commonLabels" . | nindent 8 }}
+        {{- include "app.podLabels" . | nindent 8 }}
+        {{- include "app.labels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.pod.annotations -}}
+        {{-   toYaml .Values.pod.annotations | nindent 4 }}
+        {{- end }}
+    spec:
+      {{- if .tolerations }}
+      tolerations:
+        {{- toYaml .tolerations | nindent 8 }}
+      {{- end }}
+      {{- include "wandb.nodeSelector" . | nindent 6 }}
+      {{- include "wandb.priorityClassName" . | nindent 6 }}
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      initContainers:
+        - name: init-db
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          env:
+            - name: MYSQL_PORT
+              value: "{{ include "wandb.mysql.port" . }}"
+            - name: MYSQL_HOST
+              value: "{{ include "wandb.mysql.host" . }}"
+            - name: MYSQL_DATABASE
+              value: "{{ include "wandb.mysql.database" . }}"
+            - name: MYSQL_USER
+              value: "{{ include "wandb.mysql.user" . }}"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . }}
+                  key:  MYSQL_PASSWORD
+          command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+          env:
+            {{- if .Values.extraCors }}
+            - name: GORILLA_CORS_ORIGINS
+              value: "{{ join "," .Values.extraCors }}"
+            {{- end }}
+            - name: MYSQL_PORT
+              value: "{{ include "wandb.mysql.port" . }}"
+            - name: MYSQL_HOST
+              value: "{{ include "wandb.mysql.host" . }}"
+            - name: MYSQL_DATABASE
+              value: "{{ include "wandb.mysql.database" . }}"
+            - name: MYSQL_USER
+              value: "{{ include "wandb.mysql.user" . }}"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . }}
+                  key:  MYSQL_PASSWORD
+            # - name: MYSQL
+            #   value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+            - name: HOST
+              value: {{ .Values.host }}
+            - name: WEAVE_SERVICE
+              value: {{ .Release.Name }}-weave:9994
+            {{- include "app.extraEnv" (dict "global" .Values.global "local" .) | nindent 12 }}
+            {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            failureThreshold: 120
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}
