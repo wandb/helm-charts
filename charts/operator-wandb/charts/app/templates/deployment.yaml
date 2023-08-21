@@ -70,6 +70,9 @@ spec:
               containerPort: 8181
               protocol: TCP
           env:
+            - name: HOST
+              value: {{ .Values.host }}
+
             {{- if .Values.extraCors }}
             - name: GORILLA_CORS_ORIGINS
               value: "{{ join "," .Values.extraCors }}"
@@ -111,13 +114,22 @@ spec:
             - name: PARQUET_ENABLED
               value: "true"
 
+            - name: OIDC_SECRET
+              value: {{ .Values.global.oidc.secret }}
+            - name: OIDC_CLIENT_ID
+              value: {{ .Values.global.oidc.clientId }}
+            - name: OIDC_AUTH_METHOD
+              value: {{ .Values.global.oidc.authMethod }}
+            - name: OIDC_ISSUER
+              value: {{ .Values.global.oidc.issuer }}
 
-            - name: HOST
-              value: {{ .Values.host }}
             - name: BUCKET
               value: {{ .Values.global.storage.connectionString }}
             - name: AWS_REGION
               value: {{ .Values.global.storage.region }}
+            - name: AWS_S3_KMS_ID
+              value: "{{ .Values.global.storage.kmsKeyArn }}"
+
             - name: LOGGING_ENABLED
               value: 'true'
             {{- include "app.extraEnv" (dict "global" .Values.global "local" .) | nindent 12 }}
