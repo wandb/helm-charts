@@ -177,10 +177,12 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
-      {{- if or (not .Values.bucket) .Values.existingClaim }}
         - name: wandb-data
+      {{- if and (not .Values.bucket) .Values.existingClaim }}
           persistentVolumeClaim:
             claimName: {{ .Values.existingClaim | default (include "wandb.volumeClaim" .) }}
+      {{- else }}
+          emptyDir: {}
       {{- end }}
       {{- if .Values.customCACerts }}
         - name: wandb-ca-certs
@@ -188,7 +190,7 @@ spec:
             name: {{ include "wandb.fullname" . }}-ca-certs
       {{- end }}
 ---
-{{- if and (not .Values.bucket) (not .Values.existingClaim)  }}
+{{- if and (not .Values.bucket) .Values.existingClaim }}
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
