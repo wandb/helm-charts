@@ -62,6 +62,12 @@ spec:
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          volumeMounts:
+            {{- if ne (include "wandb.redis.caCert" .) "" }}
+            - name: {{ include "app.fullname" . }}-redis-ca
+              mountPath: /etc/ssl/certs/redis_ca.pem
+              subPath: redis_ca.pem
+            {{- end }}
           ports:
             - name: http
               containerPort: 8080
@@ -94,8 +100,6 @@ spec:
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
 
-            - name: REDIS_PORT
-              value: "{{ include "wandb.redis.port" . }}"
             {{- if ne (include "wandb.redis.password" .) "" }}
             - name: REDIS_PASSWORD
               valueFrom:
@@ -103,8 +107,12 @@ spec:
                   name: {{ include "wandb.redis.passwordSecret" . }}
                   key: REDIS_PASSWORD
             {{- end }}
+            - name: REDIS_PORT
+              value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
               value: "{{ include "wandb.redis.host" . }}"
+            - name: REDIS
+              value: "{{ include "app.redis" . | trim }}"
 
             - name: WEAVE_SERVICE
               value: {{ .Release.Name }}-weave:9994
@@ -125,6 +133,8 @@ spec:
 
             - name: BUCKET
               value: {{ .Values.global.storage.connectionString }}
+            - name: BUCKET_QUEUE
+              value: "internal://"
             - name: AWS_REGION
               value: {{ .Values.global.storage.region }}
             - name: AWS_S3_KMS_ID
@@ -150,4 +160,13 @@ spec:
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        {{- if ne (include "wandb.redis.caCert" .) "" }}
+        - name: {{ include "app.fullname" . }}-redis-ca
+          secret:
+            secretName: "{{ include "wandb.redis.passwordSecret" . }}"
+            items:
+              - key: REDIS_CA_CERT
+                path: redis_ca.pem
+        {{- end }}
 {{- end }}

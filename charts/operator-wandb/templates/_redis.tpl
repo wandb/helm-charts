@@ -43,8 +43,15 @@ Return the redis to url
 {{- define "wandb.redis.connectionString" -}}
 {{- $password := include "wandb.redis.password" . }}
 {{- if $password }}
-print "redis://:{{ $password }}@$(REDIS_HOST):$(REDIS_PORT)"
+redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)
 {{- else }}
-print "redis://$(REDIS_HOST):$(REDIS_PORT)"
+redis://$(REDIS_HOST):$(REDIS_PORT)
 {{- end }}
 {{- end }}
+
+{{/*
+Return the redis caCert
+*/}}
+{{- define "wandb.redis.caCert" -}}
+{{- print $.Values.global.redis.caCert -}}
+{{- end -}}
