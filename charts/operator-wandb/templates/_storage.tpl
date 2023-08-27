@@ -1,6 +1,6 @@
 {{- define "wandb.storageClass" -}}
-{{- if .Values.storageClass -}}
-{{-   if (ne .Values.storageClass "") -}}
+{{- if .Values.persistence.storageClass -}}
+{{-   if (ne .Values.persistence.storageClass "") -}}
 {{-     printf "storageClassName: %s" .Values.storageClass -}}
 {{-   end -}}
 {{- else if .Values.global.storageClass -}}
