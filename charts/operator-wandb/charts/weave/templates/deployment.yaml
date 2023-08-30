@@ -61,6 +61,8 @@ spec:
               value: /vol/weave/cache
             - name: WEAVE_AUTH_GRAPHQL_URL
               value: {{ .Values.global.host }}/graphql
+            - name: WEAVE_SERVER_NUM_WORKERS
+              value: "4"
 
             {{- include "weave.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
@@ -89,4 +91,30 @@ spec:
         - name: cache
           persistentVolumeClaim:
             claimName: {{ template "weave.fullname" . }}
+{{- end }}
+---
+{{- if eq .Values.persistence.accessMode "ReadWriteMany" }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name:  {{ include "weave.fullname" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "weave.commonLabels" . | nindent 4 }}
+    {{- include "weave.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "weave.fullname" . }}
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
 {{- end }}
