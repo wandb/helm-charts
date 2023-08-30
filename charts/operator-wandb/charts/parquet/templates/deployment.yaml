@@ -55,6 +55,31 @@ spec:
             - name: LOGGING_ENABLED
               value: 'true'
 
+            - name: MYSQL_PORT
+              value: "{{ include "wandb.mysql.port" . }}"
+            - name: MYSQL_HOST
+              value: "{{ include "wandb.mysql.host" . }}"
+            - name: MYSQL_DATABASE
+              value: "{{ include "wandb.mysql.database" . }}"
+            - name: MYSQL_USER
+              value: "{{ include "wandb.mysql.user" . }}"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . }}
+                  key:  MYSQL_PASSWORD
+            - name: MYSQL
+              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+
+            - name: BUCKET
+              value: "{{ include "parquet.bucket" . }}"
+            - name: BUCKET_QUEUE
+              value: "internal://"
+            - name: AWS_REGION
+              value: {{ .Values.global.bucket.region }}
+            - name: AWS_S3_KMS_ID
+              value: "{{ .Values.global.bucket.kmsKey }}"
+
             {{- include "parquet.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
 

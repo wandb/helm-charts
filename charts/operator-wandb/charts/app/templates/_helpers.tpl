@@ -111,16 +111,13 @@ app deployments.
 {{- end }}
 
 {{- define "app.bucket" -}}
-{{- if eq .Values.global.bucket.provider "azure" }}
+{{- if eq .Values.global.bucket.provider "az" }}
 {{- printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
 {{- end }}
-{{- if eq .Values.global.bucket.provider "google" }}
+{{- if eq .Values.global.bucket.provider "gcs" }}
 {{- printf "gs://%s" .Values.global.bucket.name -}}
 {{- end }}
 {{- if eq .Values.global.bucket.provider "s3" }}
-{{- printf "s3://%s" .Values.global.bucket.name -}}
-{{- end }}
-{{- if eq .Values.global.bucket.provider "aws" }}
 {{- printf "s3://%s" .Values.global.bucket.name -}}
 {{- end }}
 {{- end }}
