@@ -17,7 +17,7 @@ Return the db host
 */}}
 {{- define "wandb.redis.host" -}}
 {{- if eq .Values.global.redis.host "" -}}
-{{ printf "%s-%s" .Release.Name "redis" }}
+{{ printf "%s-%s" .Release.Name "redis-master" }}
 {{- else -}}
 {{ .Values.global.redis.host }}
 {{- end -}}
