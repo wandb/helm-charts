@@ -1,0 +1,86 @@
+{{- if .Values.enabled }}
+{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "node-exporter.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "node-exporter.commonLabels" . | nindent 4 }}
+    {{- include "node-exporter.labels" . | nindent 4 }}
+    {{- if .Values.deployment.labels -}}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
+    {{- if .Values.deployment.annotations -}}
+    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "wandb.selectorLabels" $ | nindent 6 }}
+      {{- include "node-exporter.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wandb.podLabels" . | nindent 8 }}
+        {{- include "node-exporter.commonLabels" . | nindent 8 }}
+        {{- include "node-exporter.podLabels" . | nindent 8 }}
+        {{- include "node-exporter.labels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.pod.annotations -}}
+        {{-   toYaml .Values.pod.annotations | nindent 4 }}
+        {{- end }}
+    spec:
+      {{- if .tolerations }}
+      tolerations:
+        {{- toYaml .tolerations | nindent 8 }}
+      {{- end }}
+      {{- include "wandb.nodeSelector" . | nindent 6 }}
+      {{- include "wandb.priorityClassName" . | nindent 6 }}
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          args:
+            - --path.sysfs=/host/sys
+            - --path.rootfs=/host/root
+            - --no-collector.wifi
+            - --no-collector.hwmon
+            - --collector.filesystem.ignored-mount-points=^/(dev|proc|sys|var/lib/docker/.+|var/lib/kubelet/pods/.+)($|/)
+            - --collector.netclass.ignored-devices=^(veth.*)$
+          ports:
+            - name: exporter
+              containerPort: 9100
+              protocol: TCP
+          env:
+            {{- include "node-exporter.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
+            {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: exporter
+          readinessProbe:
+            httpGet:
+              path: /
+              port: exporter
+          volumeMounts:
+            - mountPath: /host/sys
+              mountPropagation: HostToContainer
+              name: sys
+              readOnly: true
+            - mountPath: /host/root
+              mountPropagation: HostToContainer
+              name: root
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - hostPath:
+            path: /sys
+          name: sys
+        - hostPath:
+            path: /
+          name: root
+{{- end }}
