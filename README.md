@@ -48,7 +48,7 @@ helm upgrade --namespace=wandb --create-namespace --install wandb ./charts/wandb
 
 # Mounting SSL Certificates to the Deployment
 
-Important Note: W&B strongly recommends against using a self-signed certificate and would suggest getting a CA certificate that works best with all network configurations and doesn't need any extra work to setup.
+Important Note: W&B strongly cautions against using a self-signed certificate, and suggest you obtain a certificate from a CA that works best with all network configurations, and doesn't need any extra work to setup.
 
 To mount self-signed SSL certificates to your wandb deployment, follow these steps:
 
