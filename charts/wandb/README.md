@@ -30,9 +30,18 @@ recommended for use in production.
 
 ### Redis
 
-By default, the W&B Server chart includes an in-cluster Redis deployment that is
-provided by bitnami/Redis. This deployment is for trial purposes only and not
-recommended for use in production.
+By default, the W&B Server container includes an embeded Redis installation.
+Although supported, we don't recommend the use in production.
+For production, we comend set the `redis` configuration.
+
+Valid configuration for external Redis are:
+
+- `redis: "redis://<HOST>:<PORT>"`
+- `redis: "redis://<USER>:<PASSWORD>@<HOST>:<PORT>"`
+- `redis: "redis://<USER>:<PASSWORD>@<HOST>:<PORT>?tls=true"`
+
+Or via command line using `--set redis=<REDIS CONFIG>`
+
 
 ## Use extneral stateful data
 
