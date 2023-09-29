@@ -118,6 +118,10 @@ app deployments.
 {{- printf "gs://%s" .Values.global.bucket.name -}}
 {{- end }}
 {{- if eq .Values.global.bucket.provider "s3" }}
+{{- if and .Values.global.bucket.accessKey .Values.global.bucket.secretKey}}
+{{- printf "s3://%s:%s@%s" .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.name -}}
+{{- else }}
 {{- printf "s3://%s" .Values.global.bucket.name -}}
+{{- end }}
 {{- end }}
 {{- end }}
