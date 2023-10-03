@@ -121,6 +121,8 @@ spec:
               value: {{ "mysql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST)/$(DB)" }}
             - name: HOST
               value: {{ .Values.host | default "http://localhost:8080" }}
+            - name: REDIS
+              value: {{ .Values.redis | default "redis://127.0.0.1:6379" }}
             {{- if .Values.extraEnv }}
             {{- toYaml .Values.extraEnv | nindent 12 }}
             {{- end }}
@@ -177,10 +179,12 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
-      {{- if or (not .Values.bucket) .Values.existingClaim }}
         - name: wandb-data
+      {{- if and (not .Values.bucket) .Values.existingClaim }}
           persistentVolumeClaim:
             claimName: {{ .Values.existingClaim | default (include "wandb.volumeClaim" .) }}
+      {{- else }}
+          emptyDir: {}
       {{- end }}
       {{- if .Values.customCACerts }}
         - name: wandb-ca-certs
@@ -188,7 +192,7 @@ spec:
             name: {{ include "wandb.fullname" . }}-ca-certs
       {{- end }}
 ---
-{{- if and (not .Values.bucket) (not .Values.existingClaim)  }}
+{{- if and (not .Values.bucket) .Values.existingClaim }}
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:

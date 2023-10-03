@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "redis-exporter.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "redis-exporter.labels" . | nindent 4 }}
+    {{- include "redis-exporter.commonLabels" . | nindent 4 }}
+    {{- if .Values.service.labels -}}
+    {{-   toYaml .Values.service.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '9104'
+    {{- if .Values.service.annotations -}}
+    {{-   toYaml .Values.service.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: 9104
+      protocol: TCP
+      name: redis-exporter
+  selector:
+    {{- include "redis-exporter.labels" . | nindent 4 }}

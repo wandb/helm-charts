@@ -3,15 +3,10 @@
 This chart contains all the required components to get started and can scale to
 large deployments.
 
-> The default Helm chart configuration is not intended for production. The
-> default chart creates a proof of concept (PoC) implementation where all
-> Weights & Biases services are deployed in the cluster. For production
-> deployments, all stateful Weights & Biases components should be deployed
-> outside the Kubernetes cluster.
-
-For a production deployment, you should have strong working knowledge of
-Kubernetes. This method of deployment has different management, observability,
-and concepts than traditional deployments.
+The default Helm chart configuration is intended for PoCs and in cases where components cannot be provisioned outside of kubernetes.
+ 
+> For a production deployment, you should have strong working knowledge of Kubernetes. This method of deployment has different management, observability,
+> and administrative requirements than traditional deployments.
 
 The W&B Server Helm chart is made up of multiple subcharts, each of which can be
 installed separately.
@@ -35,9 +30,18 @@ recommended for use in production.
 
 ### Redis
 
-By default, the W&B Server chart includes an in-cluster Redis deployment that is
-provided by bitnami/Redis. This deployment is for trial purposes only and not
-recommended for use in production.
+By default, the W&B Server container includes an embeded Redis installation.
+Although supported, we don't recommend the use in production.
+For production, we comend set the `redis` configuration.
+
+Valid configuration for external Redis are:
+
+- `redis: "redis://<HOST>:<PORT>"`
+- `redis: "redis://<USER>:<PASSWORD>@<HOST>:<PORT>"`
+- `redis: "redis://<USER>:<PASSWORD>@<HOST>:<PORT>?tls=true"`
+
+Or via command line using `--set redis=<REDIS CONFIG>`
+
 
 ## Use extneral stateful data
 

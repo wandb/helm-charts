@@ -1,0 +1,56 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ template "weave.fullname" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "weave.commonLabels" . | nindent 4 }}
+    {{- include "weave.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.accessMode | quote }}
+  {{- if eq .Values.persistence.provider "" }}
+  {{ include "wandb.storageClass" . | nindent 4 }}
+  {{- else }}
+  storageClassName: {{ template "weave.fullname" . }}-cache-{{ .Values.persistence.provider }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size | quote }}
+---
+{{- if ne .Values.persistence.provider "" }}
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: {{ template "weave.fullname" . }}-cache-{{ .Values.persistence.provider }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "weave.commonLabels" . | nindent 4 }}
+    {{- include "weave.labels" . | nindent 4 }}
+{{- if eq .Values.persistence.provider "azurefile" }}
+provisioner: file.csi.azure.com
+allowVolumeExpansion: true
+mountOptions:
+ - dir_mode=0777
+ - file_mode=0777
+ - uid=0
+ - gid=0
+ - mfsymlinks
+ - cache=strict
+ - actimeo=30
+parameters:
+  skuName: Premium_LRS
+{{- else if eq .Values.persistence.provider "filestore" }}
+provisioner: filestore.csi.storage.gke.io
+allowVolumeExpansion: true
+parameters:
+  tier: BASIC_SSD
+  network: default
+mountOptions: 
+  - "strictatime"
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+{{- end }}
+{{- end }}
