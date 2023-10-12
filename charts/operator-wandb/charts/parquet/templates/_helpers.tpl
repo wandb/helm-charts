@@ -110,7 +110,7 @@ app deployments.
 {{- end }}
 {{- end -}}
 
-{{- define "app.bucket" -}}
+{{- define "parquet.bucket" -}}
 {{- if eq .Values.global.bucket.provider "az" }}
 {{- printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
 {{- end }}
