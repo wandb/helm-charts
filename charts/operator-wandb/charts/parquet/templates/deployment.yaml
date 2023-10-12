@@ -55,31 +55,19 @@ spec:
               containerPort: 8087
               protocol: TCP
           env:
+            - name: HOST
+              value: "{{ .Values.global.host }}"
+
+            {{- if .Values.extraCors }}
+            - name: GORILLA_CORS_ORIGINS
+              value: "{{ join "," .Values.extraCors }}"
+            {{- end }}
+
             - name: ONLY_SERVICE
               value: gorilla-parquet
 
             - name: LOGGING_ENABLED
               value: 'true'
-
-            {{- if ne (include "wandb.redis.password" .) "" }}
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "wandb.redis.passwordSecret" . }}
-                  key: REDIS_PASSWORD
-            {{- end }}
-            - name: REDIS_PORT
-              value: "{{ include "wandb.redis.port" . }}"
-            - name: REDIS_HOST
-              value: "{{ include "wandb.redis.host" . }}"
-            - name: REDIS
-              value: "{{ include "parquet.redis" . | trim }}"
-
-            - name: BUCKET
-              value: "{{ include "parquet.bucket" . }}"
-
-            - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-              value: "{{ include "parquet.redis" . | trim }}"
 
             - name: MYSQL_PORT
               value: "{{ include "wandb.mysql.port" . }}"
@@ -97,6 +85,42 @@ spec:
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
 
+            - name: WEAVE_SERVICE
+              value: "{{ .Release.Name }}-weave:9994"
+
+            {{- if ne (include "wandb.redis.password" .) "" }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.redis.passwordSecret" . }}
+                  key: REDIS_PASSWORD
+            {{- end }}
+            - name: REDIS_PORT
+              value: "{{ include "wandb.redis.port" . }}"
+            - name: REDIS_HOST
+              value: "{{ include "wandb.redis.host" . }}"
+            - name: REDIS
+              value: "{{ include "parquet.redis" . | trim }}"
+
+            - name: LICENSE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: LICENSE
+                  optional: true
+            - name: GORILLA_LICENSE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: LICENSE
+                  optional: true
+            - name: GORILLA_SETTINGS_CACHE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.fullname" . }}-config
+                  key: LICENSE
+                  optional: true
+
             - name: BUCKET
               value: "{{ include "parquet.bucket" . }}"
             - name: BUCKET_QUEUE
@@ -105,6 +129,12 @@ spec:
               value: {{ .Values.global.bucket.region }}
             - name: AWS_S3_KMS_ID
               value: "{{ .Values.global.bucket.kmsKey }}"
+            - name: AZURE_STORAGE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "wandb.bucket.secret" . }}"
+                  key: ACCESS_KEY
+                  optional: true
 
             {{- include "parquet.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
