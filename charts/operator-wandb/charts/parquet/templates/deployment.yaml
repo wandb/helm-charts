@@ -55,14 +55,6 @@ spec:
               containerPort: 8087
               protocol: TCP
           env:
-            - name: HOST
-              value: "{{ .Values.global.host }}"
-
-            {{- if .Values.extraCors }}
-            - name: GORILLA_CORS_ORIGINS
-              value: "{{ join "," .Values.extraCors }}"
-            {{- end }}
-
             - name: ONLY_SERVICE
               value: gorilla-parquet
 
@@ -85,9 +77,6 @@ spec:
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
 
-            - name: WEAVE_SERVICE
-              value: "{{ .Release.Name }}-weave:9994"
-
             {{- if ne (include "wandb.redis.password" .) "" }}
             - name: REDIS_PASSWORD
               valueFrom:
@@ -102,24 +91,8 @@ spec:
             - name: REDIS
               value: "{{ include "parquet.redis" . | trim }}"
 
-            - name: LICENSE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "app.fullname" . }}-config
-                  key: LICENSE
-                  optional: true
-            - name: GORILLA_LICENSE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "app.fullname" . }}-config
-                  key: LICENSE
-                  optional: true
             - name: GORILLA_SETTINGS_CACHE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "app.fullname" . }}-config
-                  key: LICENSE
-                  optional: true
+              value: "{{ include "parquet.redis" . | trim }}"
 
             - name: BUCKET
               value: "{{ include "parquet.bucket" . }}"
@@ -143,7 +116,7 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         {{- if ne (include "wandb.redis.caCert" .) "" }}
-        - name: {{ include "app.fullname" . }}-redis-ca
+        - name: {{ include "parquet.fullname" . }}-redis-ca
           secret:
             secretName: "{{ include "wandb.redis.passwordSecret" . }}"
             items:
