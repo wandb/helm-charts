@@ -112,16 +112,16 @@ app deployments.
 
 {{- define "app.bucket" -}}
 {{- if eq .Values.global.bucket.provider "az" }}
-{{- printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
+{{- trimSuffix "/" (printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path) -}}
 {{- end }}
 {{- if eq .Values.global.bucket.provider "gcs" }}
-{{- printf "gs://%s" .Values.global.bucket.name -}}
+{{- trimSuffix "/" (printf "gs://%s" .Values.global.bucket.name) -}}
 {{- end }}
 {{- if eq .Values.global.bucket.provider "s3" }}
 {{- if and .Values.global.bucket.accessKey .Values.global.bucket.secretKey}}
-{{- printf "s3://%s:%s@%s" .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.name -}}
+{{- trimSuffix "/" (printf "s3://%s:%s@%s/%s" .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.name .Values.global.bucket.path) -}}
 {{- else }}
-{{- printf "s3://%s" .Values.global.bucket.name -}}
+{{- trimSuffix "/" (printf "s3://%s/%s" .Values.global.bucket.name .Values.global.bucket.path) -}}
 {{- end }}
 {{- end }}
 {{- end }}
