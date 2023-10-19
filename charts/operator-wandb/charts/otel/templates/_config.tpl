@@ -63,6 +63,14 @@ processors:
         - "k8s.pod.name"
         - "k8s.pod.uid"
         - "k8s.pod.start_time"
+      annotations:
+        - tag_name: $$1
+          key_regex: (.*)
+          from: pod
+      labels:
+        - tag_name: $$1
+          key_regex: (.*)
+          from: pod
 {{- end }}
 
 {{- define "otel.service" -}}
