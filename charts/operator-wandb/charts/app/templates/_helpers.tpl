@@ -111,17 +111,19 @@ app deployments.
 {{- end }}
 
 {{- define "app.bucket" -}}
-{{- if eq .Values.global.bucket.provider "az" }}
-{{- printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
-{{- end }}
-{{- if eq .Values.global.bucket.provider "gcs" }}
-{{- printf "gs://%s" .Values.global.bucket.name -}}
-{{- end }}
-{{- if eq .Values.global.bucket.provider "s3" }}
-{{- if and .Values.global.bucket.accessKey .Values.global.bucket.secretKey}}
-{{- printf "s3://%s:%s@%s" .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.name -}}
-{{- else }}
-{{- printf "s3://%s" .Values.global.bucket.name -}}
-{{- end }}
-{{- end }}
-{{- end }}
+{{- $bucket := "" -}} 
+{{- if eq .Values.global.bucket.provider "az" -}}
+{{- $bucket = printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
+{{- end -}}
+{{- if eq .Values.global.bucket.provider "gcs" -}}
+{{- $bucket = printf "gs://%s" .Values.global.bucket.name -}}
+{{- end -}}
+{{- if eq .Values.global.bucket.provider "s3" -}}
+{{- if and .Values.global.bucket.accessKey .Values.global.bucket.secretKey -}}
+{{- $bucket = printf "s3://%s:%s@%s/%s" .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.name .Values.global.bucket.path -}}
+{{- else -}}
+{{- $bucket = printf "s3://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
+{{- end -}}
+{{- end -}}
+{{- trimSuffix "/" $bucket -}}
+{{- end -}}
