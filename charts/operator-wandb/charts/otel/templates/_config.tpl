@@ -3,6 +3,8 @@
 {{- $config := .Values.config }}
 {{- $config = mustMergeOverwrite (include "otel.hostMetricsReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.logsCollectionReceiver" . | fromYaml) $config }}
+{{- $config = mustMergeOverwrite (include "otel.kubeletMetricsReceiver" . | fromYaml) $config }}
+{{- $config = mustMergeOverwrite (include "otel.kubernetesEventReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.extensions" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.processors" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.service" . | fromYaml) $config }}
@@ -29,6 +31,31 @@ processors:
     check_interval: 5s
     limit_percentage: 80
     spike_limit_percentage: 25
+  k8sattributes:
+    filter:
+      node_from_env_var: NODE_NAME
+    passthrough: false
+    pod_association:
+    - sources:
+      - from: resource_attribute
+        name: k8s.pod.ip
+    - sources:
+      - from: resource_attribute
+        name: k8s.pod.uid
+    - sources:
+      - from: connection
+    extract:
+      metadata:
+        - "k8s.namespace.name"
+        - "k8s.deployment.name"
+        - "k8s.statefulset.name"
+        - "k8s.daemonset.name"
+        - "k8s.cronjob.name"
+        - "k8s.job.name"
+        - "k8s.node.name"
+        - "k8s.pod.name"
+        - "k8s.pod.uid"
+        - "k8s.pod.start_time"
 {{- end }}
 
 {{- define "otel.service" -}}
@@ -39,7 +66,7 @@ service:
   pipelines:
     metrics:
       exporters: [debug]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, batch, k8sattributes]
       receivers: [hostmetrics]
     logs:
       exporters: [debug]

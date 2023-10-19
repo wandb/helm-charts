@@ -134,3 +134,22 @@ receivers:
         from: attributes.log
         to: body
 {{- end }}
+
+{{- define "otel.kubeletMetricsReceiver" -}}
+receivers:
+  kubeletstats:
+    collection_interval: 20s
+    auth_type: "serviceAccount"
+    endpoint: "${env:NODE_NAME}:10250"
+{{- end }}
+
+{{- define "otel.kubernetesEventReceiver" -}}
+receivers:
+  k8sobjects:
+    objects:
+      - name: events
+        mode: "watch"
+        group: "events.k8s.io"
+        exclude_watch_type:
+          - "DELETED"
+{{- end }}
