@@ -140,7 +140,8 @@ receivers:
   kubeletstats:
     collection_interval: 20s
     auth_type: "serviceAccount"
-    endpoint: "${env:NODE_NAME}:10250"
+    endpoint: "https://${env:K8S_NODE_NAME}:10250"
+    insecure_skip_verify: true
 {{- end }}
 
 {{- define "otel.kubernetesEventReceiver" -}}
@@ -152,4 +153,10 @@ receivers:
         group: "events.k8s.io"
         exclude_watch_type:
           - "DELETED"
+{{- end }}
+
+{{- define "otel.kubernetesClusterReceiver" -}}
+receivers:
+  k8s_cluster:
+    collection_interval: 10s
 {{- end }}

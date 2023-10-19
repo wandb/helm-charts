@@ -5,6 +5,7 @@
 {{- $config = mustMergeOverwrite (include "otel.logsCollectionReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.kubeletMetricsReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.kubernetesEventReceiver" . | fromYaml) $config }}
+{{- $config = mustMergeOverwrite (include "otel.kubernetesClusterReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.extensions" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.processors" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.service" . | fromYaml) $config }}
@@ -33,7 +34,7 @@ processors:
     spike_limit_percentage: 25
   k8sattributes:
     filter:
-      node_from_env_var: NODE_NAME
+      node_from_env_var: K8S_NODE_NAME
     passthrough: false
     pod_association:
     - sources:
@@ -67,7 +68,7 @@ service:
     metrics:
       exporters: [debug]
       processors: [memory_limiter, batch, k8sattributes]
-      receivers: [hostmetrics]
+      receivers: [hostmetrics, k8s_cluster, kubeletstats]
     logs:
       exporters: [debug]
       processors: [memory_limiter, batch]
