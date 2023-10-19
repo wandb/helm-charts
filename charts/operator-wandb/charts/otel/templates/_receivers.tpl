@@ -160,3 +160,21 @@ receivers:
   k8s_cluster:
     collection_interval: 10s
 {{- end }}
+
+{{- define "otel.sqlQueryReceiver" -}}
+receivers:
+  sqlquery:
+    driver: mysql
+    datasource: ${env:MYSQL_USER}:${env:MYSQL_PASSWORD}@tcp(${env:MYSQL_HOST}:${env:MYSQL_PORT})/${env:MYSQL_DATABASE}?tls=true
+    queries:
+      - sql: "select count(*) as count from users where account_type != 'service'"
+        metrics:
+          - metric_name: users.count
+            value_column: "count"
+{{- end }}
+
+{{- define "otel.statsdAppReceiver" -}}
+receivers:
+  statsd:
+    endpoint: {{ $.Release.Name }}-app:8125
+{{- end }}

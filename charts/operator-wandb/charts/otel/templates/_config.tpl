@@ -6,6 +6,8 @@
 {{- $config = mustMergeOverwrite (include "otel.kubeletMetricsReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.kubernetesEventReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.kubernetesClusterReceiver" . | fromYaml) $config }}
+{{- $config = mustMergeOverwrite (include "otel.sqlQueryReceiver" . | fromYaml) $config }}
+{{- $config = mustMergeOverwrite (include "otel.statsdAppReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.extensions" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.processors" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.service" . | fromYaml) $config }}
@@ -16,6 +18,10 @@
 {{- define "otel.exporter" -}}
 exporters:
   debug: {}
+  debug/detailed:
+    verbosity: detailed
+  prometheus:
+    endpoint: 0.0.0.0:9109
 {{- end }}
 
 {{- define "otel.extensions" -}}
@@ -66,9 +72,9 @@ service:
   - memory_ballast
   pipelines:
     metrics:
-      exporters: [debug]
+      exporters: [debug, prometheus]
       processors: [memory_limiter, batch, k8sattributes]
-      receivers: [hostmetrics, k8s_cluster, kubeletstats]
+      receivers: [hostmetrics, k8s_cluster, kubeletstats, sqlquery]
     logs:
       exporters: [debug]
       processors: [memory_limiter, batch]
