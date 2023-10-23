@@ -34,7 +34,7 @@ spec:
         {{-   toYaml .Values.pod.annotations | nindent 4 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "app.fullname" . }}
+      serviceAccountName: {{ include "app.serviceAccountName" . }}
       {{- if .tolerations }}
       tolerations:
         {{- toYaml .tolerations | nindent 8 }}
@@ -76,6 +76,9 @@ spec:
             - name: prometheus
               containerPort: 8181
               protocol: TCP
+            - name: gorilla-statsd
+              containerPort: 8125
+              protocol: TCP
           env:
             - name: HOST
               value: "{{ .Values.global.host }}"
@@ -101,6 +104,13 @@ spec:
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
 
+            - name: WEAVE_SERVICE
+              value: "{{ .Release.Name }}-weave:9994"
+            - name: PARQUET_HOST
+              value: "http://{{ .Release.Name }}-parquet:8087"
+            - name: PARQUET_ENABLED
+              value: "true"
+
             {{- if ne (include "wandb.redis.password" .) "" }}
             - name: REDIS_PASSWORD
               valueFrom:
@@ -114,14 +124,6 @@ spec:
               value: "{{ include "wandb.redis.host" . }}"
             - name: REDIS
               value: "{{ include "app.redis" . | trim }}"
-
-            - name: WEAVE_SERVICE
-              value: "{{ .Release.Name }}-weave:9994"
-
-            - name: PARQUET_HOST
-              value: "http://{{ .Release.Name }}-parquet:8087"
-            - name: PARQUET_ENABLED
-              value: "true"
 
             - name: SLACK_CLIENT_ID
               value: {{ .Values.global.slack.clientId }}
@@ -154,6 +156,11 @@ spec:
 
             - name: GORILLA_SESSION_LENGTH
               value: "{{ .Values.global.auth.sessionLengthHours }}h"
+            
+            - name: GORILLA_STATSD_PORT
+              value: "8125"
+            - name: GORILLA_STATSD_HOST
+              value: "0.0.0.0"
 
             - name: BUCKET
               value: "{{ include "app.bucket" . }}"
