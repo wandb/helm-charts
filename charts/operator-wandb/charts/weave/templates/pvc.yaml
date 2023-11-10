@@ -10,16 +10,19 @@ metadata:
 spec:
   accessModes:
     - {{ .Values.persistence.accessMode | quote }}
-  {{- if eq .Values.persistence.provider "" }}
+  {{- if or (eq .Values.persistence.provider "") (eq .Values.persistence.enabled "onprem") }}
   {{ include "wandb.storageClass" . | nindent 4 }}
   {{- else }}
   storageClassName: {{ template "weave.fullname" . }}-cache-{{ .Values.persistence.provider }}
+  {{- end }}
+  {{- if eq .Values.persistence.enabled "onprem" }}
+  volumeMode: Filesystem
   {{- end }}
   resources:
     requests:
       storage: {{ .Values.persistence.size | quote }}
 ---
-{{- if ne .Values.persistence.provider "" }}
+{{- if or (ne .Values.persistence.provider "") (ne .Values.persistence.enabled "onprem") }}
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
@@ -54,3 +57,20 @@ reclaimPolicy: Delete
 volumeBindingMode: WaitForFirstConsumer
 {{- end }}
 {{- end }}
+
+
+
+
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rbd-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: csi-rbd-sc
