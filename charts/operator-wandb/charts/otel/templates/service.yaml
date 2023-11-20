@@ -1,29 +1,26 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "app.fullname" . }}
+  name: {{ include "otel.fullname" . }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "app.labels" . | nindent 4 }}
-    {{- include "app.commonLabels" . | nindent 4 }}
+    {{- include "otel.labels" . | nindent 4 }}
+    {{- include "otel.commonLabels" . | nindent 4 }}
     {{- if .Values.service.labels -}}
     {{-   toYaml .Values.service.labels | nindent 4 }}
     {{- end }}
   annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '9109'
     {{- if .Values.service.annotations -}}
     {{-   toYaml .Values.service.annotations | nindent 4 }}
     {{- end }}
 spec:
   type: {{ .Values.service.type }}
   ports:
-    - port: 8080
+    - port: 9109
       protocol: TCP
-      name: app
-    - port: 8181
-      protocol: TCP
-      name: prometheus
-    - port: 8125
-      protocol: UDP
-      name: gorilla-statsd
+      name: otel-exporter
   selector:
-    {{- include "app.labels" . | nindent 4 }}
+    {{- include "otel.labels" . | nindent 4 }}

@@ -1,0 +1,54 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "otel.fullname" . }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "otel.commonLabels" . | nindent 4 }}
+    {{- include "otel.labels" . | nindent 4 }}
+    {{- if .Values.clusterRole.labels -}}
+    {{-   toYaml .Values.clusterRole.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.clusterRole.annotations -}}
+    {{-   toYaml .Values.clusterRole.annotations | nindent 4 }}
+    {{- end }}
+rules:
+  # kubernetesAttributes
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+
+  # clusterMetrics
+  - apiGroups: [""]
+    resources: ["events", "namespaces", "namespaces/status", "nodes", "nodes/spec", "pods", "pods/status", "replicationcontrollers", "replicationcontrollers/status", "resourcequotas", "services" ]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets", "deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources: ["daemonsets", "deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+
+  # kubeletMetrics
+  - apiGroups: [""]
+    resources: ["nodes/stats"]
+    verbs: ["get", "watch", "list"]
+
+  # kubernetesEvents
+  - apiGroups: ["events.k8s.io"]
+    resources: ["events"]
+    verbs: ["watch", "list"]

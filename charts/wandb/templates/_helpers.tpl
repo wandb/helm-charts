@@ -88,3 +88,15 @@ SQL configuration helpers, MySQL 8 needs session variable permissions
 {{- printf "SESSION_VARIABLES_ADMIN," -}}
 {{- end }}
 {{- end }}
+
+
+{{/*
+Secrets Manager Role and Binding
+*/}}
+{{- define "wandb.secretManagerRoleName" -}}
+{{- printf "%s-secret-manager-role" (include "wandb.fullname" .) -}}
+{{- end -}}
+
+{{- define "wandb.secretManagerRoleBindingName" -}}
+{{- printf "%s-secret-manager-binding" (include "wandb.fullname" .) -}}
+{{- end -}}
