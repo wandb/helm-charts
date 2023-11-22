@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: launch-agent
+  name: launch-agent-{{ .Release.Name }}
   namespace: {{ .Values.namespace }}
   annotations:
     checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
@@ -12,16 +12,16 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: launch-agent
+      app: launch-agent-{{ .Release.Name }}
   template:
     metadata:
       labels:
-        app: launch-agent
+        app: launch-agent-{{ .Release.Name }}
 {{- if .Values.agent.labels }}
 {{- toYaml .Values.agent.labels | trim | nindent 8 }}
 {{- end }}
     spec:
-      serviceAccountName: wandb-launch-serviceaccount
+      serviceAccountName: wandb-launch-serviceaccount-{{ .Release.Name }}
       containers:
         - name: launch-agent
           image: {{ .Values.agent.image }}
@@ -40,7 +40,7 @@ spec:
             - name: WANDB_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: wandb-api-key
+                  name: wandb-api-key-{{ .Release.Name }}
                   key: password
             - name: WANDB_LAUNCH_SERVICE_ACCOUNT_NAME
               valueFrom:
@@ -49,7 +49,7 @@ spec:
             - name: WANDB_BASE_URL
               valueFrom:
                 configMapKeyRef:
-                  name: wandb-launch-configmap
+                  name: wandb-launch-configmap-{{ .Release.Name }}
                   key: wandb-base-url
             - name: CM_CHECKSUM
               value: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
@@ -70,7 +70,7 @@ spec:
       volumes:
         - name: wandb-launch-config
           configMap:
-            name: wandb-launch-configmap
+            name: wandb-launch-configmap-{{ .Release.Name }}
         {{ if .Values.gitCreds}}
         - name: git-creds
           secret:
