@@ -3,6 +3,18 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: {{ include "cron.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "parquet.commonLabels" . | nindent 4 }}
+    {{- include "parquet.labels" . | nindent 4 }}
+    {{- if .Values.deployment.labels -}}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
+    {{- if .Values.deployment.annotations -}}
+    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- end }}
 spec:
   schedule: "{{ .Values.backfillSchedule }}"
   concurrencyPolicy: {{ .Values.concurrencyPolicy }}
