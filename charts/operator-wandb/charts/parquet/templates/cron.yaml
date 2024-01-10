@@ -7,13 +7,13 @@ metadata:
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "parquet.commonLabels" . | nindent 4 }}
     {{- include "parquet.labels" . | nindent 4 }}
-    {{- if .Values.deployment.labels -}}
-    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- if .Values.cronjob.labels -}} # TODO CronJob labels
+    {{-   toYaml .Values.cronjob.labels | nindent 4 }}
     {{- end }}
   annotations:
-    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
-    {{- if .Values.deployment.annotations -}}
-    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }} # TODO CronJob annotations
+    {{- if .Values.cronjob.annotations -}}
+    {{-   toYaml .Values.cronjob.annotations | nindent 4 }}
     {{- end }}
 spec:
   schedule: "{{ .Values.backfillSchedule }}"
@@ -21,7 +21,24 @@ spec:
   jobTemplate:
     spec:
       template:
+        metadata:
+          labels:
+            {{- include "wandb.podLabels" . | nindent 12 }}
+            {{- include "parquet.commonLabels" . | nindent 12 }}
+            {{- include "parquet.podLabels" . | nindent 12 }}
+            {{- include "parquet.labels" . | nindent 12 }}
+          annotations:
+            {{- if .Values.pod.annotations -}}
+            {{-   toYaml .Values.pod.annotations | nindent 4 }}
+            {{- end }}
         spec:
+          {{- if .tolerations }}
+          tolerations:
+            {{- toYaml .tolerations | nindent 12 }}
+          {{- end }}
+          {{- include "wandb.nodeSelector" . | nindent 10 }}
+          {{- include "wandb.priorityClassName" . | nindent 10 }}
+          {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 10 }}
           containers:
             - name: {{ include "cron.name" . }}
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -132,11 +149,7 @@ spec:
                     fieldRef:
                       fieldPath: metadata.namespace
 
-                {{- include "app.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 16 }}
+                {{- include "parquet.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 16 }}
                 {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 16 }}
           restartPolicy: Never
-# TODO: Env - Look at gorilla glue config
-# TODO: NodeSelectors
-# TODO: Labels
-# TODO: Annotations
 {{- end }}
