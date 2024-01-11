@@ -1,4 +1,5 @@
 {{- if .Values.backfillEnabled }}
+{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -7,11 +8,11 @@ metadata:
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "parquet.commonLabels" . | nindent 4 }}
     {{- include "parquet.labels" . | nindent 4 }}
-    {{- if .Values.cronjob.labels -}} # TODO CronJob labels
+    {{- if .Values.cronjob.labels -}}
     {{-   toYaml .Values.cronjob.labels | nindent 4 }}
     {{- end }}
   annotations:
-    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }} # TODO CronJob annotations
+    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
     {{- if .Values.cronjob.annotations -}}
     {{-   toYaml .Values.cronjob.annotations | nindent 4 }}
     {{- end }}
@@ -42,8 +43,12 @@ spec:
           containers:
             - name: {{ include "cron.name" . }}
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-              command: 
-                {{ toYaml .Values.backfillCommand | nindent 16 }}
+              command: [
+                "/sbin/my_init",
+                "--skip-runit",
+                "megabinary",
+                "glue",
+              ]
 
               env:
                 {{- if .Values.extraCors }}
@@ -51,8 +56,10 @@ spec:
                   value: "{{ join "," .Values.extraCors }}"
                 {{- end }}
 
-                - name: GORILLA_ONPREM
+                - name: GORILLA_GLUE_EXECUTE
                   value: "true"
+                - name: GORILLA_GLUE_EXECUTE_TASK_NAME
+                  value: "EXPORTHISTORYTOPARQUET"
 
                 - name: MYSQL_PORT
                   value: "{{ include "wandb.mysql.port" . }}"
