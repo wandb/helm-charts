@@ -3,7 +3,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "cron.fullname" . }}
+  name: {{ include "parquet.fullname" . }}-backfill
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "parquet.commonLabels" . | nindent 4 }}
@@ -12,7 +12,6 @@ metadata:
     {{-   toYaml .Values.cronjob.labels | nindent 4 }}
     {{- end }}
   annotations:
-    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
     {{- if .Values.cronjob.annotations -}}
     {{-   toYaml .Values.cronjob.annotations | nindent 4 }}
     {{- end }}
@@ -41,7 +40,7 @@ spec:
           {{- include "wandb.priorityClassName" . | nindent 10 }}
           {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 10 }}
           containers:
-            - name: {{ include "cron.name" . }}
+            - name: backfill-job
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
               command: [
                 "/sbin/my_init",
