@@ -123,24 +123,33 @@ spec:
               value: {{ .Values.host | default "http://localhost:8080" }}
             - name: REDIS
               value: {{ .Values.redis | default "redis://127.0.0.1:6379" }}
-            {{- if and .Values.ldap.enabled }}
+            {{- if .Values.ldap.enabled }}
+            - name: LOCAL_LDAP_LOGIN
+              value: "true"
             - name: LOCAL_LDAP_ADDRESS
-              value: {{ .Values.ldap.address }}
-            - name: LOCAL_LDAP_ATTRIBUTES
-              value: {{ .Values.ldap.attributes }}
+              value: {{ .Values.ldap.host }}
             - name: LOCAL_LDAP_BASE_DN
-              value: {{ .Values.ldap.baseDn }}
+              value: {{ .Values.ldap.baseDN }}
             - name: LOCAL_LDAP_BIND_DN
-              value: {{ .Values.ldap.bindDn }}
+              value: {{ .Values.ldap.bindDN }}
+            {{- if .Values.createSecrets }}
             - name: LOCAL_LDAP_BIND_PW
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.fullname" . }}-secrets
                   key: LOCAL_LDAP_BIND_PW
-            - name: LOCAL_LDAP_LOGIN
-              value: {{ .Values.ldap.login }}
+            {{- else }}
+            - name: LOCAL_LDAP_BIND_PW
+              value: {{ .Values.ldap.bindPW }}
+            {{- end }}
+            - name: LOCAL_LDAP_ATTRIBUTES
+              value: {{ .Values.ldap.attributes }}
+            {{- if .Values.ldap.tls }}
             - name: LOCAL_LDAP_TLS_ENABLE
-              value: {{ .Values.ldap.tls }}
+              value: "true"
+            {{- end }}
+            - name: LOCAL_LDAP_GROUP_ALLOW_LIST
+              value: {{ .Values.ldap.groupAllowList }}
             {{- end }}
             {{- if .Values.extraEnv }}
             {{- toYaml .Values.extraEnv | nindent 12 }}
@@ -184,7 +193,7 @@ spec:
               mountPath: /var/run/secrets/wandb.ai/ldap/ca.crt
               subPath: ca.crt
               readOnly: true
-          {{- end }}
+          {{ end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       hostAliases:
