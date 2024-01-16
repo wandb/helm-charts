@@ -56,3 +56,29 @@ The following Terraform (IaC) options use this approach.
 
 For production-grade implementation, the appropriate chart parameters should be
 used to point to prebuilt, externalized state stores.
+
+### LDAP
+
+The LDAP TLS cert configuration requires a config map pre-created with the certificate content.
+
+To create the config map you can use the following command:
+
+```
+ kubectl -n wandb-helm create configmap ldap-tls-cert --from-file=certificate.crt
+```
+
+And use the config map in the `values.yaml` like the example below
+
+```
+ldap:
+  enabled: true
+  [...]
+  # Enable LDAP TLS
+  tls: true
+  # ConfigMap name and key with CA certificate for LDAP server
+  tlsCert:
+    configMap:
+      name: "ldap-tls-cert"
+      key: "certificate.crt"
+```
+
