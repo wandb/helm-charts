@@ -123,6 +123,34 @@ spec:
               value: {{ .Values.host | default "http://localhost:8080" }}
             - name: REDIS
               value: {{ .Values.redis | default "redis://127.0.0.1:6379" }}
+            {{- if .Values.ldap.enabled }}
+            - name: LOCAL_LDAP_LOGIN
+              value: "true"
+            - name: LOCAL_LDAP_ADDRESS
+              value: {{ .Values.ldap.host }}
+            - name: LOCAL_LDAP_BASE_DN
+              value: {{ .Values.ldap.baseDN }}
+            - name: LOCAL_LDAP_BIND_DN
+              value: {{ .Values.ldap.bindDN }}
+            {{- if .Values.createSecrets }}
+            - name: LOCAL_LDAP_BIND_PW
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.fullname" . }}-secrets
+                  key: LOCAL_LDAP_BIND_PW
+            {{- else }}
+            - name: LOCAL_LDAP_BIND_PW
+              value: {{ .Values.ldap.bindPW }}
+            {{- end }}
+            - name: LOCAL_LDAP_ATTRIBUTES
+              value: {{ .Values.ldap.attributes }}
+            {{- if .Values.ldap.tls }}
+            - name: LOCAL_LDAP_TLS_ENABLE
+              value: "true"
+            {{- end }}
+            - name: LOCAL_LDAP_GROUP_ALLOW_LIST
+              value: {{ .Values.ldap.groupAllowList }}
+            {{- end }}
             {{- if .Values.extraEnv }}
             {{- toYaml .Values.extraEnv | nindent 12 }}
             {{- end }}
@@ -160,6 +188,12 @@ spec:
               mountPath: /usr/local/share/ca-certificates/customCA{{$index}}.crt
               subPath: customCA{{$index}}.crt
           {{- end }}
+          {{- if and .Values.ldap.enabled .Values.ldap.tls }}
+            - name: ldap-tls-cert
+              mountPath: /var/run/secrets/wandb.ai/ldap/ca.crt
+              subPath: ca.crt
+              readOnly: true
+          {{ end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       hostAliases:
@@ -190,6 +224,14 @@ spec:
         - name: wandb-ca-certs
           configMap:
             name: {{ include "wandb.fullname" . }}-ca-certs
+      {{- end }}
+      {{- if and .Values.ldap.enabled .Values.ldap.tls }}
+        - name: ldap-tls-cert
+          configMap:
+            name: {{ .Values.ldap.tlsCert.configMap.name }}
+            items:
+              - key: {{ .Values.ldap.tlsCert.configMap.key }}
+                path: ca.crt
       {{- end }}
 ---
 {{- if and (not .Values.bucket) .Values.existingClaim }}
