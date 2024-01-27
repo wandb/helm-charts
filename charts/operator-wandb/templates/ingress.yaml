@@ -60,12 +60,13 @@ metadata:
     {{-   toYaml .Values.ingress.annotations | nindent 4 }}
     {{- end }}
 spec:
+  {{- $defaultHost := replace "https://" "" (replace "http://" "" .Values.global.host) }}
   ingressClassName: {{ .Values.ingress.class }}
 
   {{- if .Values.ingress.issuer.create }}
   {{- if ne .Values.ingress.issuer.provider "google" }}
   tls:
-    - host: [{{ replace "https://" "" (replace "http://" "" .Values.global.host) }}]
+    - host: [{{ $defaultHost }}]
       secretName: {{ .Release.Name }}-tls
   {{- end }}
   {{- else }}
@@ -73,7 +74,8 @@ spec:
   {{- end }}
 
   rules:
-  - host: {{ replace "https://" "" (replace "http://" "" .Values.global.host) }}
+  {{- range append .Values.ingress.additionalHosts (list $defaultHost) }}
+  - host: {{ . }}
     http:
       paths:
       - pathType: Prefix
@@ -96,3 +98,4 @@ spec:
             name: {{ .Release.Name }}-console
             port:
               number: 8082
+  {{- end }}
