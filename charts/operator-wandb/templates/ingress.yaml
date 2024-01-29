@@ -61,11 +61,12 @@ metadata:
     {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.class }}
+  {{- $defaultHost := include "defaultHost" . -}}
 
   {{- if .Values.ingress.issuer.create }}
   {{- if ne .Values.ingress.issuer.provider "google" }}
   tls:
-    - host: [{{ replace "https://" "" (replace "http://" "" .Values.global.host) }}]
+    - host: [{{ $defaultHost }}]
       secretName: {{ .Release.Name }}-tls
   {{- end }}
   {{- else }}
@@ -73,19 +74,20 @@ spec:
   {{- end }}
 
   rules:
-  - host: {{ replace "https://" "" (replace "http://" "" .Values.global.host) }}
+  {{- range concat (list $defaultHost) .Values.ingress.additionalHosts }}
+  - host: {{ . }}
     http:
       paths:
       - pathType: Prefix
         path: /
         backend:
           service:
-            {{- if eq .Values.ingress.defaultBackend "console" }}
-            name: {{ .Release.Name }}-console
+            {{- if eq $.Values.ingress.defaultBackend "console" }}
+            name: {{ $.Release.Name }}-console
             port:
               number: 8082
             {{- else }}
-            name: {{ .Release.Name }}-app
+            name: {{ $.Release.Name }}-app
             port: 
               number: 8080
             {{- end }}
@@ -93,6 +95,7 @@ spec:
         path: /console
         backend:
           service:
-            name: {{ .Release.Name }}-console
+            name: {{ $.Release.Name }}-console
             port:
               number: 8082
+  {{- end }}
