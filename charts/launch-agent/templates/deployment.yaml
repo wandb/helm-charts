@@ -6,6 +6,7 @@ metadata:
   namespace: {{ .Values.namespace }}
   annotations:
     checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    checksum/config: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
 spec:
   replicas: 1
   strategy:
@@ -57,6 +58,21 @@ spec:
               value: "{{ .Values.agent.startTimeout }}"
             - name: WANDB_RELEASE_NAME
               value: "{{ .Release.Name }}"
+            {{- if .Values.additionalEnvVars }}
+            {{- range .Values.additionalEnvVars }}
+            - name: {{ .name }}
+              value: {{ .value }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.additionalSecretEnvVars }}
+            {{- range .Values.additionalSecretEnvVars }}
+            - name: {{ .name }}
+              valueFrom:
+                secretKeyRef:
+                  name: launch-agent-secret-env-vars
+                  key: {{ .name }}
+            {{- end }}
+            {{- end }}
           volumeMounts:
             - name: wandb-launch-config
               mountPath: /home/launch_agent/.config/wandb
