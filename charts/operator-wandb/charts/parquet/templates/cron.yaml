@@ -1,0 +1,131 @@
+---
+{{- if .Values.cronJob.exportHistoryToParquet.enabled -}}
+{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "parquet.fullname" . }}-backfill
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "parquet.commonLabels" . | nindent 4 }}
+    {{- include "parquet.labels" . | nindent 4 }}
+    {{- if .Values.cronJob.labels -}}
+    {{-   toYaml .Values.cronJob.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.cronJob.annotations -}}
+    {{-   toYaml .Values.cronJob.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  schedule: "{{ .Values.cronJob.exportHistoryToParquet.schedule }}"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "wandb.podLabels" . | nindent 12 }}
+            {{- include "parquet.commonLabels" . | nindent 12 }}
+            {{- include "parquet.podLabels" . | nindent 12 }}
+            {{- include "parquet.labels" . | nindent 12 }}
+          annotations:
+            {{- if .Values.pod.annotations -}}
+            {{-   toYaml .Values.pod.annotations | nindent 4 }}
+            {{- end }}
+        spec:
+          {{- if .tolerations }}
+          tolerations:
+            {{- toYaml .tolerations | nindent 12 }}
+          {{- end }}
+          {{- include "wandb.nodeSelector" . | nindent 10 }}
+          {{- include "wandb.priorityClassName" . | nindent 10 }}
+          {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 10 }}
+          containers:
+            - name: backfill-job
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              command: [
+                "/sbin/my_init",
+                "--skip-runit",
+                "megabinary",
+                "glue",
+              ]
+
+              env:
+                - name: GORILLA_GLUE_EXECUTE
+                  value: "true"
+                - name: GORILLA_GLUE_EXECUTE_TASK_NAME
+                  value: "EXPORTHISTORYTOPARQUET"
+
+                - name: MYSQL_PORT
+                  value: "{{ include "wandb.mysql.port" . }}"
+                - name: MYSQL_HOST
+                  value: "{{ include "wandb.mysql.host" . }}"
+                - name: MYSQL_DATABASE
+                  value: "{{ include "wandb.mysql.database" . }}"
+                - name: MYSQL_USER
+                  value: "{{ include "wandb.mysql.user" . }}"
+                - name: MYSQL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "wandb.mysql.passwordSecret" . }}
+                      key:  MYSQL_PASSWORD
+                - name: MYSQL
+                  value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+
+                {{- if ne (include "wandb.redis.password" .) "" }}
+                - name: REDIS_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "wandb.redis.passwordSecret" . }}
+                      key: REDIS_PASSWORD
+                {{- end }}
+                - name: REDIS_PORT
+                  value: "{{ include "wandb.redis.port" . }}"
+                - name: REDIS_HOST
+                  value: "{{ include "wandb.redis.host" . }}"
+                - name: REDIS
+                  value: "{{ include "parquet.redis" . | trim }}"
+
+                - name: GORILLA_SETTINGS_CACHE
+                  value: "{{ include "parquet.redis" . | trim }}"
+
+                - name: WEAVE_SERVICE
+                  value: "{{ .Release.Name }}-weave:9994"
+                - name: PARQUET_HOST
+                  value: "http://{{ .Release.Name }}-parquet:8087"
+                - name: PARQUET_ENABLED
+                  value: "true"
+
+                {{- if and .Values.global .Values.global.observability }}
+                {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
+                - name: GORILLA_STATSD_PORT
+                  value: "8125"
+                - name: GORILLA_STATSD_HOST
+                  value: "0.0.0.0"
+                {{- end }}
+                {{- end }}
+
+                - name: OPERATOR_ENABLED
+                  value: 'true'
+
+                - name: LOGGING_ENABLED
+                  value: 'true'
+
+                - name: BUCKET
+                  value: "{{ include "parquet.bucket" . }}"
+                - name: AWS_REGION
+                  value: {{ .Values.global.bucket.region }}
+                - name: AWS_S3_KMS_ID
+                  value: "{{ .Values.global.bucket.kmsKey }}"
+
+                - name: AZURE_STORAGE_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: "{{ include "wandb.bucket.secret" . }}"
+                      key: ACCESS_KEY
+                      optional: true
+                
+                {{- include "parquet.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 16 }}
+                {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 16 }}
+          restartPolicy: Never
+{{- end }}
