@@ -6,7 +6,7 @@ metadata:
   namespace: {{ .Values.namespace }}
   annotations:
     checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-    checksum/config: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
 spec:
   replicas: 1
   strategy:
@@ -73,6 +73,10 @@ spec:
                   key: {{ .name }}
             {{- end }}
             {{- end }}
+            {{- if and .Values.customCABundle.configMap.name .Values.customCABundle.configMap.key }}
+            - name: REQUESTS_CA_BUNDLE
+              value: /usr/local/share/ca-certificates/custom-ca.crt
+            {{- end }}
           volumeMounts:
             - name: wandb-launch-config
               mountPath: /home/launch_agent/.config/wandb
@@ -83,6 +87,12 @@ spec:
               readOnly: true
             - name: git-config
               mountPath: /home/launch_agent/
+              readOnly: true
+            {{ end }}
+            {{- if and .Values.customCABundle.configMap.name .Values.customCABundle.configMap.key }}
+            - name: custom-cabundle
+              mountPath: /usr/local/share/ca-certificates/custom-ca.crt
+              subPath: custom-ca.crt
               readOnly: true
             {{ end }}
       volumes:
@@ -97,6 +107,14 @@ spec:
           secret:
             secretName: git-config
         {{ end}}
+        {{- if and .Values.customCABundle.configMap.name .Values.customCABundle.configMap.key }}
+        - name: custom-cabundle
+          configMap:
+            name: {{ .Values.customCABundle.configMap.name }}
+            items:
+              - key: {{ .Values.customCABundle.configMap.key }}
+                path: custom-ca.crt
+        {{- end}}
       nodeSelector:
         {{- toYaml .Values.agent.nodeSelector | nindent 8 }}
 ---
