@@ -1,0 +1,94 @@
+---
+{{- if .Values.clearCache.enabled -}}
+{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "weave.fullname" . }}-cache-clear
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "weave.commonLabels" . | nindent 4 }}
+    {{- include "weave.labels" . | nindent 4 }}
+    {{- if .Values.clearCache.labels -}}
+    {{-   toYaml .Values.clearCache.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.clearCache.annotations -}}
+    {{-   toYaml .Values.clearCache.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  schedule: "{{ .Values.clearCache.schedule }}"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "wandb.podLabels" . | nindent 12 }}
+            {{- include "weave.commonLabels" . | nindent 12 }}
+            {{- include "weave.podLabels" . | nindent 12 }}
+            {{- include "weave.labels" . | nindent 12 }}
+          annotations:
+            {{- if .Values.pod.annotations -}}
+            {{-   toYaml .Values.pod.annotations | nindent 4 }}
+            {{- end }}
+        spec:
+          {{- if .tolerations }}
+          tolerations:
+            {{- toYaml .tolerations | nindent 12 }}
+          {{- end }}
+          {{- include "wandb.nodeSelector" . | nindent 10 }}
+          {{- include "wandb.priorityClassName" . | nindent 10 }}
+          {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 10 }}
+          volumes:
+          - name: cache
+            persistentVolumeClaim:
+              claimName: {{ template "weave.fullname" . }}
+          containers:
+            - name: weave-cache-clear
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              command: ["python", "-c", "from weave import cache; cache.clear_cache()"]
+              volumeMounts:
+                - name: cache
+                  mountPath: /vol/weave/cache
+              env:
+                - name: WEAVE_SERVICE
+                  value: "{{ .Release.Name }}-weave:9994"
+                - name: WEAVE_LOCAL_ARTIFACT_DIR
+                  value: /vol/weave/cache
+                - name: WANDB_BASE_URL
+                  value: {{ .Values.global.host }}
+
+                {{- if and .Values.global .Values.global.observability }}
+                {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
+                - name: GORILLA_STATSD_PORT
+                  value: "8125"
+                - name: GORILLA_STATSD_HOST
+                  value: "0.0.0.0"
+                {{- end }}
+                {{- end }}
+
+                - name: OPERATOR_ENABLED
+                  value: 'true'
+
+                - name: LOGGING_ENABLED
+                  value: 'true'
+
+                - name: BUCKET
+                  value: "{{ include "parquet.bucket" . }}"
+                - name: AWS_REGION
+                  value: {{ .Values.global.bucket.region }}
+                - name: AWS_S3_KMS_ID
+                  value: "{{ .Values.global.bucket.kmsKey }}"
+
+                - name: AZURE_STORAGE_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: "{{ include "wandb.bucket.secret" . }}"
+                      key: ACCESS_KEY
+                      optional: true
+
+                {{- include "weave.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 16 }}
+                {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 16 }}
+          restartPolicy: Never
+{{- end }}
