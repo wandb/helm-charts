@@ -18,10 +18,8 @@ metadata:
     {{- end }}
 spec:
   replicas: 1
-  {{- if ne .Values.persistence.accessMode "ReadWriteMany" }}
   strategy:
     type: Recreate
-  {{- end }}
   selector:
     matchLabels:
       {{- include "wandb.selectorLabels" $ | nindent 6 }}
@@ -46,7 +44,7 @@ spec:
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: {{ include "weave.fullname" .  }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           ports:
             - name: http
@@ -89,13 +87,39 @@ spec:
           volumeMounts:
             - name: cache
               mountPath: /vol/weave/cache
+
+        - name: {{ include "weave.fullname" . }}-cache-clear
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command: ["python", "-c"]
+          args: 
+          - |
+            import time
+            from weave import cache
+            print("Starting clear cache job", flush=True)
+            while True:
+              curTime = time.strftime("%x, %X", time.localtime())
+              print("Clearing cache " + curTime, flush=True)
+              cache.clear_cache()
+              time.sleep({{ .Values.clearCache.hourInterval | default 2 }}*60*60)
+            
+          env:
+            - name: WEAVE_LOCAL_ARTIFACT_DIR
+              value: /vol/weave/cache
+
+            {{- include "weave.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
+            {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+
+          volumeMounts:
+            - name: cache
+              mountPath: /vol/weave/cache
+
       volumes:
         - name: cache
-          persistentVolumeClaim:
-            claimName: {{ template "weave.fullname" . }}
+          emptyDir: 
+            sizeLimit: {{ .Values.cache.size | default "5Gi" }}
+  
 {{- end }}
 ---
-{{- if eq .Values.persistence.accessMode "ReadWriteMany" }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -119,4 +143,3 @@ spec:
       target:
         type: Utilization
         averageUtilization: 70
-{{- end }}
