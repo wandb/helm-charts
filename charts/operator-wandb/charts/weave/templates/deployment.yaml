@@ -90,21 +90,13 @@ spec:
 
         - name: {{ include "weave.fullname" . }}-cache-clear
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          command: ["python", "-c"]
-          args: 
-          - |
-            import time
-            from weave import cache
-            print("Starting clear cache job", flush=True)
-            while True:
-              curTime = time.strftime("%x, %X", time.localtime())
-              print("Clearing cache " + curTime, flush=True)
-              cache.clear_cache()
-              time.sleep({{ .Values.clearCache.hourInterval | default 2 }}*60*60)
+          command: ["python", "-m", "weave.clear_cache"]
             
           env:
             - name: WEAVE_LOCAL_ARTIFACT_DIR
               value: /vol/weave/cache
+            - name: WEAVE_CACHE_CLEAR_INTERVAL
+              value: "{{ .Values.clearCache.hourInterval | default 2 }}"
 
             {{- include "weave.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
@@ -117,6 +109,7 @@ spec:
         - name: cache
           emptyDir: 
             sizeLimit: {{ .Values.cache.size | default "5Gi" }}
+            medium: {{ .Values.cache.medium | default "" }}
   
 {{- end }}
 ---
