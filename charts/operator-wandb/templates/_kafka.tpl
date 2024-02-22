@@ -10,34 +10,30 @@ Return the db host
 {{- end -}}
 
 {{/*
-Return the kafka sasl mechanism
+Return the kafka client username
 */}}
-{{- define "wandb.kafka.sasl.mechanism" -}}
-{{- if eq .Values.global.kafka.sasl.mechanism "" -}}
-{{ printf "PLAIN" }}
+{{- define "wandb.kafka.client.username" -}}
+{{- if eq .Values.global.kafka.client.username "" -}}
+{{ print "wandb" }}
 {{- else -}}
-{{ .Values.global.kafka.sasl.mechanism }}
+{{ .Values.global.kafka.client.username }}
 {{- end -}}
 {{- end -}}
 
 {{/*
-Return the kafka sasl username
+Return the kafka client password
 */}}
-{{- define "wandb.kafka.sasl.username" -}}
-{{- if eq .Values.global.kafka.sasl.username "" -}}
+{{- define "wandb.kafka.client.password" -}}
+{{- if eq .Values.global.kafka.client.password "" -}}
 {{ print "wandb" }}
 {{- else -}}
-{{ .Values.global.kafka.sasl.username }}
+{{ .Values.global.kafka.client.password }}
 {{- end -}}
 {{- end -}}
 
 {{/*
-Return the kafka sasl password
+Return name of secret where kafka information is stored
 */}}
-{{- define "wandb.kafka.sasl.password" -}}
-{{- if eq .Values.global.kafka.sasl.password "" -}}
-{{ print "wandb" }}
-{{- else -}}
-{{ .Values.global.kafka.sasl.password }}
-{{- end -}}
+{{- define "wandb.kafka.client.passwordSecret" -}}
+{{- print .Release.Name "-kafka" -}}
 {{- end -}}
