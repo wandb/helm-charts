@@ -13,7 +13,7 @@ Return the redis port
 {{- end -}}
 
 {{/*
-Return the db host
+Return the redis host
 */}}
 {{- define "wandb.redis.host" -}}
 {{- if eq .Values.global.redis.host "" -}}
