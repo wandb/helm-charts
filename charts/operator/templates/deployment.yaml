@@ -42,6 +42,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.serviceAccountName
+        - name: LOCAL_RELEASE
+          value: {{ .Values.localRelease | quote }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -55,6 +57,9 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.resources | nindent 10 }}
+        volumeMounts:
+        - name: wandb-chart-configmap
+          mountPath: /wandb-chart
       - args:
         - --secure-listen-address=0.0.0.0:8443
         - --upstream=http://127.0.0.1:8080/
@@ -66,5 +71,9 @@ spec:
         - containerPort: 8443
           name: https
           protocol: TCP
+      volumes:
+      - name: wandb-chart-configmap
+        configMap:
+          name: wandb-chart-configmap
       serviceAccountName: {{ include "manager.serviceAccount.name" . }}
       terminationGracePeriodSeconds: 10
