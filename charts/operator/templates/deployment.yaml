@@ -57,9 +57,11 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.resources | nindent 10 }}
+        {{- if ne .Values.chartPath "" }}
         volumeMounts:
         - name: wandb-chart-configmap
           mountPath: /wandb-chart
+        {{- end }}
       - args:
         - --secure-listen-address=0.0.0.0:8443
         - --upstream=http://127.0.0.1:8080/
@@ -71,9 +73,11 @@ spec:
         - containerPort: 8443
           name: https
           protocol: TCP
+      {{- if ne .Values.chartPath "" }}
       volumes:
       - name: wandb-chart-configmap
         configMap:
           name: wandb-chart-configmap
+      {{- end }}
       serviceAccountName: {{ include "manager.serviceAccount.name" . }}
       terminationGracePeriodSeconds: 10
