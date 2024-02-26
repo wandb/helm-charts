@@ -23,6 +23,19 @@ spec:
 {{- end }}
     spec:
       serviceAccountName: wandb-launch-serviceaccount-{{ .Release.Name }}
+      {{- if .Values.kanikoPvcName }}
+      initContainers:
+      - name: kaniko_chown
+        image: {{ .Values.agent.image }}
+        command: ["sh", "-c"]
+        args:
+        - chown -R 1000:1000 /home/launch_agent/kaniko
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+          - name: kaniko-pvc
+            mountPath: /home/launch_agent/kaniko
+      {{- end }}
       containers:
         - name: launch-agent
           image: {{ .Values.agent.image }}
@@ -77,6 +90,16 @@ spec:
             - name: REQUESTS_CA_BUNDLE
               value: /usr/local/share/ca-certificates/custom-ca.crt
             {{- end }}
+            {{- if .Values.kanikoPvcName }}
+            - name: WANDB_LAUNCH_KANIKO_PVC_NAME
+              value: {{ .Values.kanikoPvcName }}
+            - name: WANDB_LAUNCH_KANIKO_PVC_MOUNT_PATH
+              value: /home/launch_agent/kaniko
+            {{- end }}
+            {{- if .Values.kanikoDockerConfigSecret }}
+            - name: WANDB_LAUNCH_KANIKO_AUTH_SECRET
+              value: {{ .Values.kanikoDockerConfigSecret }}
+            {{- end }}
           volumeMounts:
             - name: wandb-launch-config
               mountPath: /home/launch_agent/.config/wandb
@@ -91,6 +114,10 @@ spec:
               mountPath: /usr/local/share/ca-certificates/custom-ca.crt
               subPath: custom-ca.crt
               readOnly: true
+            {{ end }}
+            {{- if .Values.kanikoPvcName }}
+            - name: kaniko-pvc
+              mountPath: /home/launch_agent/kaniko
             {{ end }}
       volumes:
         - name: wandb-launch-config
@@ -111,6 +138,11 @@ spec:
             items:
               - key: {{ .Values.customCABundle.configMap.key }}
                 path: custom-ca.crt
+        {{- end}}
+        {{ if .Values.kanikoPvcName }}
+        - name: kaniko-pvc
+          persistentVolumeClaim:
+            claimName: {{ .Values.kanikoPvcName }}
         {{- end}}
       nodeSelector:
         {{- toYaml .Values.agent.nodeSelector | nindent 8 }}
