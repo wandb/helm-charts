@@ -5,7 +5,7 @@ agent:
   # Providing API key can be done external to this chart
   useExternalWandbSecret: false
   # Container image to use for the agent.
-  image: wandb/launch-agent-dev:kaniko-pvc-ctx-05b1e54f
+  image: wandb/launch-agent:0.16.3
   # Image pull policy for agent image.
   imagePullPolicy: Always
   # Resources block for the agent spec.
@@ -20,25 +20,25 @@ agent:
   # Minimum available agent pods.
   minAvailable: 1
 
-
 # Namespace to deploy launch agent into
-namespace: tenant-0b0b59-wandb
+namespace: wandb
 
 # W&B api url (Set yours here)
 baseUrl: https://api.wandb.ai
 
 # Additional target namespaces that the launch agent can deploy into
-additionalTargetNamespaces: []
+additionalTargetNamespaces:
+  - default
+  - wandb
 
 # This should be set to the literal contents of your launch agent config.
 launchConfig: |
   queues:  # List of queues to poll for jobs.
-  - test
+  - <YOUR QUEUE NAME>
   max_jobs: 10  # Max number of jobs to run concurrently.
   max_schedulers: 1  # Max number of sweep schedulers to run concurrently.
   builder:  # Builder config. Type `noop` and `kaniko` can be used in a kubernetes cluster.
-    type: kaniko
-    destination: https://launchimages.tenant-0b0b59-wandb.las1.ingress.coreweave.cloud/v2/testimage
+    type: noop
 
 # # Additional environment variables to set on the agent container.
 additionalEnvVars: {}
@@ -73,12 +73,12 @@ customCABundle:
     key:
 
 # Configure the agent to pass build contexts to kaniko through a persistent volume claim.
-# The pvc will be mounted at /home.launch_agent/build_contexts in the agent container and at 
+# The pvc will be mounted at /home.launch_agent/build_contexts in the agent container and at
 # /context in the kaniko containers.
-kanikoPvcName: 
+kanikoPvcName:
 
 # Name of a kubernetes.io/dockerconfigjson secret to use for kaniko.
 # The secret stores a docker auth config under the `.dockerconfigjson` key.
 # This is mounted at /kaniko/.docker/config.json in the kaniko build container
 # to grant access to private docker registries.
-kanikoDockerConfigSecret: 
+kanikoDockerConfigSecret:
