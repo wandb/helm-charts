@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: wandb-frfu
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frfu
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frfu
+    spec:
+      containers:
+      - name: frfu
+        image: TODO
+        imagePullPolicy: Always
+        resources:
+          limits:
+            cpu: "8"
+            memory: 16Gi
+          requests:
+            cpu: "1"
+            memory: 2Gi
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: ONLY_SERVICE
+            value: gorilla-flat-run-fields-updater
+          - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_DUAL_RUN_UPDATER
+            value: "true"
+          - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
+            value: "true"
+          - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_SCHEMA
+            value: "true"
+          - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DUAL_WRITE_RUN_UPDATES
+            value: "true"
+          - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_PANIC_ON_CREATE_SCHEMA_FAIL
+            value: "true"
+          - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_RUN_STORE_READ
+            value: "true"
+          - name: LOGGING_ENABLED
+            value: "true"
+          - name: MYSQL_PORT
+            value: "3306"
+          - name: MYSQL_HOST
+            value: testing-yo-lt01-intense-cougar.mysql.database.azure.com
+          - name: MYSQL_DATABASE
+            value: wandb_local
+          - name: MYSQL_USER
+            value: wandb
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: MYSQL_PASSWORD
+                name: wandb-mysql
+          - name: MYSQL
+            value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)
+          - name: GORILLA_RUN_STORE
+            value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/wandb_local_flat?tls=preferred
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: REDIS_PASSWORD
+                name: wandb-redis
+          - name: REDIS_PORT
+            value: "6379"
+          - name: REDIS_HOST
+            value: testing-yo-lt01.redis.cache.windows.net
+          - name: REDIS
+            value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)
+          - name: GORILLA_SETTINGS_CACHE
+            value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)
+          - name: KAFKA_CLIENT_USERS
+            value: "TODO"
+          - name: KAFKA_CLIENT_PASSWORDS
+            valueFrom:
+              secretKeyRef:
+                name: TODO
+                key: client-passwords
+          - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
+            value: "{\"overflow-bucket\": {\"store\": \"az://testingyolt01storage/wandb\", \"name\": \"wandb\"}, \"subscriptions\": {\"flatRunFieldsUpdater\": \"kafka://$(KAFKA_CLIENT_USERS):$(KAFKA_CLIENT_PASSWORDS)@yo-kafka:9092/test-010?consumer_group_id=gid003&producer_batch_bytes=1048576\"}}"
+          - name: BUCKET
+            value: az://testingyolt01storage/wandb
+          - name: AZURE_STORAGE_KEY
+            valueFrom:
+              secretKeyRef:
+                key: ACCESS_KEY
+                name: wandb-bucket
+                optional: true
+          - name: BUCKET_QUEUE
+            value: internal://
+          - name: DD_AGENT_HOST
+            value: datadog.datadog
+          - name: DD_DOGSTATSD_URL
+            value: udp://datadog.datadog:8125
+          - name: DD_ENV
+            value: managed-install
+          - name: DD_PROFILING_ENABLED
+            value: "true"
+          - name: DD_SERVICE
+            value: weave-python
+          - name: DD_TRACE_AGENT_HOSTNAME
+            value: datadog.datadog
+          - name: GORILLA_STATSD_HOST
+            value: datadog.datadog
+          - name: GORILLA_STATSD_PORT
+            value: "8125"
+          - name: WEAVE_OBS_CUSTOMER_NS
+            value: testing-yo-lt01
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch
+        runAsUser: 999
+      terminationGracePeriodSeconds: 30
