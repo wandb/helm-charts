@@ -1,18 +1,4 @@
 {{- if .Values.ingress.issuer.create }}
-{{- if eq .Values.ingress.issuer.provider "google" }}
----
-apiVersion: networking.gke.io/v1
-kind: ManagedCertificate
-metadata:
-  name: {{ .Release.Name }}-cert
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "wandb.commonLabels" . | nindent 4 }}
-spec:
-  domains:
-  - {{ replace "https://" "" (replace "http://" "" .Values.global.host) }}
-{{- else }}
----
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
@@ -34,7 +20,6 @@ spec:
           ingress:
             class: {{ .Values.ingress.class }}
 {{- end }}
-{{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -47,12 +32,8 @@ metadata:
     {{- end }}
   annotations:
     {{- if .Values.ingress.issuer.create }}
-      {{- if eq .Values.ingress.issuer.provider "google" }}
-    "networking.gke.io/managed-certificates" : "{{ .Release.Name }}-cert"
-      {{- else }}
     "cert-manager.io/issuer": "{{ .Release.Name }}-issuer"
     "cert-manager.io/acme-challenge-type": "http01"
-      {{- end }}
     "kubernetes.io/ingress.allow-http" : "false"
     {{- end }}
 
@@ -64,11 +45,9 @@ spec:
   {{- $defaultHost := include "defaultHost" . -}}
 
   {{- if .Values.ingress.issuer.create }}
-  {{- if ne .Values.ingress.issuer.provider "google" }}
   tls:
     - host: [{{ $defaultHost }}]
       secretName: {{ .Release.Name }}-tls
-  {{- end }}
   {{- else }}
   tls: {{ toYaml .Values.ingress.tls | nindent 4 }}
   {{- end }}
