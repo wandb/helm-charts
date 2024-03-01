@@ -1,5 +1,4 @@
 {{- if .Values.ingress.issuer.create }}
-{{- if ne .Values.ingress.issuer.provider "google" }}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
@@ -21,7 +20,6 @@ spec:
           ingress:
             class: {{ .Values.ingress.class }}
 {{- end }}
-{{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -34,10 +32,8 @@ metadata:
     {{- end }}
   annotations:
     {{- if .Values.ingress.issuer.create }}
-      {{- if ne .Values.ingress.issuer.provider "google" }}
     "cert-manager.io/issuer": "{{ .Release.Name }}-issuer"
     "cert-manager.io/acme-challenge-type": "http01"
-      {{- end }}
     "kubernetes.io/ingress.allow-http" : "false"
     {{- end }}
 
@@ -49,11 +45,9 @@ spec:
   {{- $defaultHost := include "defaultHost" . -}}
 
   {{- if .Values.ingress.issuer.create }}
-  {{- if ne .Values.ingress.issuer.provider "google" }}
   tls:
     - host: [{{ $defaultHost }}]
       secretName: {{ .Release.Name }}-tls
-  {{- end }}
   {{- else }}
   tls: {{ toYaml .Values.ingress.tls | nindent 4 }}
   {{- end }}
