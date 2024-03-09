@@ -75,10 +75,17 @@ global:
     caCert: ""
 
   kafka:
-    brokers: ""
-    client:
-      username: ""
-      password: ""
+    # The following values are anchored here, and referenced by alias later for the kafka dependency chart.
+    # List of username for kafka, first being the admin user.  Must have the same number of elements as the passwords value
+    users: &kafkaUsers
+      - "user1"
+    # Comma separated list of passwords for kafka, corresponding to the list of users above.
+    passwords: &kafkaPasswords "wandb"
+    # The following value is wrapped with a template function, allowing for the use of variables in the values
+    consumerUrl: "{{ .Release.Name }}-kafka.{{ .Release.Namespace }}"
+    consumerPort: 9092
+    # The following value assumes a standard 3 broker cluster.  Adjust this accordingly if you change the cluster size
+    producerUrl: "{{ .Release.Name }}-kafka-controller-headless-0.{{ .Release.Namespace }}:9092,{{ .Release.Name }}-kafka-controller-headless-1.{{ .Release.Namespace }}:9092,{{ .Release.Name }}-kafka-controller-headless-2.{{ .Release.Namespace }}:9092"
 
 ingress:
   nameOverride: ""
@@ -182,22 +189,20 @@ otel:
 nameOverride: ""
 fullnameOverride: ""
 
+# A note about kafka values.  When installing a fresh deployment via helm, the template will auto-generate initial passwords if they are not supplied
+# It is *strongly* recommended to supply these values yourself, and *required* when updating after the first deployment.
 kafka:
-  secretName: wandb-kafka-secrets
   install: false
   sasl:
-    existingSecret: wandb-kafka-secrets
-  client:
-    passwords: ""
-    users:
-      - user1
-  broker:
-    password: ""
-  controller:
-    password: ""
+    interbroker:
+      password: ""
+    controller:
+      password: ""
+    # The client usernames and passwords are alias references from the global values section at the beginning of this file.
+    # Please update the values there to ensure proper propogation to the application
+    client:
+      users: *kafkaUsers
+      passwords: *kafkaPasswords
   kraft:
-    existingClusterIdSecret: wandb-kafka-secrets
-
-flat-run-fields-updater:
-  install: false
-  kafkaSecret: wandb-kafka-secrets
+    # This field is a UUID.  As with the above passwords, it's auto-generated on initial install but *must* be supplied on subsequent upgrades
+    clusterId: ""
