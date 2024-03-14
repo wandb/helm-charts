@@ -74,6 +74,14 @@ global:
     parameters: {}
     caCert: ""
 
+  kafka:
+    # The following values are anchored here, and referenced by alias later for the kafka dependency chart.
+    user: &kafkaUser "user1"
+    password: &kafkaPassword "wandb"
+    consumerUrl: "wandb-kafka"
+    consumerPort: 9092
+    producerUrl: "wandb-kafka-controller-headless-0:9092,wandb-kafka-controller-headless-1:9092,wandb-kafka-controller-headless-2:9092"
+
 ingress:
   nameOverride: ""
   defaultBackend: "app"
@@ -173,3 +181,21 @@ otel:
 
 nameOverride: ""
 fullnameOverride: ""
+
+# It is *strongly* recommended to supply passwords yourself for production installs.
+kafka:
+  install: false
+  sasl:
+    interbroker:
+      password: "inter-broker"
+    controller:
+      password: "controller-pw"
+    # The client usernames and passwords are alias references from the global values section at the beginning of this file.
+    # Please update the values there to ensure proper propogation to the application
+    client:
+      users:
+        - *kafkaUser
+      passwords: *kafkaPassword
+  kraft:
+    # This field is a UUID. It is *strongly* recommended to supply a new UUID yourself for production installs.
+    clusterId: "2cee15fc-949d-473c-814e-2bdfa41d4091"
