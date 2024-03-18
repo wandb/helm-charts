@@ -1,0 +1,15 @@
+{{- $secretName := (include "wandb.kafka.passwordSecret" .)  }}
+{{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+{{- if $secret }}
+  KAFKA_CLIENT_PASSWORD: {{ default ($secret.data.KAFKA_CLIENT_PASSWORD) (include "wandb.kafka.password" . | b64enc) }}
+{{- else }}
+  KAFKA_CLIENT_PASSWORD: {{ default (randAlphaNum 64) (include "wandb.kafka.password" .) | b64enc }}
+{{- end }}
+
