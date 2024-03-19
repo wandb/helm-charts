@@ -25,11 +25,7 @@ Return the kafka host
 
 {{- define "wandb.kafka.producerUrl" -}}
 {{- if eq .Values.global.kafka.producerUrl "" -}}
-{{- $kafkaSlice := [] -}}
-{{- range tuple "0" "1" "2" -}}
-{{ $kafkaSlice := $kafkaSlice append(printf "%s-%s-%s:%s" .Release.Name "kafka-controller-headless" . .Values.global.kafka.port) }}
-{{- end -}}
-{{ join "," $kafkaSlice }}
+{{ printf "%s-%s" .Release.Name "kafka" }}
 {{- else -}}
 {{ .Values.global.kafka.producerUrl }}
 {{- end -}}
