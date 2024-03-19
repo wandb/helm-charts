@@ -27,7 +27,6 @@ Return the kafka client password
 {{ .Values.global.kafka.password }}
 {{- end -}}
 
-
 {{/*
 Return name of secret where kafka information is stored
 */}}
