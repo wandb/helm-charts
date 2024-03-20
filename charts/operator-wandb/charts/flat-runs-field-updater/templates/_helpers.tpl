@@ -43,6 +43,43 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Returns the extraEnv keys and values to inject into containers.
+
+Global values will override any chart-specific values.
+*/}}
+{{- define "flat-runs-field-updater.extraEnv" -}}
+{{- $allExtraEnv := merge (default (dict) .local.extraEnv) .global.extraEnv -}}
+{{- range $key, $value := $allExtraEnv }}
+- name: {{ $key }}
+  value: {{ $value | quote }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Returns a list of _common_ labels to be shared across all
+flat-runs-field-updater deployments and other shared objects.
+*/}}
+{{- define "flat-runs-field-updater.commonLabels" -}}
+{{- $commonLabels := default (dict) .Values.common.labels -}}
+{{- if $commonLabels }}
+{{-   range $key, $value := $commonLabels }}
+{{ $key }}: {{ $value | quote }}
+{{-   end }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Returns a list of _pod_ labels to be shared across all
+flat-runs-field-updater deployments.
+*/}}
+{{- define "flat-runs-field-updater.podLabels" -}}
+{{- range $key, $value := .Values.pod.labels }}
+{{ $key }}: {{ $value | quote }}
+{{- end }}
+{{- end -}}
+
+
+{{/*
 Selector labels
 */}}
 {{- define "flat-runs-field-updater.selectorLabels" -}}
@@ -60,3 +97,21 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "flat-runs-field-updater.bucket" -}}
+{{- $bucket := "" -}} 
+{{- if eq .Values.global.bucket.provider "az" -}}
+{{- $bucket = printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
+{{- end -}}
+{{- if eq .Values.global.bucket.provider "gcs" -}}
+{{- $bucket = printf "gs://%s" .Values.global.bucket.name -}}
+{{- end -}}
+{{- if eq .Values.global.bucket.provider "s3" -}}
+{{- if and .Values.global.bucket.accessKey .Values.global.bucket.secretKey -}}
+{{- $bucket = printf "s3://%s:%s@%s/%s" .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.name .Values.global.bucket.path -}}
+{{- else -}}
+{{- $bucket = printf "s3://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
+{{- end -}}
+{{- end -}}
+{{- trimSuffix "/" $bucket -}}
+{{- end -}}

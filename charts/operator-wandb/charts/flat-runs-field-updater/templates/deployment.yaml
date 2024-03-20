@@ -107,15 +107,31 @@ spec:
                   key:  MYSQL_PASSWORD
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
-            - name: KAFKA_CONSUMER_URL
-              value: "{{ include "wandb.kafka.consumerUrl" . }}"
+            - name: KAFKA_BROKER_HOST
+              value: "{{ include "wandb.kafka.brokerHost" . }}"
+            - name: KAFKA_BROKER_PORT
+              value: "{{ include "wandb.kafka.brokerPort" . }}"
             - name: KAFKA_CLIENT_USER
-              value: "{{ include "wandb.kafka.clientUser" . }}"
+              value: "{{ include "wandb.kafka.user" . }}"
             - name: KAFKA_CLIENT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "wandb.kafka.clientPasswordSecret" . }}
-                  key:  KAFKA_CLIENT_PASSWORD
+                  name: {{ include "wandb.kafka.passwordSecret" . }}
+                  key: KAFKA_CLIENT_PASSWORD
+            - name: BUCKET
+              value: "{{ include "flat-runs-field-updater.bucket" .}}"
+            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
+              value: >
+                {
+                  "overflow-bucket": {
+                    "store": "$(BUCKET)",
+                    "name": "wandb",
+                    "prefix": "wandb-overflow"
+                  },
+                  "subscriptions": {
+                    "flatRunFieldsUpdater": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/flat-runs?consumer_group_id=deafult-group"
+                  }
+                }
             {{- if and .Values.global .Values.global.observability }}
             {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
             - name: GORILLA_STATSD_PORT
