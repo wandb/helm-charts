@@ -198,6 +198,12 @@ spec:
                 fieldRef:
                   fieldPath: status.hostIP
 
+            - name: KAFKA_CLIENT_USER
+              value: "{{ include "wandb.kafka.user" . }}"
+            - name: KAFKA_CLIENT_PASSWORD
+              value: "{{ include "wandb.kafka.password" . }}"
+            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
+              value: "{\"addr\": \"kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/flat-runs?producer_batch_bytes=1048576\", \"overflow-bucket\": {\"store\": \"$(OVERFLOW_BUCKET_ADDR)\", \"name\": \"wandb\", \"prefix\": \"wandb-overflow\"}}"
             {{- include "app.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           livenessProbe:
