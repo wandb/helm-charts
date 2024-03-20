@@ -1,7 +1,7 @@
 {{/*
 These are the variables a service can expect
-            - name: KAFKA_BROKER_URL
-              value: "{{ include "wandb.kafka.brokerUrl" . }}"
+            - name: KAFKA_BROKER_HOST
+              value: "{{ include "wandb.kafka.brokerHost" . }}"
             - name: KAFKA_BROKER_PORT
               value: "{{ include "wandb.kafka.brokerPort" . }}"
             - name: KAFKA_CLIENT_USER
@@ -37,11 +37,11 @@ Return name of secret where kafka information is stored
 {{/*
 Return the kafka broker url port
 */}}
-{{- define "wandb.kafka.brokerUrl" -}}
-{{- if eq .Values.global.redis.host "" -}}
+{{- define "wandb.kafka.brokerHost" -}}
+{{- if eq .Values.global.kafka.brokerHost "" -}}
 {{ printf "%s-%s" .Release.Name "kafka" }}
 {{- else -}}
-{{ .Values.global.kafka.brokerUrl }}
+{{ .Values.global.kafka.brokerHost }}
 {{- end -}}
 {{- end -}}
 
