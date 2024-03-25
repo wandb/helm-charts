@@ -79,19 +79,7 @@ spec:
               value: "{{ join "," .Values.extraCors }}"
             {{- end }}
             - name: ONLY_SERVICE
-              value: {{ include "flat-runs-field-updater.fullname" . }}
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_DUAL_RUN_UPDATER
-              value: "true"
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-              value: "true"
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_SCHEMA
-              value: "true"
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DUAL_WRITE_RUN_UPDATES
-              value: "true"
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_PANIC_ON_CREATE_SCHEMA_FAIL
-              value: "true"
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_RUN_STORE_READ
-              value: "true"
+              value: gorilla-flat-run-fields-updater
             - name: MYSQL_PORT
               value: "{{ include "wandb.mysql.port" . }}"
             - name: MYSQL_HOST
@@ -107,6 +95,20 @@ spec:
                   key:  MYSQL_PASSWORD
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+            - name: GORILLA_RUN_STORE
+              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/wandb_local_flat?tls=preferred"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_DUAL_RUN_UPDATER
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_SCHEMA
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DUAL_WRITE_RUN_UPDATES
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_PANIC_ON_CREATE_SCHEMA_FAIL
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_RUN_STORE_READ
+              value: "true"
             - name: KAFKA_BROKER_HOST
               value: "{{ include "wandb.kafka.brokerHost" . }}"
             - name: KAFKA_BROKER_PORT
@@ -132,6 +134,21 @@ spec:
                     "flatRunFieldsUpdater": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/flat-runs?consumer_group_id=deafult-group"
                   }
                 }
+            {{- if ne (include "wandb.redis.password" .) "" }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.redis.passwordSecret" . }}
+                  key: REDIS_PASSWORD
+            {{- end }}
+            - name: REDIS_PORT
+              value: "{{ include "wandb.redis.port" . }}"
+            - name: REDIS_HOST
+              value: "{{ include "wandb.redis.host" . }}"
+            - name: REDIS
+              value: "{{ include "flat-runs-field-updater.redis" . | trim }}"
+            - name: GORILLA_SETTINGS_CACHE
+              value: "{{ include "flat-runs-field-updater.redis" . | trim }}"
             {{- if and .Values.global .Values.global.observability }}
             {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
             - name: GORILLA_STATSD_PORT
