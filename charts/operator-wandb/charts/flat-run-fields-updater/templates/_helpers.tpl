@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "flat-runs-field-updater.name" -}}
+{{- define "flat-run-fields-updater.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "flat-runs-field-updater.fullname" -}}
+{{- define "flat-run-fields-updater.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "flat-runs-field-updater.chart" -}}
+{{- define "flat-run-fields-updater.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "flat-runs-field-updater.labels" -}}
-helm.sh/chart: {{ include "flat-runs-field-updater.chart" . }}
-{{ include "flat-runs-field-updater.selectorLabels" . }}
+{{- define "flat-run-fields-updater.labels" -}}
+helm.sh/chart: {{ include "flat-run-fields-updater.chart" . }}
+{{ include "flat-run-fields-updater.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -47,7 +47,7 @@ Returns the extraEnv keys and values to inject into containers.
 
 Global values will override any chart-specific values.
 */}}
-{{- define "flat-runs-field-updater.extraEnv" -}}
+{{- define "flat-run-fields-updater.extraEnv" -}}
 {{- $allExtraEnv := merge (default (dict) .local.extraEnv) .global.extraEnv -}}
 {{- range $key, $value := $allExtraEnv }}
 - name: {{ $key }}
@@ -57,9 +57,9 @@ Global values will override any chart-specific values.
 
 {{/*
 Returns a list of _common_ labels to be shared across all
-flat-runs-field-updater deployments and other shared objects.
+flat-run-fields-updater deployments and other shared objects.
 */}}
-{{- define "flat-runs-field-updater.commonLabels" -}}
+{{- define "flat-run-fields-updater.commonLabels" -}}
 {{- $commonLabels := default (dict) .Values.common.labels -}}
 {{- if $commonLabels }}
 {{-   range $key, $value := $commonLabels }}
@@ -70,9 +70,9 @@ flat-runs-field-updater deployments and other shared objects.
 
 {{/*
 Returns a list of _pod_ labels to be shared across all
-flat-runs-field-updater deployments.
+flat-run-fields-updater deployments.
 */}}
-{{- define "flat-runs-field-updater.podLabels" -}}
+{{- define "flat-run-fields-updater.podLabels" -}}
 {{- range $key, $value := .Values.pod.labels }}
 {{ $key }}: {{ $value | quote }}
 {{- end }}
@@ -82,23 +82,23 @@ flat-runs-field-updater deployments.
 {{/*
 Selector labels
 */}}
-{{- define "flat-runs-field-updater.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "flat-runs-field-updater.name" . }}
+{{- define "flat-run-fields-updater.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "flat-run-fields-updater.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "flat-runs-field-updater.serviceAccountName" -}}
+{{- define "flat-run-fields-updater.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "flat-runs-field-updater.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "flat-run-fields-updater.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
 
-{{- define "flat-runs-field-updater.redis" -}}
+{{- define "flat-run-fields-updater.redis" -}}
 {{- $cs := include "wandb.redis.connectionString" . }}
 {{- $ca := include "wandb.redis.caCert" . }}
 {{- if $ca }}
@@ -108,7 +108,7 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{- define "flat-runs-field-updater.bucket" -}}
+{{- define "flat-run-fields-updater.bucket" -}}
 {{- $bucket := "" -}} 
 {{- if eq .Values.global.bucket.provider "az" -}}
 {{- $bucket = printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}

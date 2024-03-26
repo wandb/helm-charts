@@ -4,11 +4,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "flat-runs-field-updater.fullname" . }}
+  name: {{ include "flat-run-fields-updater.fullname" . }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "flat-runs-field-updater.commonLabels" . | nindent 4 }}
-    {{- include "flat-runs-field-updater.labels" . | nindent 4 }}
+    {{- include "flat-run-fields-updater.commonLabels" . | nindent 4 }}
+    {{- include "flat-run-fields-updater.labels" . | nindent 4 }}
     {{- if .Values.deployment.labels -}}
     {{-   toYaml .Values.deployment.labels | nindent 4 }}
     {{- end }}
@@ -24,7 +24,7 @@ spec:
   selector:
     matchLabels:
       {{- include "wandb.selectorLabels" $ | nindent 6 }}
-      {{- include "flat-runs-field-updater.labels" . | nindent 6 }}
+      {{- include "flat-run-fields-updater.labels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.pod.annotations }}
@@ -33,15 +33,15 @@ spec:
       {{- end }}
       labels:
         {{- include "wandb.podLabels" . | nindent 8 }}
-        {{- include "flat-runs-field-updater.labels" . | nindent 8 }}
-        {{- include "flat-runs-field-updater.commonLabels" . | nindent 8 }}
-        {{- include "flat-runs-field-updater.podLabels" . | nindent 8 }}
+        {{- include "flat-run-fields-updater.labels" . | nindent 8 }}
+        {{- include "flat-run-fields-updater.commonLabels" . | nindent 8 }}
+        {{- include "flat-run-fields-updater.podLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "flat-runs-field-updater.serviceAccountName" . }}
+      serviceAccountName: {{ include "flat-run-fields-updater.serviceAccountName" . }}
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
@@ -121,7 +121,7 @@ spec:
                   name: {{ include "wandb.kafka.passwordSecret" . }}
                   key: KAFKA_CLIENT_PASSWORD
             - name: BUCKET
-              value: "{{ include "flat-runs-field-updater.bucket" .}}"
+              value: "{{ include "flat-run-fields-updater.bucket" .}}"
             - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
               value: >
                 {
@@ -146,9 +146,9 @@ spec:
             - name: REDIS_HOST
               value: "{{ include "wandb.redis.host" . }}"
             - name: REDIS
-              value: "{{ include "flat-runs-field-updater.redis" . | trim }}"
+              value: "{{ include "flat-run-fields-updater.redis" . | trim }}"
             - name: GORILLA_SETTINGS_CACHE
-              value: "{{ include "flat-runs-field-updater.redis" . | trim }}"
+              value: "{{ include "flat-run-fields-updater.redis" . | trim }}"
             {{- if and .Values.global .Values.global.observability }}
             {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
             - name: GORILLA_STATSD_PORT
@@ -157,7 +157,7 @@ spec:
               value: "0.0.0.0"
             {{- end }}
             {{- end }}
-            {{- include "flat-runs-field-updater.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
+            {{- include "flat-run-fields-updater.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
