@@ -1,0 +1,174 @@
+{{- if .Values.install }}
+{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "flat-run-fields-updater.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "flat-run-fields-updater.commonLabels" . | nindent 4 }}
+    {{- include "flat-run-fields-updater.labels" . | nindent 4 }}
+    {{- if .Values.deployment.labels -}}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "wandb.deploymentAnnotations" . | nindent 4 }}
+    {{- if .Values.deployment.annotations -}}
+    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "wandb.selectorLabels" $ | nindent 6 }}
+      {{- include "flat-run-fields-updater.labels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.pod.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "wandb.podLabels" . | nindent 8 }}
+        {{- include "flat-run-fields-updater.labels" . | nindent 8 }}
+        {{- include "flat-run-fields-updater.commonLabels" . | nindent 8 }}
+        {{- include "flat-run-fields-updater.podLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "flat-run-fields-updater.serviceAccountName" . }}
+      {{- include "wandb.nodeSelector" . | nindent 6 }}
+      {{- include "wandb.priorityClassName" . | nindent 6 }}
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: G_HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: OPERATOR_ENABLED
+              value: 'true'
+            - name: LOGGING_ENABLED
+              value: 'true'
+            - name: AZURE_STORAGE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "wandb.bucket.secret" . }}"
+                  key: ACCESS_KEY
+                  optional: true
+            - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- if .Values.extraCors }}
+            - name: GORILLA_CORS_ORIGINS
+              value: "{{ join "," .Values.extraCors }}"
+            {{- end }}
+            - name: ONLY_SERVICE
+              value: gorilla-flat-run-fields-updater
+            - name: MYSQL_PORT
+              value: "{{ include "wandb.mysql.port" . }}"
+            - name: MYSQL_HOST
+              value: "{{ include "wandb.mysql.host" . }}"
+            - name: MYSQL_DATABASE
+              value: "{{ include "wandb.mysql.database" . }}"
+            - name: MYSQL_USER
+              value: "{{ include "wandb.mysql.user" . }}"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . }}
+                  key:  MYSQL_PASSWORD
+            - name: MYSQL
+              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+            - name: GORILLA_RUN_STORE
+              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/wandb_local_flat?tls=preferred"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_DUAL_RUN_UPDATER
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_SCHEMA
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DUAL_WRITE_RUN_UPDATES
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_PANIC_ON_CREATE_SCHEMA_FAIL
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_RUN_STORE_READ
+              value: "true"
+            - name: KAFKA_BROKER_HOST
+              value: "{{ include "wandb.kafka.brokerHost" . }}"
+            - name: KAFKA_BROKER_PORT
+              value: "{{ include "wandb.kafka.brokerPort" . }}"
+            - name: KAFKA_CLIENT_USER
+              value: "{{ include "wandb.kafka.user" . }}"
+            - name: KAFKA_CLIENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.kafka.passwordSecret" . }}
+                  key: KAFKA_CLIENT_PASSWORD
+            - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
+              value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
+            - name: BUCKET
+              value: "{{ include "flat-run-fields-updater.bucket" .}}"
+            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
+              value: >
+                {
+                  "overflow-bucket": {
+                    "store": "$(BUCKET)",
+                    "name": "wandb",
+                    "prefix": "wandb-overflow"
+                  },
+                  "subscriptions": {
+                    "flatRunFieldsUpdater": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group"
+                  }
+                }
+            {{- if ne (include "wandb.redis.password" .) "" }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.redis.passwordSecret" . }}
+                  key: REDIS_PASSWORD
+            {{- end }}
+            - name: REDIS_PORT
+              value: "{{ include "wandb.redis.port" . }}"
+            - name: REDIS_HOST
+              value: "{{ include "wandb.redis.host" . }}"
+            - name: REDIS
+              value: "{{ include "flat-run-fields-updater.redis" . | trim }}"
+            - name: GORILLA_SETTINGS_CACHE
+              value: "{{ include "flat-run-fields-updater.redis" . | trim }}"
+            {{- if and .Values.global .Values.global.observability }}
+            {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
+            - name: GORILLA_STATSD_PORT
+              value: "8125"
+            - name: GORILLA_STATSD_HOST
+              value: "0.0.0.0"
+            {{- end }}
+            {{- end }}
+            {{- include "flat-run-fields-updater.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
+            {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
