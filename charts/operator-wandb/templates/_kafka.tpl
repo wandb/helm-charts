@@ -51,3 +51,15 @@ Return kafka broker url port
 {{- define "wandb.kafka.brokerPort" -}}
 {{- print .Values.global.kafka.brokerPort -}}
 {{- end -}}
+
+
+{{/*
+Return the kafka topic name for run-updates-shadow
+*/}}
+{{- define "wandb.kafka.runUpdatesShadowTopic" -}}
+{{- if eq .Values.global.kafka.runUpdatesShadowTopic "" -}}
+{{ printf "%s-%s" .Release.Name "run-updates-shadow" | trunc 63 | trimSuffix "-" }}
+{{- else -}}
+{{ .Values.global.kafka.runUpdatesShadowTopic }}
+{{- end -}}
+{{- end -}}
