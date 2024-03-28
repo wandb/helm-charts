@@ -173,8 +173,12 @@ receivers:
             value_column: "count"
 {{- end }}
 
-{{- define "otel.statsdAppReceiver" -}}
+{{- define "otel.otlpReceiver} -}}
 receivers:
-  statsd:
-    endpoint: {{ $.Release.Name }}-app:8125
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
 {{- end }}

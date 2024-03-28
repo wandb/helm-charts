@@ -7,7 +7,7 @@
 {{- $config = mustMergeOverwrite (include "otel.kubernetesEventReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.kubernetesClusterReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.sqlQueryReceiver" . | fromYaml) $config }}
-{{- $config = mustMergeOverwrite (include "otel.statsdAppReceiver" . | fromYaml) $config }}
+{{- $config = mustMergeOverwrite (include "otel.otlpReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.extensions" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.processors" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.service" . | fromYaml) $config }}
