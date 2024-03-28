@@ -176,7 +176,7 @@ receivers:
 {{- define "otel.statsdAppReceiver" -}}
 receivers:
   statsd:
-    endpoint: localhost:8125
+    endpoint: 0.0.0.0:8125
 {{- end }}
 
 {{- define "otel.otlpReceiver" -}}
@@ -184,7 +184,7 @@ receivers:
   otlp:
     protocols:
       grpc:
-        endpoint: localhost:4317
+        endpoint: 0.0.0.0:4317
       http:
-        endpoint: localhost:4318
+        endpoint: 0.0.0.0:4318
 {{- end }}
