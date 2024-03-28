@@ -6,7 +6,6 @@
 {{- $config = mustMergeOverwrite (include "otel.kubeletMetricsReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.kubernetesEventReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.kubernetesClusterReceiver" . | fromYaml) $config }}
-{{- $config = mustMergeOverwrite (include "otel.sqlQueryReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.otlpReceiver" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.extensions" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.processors" . | fromYaml) $config }}
@@ -82,7 +81,7 @@ service:
     metrics:
       exporters: [debug, prometheus]
       processors: [memory_limiter, batch, k8sattributes]
-      receivers: [hostmetrics, k8s_cluster, kubeletstats, sqlquery]
+      receivers: [hostmetrics, k8s_cluster, kubeletstats]
     logs:
       exporters: [debug]
       processors: [memory_limiter, batch]

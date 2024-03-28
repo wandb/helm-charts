@@ -173,7 +173,7 @@ receivers:
             value_column: "count"
 {{- end }}
 
-{{- define "otel.otlpReceiver} -}}
+{{- define "otel.otlpReceiver" -}}
 receivers:
   otlp:
     protocols:
