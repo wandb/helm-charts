@@ -173,12 +173,18 @@ receivers:
             value_column: "count"
 {{- end }}
 
+{{- define "otel.statsdAppReceiver" -}}
+receivers:
+  statsd:
+    endpoint: localhost:8125
+{{- end }}
+
 {{- define "otel.otlpReceiver" -}}
 receivers:
   otlp:
     protocols:
       grpc:
-        endpoint: "0.0.0.0:4317"
+        endpoint: localhost:4317
       http:
-        endpoint: "0.0.0.0:4318"
+        endpoint: localhost:4318
 {{- end }}

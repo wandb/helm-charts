@@ -20,7 +20,7 @@ exporters:
   debug/detailed:
     verbosity: detailed
   prometheus:
-    endpoint: 0.0.0.0:9109
+    endpoint: localhost:9109
 {{- end }}
 
 {{- define "otel.extensions" -}}
