@@ -176,5 +176,15 @@ receivers:
 {{- define "otel.statsdAppReceiver" -}}
 receivers:
   statsd:
-    endpoint: {{ $.Release.Name }}-app:8125
+    endpoint: 0.0.0.0:8125
+{{- end }}
+
+{{- define "otel.otlpReceiver" -}}
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
 {{- end }}
