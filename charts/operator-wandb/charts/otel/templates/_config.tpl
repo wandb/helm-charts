@@ -79,6 +79,10 @@ service:
   - health_check
   - memory_ballast
   pipelines:
+    traces:
+      exporters: [debug]
+      processors: [batch, memory_limiter, k8sattributes, attributes]
+      receivers: [otlp]
     metrics:
       exporters: [debug, prometheus]
       processors: [memory_limiter, batch, k8sattributes]
