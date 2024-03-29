@@ -78,3 +78,62 @@ spec:
             port:
               number: 8082
   {{- end }}
+---
+{{- if .Values.ingress_internal.create }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ default .Release.Name .Values.ingress_internal.nameOverride }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- if .Values.ingress_internal.labels -}}
+    {{-   toYaml .Values.ingress_internal.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.ingress_internal.issuer.create }}
+    "cert-manager.io/issuer": "{{ .Release.Name }}-issuer"
+    "cert-manager.io/acme-challenge-type": "http01"
+    "kubernetes.io/ingress.allow-http" : "false"
+    {{- end }}
+
+    {{- if .Values.ingress_internal.annotations -}}
+    {{-   toYaml .Values.ingress_internal.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress_internal.class }}
+  {{- $defaultHost := include "defaultHost" . -}}
+
+  {{- if .Values.ingress_internal.issuer.create }}
+  tls:
+    - host: [{{ $defaultHost }}]
+      secretName: {{ .Release.Name }}-tls
+  {{- else }}
+  tls: {{ toYaml .Values.ingress_internal.tls | nindent 4 }}
+  {{- end }}
+
+  rules:
+  {{- range concat (list $defaultHost) .Values.ingress_internal.additionalHosts }}
+  - host: {{ . }}
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            {{- if eq $.Values.ingress_internal.defaultBackend "console" }}
+            name: {{ $.Release.Name }}-console
+            port:
+              number: 8082
+            {{- else }}
+            name: {{ $.Release.Name }}-app
+            port: 
+              number: 8080
+            {{- end }}
+      - pathType: Prefix
+        path: /console
+        backend:
+          service:
+            name: {{ $.Release.Name }}-console
+            port:
+              number: 8082
+  {{- end }}
