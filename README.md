@@ -33,7 +33,7 @@ GRANT ALL ON wandb.* TO 'wandb'@'%' WITH GRANT OPTION;
 
 ```shell
 helm repo add wandb https://wandb.github.io/helm-charts
-helm upgrade --namespace=wandb --create-namespace --install wandb wandb/wandb --version 0.2.0 --set license=$LICENSE --set bucket=$BUCKET --set bucketRegion=$BUCKET_REGION
+helm upgrade --namespace=wandb --create-namespace --install wandb wandb/wandb --version 0.3.7 --set license=$LICENSE --set bucket=$BUCKET --set bucketRegion=$BUCKET_REGION
 ```
 
 ## Install from source
