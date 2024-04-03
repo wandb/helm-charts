@@ -57,10 +57,8 @@ spec:
           env:
             - name: ONLY_SERVICE
               value: gorilla-parquet
-
             - name: LOGGING_ENABLED
               value: 'true'
-
             - name: MYSQL_PORT
               value: "{{ include "wandb.mysql.port" . }}"
             - name: MYSQL_HOST
@@ -111,10 +109,35 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
+            
+            {{- if ne .Values.global.email.smtp.host "" }}
+            - name: GORILLA_EMAIL_SINK
+              value: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
+            {{- end }}
 
             {{- include "parquet.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
 
+          livenessProbe:
+            httpGet:
+              path: /ready 
+              port: 8087
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+          readinessProbe:
+            httpGet:
+              path: /ready 
+              port: 8087
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+          
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:

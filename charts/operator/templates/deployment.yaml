@@ -42,6 +42,8 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.serviceAccountName
+        - name: AIRGAPPED
+          value: {{ .Values.airgapped | quote }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -55,6 +57,11 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.resources | nindent 10 }}
+        {{- if .Values.airgapped }}
+        volumeMounts:
+        - name: {{ include "name" . }}-charts
+          mountPath: /charts
+        {{- end }}
       - args:
         - --secure-listen-address=0.0.0.0:8443
         - --upstream=http://127.0.0.1:8080/
@@ -66,5 +73,11 @@ spec:
         - containerPort: 8443
           name: https
           protocol: TCP
+      {{- if .Values.airgapped }}
+      volumes:
+      - name: {{ include "name" . }}-charts
+        configMap:
+          name: {{ include "name" . }}-charts
+      {{- end }}
       serviceAccountName: {{ include "manager.serviceAccount.name" . }}
       terminationGracePeriodSeconds: 10
