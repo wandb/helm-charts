@@ -42,6 +42,9 @@ spec:
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      # Extend the pods shutdown grace period from the default of 30s to 60s.
+      # This goes in the pod template spec.
+      terminationGracePeriodSeconds: 60
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -76,11 +79,20 @@ spec:
             httpGet:
               path: /console/api/ready
               port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
           startupProbe:
             httpGet:
               path: /console/api/ready
               port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
             failureThreshold: 120
+          # Increase the sleep before SIGTERM to 25s. I had this as 5s previously and it wasn't enough.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "25"]
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
