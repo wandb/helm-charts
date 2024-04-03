@@ -32,7 +32,7 @@ spec:
       annotations:
         checksum/secret: {{ include (print $.Template.BasePath "/secrets.yaml") . | sha256sum }}
         {{- if .Values.pod.annotations -}}
-        {{-   toYaml .Values.pod.annotations | nindent 4 }}
+        {{-   toYaml .Values.pod.annotations | nindent 8 }}
         {{- end }}
     spec:
       serviceAccountName: {{ include "app.serviceAccountName" . }}
@@ -209,7 +209,43 @@ spec:
             - name: GORILLA_TRACER
               value: "otlp+grpc://{{ .Release.Name }}-otel:4317?trace_ratio={{ .Values.traceRatio }}"
             {{- end }}
-
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_DUAL_RUN_UPDATER
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_SCHEMA
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DUAL_WRITE_RUN_UPDATES
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_PANIC_ON_CREATE_SCHEMA_FAIL
+              value: "true"
+            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_RUN_STORE_READ
+              value: "true"
+            - name: KAFKA_BROKER_HOST
+              value: "{{ include "wandb.kafka.brokerHost" . }}"
+            - name: KAFKA_BROKER_PORT
+              value: "{{ include "wandb.kafka.brokerPort" . }}"
+            - name: KAFKA_CLIENT_USER
+              value: "{{ include "wandb.kafka.user" . }}"
+            - name: KAFKA_CLIENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.kafka.passwordSecret" . }}
+                  key: KAFKA_CLIENT_PASSWORD
+            - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
+              value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
+            - name: OVERFLOW_BUCKET_ADDR
+              value: "{{ include "app.bucket" .}}"
+            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
+              value: >
+                {
+                  "overflow-bucket": {
+                    "store": "$(OVERFLOW_BUCKET_ADDR)",
+                    "name": "wandb",
+                    "prefix": "wandb-overflow"
+                  },
+                  "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576"
+                }
             {{- include "app.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           livenessProbe:
