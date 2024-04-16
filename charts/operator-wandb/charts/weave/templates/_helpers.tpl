@@ -31,10 +31,10 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 If release name contains chart name it will be used as a full name.
 */}}
 {{- define "weave.appFullname" -}}
-{{- if .Values.appFullnameOverride }}
-{{- .Values.appFullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- if .Values.app.fullnameOverride }}
+{{- .Values.app.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- $name := default .Values.appServiceName .Values.appNameOverride }}
+{{- $name := default .Values.app.serviceName .Values.app.nameOverride }}
 {{- if contains $name .Release.Name }}
 {{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
