@@ -1,13 +1,27 @@
 {{- define "otel.config" -}}
 {{- $data := deepCopy .Values.config }}
 {{- $config := .Values.config }}
+{{- if .Values.presets.receiver.hostMetrics }}
 {{- $config = mustMergeOverwrite (include "otel.hostMetricsReceiver" . | fromYaml) $config }}
+{{- end }}
+{{- if .Values.presets.receiver.logsCollection }}
 {{- $config = mustMergeOverwrite (include "otel.logsCollectionReceiver" . | fromYaml) $config }}
+{{- end }}
+{{- if .Values.presets.receiver.kubeletMetrics }}
 {{- $config = mustMergeOverwrite (include "otel.kubeletMetricsReceiver" . | fromYaml) $config }}
+{{- end }}
+{{- if .Values.presets.receiver.kubernetesEvent }}
 {{- $config = mustMergeOverwrite (include "otel.kubernetesEventReceiver" . | fromYaml) $config }}
+{{- end }}
+{{- if .Values.presets.receiver.kubernetesCluster }}
 {{- $config = mustMergeOverwrite (include "otel.kubernetesClusterReceiver" . | fromYaml) $config }}
+{{- end }}
+{{- if .Values.presets.receiver.statsd }}
+{{- $config = mustMergeOverwrite (include "otel.statsdReceiver" . | fromYaml) $config }}
+{{- end }}
+{{- if .Values.presets.receiver.otlp }}
 {{- $config = mustMergeOverwrite (include "otel.otlpReceiver" . | fromYaml) $config }}
-{{- $config = mustMergeOverwrite (include "otel.statsdAppReceiver" . | fromYaml) $config }}
+{{- end }}
 {{- $config = mustMergeOverwrite (include "otel.extensions" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.processors" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otel.service" . | fromYaml) $config }}
