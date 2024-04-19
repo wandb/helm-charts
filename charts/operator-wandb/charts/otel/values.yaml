@@ -2,19 +2,49 @@ daemonset:
   install: true
   mode: "daemonset"
   presets:
-    hostMetrics: true
-    logsCollection: true
-    kubeletMetrics: true
-    kubernetesEvent: true
-    kubernetesCluster: true
-    statsd: true
-    otlp: true
-  config: {}
+    receivers:
+      hostMetrics: true
+      logsCollection: true
+      kubeletMetrics: true
+      kubernetesEvent: true
+      kubernetesCluster: true
+      statsd: true
+      otlp: true
+  config:
+    service:
+      pipelines:
+        traces:
+          exporters: [debug]
+          processors: [batch, memory_limiter, k8sattributes]
+          receivers: [otlp]
+        metrics:
+          exporters: [debug, prometheus]
+          processors: [memory_limiter, batch, k8sattributes]
+          receivers: [hostmetrics, k8s_cluster, kubeletstats]
+        logs:
+          exporters: [debug]
+          processors: [memory_limiter, batch, k8sattributes]
+          receivers: [filelog]
 
 deployment:
   install: true
   mode: "deployment"
   presets:
-    statsd: true
-    otlp: true
-  config: {}
+    receivers:
+      statsd: true
+      otlp: true
+  config:
+    service:
+      pipelines:
+        traces:
+          exporters: [debug]
+          processors: [batch, memory_limiter, k8sattributes]
+          receivers: [otlp]
+        metrics:
+          exporters: [debug, prometheus]
+          processors: [memory_limiter, batch, k8sattributes]
+          receivers: [otlp]
+        logs:
+          exporters: [debug]
+          processors: [memory_limiter, batch, k8sattributes]
+          receivers: [otlp]

@@ -3,7 +3,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "otel.name" -}}
+{{- define "otelAgent.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -12,7 +12,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "otel.fullname" -}}
+{{- define "otelAgent.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -28,37 +28,37 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "otel.chart" -}}
+{{- define "otelAgent.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "otel.labels" -}}
-helm.sh/chart: {{ include "otel.chart" . }}
-{{ include "otel.selectorLabels" . }}
+{{- define "otelAgent.labels" -}}
+helm.sh/chart: {{ include "otelAgent.chart" . }}
+{{ include "otelAgent.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
-wandb.com/app-name: {{ include "otel.chart" . }}
+wandb.com/app-name: {{ include "otelAgent.chart" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
 Selector labels
 */}}
-{{- define "otel.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "otel.name" . }}
+{{- define "otelAgent.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "otelAgent.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "otel.serviceAccountName" -}}
+{{- define "otelAgent.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "otel.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "otelAgent.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -69,7 +69,7 @@ Returns the extraEnv keys and values to inject into containers.
 
 Global values will override any chart-specific values.
 */}}
-{{- define "otel.extraEnv" -}}
+{{- define "otelAgent.extraEnv" -}}
 {{- $allExtraEnv := merge (default (dict) .local.extraEnv) .global.extraEnv -}}
 {{- range $key, $value := $allExtraEnv }}
 - name: {{ $key }}
@@ -81,7 +81,7 @@ Global values will override any chart-specific values.
 Returns a list of _common_ labels to be shared across all
 app deployments and other shared objects.
 */}}
-{{- define "otel.commonLabels" -}}
+{{- define "otelAgent.commonLabels" -}}
 {{- $commonLabels := default (dict) .Values.common.labels -}}
 {{- if $commonLabels }}
 {{-   range $key, $value := $commonLabels }}
@@ -94,7 +94,7 @@ app deployments and other shared objects.
 Returns a list of _pod_ labels to be shared across all
 app deployments.
 */}}
-{{- define "otel.podLabels" -}}
+{{- define "otelAgent.podLabels" -}}
 {{- range $key, $value := .Values.pod.labels }}
 {{ $key }}: {{ $value | quote }}
 {{- end }}
