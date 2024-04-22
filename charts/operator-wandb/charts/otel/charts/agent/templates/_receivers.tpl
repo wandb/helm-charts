@@ -1,4 +1,4 @@
-{{- define "otel.hostMetricsReceiver" -}}
+{{- define "otelAgent.hostMetricsReceiver" -}}
 receivers:
   hostmetrics:
     root_path: /hostfs
@@ -48,7 +48,7 @@ receivers:
         network:
 {{- end }}
 
-{{- define "otel.logsCollectionReceiver" -}}
+{{- define "otelAgent.logsCollectionReceiver" -}}
 receivers:
   filelog:
     include: [ /var/log/pods/*/*/*.log ]
@@ -135,7 +135,7 @@ receivers:
         to: body
 {{- end }}
 
-{{- define "otel.kubeletMetricsReceiver" -}}
+{{- define "otelAgent.kubeletMetricsReceiver" -}}
 receivers:
   kubeletstats:
     collection_interval: 20s
@@ -144,7 +144,7 @@ receivers:
     insecure_skip_verify: true
 {{- end }}
 
-{{- define "otel.kubernetesEventReceiver" -}}
+{{- define "otelAgent.kubernetesEventReceiver" -}}
 receivers:
   k8sobjects:
     objects:
@@ -155,19 +155,19 @@ receivers:
           - "DELETED"
 {{- end }}
 
-{{- define "otel.kubernetesClusterReceiver" -}}
+{{- define "otelAgent.kubernetesClusterReceiver" -}}
 receivers:
   k8s_cluster:
     collection_interval: 10s
 {{- end }}
 
-{{- define "otel.statsdReceiver" -}}
+{{- define "otelAgent.statsdReceiver" -}}
 receivers:
   statsd:
     endpoint: 0.0.0.0:8125
 {{- end }}
 
-{{- define "otel.otlpReceiver" -}}
+{{- define "otelAgent.otlpReceiver" -}}
 receivers:
   otlp:
     protocols:

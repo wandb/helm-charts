@@ -2,11 +2,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "otel.fullname" . }}-agent
+  name: {{ include "otelAgent.fullname" . }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "otel.commonLabels" . | nindent 4 }}
-    {{- include "otel.labels" . | nindent 4 }}
+    {{- include "otelAgent.commonLabels" . | nindent 4 }}
+    {{- include "otelAgent.labels" . | nindent 4 }}
     {{- if .Values.deployment.labels -}}
     {{-   toYaml .Values.deployment.labels | nindent 4 }}
     {{- end }}
@@ -16,27 +16,25 @@ metadata:
     {{-   toYaml .Values.deployment.annotations | nindent 4 }}
     {{- end }}
 spec:
-  updateStrategy:
-    type: RollingUpdate
-  replica: 1
+  replicas: 1
   selector:
     matchLabels:
       {{- include "wandb.selectorLabels" $ | nindent 6 }}
-      {{- include "otel.labels" . | nindent 6 }}
+      {{- include "otelAgent.labels" . | nindent 6 }}
   template:
     metadata:
       labels:
         {{- include "wandb.podLabels" . | nindent 8 }}
-        {{- include "otel.commonLabels" . | nindent 8 }}
-        {{- include "otel.podLabels" . | nindent 8 }}
-        {{- include "otel.labels" . | nindent 8 }}
+        {{- include "otelAgent.commonLabels" . | nindent 8 }}
+        {{- include "otelAgent.podLabels" . | nindent 8 }}
+        {{- include "otelAgent.labels" . | nindent 8 }}
       annotations:
         checksum/configmap: {{ include (print .Template.BasePath "/configmap.yaml") . | sha256sum | trunc 63 }}
         {{- if .Values.pod.annotations -}}
         {{-   toYaml .Values.pod.annotations | nindent 4 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "otel.serviceAccountName" . }}
+      serviceAccountName: {{ include "otelAgent.serviceAccountName" . }}
       {{- if .tolerations }}
       tolerations:
         {{- toYaml .tolerations | nindent 8 }}
@@ -54,19 +52,15 @@ spec:
             - name: otlp
               containerPort: 4317
               protocol: TCP
-              hostPort: 4317
             - name: otlp-http
               containerPort: 4318
               protocol: TCP
-              hostPort: 4318
             - name: prometheus
               containerPort: 9109
               protocol: TCP
-              hostPort: 9109
             - name: statsd
               containerPort: 8125
               protocol: TCP
-              hostPort: 8125
           env:
             - name: MYSQL_PORT
               value: "{{ include "wandb.mysql.port" . }}"
@@ -91,7 +85,7 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: status.podIP
-            {{- include "otel.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
+            {{- include "otelAgent.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           livenessProbe:
             httpGet:
@@ -109,7 +103,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: {{ include "otel.fullname" . }}
+            name: {{ include "otelAgent.fullname" . }}
             items:
               - key: config
                 path: config.yaml
