@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nginx.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "nginx.commonLabels" . | nindent 4 }}
+    {{- include "nginx.labels" . | nindent 4 }}
+    {{- if .Values.configMap.labels -}}
+    {{-   toYaml .Values.configMap.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.configMap.annotations -}}
+    {{-   toYaml .Values.configMap.annotations | nindent 4 }}
+    {{- end }}
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log;
+    pid /var/run/nginx.pid;
+
+    events {
+      worker_connections 1024;
+    }
+
+    http {
+      server {
+        listen 80;
+
+        location / {
+          proxy_pass http://{{ .Release.Name }}-app;
+        }
+
+        location /console {
+          proxy_pass http://{{ .Release.Name }}-console;
+        }
+      }
+    }
