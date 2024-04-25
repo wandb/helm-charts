@@ -16,6 +16,18 @@ global:
 
   storageClass: ""
 
+  banners:
+    {}
+    # banner1:
+    #   type: warning | error | info
+    #   message: "This is a warning message"
+    #   heading: "This is a warning"
+    #   dismissable: true
+    # banner2:
+    #   type: warning | error | info
+    #   message: "This is a warning message"
+    #   heading: "This is a warning"
+
   common:
     labels: {}
     annotations: {}
@@ -86,10 +98,12 @@ global:
     # the kafka dependency chart.
     user: &kafkaUser "wandb"
     password: &kafkaPassword "wandb"
-    brokerUrl: ""
+    brokerHost: ""
     brokerPort: 9092
+    runUpdatesShadowTopic: ""
 
 ingress:
+  install: true
   nameOverride: ""
   defaultBackend: "app"
   annotations: {}
@@ -127,6 +141,12 @@ console:
     repository: wandb/console
     tag: latest
 
+flat-run-fields-updater:
+  install: false
+  image:
+    repository: wandb/local
+    tag: latest
+
 mysql:
   install: true
   persistence:
@@ -161,6 +181,20 @@ prometheus:
 
 otel:
   install: true
+
+  # Consider deploying with a deployment rather than a daemonset to avoid
+  # redundant metrics. In setups where both are scraping the same endpoints,
+  # this redundancy occurs as both scrape the same points.
+  daemonset:
+    install: true
+
+  # By default, we use only the daemonset which, along with the Prometheus
+  # receiver, gathers most necessary metrics.
+  # - To forward Kafka metrics to an external system, you will need to scrape a
+  #   promethus endpoint which causes duplicated metrics that get repoted.
+  deployment:
+    install: false
+
 #   # cannot use install because schema validation will fail.
 #   enabled: true
 
