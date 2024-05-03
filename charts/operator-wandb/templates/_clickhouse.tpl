@@ -1,11 +1,4 @@
 {{/*
-Return the clickhouse client user
-*/}}
-{{- define "wandb.clickhouse.user" -}}
-{{ .Values.global.clickhouse.user }}
-{{- end -}}
-
-{{/*
 Return the kafka client password
 */}}
 {{- define "wandb.clickhouse.password" -}}
