@@ -83,40 +83,40 @@ spec:
 {{- end }}
 {{- end }}
 ---
-{{- if .Values.gcpPrivatLinkIngress.create }}
+{{- if .Values.secondaryIngress.create }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ default .Release.Name .Values.gcpPrivatLinkIngress.nameOverride }}
+  name: {{ default .Release.Name .Values.secondaryIngress.nameOverride }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- if .Values.gcpPrivatLinkIngress.labels -}}
-    {{-   toYaml .Values.gcpPrivatLinkIngress.labels | nindent 4 }}
+    {{- if .Values.secondaryIngress.labels -}}
+    {{-   toYaml .Values.secondaryIngress.labels | nindent 4 }}
     {{- end }}
   annotations:
-    {{- if .Values.gcpPrivatLinkIngress.issuer.create }}
+    {{- if .Values.secondaryIngress.issuer.create }}
     "cert-manager.io/issuer": "{{ .Release.Name }}-issuer"
     "cert-manager.io/acme-challenge-type": "http01"
     "kubernetes.io/ingress.allow-http" : "false"
     {{- end }}
 
-    {{- if .Values.gcpPrivatLinkIngress.annotations -}}
-    {{-   toYaml .Values.gcpPrivatLinkIngress.annotations | nindent 4 }}
+    {{- if .Values.secondaryIngress.annotations -}}
+    {{-   toYaml .Values.secondaryIngress.annotations | nindent 4 }}
     {{- end }}
 spec:
-  ingressClassName: {{ .Values.gcpPrivatLinkIngress.class }}
+  ingressClassName: {{ .Values.secondaryIngress.class }}
   {{- $defaultHost := include "defaultHost" . -}}
 
-  {{- if .Values.gcpPrivatLinkIngress.issuer.create }}
+  {{- if .Values.secondaryIngress.issuer.create }}
   tls:
     - host: [{{ $defaultHost }}]
       secretName: {{ .Release.Name }}-tls
   {{- else }}
-  tls: {{ toYaml .Values.gcpPrivatLinkIngress.tls | nindent 4 }}
+  tls: {{ toYaml .Values.secondaryIngress.tls | nindent 4 }}
   {{- end }}
 
   rules:
-  {{- range concat (list $defaultHost) .Values.gcpPrivatLinkIngress.additionalHosts }}
+  {{- range concat (list $defaultHost) .Values.secondaryIngress.additionalHosts }}
   - host: {{ . }}
     http:
       paths:
@@ -124,7 +124,7 @@ spec:
         path: /
         backend:
           service:
-            {{- if eq $.Values.gcpPrivatLinkIngress.defaultBackend "console" }}
+            {{- if eq $.Values.secondaryIngress.defaultBackend "console" }}
             name: {{ $.Release.Name }}-console
             port:
               number: 8082
