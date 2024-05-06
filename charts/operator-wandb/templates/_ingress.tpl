@@ -44,12 +44,12 @@ It expects a dictionary with two entries:
   path: /
   backend:
     service:
-      {{- if eq .defaultBackend "console" }}
-      name: {{ .Release.Name }}-console
+      {{- if eq $.Values.ingress.defaultBackend "console" }}
+      name: {{ $.Release.Name }}-console
       port:
         number: 8082
       {{- else }}
-      name: {{ .Release.Name }}-app
+      name: {{ $.Release.Name }}-app
       port: 
         number: 8080
       {{- end }}
@@ -57,7 +57,7 @@ It expects a dictionary with two entries:
   path: /console
   backend:
     service:
-      name: {{ .Release.Name }}-console
+      name: {{ $.Release.Name }}-console
       port:
         number: 8082
 {{- end }}
