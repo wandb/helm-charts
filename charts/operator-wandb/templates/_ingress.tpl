@@ -61,3 +61,26 @@ It expects a dictionary with two entries:
       port:
         number: 8082
 {{- end }}
+
+{{- define "ingressPathSecondary" -}}
+- pathType: Prefix
+  path: /
+  backend:
+    service:
+      {{- if eq $.Values.ingress.secondary.defaultBackend "console" }}
+      name: {{ $.Release.Name }}-console
+      port:
+        number: 8082
+      {{- else }}
+      name: {{ $.Release.Name }}-app
+      port: 
+        number: 8080
+      {{- end }}
+- pathType: Prefix
+  path: /console
+  backend:
+    service:
+      name: {{ $.Release.Name }}-console
+      port:
+        number: 8082
+{{- end }}

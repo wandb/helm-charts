@@ -22,6 +22,31 @@ spec:
 {{- end }}
 {{- if .Values.ingress.install }}
 ---
+{{- if .Values.ingress.secondary.issuer.create }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ .Release.Name }}-issuer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+spec:
+  acme:
+    # The ACME server URL
+    server: {{ .Values.ingress.secondary.issuer.server | quote }}
+    email: {{ .Values.ingress.secondary.issuer.email | quote }}
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: {{ .Release.Name }}-acme-key
+    # Enable the HTTP-01 challenge provider
+    solvers:
+      - http01:
+          ingress:
+            class: {{ .Values.ingress.secondary.class }}
+{{- end }}
+{{- end }}
+{{- if .Values.ingress.install }}
+---
 {{- if .Values.ingress.create }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -64,44 +89,44 @@ spec:
 {{- end }}
 {{- end }}
 ---
-{{- if .Values.secondaryIngress.create }}
+{{- if .Values.ingress.secondary.create }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ default .Release.Name .Values.secondaryIngress.nameOverride }}
+  name: {{ default .Release.Name .Values.ingress.secondary.nameOverride }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- if .Values.secondaryIngress.labels -}}
-    {{-   toYaml .Values.secondaryIngress.labels | nindent 4 }}
+    {{- if .Values.ingress.secondary.labels -}}
+    {{-   toYaml .Values.ingress.secondary.labels | nindent 4 }}
     {{- end }}
   annotations:
-    {{- if .Values.secondaryIngress.issuer.create }}
+    {{- if .Values.ingress.secondary.issuer.create }}
     "cert-manager.io/issuer": "{{ .Release.Name }}-issuer"
     "cert-manager.io/acme-challenge-type": "http01"
     "kubernetes.io/ingress.allow-http" : "false"
     {{- end }}
 
-    {{- if .Values.secondaryIngress.annotations -}}
-    {{-   toYaml .Values.secondaryIngress.annotations | nindent 4 }}
+    {{- if .Values.ingress.secondary.annotations -}}
+    {{-   toYaml .Values.ingress.secondary.annotations | nindent 4 }}
     {{- end }}
 spec:
-  ingressClassName: {{ .Values.secondaryIngress.class }}
+  ingressClassName: {{ .Values.ingress.secondary.class }}
   {{- $defaultHost := include "defaultHost" . -}}
 
-  {{- if .Values.secondaryIngress.issuer.create }}
+  {{- if .Values.ingress.secondary.issuer.create }}
   tls:
     - host: [{{ $defaultHost }}]
       secretName: {{ .Release.Name }}-tls
   {{- else }}
-  tls: {{ toYaml .Values.secondaryIngress.tls | nindent 4 }}
+  tls: {{ toYaml .Values.ingress.secondary.tls | nindent 4 }}
   {{- end }}
 
   rules:
-  {{- range concat (list $defaultHost) .Values.secondaryIngress.additionalHosts }}
+  {{- range concat (list $defaultHost) .Values.ingress.secondary.additionalHosts }}
   - host: {{ . }}
     http:
       paths:
-      {{- template "ingressPath" . }}
+      {{- template "ingressPathSecondary" . }}
 
   {{- end }}
  {{- end }}
