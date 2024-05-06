@@ -39,17 +39,21 @@ It expects a dictionary with two entries:
 {{- replace "https://" "" (replace "http://" "" .Values.global.host) }}
 {{- end -}}
 
+{{/* 
+Return the ingress backend paths
+*/}}
+
 {{- define "ingressPath" -}}
 - pathType: Prefix
   path: /
   backend:
     service:
-      {{- if eq $.Values.ingress.defaultBackend "console" }}
-      name: {{ $.Release.Name }}-console
+      {{- if eq .Values.ingress.defaultBackend "console" }}
+      name: {{ .Release.Name }}-console
       port:
         number: 8082
       {{- else }}
-      name: {{ $.Release.Name }}-app
+      name: {{ .Release.Name }}-app
       port: 
         number: 8080
       {{- end }}
@@ -57,30 +61,7 @@ It expects a dictionary with two entries:
   path: /console
   backend:
     service:
-      name: {{ $.Release.Name }}-console
-      port:
-        number: 8082
-{{- end }}
-
-{{- define "ingressPathSecondary" -}}
-- pathType: Prefix
-  path: /
-  backend:
-    service:
-      {{- if eq $.Values.ingress.secondary.defaultBackend "console" }}
-      name: {{ $.Release.Name }}-console
-      port:
-        number: 8082
-      {{- else }}
-      name: {{ $.Release.Name }}-app
-      port: 
-        number: 8080
-      {{- end }}
-- pathType: Prefix
-  path: /console
-  backend:
-    service:
-      name: {{ $.Release.Name }}-console
+      name: {{ .Release.Name }}-console
       port:
         number: 8082
 {{- end }}
