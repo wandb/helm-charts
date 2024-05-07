@@ -38,30 +38,3 @@ It expects a dictionary with two entries:
 {{- define "defaultHost" -}}
 {{- replace "https://" "" (replace "http://" "" .Values.global.host) }}
 {{- end -}}
-
-{{/* 
-Return the ingress backend paths
-*/}}
-
-{{- define "ingressPath" -}}
-- pathType: Prefix
-  path: /
-  backend:
-    service:
-      {{- if eq .Values.ingress.defaultBackend "console" }}
-      name: {{ .Release.Name }}-console
-      port:
-        number: 8082
-      {{- else }}
-      name: {{ .Release.Name }}-app
-      port: 
-        number: 8080
-      {{- end }}
-- pathType: Prefix
-  path: /console
-  backend:
-    service:
-      name: {{ .Release.Name }}-console
-      port:
-        number: 8082
-{{- end }}
