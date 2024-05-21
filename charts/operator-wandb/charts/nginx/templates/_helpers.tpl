@@ -64,18 +64,6 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{/*
-Returns the extraEnv keys and values to inject into containers.
-
-Global values will override any chart-specific values.
-*/}}
-{{- define "nginx.extraEnv" -}}
-{{- $allExtraEnv := merge (default (dict) .local.extraEnv) .global.extraEnv -}}
-{{- range $key, $value := $allExtraEnv }}
-- name: {{ $key }}
-  value: {{ $value | quote }}
-{{- end -}}
-{{- end -}}
 
 {{/*
 Returns a list of _common_ labels to be shared across all
@@ -100,33 +88,6 @@ nginx deployments.
 {{- end }}
 {{- end -}}
 
-{{- define "nginx.redis" -}}
-{{- $cs := include "wandb.redis.connectionString" . }}
-{{- $ca := include "wandb.redis.caCert" . }}
-{{- if $ca }}
-{{- printf "%s?tls=true&caCertPath=/etc/ssl/certs/redis_ca.pem&ttlInSeconds=604800" $cs -}}
-{{- else }}
-{{- print $cs -}}
-{{- end }}
-{{- end }}
-
-{{- define "nginx.bucket" -}}
-{{- $bucket := "" -}} 
-{{- if eq .Values.global.bucket.provider "az" -}}
-{{- $bucket = printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
-{{- end -}}
-{{- if eq .Values.global.bucket.provider "gcs" -}}
-{{- $bucket = printf "gs://%s" .Values.global.bucket.name -}}
-{{- end -}}
-{{- if eq .Values.global.bucket.provider "s3" -}}
-{{- if and .Values.global.bucket.accessKey .Values.global.bucket.secretKey -}}
-{{- $bucket = printf "s3://%s:%s@%s/%s" .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.name .Values.global.bucket.path -}}
-{{- else -}}
-{{- $bucket = printf "s3://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
-{{- end -}}
-{{- end -}}
-{{- trimSuffix "/" $bucket -}}
-{{- end -}}
 
 {{- define "nginx.nodeSelector" -}}
 {{- $nodeSelector := default .Values.global.nodeSelector .Values.nodeSelector -}}
