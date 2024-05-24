@@ -35,7 +35,7 @@ It expects a dictionary with two entries:
 {{- default .global.provider .local.provider -}}
 {{- end -}}
 
-{{- define "defaultHost" -}}
+{{- define "wandb.ingress.defaultHost" -}}
 {{- replace "https://" "" (replace "http://" "" .Values.global.host) }}
 {{- end -}}
 
