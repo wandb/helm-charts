@@ -49,12 +49,6 @@ spec:
                 "megabinary",
                 "glue",
               ]
-              volumeMounts:
-                {{- if ne (include "wandb.redis.caCert" .) "" }}
-                - name: {{ include "parquet.fullname" . }}-redis-ca
-                  mountPath: /etc/ssl/certs/redis_ca.pem
-                  subPath: redis_ca.pem
-              {{- end }}
               env:
                 - name: GORILLA_GLUE_EXECUTE
                   value: "true"
@@ -134,14 +128,6 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: status.hostIP
-          volumes:
-            {{- if ne (include "wandb.redis.caCert" .) "" }}
-            - name: {{ include "parquet.fullname" . }}-redis-ca
-              secret:
-                secretName: "{{ include "wandb.redis.passwordSecret" . }}"
-                items:
-                - key: REDIS_CA_CERT
-                  path: redis_ca.pem
             {{- end }}
                 {{- include "parquet.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 16 }}
                 {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 16 }}
