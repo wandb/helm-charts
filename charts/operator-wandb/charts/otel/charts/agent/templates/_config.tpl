@@ -22,6 +22,9 @@
 {{- if .Values.presets.receivers.otlp }}
 {{- $config = mustMergeOverwrite (include "otelAgent.otlpReceiver" . | fromYaml) $config }}
 {{- end }}
+{{- if .Values.presets.receivers.azuremonitor }}
+{{- $config = mustMergeOverwrite (include "otelAgent.azuremonitorReceiver" . | fromYaml) $config }}
+{{- end }}
 {{- $config = mustMergeOverwrite (include "otelAgent.extensions" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otelAgent.processors" . | fromYaml) $config }}
 {{- $config = mustMergeOverwrite (include "otelAgent.service" . | fromYaml) $config }}

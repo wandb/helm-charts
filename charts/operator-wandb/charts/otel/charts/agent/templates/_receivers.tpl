@@ -161,6 +161,22 @@ receivers:
     collection_interval: 10s
 {{- end }}
 
+
+{{- define "otelAgent.azuremonitorReceiver" -}}
+receivers:
+  azuremonitor:
+    subscription_id: "{{ .Values.presets.receivers.azuremonitor.subscription_id }}"
+    resource_groups:
+      {{- range .Values.presets.receivers.azuremonitor.resource_groups }}
+      - {{ . }}
+      {{- end }}
+    auth: "workload_identity"
+    tenant_id: "${env:AZURE_TENANT_ID}"
+    client_id: "${env:AZURE_CLIENT_ID}"
+    federated_token_file: "${env:AZURE_FEDERATED_TOKEN_FILE}"
+    services: ["Microsoft.DBforMySQL/flexibleServers","Microsoft.Cache/Redis"]
+{{- end }}
+
 {{- define "otelAgent.statsdReceiver" -}}
 receivers:
   statsd:
