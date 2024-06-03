@@ -48,7 +48,6 @@ extensions:
 {{- define "otelAgent.processors" -}}
 processors:
   batch: {}
-  attributes: {}
   memory_limiter:
     check_interval: 5s
     limit_percentage: 80
