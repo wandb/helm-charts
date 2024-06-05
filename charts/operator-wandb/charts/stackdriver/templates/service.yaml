@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stackdriver.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "stackdriver.labels" . | nindent 4 }}
+    {{- include "stackdriver.commonLabels" . | nindent 4 }}
+    {{- if .Values.service.labels -}}
+    {{-   toYaml .Values.service.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.service.annotations -}}
+    {{-   toYaml .Values.service.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: 9255
+      protocol: TCP
+      name: stackdriver
+  selector:
+    {{- include "stackdriver.labels" . | nindent 4 }}
