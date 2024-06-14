@@ -43,7 +43,7 @@ Valid configuration for external Redis are:
 Or via command line using `--set redis=<REDIS CONFIG>`
 
 
-## Use extneral stateful data
+## Use external stateful data
 
 You can configure the W&B Server Helm chart to point to external stateful
 storage for items like MySQL, Redis, and Storage.
