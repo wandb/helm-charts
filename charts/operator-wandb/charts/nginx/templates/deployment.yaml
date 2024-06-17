@@ -1,0 +1,54 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    {{- if .Values.deployment.annotations -}}
+    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- end }}
+  labels:
+    {{- include "nginx.commonLabels" . | nindent 4 }}
+    {{- include "nginx.labels" . | nindent 4 }}
+    {{- if .Values.deployment.labels -}}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  name: {{ include "nginx.fullname" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "nginx.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nginx.commonLabels" . | nindent 8 }}
+        {{- include "nginx.podLabels" . | nindent 8 }}
+        {{- include "nginx.labels" . | nindent 8 }}
+      annotations:
+        checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.pod.annotations -}}
+        {{-   toYaml .Values.pod.annotations | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "nginx.serviceAccountName" . }}
+      {{- if .tolerations }}
+      tolerations:
+        {{- toYaml .tolerations | nindent 8 }}
+      {{- end }}
+      {{- include "nginx.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      containers:
+      - image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        name: {{ .Chart.Name }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }} 
+        ports:
+          - containerPort: 8080
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: {{ include "nginx.fullname" . }}
+{{- end }}
