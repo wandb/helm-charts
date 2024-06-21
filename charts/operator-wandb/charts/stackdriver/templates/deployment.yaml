@@ -1,0 +1,123 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "stackdriver.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "stackdriver.commonLabels" . | nindent 4 }}
+    {{- include "stackdriver.labels" . | nindent 4 }}
+    {{- if .Values.deployment.labels -}}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
+    {{- if .Values.deployment.annotations -}}
+    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "wandb.selectorLabels" $ | nindent 6 }}
+      {{- include "stackdriver.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wandb.podLabels" . | nindent 8 }}
+        {{- include "stackdriver.commonLabels" . | nindent 8 }}
+        {{- include "stackdriver.podLabels" . | nindent 8 }}
+        {{- include "stackdriver.labels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.pod.annotations -}}
+        {{-   toYaml .Values.pod.annotations | nindent 8 }}
+        {{- end }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image:  "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command: ["stackdriver_exporter"]
+          volumeMounts:
+          {{- if or .Values.stackdriver.serviceAccountSecret .Values.stackdriver.serviceAccountKey }}
+            - name: stackdriver-service-account
+              mountPath: /etc/secrets/service-account/
+          {{- end}}
+          args:
+            - --google.project-id={{ .Values.stackdriver.projectId }}
+            - --monitoring.metrics-interval={{ .Values.stackdriver.metrics.interval }}
+            - --monitoring.metrics-offset={{ .Values.stackdriver.metrics.offset }}
+            - --monitoring.metrics-type-prefixes={{ .Values.stackdriver.metrics.typePrefixes | replace " " "" }}
+            {{- range .Values.stackdriver.metrics.filters }}
+            - --monitoring.filters={{ . }}
+            {{- end }}
+            - --stackdriver.backoff-jitter={{ .Values.stackdriver.backoffJitter }}
+            - --stackdriver.http-timeout={{ .Values.stackdriver.httpTimeout }}
+            - --stackdriver.max-backoff={{ .Values.stackdriver.maxBackoff }}
+            - --stackdriver.max-retries={{ .Values.stackdriver.maxRetries }}
+            - --stackdriver.retry-statuses={{ .Values.stackdriver.retryStatuses }}
+            - --web.listen-address={{ .Values.web.listenAddress }}
+            - --web.telemetry-path={{ .Values.web.path }}
+          {{- if .Values.stackdriver.dropDelegatedProjects }}
+            - --monitoring.drop-delegated-projects
+          {{- end }}
+          {{- if .Values.stackdriver.metrics.ingestDelay }}
+            - --monitoring.metrics-ingest-delay
+          {{- end }}
+          {{- if .Values.stackdriver.metrics.aggregateDeltas }}
+            - --monitoring.aggregate-deltas
+            - --monitoring.aggregate-deltas-ttl={{ .Values.stackdriver.metrics.aggregateDeltasTTL }}
+          {{- end }}
+          {{- if .Values.extraArgs }}
+          {{- range $key, $value := .Values.extraArgs }}
+            {{- if $value }}
+            - --{{ $key }}={{ $value }}
+            {{- end }}
+          {{- end }}
+          {{- end }}
+          {{- if or .Values.stackdriver.serviceAccountSecret .Values.stackdriver.serviceAccountKey }}
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /etc/secrets/service-account/credentials.json
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          ports:
+            - containerPort: {{ .Values.service.httpPort }}
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+      restartPolicy: {{ .Values.restartPolicy }}
+      serviceAccountName: {{ include "stackdriver.serviceAccountName" . }}
+      {{- if .tolerations }}
+      tolerations:
+        {{- toYaml .tolerations | nindent 8 }}
+      {{- end }}
+      {{- include "wandb.nodeSelector" . | nindent 6 }}
+      {{- include "wandb.priorityClassName" . | nindent 6 }}
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      volumes:
+      {{- if .Values.stackdriver.serviceAccountSecret }}
+        - name: stackdriver-service-account
+          secret:
+            secretName: {{ .Values.stackdriver.serviceAccountSecret | quote }}
+            {{- if and (.Values.stackdriver.serviceAccountSecret) (.Values.stackdriver.serviceAccountSecretKey) }}
+            items:
+              - key: {{ .Values.stackdriver.serviceAccountSecretKey | quote }}
+                path: credentials.json
+            {{- end }}
+      {{- else if .Values.stackdriver.serviceAccountKey }}
+        - name: stackdriver-service-account
+          secret:
+            secretName: {{ template "stackdriver-exporter.fullname" . }}
+      {{- end}}
+{{- end }}
