@@ -13,6 +13,6 @@ helm upgrade --install operator wandb/operator
 
 ```
 git clone https://github.com/wandb/helm-charts.git
-cd helm-charts
+cd helm-charts/charts/operator
 helm upgrade --namespace=wandb --create-namespace --install operator .
 ```
