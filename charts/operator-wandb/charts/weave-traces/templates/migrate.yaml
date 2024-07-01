@@ -1,22 +1,25 @@
-{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
-apiVersion: apps/v1
-kind: Deployment
+{{ if not .Values.disableMigrate }}
+---
+apiVersion: batch/v1
+kind: Job
 metadata:
-  name: {{ include "weaveTraces.fullname" . }}
+  name: {{ include "weaveTraces.fullname" . }}-migrate
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "weaveTraces.commonLabels" . | nindent 4 }}
     {{- include "weaveTraces.labels" . | nindent 4 }}
-    {{- if .Values.deployment.labels -}}
-    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- if .Values.migration.labels -}}
+    {{-   toYaml .Values.migration.labels | nindent 4 }}
     {{- end }}
   annotations:
-    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
-    {{- if .Values.deployment.annotations -}}
-    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    {{- if .Values.migration.annotations -}}
+    {{-   toYaml .Values.migration.annotations | nindent 4 }}
     {{- end }}
 spec:
-  replicas: 1
+  backoffLimit: 0
+  activeDeadlineSeconds: 240
   selector:
     matchLabels:
       {{- include "wandb.selectorLabels" $ | nindent 6 }}
@@ -28,6 +31,9 @@ spec:
         {{- include "weaveTraces.commonLabels" . | nindent 8 }}
         {{- include "weaveTraces.podLabels" . | nindent 8 }}
         {{- include "weaveTraces.labels" . | nindent 8 }}
+        {{- if .Values.migration.labels -}}
+        {{-   toYaml .Values.migration.labels | nindent 8 }}
+        {{- end }}
       annotations:
         {{- if .Values.pod.annotations -}}
         {{-   toYaml .Values.pod.annotations | nindent 4 }}
@@ -41,15 +47,12 @@ spec:
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       containers:
-        - name: {{ include "weaveTraces.fullname" .  }}
+        - name: {{ include "weaveTraces.fullname" . }}-migrate
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          ports:
-            - name: http
-              containerPort: 8080
-              protocol: TCP
+          command:
+            - "python"
+            - "migrator.py"
           env:
-            - name: PORT
-              value: "8080"
             - name: WF_CLICKHOUSE_HOST
               value: "{{ .Values.global.clickhouse.host }}"
             - name: WF_CLICKHOUSE_PORT
@@ -65,48 +68,5 @@ spec:
                   key: CLICKHOUSE_PASSWORD
             {{- include "weaveTraces.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: http
-            timeoutSeconds: 2
-            failureThreshold: 5
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: http
-            timeoutSeconds: 2
-            failureThreshold: 5
-          startupProbe:
-            httpGet:
-              path: /health
-              port: http
-            failureThreshold: 12
-            periodSeconds: 10
-
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name:  {{ include "weaveTraces.fullname" . }}
-  labels:
-    {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "weaveTraces.commonLabels" . | nindent 4 }}
-    {{- include "weaveTraces.labels" . | nindent 4 }}
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: {{ include "weaveTraces.fullname" . }}
-  minReplicas: 1
-  maxReplicas: 5
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-        
+      restartPolicy: "Never"
+{{ end }}
