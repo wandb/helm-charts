@@ -1,0 +1,2238 @@
+---
+# Source: operator-wandb/charts/redis/templates/networkpolicy.yaml
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: test-redis
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.19.4
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: test
+      app.kubernetes.io/name: redis
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - {}
+  ingress:
+    # Allow inbound connections
+    - ports:
+        - port: 6379
+---
+# Source: operator-wandb/charts/app/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-app
+  namespace: default
+  labels:
+    
+    
+    helm.sh/chart: app-0.1.0
+    app.kubernetes.io/name: app
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: app-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+---
+# Source: operator-wandb/charts/console/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-console
+  namespace: default
+  labels:
+    
+    
+    helm.sh/chart: console-0.1.0
+    app.kubernetes.io/name: console
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.16.0"
+    wandb.com/app-name: console-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+---
+# Source: operator-wandb/charts/otel/charts/daemonset/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-otel-daemonset
+  labels:
+    
+    
+    helm.sh/chart: daemonset-0.1.0
+    app.kubernetes.io/name: daemonset
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: daemonset-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+---
+# Source: operator-wandb/charts/redis/templates/master/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: false
+metadata:
+  name: test-redis-master
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.19.4
+---
+# Source: operator-wandb/charts/yace/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-yace
+  labels:
+    
+    
+    helm.sh/chart: yace-0.1.0
+    app.kubernetes.io/name: yace
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "v0.60.0"
+    wandb.com/app-name: yace-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+---
+# Source: operator-wandb/charts/app/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-app-config
+  labels:
+    
+data:
+  SLACK_SECRET: 
+  LICENSE:
+---
+# Source: operator-wandb/templates/bucket.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-bucket
+  labels:
+    
+data:
+  ACCESS_KEY: 
+  SECRET_KEY:
+---
+# Source: operator-wandb/templates/kafka.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-kafka
+  labels:
+    
+data:
+  KAFKA_CLIENT_PASSWORD: d2FuZGI=
+---
+# Source: operator-wandb/templates/mysql.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-mysql
+  labels:
+    
+data:
+  MYSQL_ROOT_PASSWORD: bEJmR25LcjR1dXBiVzBSTVZqY09pUEVucFI4b0gzMGZsVzNQYWxHdXFhd0pvODNzbzVzMElhaElXNHE3dGpESg==
+  MYSQL_PASSWORD: NjFMRWVHU1pLSE5PemJ1Z1VmM3N5cTZvdElQbkh1SGdHWkxKNlVsSHBTcTFMMFZXVW9haUZvbVB1S1JnSnEwdw==
+---
+# Source: operator-wandb/charts/otel/charts/daemonset/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-otel-daemonset
+  labels:
+    
+    
+    helm.sh/chart: daemonset-0.1.0
+    app.kubernetes.io/name: daemonset
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: daemonset-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+data:
+  config: |
+    exporters:
+      debug: {}
+      debug/detailed:
+        verbosity: detailed
+      prometheus:
+        endpoint: 0.0.0.0:9109
+    extensions:
+      health_check: {}
+      memory_ballast:
+        size_in_percentage: 40
+    processors:
+      batch: {}
+      k8sattributes:
+        extract:
+          annotations:
+          - from: pod
+            key_regex: (.*)
+            tag_name: $$1
+          labels:
+          - from: pod
+            key_regex: (.*)
+            tag_name: $$1
+          metadata:
+          - k8s.namespace.name
+          - k8s.deployment.name
+          - k8s.statefulset.name
+          - k8s.daemonset.name
+          - k8s.cronjob.name
+          - k8s.job.name
+          - k8s.node.name
+          - k8s.pod.name
+          - k8s.pod.uid
+          - k8s.pod.start_time
+        filter:
+          node_from_env_var: K8S_NODE_NAME
+        passthrough: false
+        pod_association:
+        - sources:
+          - from: resource_attribute
+            name: k8s.pod.ip
+        - sources:
+          - from: resource_attribute
+            name: k8s.pod.uid
+        - sources:
+          - from: connection
+      memory_limiter:
+        check_interval: 5s
+        limit_percentage: 80
+        spike_limit_percentage: 25
+    receivers:
+      filelog:
+        exclude: []
+        include:
+        - /var/log/pods/*/*/*.log
+        include_file_name: false
+        include_file_path: true
+        operators:
+        - id: get-format
+          routes:
+          - expr: body matches "^\\{"
+            output: parser-docker
+          - expr: body matches "^[^ Z]+ "
+            output: parser-crio
+          - expr: body matches "^[^ Z]+Z"
+            output: parser-containerd
+          type: router
+        - id: parser-crio
+          regex: ^(?P<time>[^ Z]+) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) ?(?P<log>.*)$
+          timestamp:
+            layout: 2006-01-02T15:04:05.999999999Z07:00
+            layout_type: gotime
+            parse_from: attributes.time
+          type: regex_parser
+        - combine_field: attributes.log
+          combine_with: ""
+          id: crio-recombine
+          is_last_entry: attributes.logtag == 'F'
+          max_log_size: 102400
+          output: extract_metadata_from_filepath
+          source_identifier: attributes["log.file.path"]
+          type: recombine
+        - id: parser-containerd
+          regex: ^(?P<time>[^ ^Z]+Z) (?P<stream>stdout|stderr) (?P<logtag>[^ ]*) ?(?P<log>.*)$
+          timestamp:
+            layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+            parse_from: attributes.time
+          type: regex_parser
+        - combine_field: attributes.log
+          combine_with: ""
+          id: containerd-recombine
+          is_last_entry: attributes.logtag == 'F'
+          max_log_size: 102400
+          output: extract_metadata_from_filepath
+          source_identifier: attributes["log.file.path"]
+          type: recombine
+        - id: parser-docker
+          output: extract_metadata_from_filepath
+          timestamp:
+            layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+            parse_from: attributes.time
+          type: json_parser
+        - id: extract_metadata_from_filepath
+          parse_from: attributes["log.file.path"]
+          regex: ^.*\/(?P<namespace>[^_]+)_(?P<pod_name>[^_]+)_(?P<uid>[a-f0-9\-]+)\/(?P<container_name>[^\._]+)\/(?P<restart_count>\d+)\.log$
+          type: regex_parser
+        - from: attributes.stream
+          to: attributes["log.iostream"]
+          type: move
+        - from: attributes.container_name
+          to: resource["k8s.container.name"]
+          type: move
+        - from: attributes.namespace
+          to: resource["k8s.namespace.name"]
+          type: move
+        - from: attributes.pod_name
+          to: resource["k8s.pod.name"]
+          type: move
+        - from: attributes.restart_count
+          to: resource["k8s.container.restart_count"]
+          type: move
+        - from: attributes.uid
+          to: resource["k8s.pod.uid"]
+          type: move
+        - from: attributes.log
+          to: body
+          type: move
+        start_at: end
+      hostmetrics:
+        collection_interval: 10s
+        root_path: /hostfs
+        scrapers:
+          cpu: null
+          disk: null
+          filesystem:
+            exclude_fs_types:
+              fs_types:
+              - autofs
+              - binfmt_misc
+              - bpf
+              - cgroup2
+              - configfs
+              - debugfs
+              - devpts
+              - devtmpfs
+              - fusectl
+              - hugetlbfs
+              - iso9660
+              - mqueue
+              - nsfs
+              - overlay
+              - proc
+              - procfs
+              - pstore
+              - rpc_pipefs
+              - securityfs
+              - selinuxfs
+              - squashfs
+              - sysfs
+              - tracefs
+              match_type: strict
+            exclude_mount_points:
+              match_type: regexp
+              mount_points:
+              - /dev/*
+              - /proc/*
+              - /sys/*
+              - /run/k3s/containerd/*
+              - /var/lib/docker/*
+              - /var/lib/kubelet/*
+              - /snap/*
+          load: null
+          memory: null
+          network: null
+      k8s_cluster:
+        collection_interval: 10s
+      k8sobjects:
+        objects:
+        - exclude_watch_type:
+          - DELETED
+          group: events.k8s.io
+          mode: watch
+          name: events
+      kubeletstats:
+        auth_type: serviceAccount
+        collection_interval: 20s
+        endpoint: https://${env:K8S_NODE_NAME}:10250
+        insecure_skip_verify: true
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      statsd:
+        endpoint: 0.0.0.0:8125
+    service:
+      extensions:
+      - health_check
+      - memory_ballast
+      pipelines:
+        logs:
+          exporters:
+          - debug
+          processors:
+          - memory_limiter
+          - batch
+          - k8sattributes
+          receivers:
+          - filelog
+        metrics:
+          exporters:
+          - debug
+          - prometheus
+          processors:
+          - memory_limiter
+          - batch
+          - k8sattributes
+          receivers:
+          - hostmetrics
+          - k8s_cluster
+          - kubeletstats
+        traces:
+          exporters:
+          - debug
+          processors:
+          - batch
+          - memory_limiter
+          - k8sattributes
+          receivers:
+          - otlp
+      telemetry:
+        metrics:
+          address: ${env:POD_IP}:8888
+---
+# Source: operator-wandb/charts/redis/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-redis-configuration
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.19.4
+data:
+  redis.conf: |-
+    # User-supplied common configuration:
+    # Enable AOF https://redis.io/topics/persistence#append-only-file
+    appendonly yes
+    # Disable RDB persistence, AOF persistence already enabled.
+    save ""
+    # End of common configuration
+  master.conf: |-
+    dir /data
+    # User-supplied master configuration:
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+    # End of master configuration
+  replica.conf: |-
+    dir /data
+    # User-supplied replica configuration:
+    rename-command FLUSHDB ""
+    rename-command FLUSHALL ""
+    # End of replica configuration
+---
+# Source: operator-wandb/charts/redis/templates/health-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-redis-health
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.19.4
+data:
+  ping_readiness_local.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+    [[ -n "$REDIS_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_PASSWORD"
+    response=$(
+      timeout -s 15 $1 \
+      redis-cli \
+        -h localhost \
+        -p $REDIS_PORT \
+        ping
+    )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    if [ "$response" != "PONG" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_liveness_local.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+    [[ -n "$REDIS_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_PASSWORD"
+    response=$(
+      timeout -s 15 $1 \
+      redis-cli \
+        -h localhost \
+        -p $REDIS_PORT \
+        ping
+    )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    responseFirstWord=$(echo $response | head -n1 | awk '{print $1;}')
+    if [ "$response" != "PONG" ] && [ "$responseFirstWord" != "LOADING" ] && [ "$responseFirstWord" != "MASTERDOWN" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_readiness_master.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
+    [[ -n "$REDIS_MASTER_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_MASTER_PASSWORD"
+    response=$(
+      timeout -s 15 $1 \
+      redis-cli \
+        -h $REDIS_MASTER_HOST \
+        -p $REDIS_MASTER_PORT_NUMBER \
+        ping
+    )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    if [ "$response" != "PONG" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_liveness_master.sh: |-
+    #!/bin/bash
+
+    [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
+    [[ -n "$REDIS_MASTER_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_MASTER_PASSWORD"
+    response=$(
+      timeout -s 15 $1 \
+      redis-cli \
+        -h $REDIS_MASTER_HOST \
+        -p $REDIS_MASTER_PORT_NUMBER \
+        ping
+    )
+    if [ "$?" -eq "124" ]; then
+      echo "Timed out"
+      exit 1
+    fi
+    responseFirstWord=$(echo $response | head -n1 | awk '{print $1;}')
+    if [ "$response" != "PONG" ] && [ "$responseFirstWord" != "LOADING" ]; then
+      echo "$response"
+      exit 1
+    fi
+  ping_readiness_local_and_master.sh: |-
+    script_dir="$(dirname "$0")"
+    exit_status=0
+    "$script_dir/ping_readiness_local.sh" $1 || exit_status=$?
+    "$script_dir/ping_readiness_master.sh" $1 || exit_status=$?
+    exit $exit_status
+  ping_liveness_local_and_master.sh: |-
+    script_dir="$(dirname "$0")"
+    exit_status=0
+    "$script_dir/ping_liveness_local.sh" $1 || exit_status=$?
+    "$script_dir/ping_liveness_master.sh" $1 || exit_status=$?
+    exit $exit_status
+---
+# Source: operator-wandb/charts/redis/templates/scripts-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-redis-scripts
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.19.4
+data:
+  start-master.sh: |
+    #!/bin/bash
+
+    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
+    if [[ -f /opt/bitnami/redis/mounted-etc/master.conf ]];then
+        cp /opt/bitnami/redis/mounted-etc/master.conf /opt/bitnami/redis/etc/master.conf
+    fi
+    if [[ -f /opt/bitnami/redis/mounted-etc/redis.conf ]];then
+        cp /opt/bitnami/redis/mounted-etc/redis.conf /opt/bitnami/redis/etc/redis.conf
+    fi
+    ARGS=("--port" "${REDIS_PORT}")
+    ARGS+=("--protected-mode" "no")
+    ARGS+=("--include" "/opt/bitnami/redis/etc/redis.conf")
+    ARGS+=("--include" "/opt/bitnami/redis/etc/master.conf")
+    exec redis-server "${ARGS[@]}"
+---
+# Source: operator-wandb/charts/yace/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-yace
+  labels:
+    
+    
+    helm.sh/chart: yace-0.1.0
+    app.kubernetes.io/name: yace
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "v0.60.0"
+    wandb.com/app-name: yace-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+data:
+  config.yml: |
+    apiVersion: v1alpha1
+    discovery:
+      jobs:
+        - type: AWS/ElastiCache
+          regions:
+          - ap-south-1
+          period: 60
+          length: 60
+          metrics:
+            - name: CPUUtilization
+              statistics: [Average]
+            - name: FreeableMemory
+              statistics: [Average]
+            - name: NetworkBytesIn
+              statistics: [Average]
+            - name: NetworkBytesOut
+              statistics: [Average]
+            - name: NetworkPacketsIn
+              statistics: [Average]
+            - name: NetworkPacketsOut
+              statistics: [Average]
+            - name: SwapUsage
+              statistics: [Average]
+            - name: CPUCreditUsage
+              statistics: [Average]
+        - type: AWS/RDS
+          regions:
+          - ap-south-1
+          period: 60
+          length: 60
+          metrics:
+            - name: CPUUtilization
+              statistics: [Maximum]
+            - name: DatabaseConnections
+              statistics: [Sum]
+            - name: FreeableMemory
+              statistics: [Average]
+            - name: FreeStorageSpace
+              statistics: [Average]
+            - name: ReadThroughput
+              statistics: [Average]
+            - name: WriteThroughput
+              statistics: [Average]
+            - name: ReadLatency
+              statistics: [Maximum]
+            - name: WriteLatency
+              statistics: [Maximum]
+            - name: ReadIOPS
+              statistics: [Average]
+            - name: WriteIOPS
+              statistics: [Average]
+---
+# Source: operator-wandb/charts/console/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test-console
+  namespace: default
+  labels:
+    
+    
+    helm.sh/chart: console-0.1.0
+    app.kubernetes.io/name: console
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.16.0"
+    wandb.com/app-name: console-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+rules:
+  # We can scope these permissions down later
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+# Source: operator-wandb/charts/otel/charts/daemonset/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test-otel-daemonset
+  namespace: default
+  labels:
+    
+    
+    helm.sh/chart: daemonset-0.1.0
+    app.kubernetes.io/name: daemonset
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: daemonset-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+rules:
+  # kubernetesAttributes
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+
+  # clusterMetrics
+  - apiGroups: [""]
+    resources: ["events", "namespaces", "namespaces/status", "nodes", "nodes/spec", "pods", "pods/status", "replicationcontrollers", "replicationcontrollers/status", "resourcequotas", "services" ]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["daemonsets", "deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources: ["daemonsets", "deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+
+  # kubeletMetrics
+  - apiGroups: [""]
+    resources: ["nodes/stats"]
+    verbs: ["get", "watch", "list"]
+
+  # kubernetesEvents
+  - apiGroups: ["events.k8s.io"]
+    resources: ["events"]
+    verbs: ["watch", "list"]
+---
+# Source: operator-wandb/charts/console/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: test-console
+  labels:
+    
+    
+    helm.sh/chart: console-0.1.0
+    app.kubernetes.io/name: console
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.16.0"
+    wandb.com/app-name: console-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: test-console
+subjects:
+  - kind: ServiceAccount
+    name: test-console
+    namespace: default
+---
+# Source: operator-wandb/charts/otel/charts/daemonset/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: test-otel-daemonset
+  labels:
+    
+    
+    helm.sh/chart: daemonset-0.1.0
+    app.kubernetes.io/name: daemonset
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: daemonset-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: test-otel-daemonset
+subjects:
+  - kind: ServiceAccount
+    name: test-otel-daemonset
+    namespace: default
+---
+# Source: operator-wandb/charts/app/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-app
+  namespace: default
+  labels:
+    
+    
+    helm.sh/chart: app-0.1.0
+    app.kubernetes.io/name: app
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: app-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get"]
+---
+# Source: operator-wandb/charts/app/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-app
+  labels:
+    
+    
+    helm.sh/chart: app-0.1.0
+    app.kubernetes.io/name: app
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: app-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: test-app
+subjects:
+  - kind: ServiceAccount
+    name: test-app
+    namespace: default
+---
+# Source: operator-wandb/charts/app/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-app
+  labels:
+    
+    helm.sh/chart: app-0.1.0
+    app.kubernetes.io/name: app
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: app-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '8181'
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      protocol: TCP
+      name: app
+    - port: 8181
+      protocol: TCP
+      name: prometheus
+  selector:
+    helm.sh/chart: app-0.1.0
+    app.kubernetes.io/name: app
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: app-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: operator-wandb/charts/console/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-console
+  labels:
+    
+    helm.sh/chart: console-0.1.0
+    app.kubernetes.io/name: console
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.16.0"
+    wandb.com/app-name: console-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8082
+      protocol: TCP
+      name: console
+  selector:
+    helm.sh/chart: console-0.1.0
+    app.kubernetes.io/name: console
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.16.0"
+    wandb.com/app-name: console-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: operator-wandb/charts/otel/charts/daemonset/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-otel-daemonset
+  labels:
+    
+    helm.sh/chart: daemonset-0.1.0
+    app.kubernetes.io/name: daemonset
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: daemonset-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '9109'
+spec:
+  type: 
+  ports:
+    - port: 9109
+      protocol: TCP
+      name: otel-exporter
+    - port: 8125
+      protocol: TCP
+      name: statsd
+    - port: 4317
+      protocol: TCP
+      name: otlp-grpc
+    - port: 4318
+      protocol: TCP
+      name: otlp-http
+  selector:
+    helm.sh/chart: daemonset-0.1.0
+    app.kubernetes.io/name: daemonset
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: daemonset-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: operator-wandb/charts/parquet/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-parquet
+  labels:
+    
+    helm.sh/chart: parquet-0.1.0
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.0.0"
+    wandb.com/app-name: parquet-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8087
+      protocol: TCP
+      name: parquet
+  selector:
+    helm.sh/chart: parquet-0.1.0
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.0.0"
+    wandb.com/app-name: parquet-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: operator-wandb/charts/prometheus/charts/mysql-exporter/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-prometheus-mysql-exporter
+  labels:
+    
+    helm.sh/chart: mysql-exporter-0.1.0
+    app.kubernetes.io/name: prometheus-mysql-exporter
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: mysql-exporter-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '9104'
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9104
+      protocol: TCP
+      name: mysql-exporter
+  selector:
+    helm.sh/chart: mysql-exporter-0.1.0
+    app.kubernetes.io/name: prometheus-mysql-exporter
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: mysql-exporter-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: operator-wandb/charts/prometheus/charts/redis-exporter/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-prometheus-redis-exporter
+  labels:
+    
+    helm.sh/chart: redis-exporter-0.1.0
+    app.kubernetes.io/name: prometheus-redis-exporter
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: redis-exporter-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '9121'
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9121
+      protocol: TCP
+      name: redis-exporter
+  selector:
+    helm.sh/chart: redis-exporter-0.1.0
+    app.kubernetes.io/name: prometheus-redis-exporter
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: redis-exporter-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: operator-wandb/charts/redis/templates/headless-svc.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-redis-headless
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.19.4
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: redis
+  selector:
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/name: redis
+---
+# Source: operator-wandb/charts/redis/templates/master/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-redis-master
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.19.4
+    app.kubernetes.io/component: master
+spec:
+  type: ClusterIP
+  internalTrafficPolicy: Cluster
+  sessionAffinity: None
+  ports:
+    - name: tcp-redis
+      port: 6379
+      targetPort: redis
+      nodePort: null
+  selector:
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: master
+---
+# Source: operator-wandb/charts/weave/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-weave
+  labels:
+    
+    helm.sh/chart: weave-0.1.0
+    app.kubernetes.io/name: weave
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.0.0"
+    wandb.com/app-name: weave-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9994
+      protocol: TCP
+      name: weave
+  selector:
+    helm.sh/chart: weave-0.1.0
+    app.kubernetes.io/name: weave
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.0.0"
+    wandb.com/app-name: weave-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: operator-wandb/charts/yace/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-yace
+  labels:
+    
+    helm.sh/chart: yace-0.1.0
+    app.kubernetes.io/name: yace
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "v0.60.0"
+    wandb.com/app-name: yace-0.1.0
+    app.kubernetes.io/managed-by: Helm
+    
+  annotations:
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      protocol: TCP
+      name: yace
+  selector:
+    helm.sh/chart: yace-0.1.0
+    app.kubernetes.io/name: yace
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "v0.60.0"
+    wandb.com/app-name: yace-0.1.0
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: operator-wandb/charts/otel/charts/daemonset/templates/deamonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: test-otel-daemonset
+  labels:
+    
+    
+    helm.sh/chart: daemonset-0.1.0
+    app.kubernetes.io/name: daemonset
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: daemonset-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: daemonset
+      app.kubernetes.io/instance: test
+      helm.sh/chart: daemonset-0.1.0
+      app.kubernetes.io/name: daemonset
+      app.kubernetes.io/instance: test
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/app-name: daemonset-0.1.0
+      app.kubernetes.io/managed-by: Helm
+  template:
+    metadata:
+      labels:
+        
+        
+        
+        helm.sh/chart: daemonset-0.1.0
+        app.kubernetes.io/name: daemonset
+        app.kubernetes.io/instance: test
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/app-name: daemonset-0.1.0
+        app.kubernetes.io/managed-by: Helm
+      annotations:
+        checksum/configmap: 7e48d224bb340edec0c5a630e4531f48faef79bf0284e9ecd2ec2efe5ffe1b4
+    spec:
+      serviceAccountName: test-otel-daemonset
+      
+      
+      
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: daemonset
+          image: "otel/opentelemetry-collector-contrib:0.97.0"
+          command:
+            - /otelcol-contrib
+            - --config=/conf/config.yaml
+          ports:
+            - name: otlp
+              containerPort: 4317
+              protocol: TCP
+              hostPort: 4317
+            - name: otlp-http
+              containerPort: 4318
+              protocol: TCP
+              hostPort: 4318
+            - name: prometheus
+              containerPort: 9109
+              protocol: TCP
+              hostPort: 9109
+            - name: statsd
+              containerPort: 8125
+              protocol: TCP
+              hostPort: 8125
+          env:
+            - name: MYSQL_PORT
+              value: "3306"
+            - name: MYSQL_HOST
+              value: "test-mysql"
+            - name: MYSQL_DATABASE
+              value: "wandb_local"
+            - name: MYSQL_USER
+              value: "wandb"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: test-mysql
+                  key:  MYSQL_PASSWORD
+
+            - name: K8S_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            
+            - name: BUCKET_QUEUE
+              value: "internal://"
+            
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 13133
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 13133
+          resources:
+            limits:
+              cpu: 500m
+              memory: 500Mi
+            requests:
+              cpu: 200m
+              memory: 200Mi
+          volumeMounts:
+            - mountPath: /conf
+              name: config
+            - name: varlogpods
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: hostfs
+              mountPath: /hostfs
+              readOnly: true
+              mountPropagation: HostToContainer
+      volumes:
+        - name: hostfs
+          hostPath:
+            path: /
+        - name: varlogpods
+          hostPath:
+            path: /var/log/pods
+        - name: config
+          configMap:
+            name: test-otel-daemonset
+            items:
+              - key: config
+                path: config.yaml
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+      hostNetwork: false
+---
+# Source: operator-wandb/charts/app/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-app
+  labels:
+    
+    
+    helm.sh/chart: app-0.1.0
+    app.kubernetes.io/name: app
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: app-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: app
+      app.kubernetes.io/instance: test
+      helm.sh/chart: app-0.1.0
+      app.kubernetes.io/name: app
+      app.kubernetes.io/instance: test
+      app.kubernetes.io/version: "0.33.0"
+      wandb.com/app-name: app-0.1.0
+      app.kubernetes.io/managed-by: Helm
+  template:
+    metadata:
+      labels:
+        
+        
+        
+        helm.sh/chart: app-0.1.0
+        app.kubernetes.io/name: app
+        app.kubernetes.io/instance: test
+        app.kubernetes.io/version: "0.33.0"
+        wandb.com/app-name: app-0.1.0
+        app.kubernetes.io/managed-by: Helm
+      annotations:
+        checksum/secret: 644f013bb4580574bdbb61c2d241453ddce41082e10d83ebae160baaaab85020
+    spec:
+      serviceAccountName: test-app
+      
+      
+      
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch
+      # Extend the pods shutdown grace period from the default of 30s to 60s.
+      # This goes in the pod template spec.
+      terminationGracePeriodSeconds: 60
+      initContainers:
+        - name: init-db
+          image: "wandb/local:latest"
+          env:
+            - name: MYSQL_PORT
+              value: "3306"
+            - name: MYSQL_HOST
+              value: "test-mysql"
+            - name: MYSQL_DATABASE
+              value: "wandb_local"
+            - name: MYSQL_USER
+              value: "wandb"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: test-mysql
+                  key:  MYSQL_PASSWORD
+          command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
+      containers:
+        - name: app
+          image: "wandb/local:latest"
+          volumeMounts:
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: prometheus
+              containerPort: 8181
+              protocol: TCP
+            - name: gorilla-statsd
+              containerPort: 8125
+              protocol: TCP
+          env:
+            - name: HOST
+              value: "http://localhost:8080"
+
+            - name: MYSQL_PORT
+              value: "3306"
+            - name: MYSQL_HOST
+              value: "test-mysql"
+            - name: MYSQL_DATABASE
+              value: "wandb_local"
+            - name: MYSQL_USER
+              value: "wandb"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: test-mysql
+                  key:  MYSQL_PASSWORD
+            - name: MYSQL
+              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+
+            - name: WEAVE_SERVICE
+              value: "test-weave:9994"
+            - name: PARQUET_HOST
+              value: "http://test-parquet:8087"
+            - name: PARQUET_ENABLED
+              value: "true"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_HOST
+              value: "test-redis-master"
+            - name: REDIS
+              value: "redis://$(REDIS_HOST):$(REDIS_PORT)"
+
+            - name: SLACK_CLIENT_ID
+              value: ""
+            - name: SLACK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: test-app-config
+                  key: SLACK_SECRET
+                  optional: true
+
+            - name: LICENSE
+              valueFrom:
+                secretKeyRef:
+                  name: test-app-config
+                  key: LICENSE
+                  optional: true
+            - name: GORILLA_LICENSE
+              valueFrom:
+                secretKeyRef:
+                  name: test-app-config
+                  key: LICENSE
+                  optional: true
+
+            - name: GORILLA_SESSION_LENGTH
+              value: "720h"
+
+            - name: BUCKET
+              value: "s3://"
+            - name: AWS_REGION
+              value: 
+            - name: AWS_S3_KMS_ID
+              value: ""
+
+            - name: OPERATOR_ENABLED
+              value: 'true'
+
+            - name: LOGGING_ENABLED
+              value: 'true'
+
+            - name: AZURE_STORAGE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "test-bucket"
+                  key: ACCESS_KEY
+                  optional: true
+            
+            - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+
+            - name: G_HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+
+            - name: BANNERS
+              value: "{}"
+            - name: KAFKA_BROKER_HOST
+              value: "test-kafka"
+            - name: KAFKA_BROKER_PORT
+              value: "9092"
+            - name: KAFKA_CLIENT_USER
+              value: "wandb"
+            - name: KAFKA_CLIENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: test-kafka
+                  key: KAFKA_CLIENT_PASSWORD
+            - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
+              value: test-run-updates-shadow
+            - name: OVERFLOW_BUCKET_ADDR
+              value: "s3://"
+            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
+              value: >
+                {
+                  "overflow-bucket": {
+                    "store": "$(OVERFLOW_BUCKET_ADDR)",
+                    "name": "wandb",
+                    "prefix": "wandb-overflow"
+                  },
+                  "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576"
+                }
+            
+            - name: BUCKET_QUEUE
+              value: "internal://"
+            
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 120
+          # Increase the sleep before SIGTERM to 25s. I had this as 5s previously and it wasn't enough.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "25"]
+
+          resources:
+            limits:
+              cpu: 4000m
+              memory: 8Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+      volumes:
+---
+# Source: operator-wandb/charts/console/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-console
+  labels:
+    
+    
+    helm.sh/chart: console-0.1.0
+    app.kubernetes.io/name: console
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.16.0"
+    wandb.com/app-name: console-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: console
+      app.kubernetes.io/instance: test
+      helm.sh/chart: console-0.1.0
+      app.kubernetes.io/name: console
+      app.kubernetes.io/instance: test
+      app.kubernetes.io/version: "1.16.0"
+      wandb.com/app-name: console-0.1.0
+      app.kubernetes.io/managed-by: Helm
+  template:
+    metadata:
+      labels:
+        
+        
+        
+        helm.sh/chart: console-0.1.0
+        app.kubernetes.io/name: console
+        app.kubernetes.io/instance: test
+        app.kubernetes.io/version: "1.16.0"
+        wandb.com/app-name: console-0.1.0
+        app.kubernetes.io/managed-by: Helm
+      annotations:
+    spec:
+      serviceAccountName: test-console
+      
+      
+      
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+      # Extend the pods shutdown grace period from the default of 30s to 60s.
+      # This goes in the pod template spec.
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: console
+          image: "wandb/console:latest"
+          ports:
+            - name: http
+              containerPort: 8082
+              protocol: TCP
+          env:
+            - name: AUTH_SERVICE
+              value: test-app:8080
+            - name: OPERATOR_NAMESPACE
+              value: default
+            - name: RELEASE_NAME
+              value: test
+            - name: RELEASE_NAMESPACE
+              value: default
+            - name: PROMETHEUS_SERVER
+              value: "http://test-prometheus-server"
+            - name: BANNERS
+              value: "{}"
+
+            - name: G_HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            
+            - name: BUCKET_QUEUE
+              value: "internal://"
+            - name: TESTING
+              value: "true"
+            
+          livenessProbe:
+            httpGet:
+              path: /console/api/healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /console/api/ready
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /console/api/ready
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 120
+          # Increase the sleep before SIGTERM to 25s. I had this as 5s previously and it wasn't enough.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "25"]
+
+          resources:
+            limits:
+              cpu: 1
+              memory: 500Mi
+            requests:
+              cpu: 200m
+              memory: 200Mi
+---
+# Source: operator-wandb/charts/parquet/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-parquet
+  labels:
+    
+    
+    helm.sh/chart: parquet-0.1.0
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.0.0"
+    wandb.com/app-name: parquet-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: parquet
+      app.kubernetes.io/instance: test
+      helm.sh/chart: parquet-0.1.0
+      app.kubernetes.io/name: parquet
+      app.kubernetes.io/instance: test
+      app.kubernetes.io/version: "1.0.0"
+      wandb.com/app-name: parquet-0.1.0
+      app.kubernetes.io/managed-by: Helm
+  template:
+    metadata:
+      labels:
+        
+        
+        
+        helm.sh/chart: parquet-0.1.0
+        app.kubernetes.io/name: parquet
+        app.kubernetes.io/instance: test
+        app.kubernetes.io/version: "1.0.0"
+        wandb.com/app-name: parquet-0.1.0
+        app.kubernetes.io/managed-by: Helm
+      annotations:
+    spec:
+      
+      
+      
+      securityContext:
+        runAsUser: 999
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: parquet
+          image: "wandb/local:latest"
+          volumeMounts:
+          ports:
+            - name: parquet
+              containerPort: 8087
+              protocol: TCP
+          env:
+            - name: ONLY_SERVICE
+              value: gorilla-parquet
+            - name: LOGGING_ENABLED
+              value: 'true'
+            - name: MYSQL_PORT
+              value: "3306"
+            - name: MYSQL_HOST
+              value: "test-mysql"
+            - name: MYSQL_DATABASE
+              value: "wandb_local"
+            - name: MYSQL_USER
+              value: "wandb"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: test-mysql
+                  key:  MYSQL_PASSWORD
+            - name: MYSQL
+              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_HOST
+              value: "test-redis-master"
+            - name: REDIS
+              value: "redis://$(REDIS_HOST):$(REDIS_PORT)"
+
+            - name: GORILLA_SETTINGS_CACHE
+              value: "redis://$(REDIS_HOST):$(REDIS_PORT)"
+
+            - name: BUCKET
+              value: "s3://"
+            - name: AWS_REGION
+              value: 
+            - name: AWS_S3_KMS_ID
+              value: ""
+            - name: AZURE_STORAGE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "test-bucket"
+                  key: ACCESS_KEY
+                  optional: true
+
+            - name: G_HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            
+            - name: BUCKET_QUEUE
+              value: "internal://"
+            
+
+          livenessProbe:
+            httpGet:
+              path: /ready 
+              port: 8087
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+          readinessProbe:
+            httpGet:
+              path: /ready 
+              port: 8087
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+          
+          resources:
+            limits:
+              cpu: 8
+              memory: 16Gi
+            requests:
+              cpu: 1
+              memory: 2Gi
+      volumes:
+---
+# Source: operator-wandb/charts/weave/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-weave
+  labels:
+    
+    
+    helm.sh/chart: weave-0.1.0
+    app.kubernetes.io/name: weave
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.0.0"
+    wandb.com/app-name: weave-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: weave
+      app.kubernetes.io/instance: test
+      helm.sh/chart: weave-0.1.0
+      app.kubernetes.io/name: weave
+      app.kubernetes.io/instance: test
+      app.kubernetes.io/version: "1.0.0"
+      wandb.com/app-name: weave-0.1.0
+      app.kubernetes.io/managed-by: Helm
+  template:
+    metadata:
+      labels:
+        
+        
+        
+        helm.sh/chart: weave-0.1.0
+        app.kubernetes.io/name: weave
+        app.kubernetes.io/instance: test
+        app.kubernetes.io/version: "1.0.0"
+        wandb.com/app-name: weave-0.1.0
+        app.kubernetes.io/managed-by: Helm
+      annotations:
+    spec:
+      
+      
+      
+      securityContext:
+        runAsUser: 999
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: test-weave
+          image: "wandb/local:latest"
+          ports:
+            - name: http
+              containerPort: 9994
+              protocol: TCP
+          env:
+            - name: ONLY_SERVICE
+              value: weave
+            - name: WANDB_BASE_URL
+              value: http://localhost:8080
+            - name: WEAVE_LOG_FORMAT
+              value: json
+            - name: WEAVE_LOCAL_ARTIFACT_DIR
+              value: /vol/weave/cache
+            - name: WEAVE_AUTH_GRAPHQL_URL
+              value: http://test-app.default.svc.cluster.local:8080/graphql
+            - name: WEAVE_SERVER_NUM_WORKERS
+              value: "4"
+            
+            - name: BUCKET_QUEUE
+              value: "internal://"
+            
+          livenessProbe:
+            httpGet:
+              path: /__weave/hello
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /__weave/hello
+              port: http
+          startupProbe:
+            httpGet:
+              path: /__weave/hello
+              port: http
+            failureThreshold: 12
+            periodSeconds: 10
+
+          resources:
+            limits:
+              cpu: 4000m
+              memory: 16Gi
+            requests:
+              cpu: 500m
+              memory: 1Gi
+
+          volumeMounts:
+            - name: cache
+              mountPath: /vol/weave/cache
+
+        - name: test-weave-cache-clear
+          image: "wandb/local:latest"
+          command: ["python", "-m", "weave.clear_cache"]
+            
+          env:
+            - name: WEAVE_LOCAL_ARTIFACT_DIR
+              value: /vol/weave/cache
+            - name: WEAVE_CACHE_CLEAR_INTERVAL
+              value: "24"
+            
+            - name: BUCKET_QUEUE
+              value: "internal://"
+            
+
+          volumeMounts:
+            - name: cache
+              mountPath: /vol/weave/cache
+
+      volumes:
+        - name: cache
+          emptyDir: 
+            sizeLimit: 20Gi
+            medium:
+---
+# Source: operator-wandb/charts/yace/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-yace
+  labels:
+    
+    
+    helm.sh/chart: yace-0.1.0
+    app.kubernetes.io/name: yace
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "v0.60.0"
+    wandb.com/app-name: yace-0.1.0
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: yace
+      app.kubernetes.io/instance: test
+      helm.sh/chart: yace-0.1.0
+      app.kubernetes.io/name: yace
+      app.kubernetes.io/instance: test
+      app.kubernetes.io/version: "v0.60.0"
+      wandb.com/app-name: yace-0.1.0
+      app.kubernetes.io/managed-by: Helm
+  template:
+    metadata:
+      labels:
+        
+        
+        
+        helm.sh/chart: yace-0.1.0
+        app.kubernetes.io/name: yace
+        app.kubernetes.io/instance: test
+        app.kubernetes.io/version: "v0.60.0"
+        wandb.com/app-name: yace-0.1.0
+        app.kubernetes.io/managed-by: Helm
+      annotations:
+        checksum/configmap: 9ac0937c0b051c7c58ccf1ceb6bb546825377f07ecf6b52e06e1ae26ef70b95
+        prometheus.io/path: /metrics
+        prometheus.io/port: "5000"
+        prometheus.io/scheme: http
+        prometheus.io/scrape: "true"
+    spec:
+      serviceAccountName: test-yace
+      
+      
+      
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: yace
+          image: "nerdswords/yet-another-cloudwatch-exporter:v0.60.0"
+          command:
+            - yace
+            - --config.file=/config/config.yml
+            - --scraping-interval=60
+          ports:
+            - containerPort: 5000
+              name: http
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: http
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: http
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: 500m
+              memory: 500Mi
+            requests:
+              cpu: 200m
+              memory: 200Mi
+          volumeMounts:
+          - mountPath: /config
+            name: yace-config
+      volumes:
+        - name: config
+          configMap:
+            defaultMode: 420
+            name: test-yace
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: test-yace
+        name: yace-config
+---
+# Source: operator-wandb/charts/app/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: test-app
+  namespace: default
+  labels:
+    
+    
+    helm.sh/chart: app-0.1.0
+    app.kubernetes.io/name: app
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "0.33.0"
+    wandb.com/app-name: app-0.1.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: test-app
+  minReplicas: 1
+  maxReplicas: 1
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+---
+# Source: operator-wandb/charts/weave/templates/deployment.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name:  test-weave
+  namespace: default
+  labels:
+    
+    
+    helm.sh/chart: weave-0.1.0
+    app.kubernetes.io/name: weave
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/version: "1.0.0"
+    wandb.com/app-name: weave-0.1.0
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: test-weave
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+---
+# Source: operator-wandb/charts/redis/templates/master/application.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: test-redis-master
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: test
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/version: 7.2.4
+    helm.sh/chart: redis-18.19.4
+    app.kubernetes.io/component: master
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: test
+      app.kubernetes.io/name: redis
+      app.kubernetes.io/component: master
+  serviceName: test-redis-headless
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: test
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/version: 7.2.4
+        helm.sh/chart: redis-18.19.4
+        app.kubernetes.io/component: master
+      annotations:
+        checksum/configmap: 86bcc953bb473748a3d3dc60b7c11f34e60c93519234d4c37f42e22ada559d47
+        checksum/health: aff24913d801436ea469d8d374b2ddb3ec4c43ee7ab24663d5f8ff1a1b6991a9
+        checksum/scripts: 43cdf68c28f3abe25ce017a82f74dbf2437d1900fd69df51a55a3edf6193d141
+        checksum/secret: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
+    spec:
+      
+      securityContext:
+        fsGroup: 1001
+        fsGroupChangePolicy: Always
+        supplementalGroups: []
+        sysctls: []
+      serviceAccountName: test-redis-master
+      automountServiceAccountToken: false
+      affinity:
+        podAffinity:
+          
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: test
+                    app.kubernetes.io/name: redis
+                    app.kubernetes.io/component: master
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+          
+      enableServiceLinks: true
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: redis
+          image: docker.io/bitnami/redis:7.2.4-debian-12-r9
+          imagePullPolicy: "IfNotPresent"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsGroup: 0
+            runAsNonRoot: true
+            runAsUser: 1001
+            seccompProfile:
+              type: RuntimeDefault
+          command:
+            - /bin/bash
+          args:
+            - -c
+            - /opt/bitnami/scripts/start-scripts/start-master.sh
+          env:
+            - name: BITNAMI_DEBUG
+              value: "false"
+            - name: REDIS_REPLICATION_MODE
+              value: master
+            - name: ALLOW_EMPTY_PASSWORD
+              value: "yes"
+            - name: REDIS_TLS_ENABLED
+              value: "no"
+            - name: REDIS_PORT
+              value: "6379"
+          ports:
+            - name: redis
+              containerPort: 6379
+          livenessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            # One second longer than command timeout should prevent generation of zombie processes.
+            timeoutSeconds: 6
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /health/ping_liveness_local.sh 5
+          readinessProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 5
+            exec:
+              command:
+                - sh
+                - -c
+                - /health/ping_readiness_local.sh 1
+          volumeMounts:
+            - name: start-scripts
+              mountPath: /opt/bitnami/scripts/start-scripts
+            - name: health
+              mountPath: /health
+            - name: redis-data
+              mountPath: /data
+            - name: config
+              mountPath: /opt/bitnami/redis/mounted-etc
+            - name: empty-dir
+              mountPath: /opt/bitnami/redis/etc/
+              subPath: app-conf-dir
+            - name: empty-dir
+              mountPath: /tmp
+              subPath: tmp-dir
+      volumes:
+        - name: start-scripts
+          configMap:
+            name: test-redis-scripts
+            defaultMode: 0755
+        - name: health
+          configMap:
+            name: test-redis-health
+            defaultMode: 0755
+        - name: config
+          configMap:
+            name: test-redis-configuration
+        - name: empty-dir
+          emptyDir: {}
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: redis-data
+        labels:
+          app.kubernetes.io/instance: test
+          app.kubernetes.io/name: redis
+          app.kubernetes.io/component: master
+      spec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "8Gi"
+---
+# Source: operator-wandb/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test
+  labels:
+    
+  annotations:
+spec:
+  ingressClassName: 
+  tls: 
+    []
+
+  rules:
+  - host: localhost:8080
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: test-app
+            port: 
+              number: 8080
+      - pathType: Prefix
+        path: /console
+        backend:
+          service:
+            name: test-console
+            port:
+              number: 8082
