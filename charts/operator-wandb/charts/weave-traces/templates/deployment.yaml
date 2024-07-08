@@ -67,8 +67,30 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.clickhouse.passwordSecret" . }}
                   key: CLICKHOUSE_PASSWORD
+            {{- if .Values.datadog.enabled }}
+            - name: DD_SERVICE
+              value: "{{ .Values.datadog.service }}"
+            - name: DD_ENV
+              value: "{{ .Values.datadog.env }}"
+            - name: DD_TRACE_ENABLED
+              value: "{{ .Values.datadog.traceEnabled }}"
+            - name: DD_LOGS_ENABLED
+              value: "{{ .Values.env.logsEnabled }}"
+            - name: DD_LOGS_INJECTION
+              value: "{{ .Values.env.logsInjection }}"
+            {{- end }}
             {{- include "weaveTraces.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+          {{- if not .Values.datadog.enabled }}
+          command:
+            - uvicorn
+          args:
+            - "src.trace_server:app"
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8080"
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /health
