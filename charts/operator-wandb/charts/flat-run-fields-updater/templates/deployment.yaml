@@ -128,6 +128,7 @@ spec:
                     "flatRunFieldsUpdater": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group"
                   }
                 }
+
             {{- if ne (include "wandb.redis.password" .) "" }}
             - name: REDIS_PASSWORD
               valueFrom:
@@ -141,8 +142,12 @@ spec:
               value: "{{ include "wandb.redis.host" . }}"
             - name: REDIS
               value: "{{ include "flat-run-fields-updater.redis" . | trim }}"
+            
             - name: GORILLA_SETTINGS_CACHE
               value: "{{ include "flat-run-fields-updater.redis" . | trim }}"
+            - name: GORILLA_METADATA_STORE_OVERFLOW
+              value: {{ .Values.global.metadataStoreOverflow | toJson | quote }}
+
             {{- if and .Values.global .Values.global.observability }}
             {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
             - name: GORILLA_STATSD_PORT
