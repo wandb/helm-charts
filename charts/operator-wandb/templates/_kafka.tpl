@@ -59,3 +59,10 @@ Return the kafka topic name for run-updates-shadow
 {{- define "wandb.kafka.runUpdatesShadowTopic" -}}
 {{ printf "%s-%s" .Release.Name "run-updates-shadow" | trunc 63 | trimSuffix "-" }}
 {{- end -}}
+
+{{/*
+Return the number of partitions for run-updates-shadow
+*/}}
+{{- define "wandb.kafka.runUpdatesShadowNumPartitions" -}}
+{{- print .Values.global.kafka.runUpdatesShadowNumPartitions -}}
+{{- end -}}
