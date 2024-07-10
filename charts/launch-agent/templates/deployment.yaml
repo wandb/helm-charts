@@ -114,6 +114,11 @@ spec:
               subPath: .git-credentials
               readOnly: true
             {{ end }}
+            {{ if .Values.gitSSHCredsSecret }}
+            - name: git-ssh-key-secret
+              mountPath: /home/launch_agent/.ssh
+              readOnly: true
+            {{ end }}
             {{- if and .Values.customCABundle.configMap.name .Values.customCABundle.configMap.key }}
             - name: custom-cabundle
               mountPath: /usr/local/share/ca-certificates/custom-ca.crt
@@ -125,6 +130,14 @@ spec:
               mountPath: /home/launch_agent/kaniko
             {{ end }}
       volumes:
+        {{ if .Values.gitSSHCredsSecret}}
+        - name: git-ssh-key-secret
+          secret:
+            secretName: {{ .Values.gitSSHCredsSecret }}
+            items: 
+              - key : ssh-privatekey
+                path: .ssh/id_rsa
+        {{ end }}
         - name: wandb-launch-config
           configMap:
             name: wandb-launch-configmap-{{ .Release.Name }}
