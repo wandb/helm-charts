@@ -23,8 +23,18 @@ spec:
 {{- end }}
     spec:
       serviceAccountName: wandb-launch-serviceaccount-{{ .Release.Name }}
-      {{- if .Values.kanikoPvcName }}
+      {{- if or .Values.gitSSHCredsSecret .Values.kanikoPvcName }}
       initContainers:
+      {{- end}}
+      {{- if .Values.gitSSHCredsSecret }}
+      - name: init-create-ssh-dir
+        image: {{ .Values.agent.image }}
+        command: ["sh", "-c", "mkdir -p /home/launch_agent/.ssh"]
+        volumeMounts:
+        - name: ssh-dir
+          mountPath: /home/launch_agent/.ssh
+      {{- end }}
+      {{- if .Values.kanikoPvcName }}
       - name: kaniko-volume-chown
         image: {{ .Values.agent.image }}
         command: ["sh", "-c"]
@@ -116,7 +126,12 @@ spec:
             {{ end }}
             {{ if .Values.gitSSHCredsSecret }}
             - name: git-ssh-key-secret
-              mountPath: /home/launch_agent/.ssh
+              mountPath: /home/launch_agent/.ssh/{{ .Values.sshKeyPath }}
+              subPath: {{ .Values.sshKeyPath }}
+              readOnly: true
+            - name: ssh-config
+              mountPath: /home/launch_agent/.ssh/config
+              subPath: config
               readOnly: true
             {{ end }}
             {{- if and .Values.customCABundle.configMap.name .Values.customCABundle.configMap.key }}
@@ -129,22 +144,27 @@ spec:
             - name: kaniko-pvc
               mountPath: /home/launch_agent/kaniko
             {{ end }}
+            - name: ssh-dir
+              mountPath: /home/launch_agent/.ssh
       volumes:
+        - name: wandb-launch-config
+          configMap:
+            name: wandb-launch-configmap-{{ .Release.Name }}
         {{ if .Values.gitSSHCredsSecret}}
         - name: git-ssh-key-secret
           secret:
             secretName: {{ .Values.gitSSHCredsSecret }}
             items: 
-              - key : ssh-privatekey
-                path: .ssh/id_rsa
-        {{ end }}
-        - name: wandb-launch-config
+              - key: {{ .Values.sshKeySecretKey }}
+                path: {{ .Values.sshKeyPath }}
+        - name: ssh-config
           configMap:
-            name: wandb-launch-configmap-{{ .Release.Name }}
-        {{ if .Values.gitCreds}}
-        - name: git-creds
-          secret:
-            secretName: git-creds
+            name: ssh-config-{{ .Release.Name }}
+            items:
+              - key: config
+                path: config
+        - name: ssh-dir
+          emptyDir: {}
         {{ end}}
         {{- if and .Values.customCABundle.configMap.name .Values.customCABundle.configMap.key }}
         - name: custom-cabundle
