@@ -9,7 +9,7 @@ metadata:
   name: wandb-launch-configmap-{{ .Release.Name }}
   namespace: {{ .Values.namespace }}
 ---
-{{- if .Values.gitSSHCredsSecret }}
+{{- if .Values.sshAuthSecrets }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -18,9 +18,11 @@ metadata:
   namespace: {{ .Values.namespace }}
 data:
   config: |
-    Host *
-      IdentityFile /home/launch_agent/.ssh/git_ssh
+    {{- range $index, $secret := .Values.sshAuthSecrets }}
+    Host {{ .host }}
+      IdentityFile /home/launch_agent/.ssh/id_repo{{ $index }}
       IdentitiesOnly yes
       StrictHostKeyChecking no
-      UserKnownHostsFile=/dev/null
+      UserKnownHostsFile /dev/null
+    {{- end }}
 {{- end }}
