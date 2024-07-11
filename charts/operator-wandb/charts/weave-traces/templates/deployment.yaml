@@ -40,6 +40,30 @@ spec:
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      {{- if not .Values.migration.useHook }}
+      initContainers:
+        - name: {{ include "weaveTraces.fullname" . }}-migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command:
+            - "python"
+            - "migrator.py"
+          env:
+            - name: WF_CLICKHOUSE_HOST
+              value: "{{ .Values.global.clickhouse.host }}"
+            - name: WF_CLICKHOUSE_PORT
+              value: "{{ .Values.global.clickhouse.port }}"
+            - name: WF_CLICKHOUSE_DATABASE
+              value: "{{ .Values.global.clickhouse.database }}"
+            - name: WF_CLICKHOUSE_USER
+              value: "{{ .Values.global.clickhouse.user }}"
+            - name: WF_CLICKHOUSE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.clickhouse.passwordSecret" . }}
+                  key: CLICKHOUSE_PASSWORD
+            {{- include "weaveTraces.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
+            {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+      {{- end }}
       containers:
         - name: {{ include "weaveTraces.fullname" .  }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -52,12 +76,14 @@ spec:
               value: "8080"
             - name: API_PATH_PREFIX
               value: "/traces"
-            - name: WF_TRACE_SERVER_URL
-              value: "{{ .Values.global.host }}/traces"
             - name: WANDB_PUBLIC_BASE_URL
               value: {{ .Values.global.host }}
             - name: WANDB_BASE_URL
-              value: http://{{ include "weaveTraces.appFullname" . }}.{{ $.Release.Namespace }}.svc.{{ .Values.app.clusterDomain }}:8080/graphql
+              value: http://{{ include "weaveTraces.appFullname" . }}.{{ $.Release.Namespace }}.svc.{{ .Values.app.clusterDomain }}:8080/
+            - name: WF_TRACE_SERVER_URL
+              value: "{{ .Values.global.host }}/traces"
+            - name: WF_ENFORCE_PASSWORD_LENGTH
+              value: "false"
             - name: WF_CLICKHOUSE_HOST
               value: "{{ .Values.global.clickhouse.host }}"
             - name: WF_CLICKHOUSE_PORT
