@@ -111,6 +111,8 @@ spec:
               value: {{ .Values.kanikoDockerConfigSecret }}
             {{- end }}
           volumeMounts:
+            - name: ssh-dir
+              mountPath: /home/launch_agent/.ssh
             - name: wandb-launch-config
               mountPath: /home/launch_agent/.config/wandb
               readOnly: true
@@ -146,14 +148,17 @@ spec:
             - name: kaniko-pvc
               mountPath: /home/launch_agent/kaniko
             {{ end }}
-            {{- if .Values.sshAuthSecrets }}
-            - name: ssh-dir
-              mountPath: /home/launch_agent/.ssh
-            {{ end }}
       volumes:
+        - name: ssh-dir
+          emptyDir: {}
         - name: wandb-launch-config
           configMap:
             name: wandb-launch-configmap-{{ .Release.Name }}
+        {{ if .Values.gitCreds}}
+        - name: git-creds
+          secret:
+            secretName: git-creds
+        {{ end}}
         {{ if .Values.sshAuthSecrets }}
         {{- range $index, $secret := .Values.sshAuthSecrets }}
         - name: git-ssh-key-secret-{{ $index }}
@@ -169,8 +174,6 @@ spec:
             items:
               - key: config
                 path: config
-        - name: ssh-dir
-          emptyDir: {}
         {{ end }}
         {{- if and .Values.customCABundle.configMap.name .Values.customCABundle.configMap.key }}
         - name: custom-cabundle
