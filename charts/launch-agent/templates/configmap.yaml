@@ -8,4 +8,21 @@ kind: ConfigMap
 metadata:
   name: wandb-launch-configmap-{{ .Release.Name }}
   namespace: {{ .Values.namespace }}
-...
+---
+{{- if .Values.sshAuthSecrets }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ssh-config-{{ .Release.Name }}
+  namespace: {{ .Values.namespace }}
+data:
+  config: |
+    {{- range $index, $secret := .Values.sshAuthSecrets }}
+    Host {{ .host }}
+      IdentityFile /home/launch_agent/.ssh/id_repo{{ $index }}
+      IdentitiesOnly yes
+      StrictHostKeyChecking no
+      UserKnownHostsFile /dev/null
+    {{- end }}
+{{- end }}
