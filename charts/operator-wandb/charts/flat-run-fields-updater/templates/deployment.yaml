@@ -53,10 +53,11 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # needed to ensure ensure Kafka consumers handle pod termination gracefully and avoid data loss
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "sleep 30"]
+                command: ["sleep", "25"]
           volumeMounts:
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "flat-run-fields-updater.fullname" . }}-redis-ca
