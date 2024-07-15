@@ -18,13 +18,23 @@ spec:
     metadata:
       labels:
         app: launch-agent-{{ .Release.Name }}
-{{- if .Values.agent.labels }}
-{{- toYaml .Values.agent.labels | trim | nindent 8 }}
-{{- end }}
+        {{- if .Values.agent.labels }}
+        {{- toYaml .Values.agent.labels | trim | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: wandb-launch-serviceaccount-{{ .Release.Name }}
-      {{- if .Values.kanikoPvcName }}
+      {{- if or .Values.sshAuthSecrets .Values.kanikoPvcName }}
       initContainers:
+      {{- end}}
+      {{- if .Values.sshAuthSecrets }}
+      - name: init-create-ssh-dir
+        image: {{ .Values.agent.image }}
+        command: ["sh", "-c", "mkdir -p /home/launch_agent/.ssh"]
+        volumeMounts:
+        - name: ssh-dir
+          mountPath: /home/launch_agent/.ssh
+      {{- end }}
+      {{- if .Values.kanikoPvcName }}
       - name: kaniko-volume-chown
         image: {{ .Values.agent.image }}
         command: ["sh", "-c"]
@@ -101,12 +111,31 @@ spec:
               value: {{ .Values.kanikoDockerConfigSecret }}
             {{- end }}
           volumeMounts:
+            - name: ssh-dir
+              mountPath: /home/launch_agent/.ssh
             - name: wandb-launch-config
               mountPath: /home/launch_agent/.config/wandb
               readOnly: true
             {{ if .Values.gitCreds}}
             - name: git-creds
-              mountPath: /home/launch_agent/
+              mountPath: /home/launch_agent/.gitconfig
+              subPath: .gitconfig
+              readOnly: true
+            - name: git-creds
+              mountPath: /home/launch_agent/.git-credentials
+              subPath: .git-credentials
+              readOnly: true
+            {{ end }}
+            {{ if .Values.sshAuthSecrets }}
+            {{- range $index, $secret := .Values.sshAuthSecrets }}
+            - name: git-ssh-key-secret-{{ $index }}
+              mountPath: /home/launch_agent/.ssh/id_repo{{ $index }}
+              subPath: id_repo{{ $index }}
+              readOnly: true
+            {{- end }}
+            - name: ssh-config
+              mountPath: /home/launch_agent/.ssh/config
+              subPath: config
               readOnly: true
             {{ end }}
             {{- if and .Values.customCABundle.configMap.name .Values.customCABundle.configMap.key }}
@@ -120,6 +149,8 @@ spec:
               mountPath: /home/launch_agent/kaniko
             {{ end }}
       volumes:
+        - name: ssh-dir
+          emptyDir: {}
         - name: wandb-launch-config
           configMap:
             name: wandb-launch-configmap-{{ .Release.Name }}
@@ -127,10 +158,23 @@ spec:
         - name: git-creds
           secret:
             secretName: git-creds
-        - name: git-config
-          secret:
-            secretName: git-config
         {{ end}}
+        {{ if .Values.sshAuthSecrets }}
+        {{- range $index, $secret := .Values.sshAuthSecrets }}
+        - name: git-ssh-key-secret-{{ $index }}
+          secret:
+            secretName: {{ $secret.name }}
+            items: 
+              - key: ssh-privatekey
+                path: id_repo{{ $index }}
+        {{- end }}
+        - name: ssh-config
+          configMap:
+            name: ssh-config-{{ .Release.Name }}
+            items:
+              - key: config
+                path: config
+        {{ end }}
         {{- if and .Values.customCABundle.configMap.name .Values.customCABundle.configMap.key }}
         - name: custom-cabundle
           configMap:
@@ -138,12 +182,12 @@ spec:
             items:
               - key: {{ .Values.customCABundle.configMap.key }}
                 path: custom-ca.crt
-        {{- end}}
+        {{- end }}
         {{ if .Values.kanikoPvcName }}
         - name: kaniko-pvc
           persistentVolumeClaim:
             claimName: {{ .Values.kanikoPvcName }}
-        {{- end}}
+        {{- end }}
       nodeSelector:
         {{- toYaml .Values.agent.nodeSelector | nindent 8 }}
       tolerations:

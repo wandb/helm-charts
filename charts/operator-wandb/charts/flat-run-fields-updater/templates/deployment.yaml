@@ -45,12 +45,20 @@ spec:
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      # needed to ensure ensure Kafka consumers handle pod termination gracefully and avoid data loss
+      terminationGracePeriodSeconds: 60
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            {{- if ne (include "wandb.redis.caCert" .) "" }}
+            - name: {{ include "flat-run-fields-updater.fullname" . }}-redis-ca
+              mountPath: /etc/ssl/certs/redis_ca.pem
+              subPath: redis_ca.pem
+            {{- end }}
           env:
             - name: POD_NAME
               valueFrom:
@@ -108,6 +116,8 @@ spec:
                   key: KAFKA_CLIENT_PASSWORD
             - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
               value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
+            - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
+              value: {{ include "wandb.kafka.runUpdatesShadowNumPartitions" .}}
             - name: BUCKET
               value: "{{ include "flat-run-fields-updater.bucket" .}}"
             - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
@@ -119,7 +129,7 @@ spec:
                     "prefix": "wandb-overflow"
                   },
                   "subscriptions": {
-                    "flatRunFieldsUpdater": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group"
+                    "flatRunFieldsUpdater": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)"
                   }
                 }
             {{- if ne (include "wandb.redis.password" .) "" }}
@@ -157,4 +167,13 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      volumes:
+        {{- if ne (include "wandb.redis.caCert" .) "" }}
+        - name: {{ include "flat-run-fields-updater.fullname" . }}-redis-ca
+          secret:
+            secretName: "{{ include "wandb.redis.passwordSecret" . }}"
+            items:
+              - key: REDIS_CA_CERT
+                path: redis_ca.pem
+        {{- end }}
 {{- end }}
