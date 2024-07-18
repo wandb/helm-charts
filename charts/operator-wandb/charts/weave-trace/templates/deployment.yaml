@@ -2,11 +2,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "weaveTraces.fullname" . }}
+  name: {{ include "weaveTrace.fullname" . }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "weaveTraces.commonLabels" . | nindent 4 }}
-    {{- include "weaveTraces.labels" . | nindent 4 }}
+    {{- include "weaveTrace.commonLabels" . | nindent 4 }}
+    {{- include "weaveTrace.labels" . | nindent 4 }}
     {{- if .Values.deployment.labels -}}
     {{-   toYaml .Values.deployment.labels | nindent 4 }}
     {{- end }}
@@ -20,14 +20,14 @@ spec:
   selector:
     matchLabels:
       {{- include "wandb.selectorLabels" $ | nindent 6 }}
-      {{- include "weaveTraces.labels" . | nindent 6 }}
+      {{- include "weaveTrace.labels" . | nindent 6 }}
   template:
     metadata:
       labels:
         {{- include "wandb.podLabels" . | nindent 8 }}
-        {{- include "weaveTraces.commonLabels" . | nindent 8 }}
-        {{- include "weaveTraces.podLabels" . | nindent 8 }}
-        {{- include "weaveTraces.labels" . | nindent 8 }}
+        {{- include "weaveTrace.commonLabels" . | nindent 8 }}
+        {{- include "weaveTrace.podLabels" . | nindent 8 }}
+        {{- include "weaveTrace.labels" . | nindent 8 }}
       annotations:
         {{- if .Values.pod.annotations -}}
         {{-   toYaml .Values.pod.annotations | nindent 4 }}
@@ -42,7 +42,7 @@ spec:
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       {{- if not .Values.migration.useHook }}
       initContainers:
-        - name: {{ include "weaveTracesMigrate.fullname" . }}
+        - name: {{ include "weaveTraceMigrate.fullname" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           command:
             - "python"
@@ -61,11 +61,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.clickhouse.passwordSecret" . }}
                   key: CLICKHOUSE_PASSWORD
-            {{- include "weaveTraces.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
+            {{- include "weaveTrace.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
       {{- end }}
       containers:
-        - name: {{ include "weaveTraces.fullname" .  }}
+        - name: {{ include "weaveTrace.fullname" .  }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           ports:
             - name: http
@@ -79,7 +79,7 @@ spec:
             - name: WANDB_PUBLIC_BASE_URL
               value: {{ .Values.global.host }}
             - name: WANDB_BASE_URL
-              value: http://{{ include "weaveTraces.appFullname" . }}.{{ $.Release.Namespace }}.svc.{{ .Values.app.clusterDomain }}:8080/
+              value: http://{{ include "weaveTrace.appFullname" . }}.{{ $.Release.Namespace }}.svc.{{ .Values.app.clusterDomain }}:8080/
             - name: WF_TRACE_SERVER_URL
               value: "{{ .Values.global.host }}/traces"
             - name: WF_ENFORCE_PASSWORD_LENGTH
@@ -109,7 +109,7 @@ spec:
             - name: DD_LOGS_INJECTION
               value: "{{ .Values.env.logsInjection }}"
             {{- end }}
-            {{- include "weaveTraces.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
+            {{- include "weaveTrace.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           {{- if not .Values.datadog.enabled }}
           command:
@@ -146,16 +146,16 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name:  {{ include "weaveTraces.fullname" . }}
+  name:  {{ include "weaveTrace.fullname" . }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "weaveTraces.commonLabels" . | nindent 4 }}
-    {{- include "weaveTraces.labels" . | nindent 4 }}
+    {{- include "weaveTrace.commonLabels" . | nindent 4 }}
+    {{- include "weaveTrace.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "weaveTraces.fullname" . }}
+    name: {{ include "weaveTrace.fullname" . }}
   minReplicas: 1
   maxReplicas: 5
   metrics:
