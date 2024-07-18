@@ -8,7 +8,7 @@ Expand the name of the chart.
 {{- end }}
 
 {{/*
-Create a default fully qualified app name. (Should be something like wandb-weave)
+Create a default fully qualified name for weave-traces. (Should be something like wandb-weave-traces)
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
@@ -24,6 +24,15 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+Create a default fully qualified name for the weave-traces migration. (Should be something like wandb-weave-traces-migrate)
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "weaveTracesMigrate.fullname" -}}
+{{ printf "%s-migrate" (include "weaveTraces.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 
 {{/*
 Create a default fully qualified app name. (Should be something like wandb-app)
