@@ -3,16 +3,16 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "parquet.name" -}}
+{{- define "weaveTrace.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
-Create a default fully qualified app name.
+Create a default fully qualified name for weave-trace. (Should be something like wandb-weave-trace)
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "parquet.fullname" -}}
+{{- define "weaveTrace.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -25,50 +25,49 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 {{- end }}
 
-{{- define "parquet.redis" -}}
-{{- $cs := include "wandb.redis.connectionString" . }}
-{{- $ca := include "wandb.redis.caCert" . }}
-{{- if $ca }}
-{{- printf "%s?tls=true&caCertPath=/etc/ssl/certs/redis_ca.pem&ttlInSeconds=604800" $cs -}}
-{{- else }}
-{{- print $cs -}}
+{{/*
+Create a default fully qualified name for the weave-trace migration. (Should be something like wandb-weave-trace-migrate)
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "weaveTraceMigrate.fullname" -}}
+{{ printf "%s-migrate" (include "weaveTrace.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
-{{- end }}
+
 
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "parquet.chart" -}}
+{{- define "weaveTrace.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "parquet.labels" -}}
-helm.sh/chart: {{ include "parquet.chart" . }}
-{{ include "parquet.selectorLabels" . }}
+{{- define "weaveTrace.labels" -}}
+helm.sh/chart: {{ include "weaveTrace.chart" . }}
+{{ include "weaveTrace.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
-wandb.com/app-name: {{ include "parquet.chart" . }}
+wandb.com/app-name: {{ include "weaveTrace.chart" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
 Selector labels
 */}}
-{{- define "parquet.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "parquet.name" . }}
+{{- define "weaveTrace.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "weaveTrace.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "parquet.serviceAccountName" -}}
+{{- define "weaveTrace.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "parquet.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "weaveTrace.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -79,7 +78,7 @@ Returns the extraEnv keys and values to inject into containers.
 
 Global values will override any chart-specific values.
 */}}
-{{- define "parquet.extraEnv" -}}
+{{- define "weaveTrace.extraEnv" -}}
 {{- $allExtraEnv := merge (default (dict) .local.extraEnv) .global.extraEnv -}}
 {{- range $key, $value := $allExtraEnv }}
 - name: {{ $key }}
@@ -91,7 +90,7 @@ Global values will override any chart-specific values.
 Returns a list of _common_ labels to be shared across all
 app deployments and other shared objects.
 */}}
-{{- define "parquet.commonLabels" -}}
+{{- define "weaveTrace.commonLabels" -}}
 {{- $commonLabels := default (dict) .Values.common.labels -}}
 {{- if $commonLabels }}
 {{-   range $key, $value := $commonLabels }}
@@ -104,26 +103,8 @@ app deployments and other shared objects.
 Returns a list of _pod_ labels to be shared across all
 app deployments.
 */}}
-{{- define "parquet.podLabels" -}}
+{{- define "weaveTrace.podLabels" -}}
 {{- range $key, $value := .Values.pod.labels }}
 {{ $key }}: {{ $value | quote }}
 {{- end }}
-{{- end -}}
-
-{{- define "parquet.bucket" -}}
-{{- $bucket := "" -}} 
-{{- if eq .Values.global.bucket.provider "az" -}}
-{{- $bucket = printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
-{{- end -}}
-{{- if eq .Values.global.bucket.provider "gcs" -}}
-{{- $bucket = printf "gs://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
-{{- end -}}
-{{- if eq .Values.global.bucket.provider "s3" -}}
-{{- if and .Values.global.bucket.accessKey .Values.global.bucket.secretKey -}}
-{{- $bucket = printf "s3://%s:%s@%s/%s" .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.name .Values.global.bucket.path -}}
-{{- else -}}
-{{- $bucket = printf "s3://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
-{{- end -}}
-{{- end -}}
-{{- trimSuffix "/" $bucket -}}
 {{- end -}}

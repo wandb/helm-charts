@@ -63,7 +63,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key:  MYSQL_PASSWORD
-          command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
+          command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -114,6 +114,10 @@ spec:
               value: "http://{{ .Release.Name }}-parquet:8087"
             - name: PARQUET_ENABLED
               value: "true"
+            {{- if index .Values.global "weave-trace" "enabled" }}
+            - name: WEAVE_TRACES_ENABLED
+              value: "true"
+            {{- end }}
 
             {{- if ne (include "wandb.redis.password" .) "" }}
             - name: REDIS_PASSWORD
@@ -227,6 +231,8 @@ spec:
                   key: KAFKA_CLIENT_PASSWORD
             - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
               value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
+            - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
+              value: "{{ include "wandb.kafka.runUpdatesShadowNumPartitions" .}}"
             - name: OVERFLOW_BUCKET_ADDR
               value: "{{ include "app.bucket" .}}"
 
@@ -241,7 +247,7 @@ spec:
                     "name": "wandb",
                     "prefix": "wandb-overflow"
                   },
-                  "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576"
+                  "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)"
                 }
             {{- include "app.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
