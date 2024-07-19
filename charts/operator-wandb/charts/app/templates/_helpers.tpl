@@ -116,7 +116,7 @@ app deployments.
 {{- $bucket = printf "az://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
 {{- end -}}
 {{- if eq .Values.global.bucket.provider "gcs" -}}
-{{- $bucket = printf "gs://%s" .Values.global.bucket.name -}}
+{{- $bucket = printf "gs://%s/%s" .Values.global.bucket.name .Values.global.bucket.path -}}
 {{- end -}}
 {{- if eq .Values.global.bucket.provider "s3" -}}
 {{- if and .Values.global.bucket.accessKey .Values.global.bucket.secretKey -}}
