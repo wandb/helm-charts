@@ -3,16 +3,16 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "weave.name" -}}
+{{- define "weaveTrace.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
-Create a default fully qualified app name. (Should be something like wandb-weave)
+Create a default fully qualified name for weave-trace. (Should be something like wandb-weave-trace)
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "weave.fullname" -}}
+{{- define "weaveTrace.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,39 +26,48 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 
 {{/*
+Create a default fully qualified name for the weave-trace migration. (Should be something like wandb-weave-trace-migrate)
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "weaveTraceMigrate.fullname" -}}
+{{ printf "%s-migrate" (include "weaveTrace.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "weave.chart" -}}
+{{- define "weaveTrace.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "weave.labels" -}}
-helm.sh/chart: {{ include "weave.chart" . }}
-{{ include "weave.selectorLabels" . }}
+{{- define "weaveTrace.labels" -}}
+helm.sh/chart: {{ include "weaveTrace.chart" . }}
+{{ include "weaveTrace.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
-wandb.com/app-name: {{ include "weave.chart" . }}
+wandb.com/app-name: {{ include "weaveTrace.chart" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
 Selector labels
 */}}
-{{- define "weave.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "weave.name" . }}
+{{- define "weaveTrace.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "weaveTrace.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "weave.serviceAccountName" -}}
+{{- define "weaveTrace.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "weave.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "weaveTrace.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -69,7 +78,7 @@ Returns the extraEnv keys and values to inject into containers.
 
 Global values will override any chart-specific values.
 */}}
-{{- define "weave.extraEnv" -}}
+{{- define "weaveTrace.extraEnv" -}}
 {{- $allExtraEnv := merge (default (dict) .local.extraEnv) .global.extraEnv -}}
 {{- range $key, $value := $allExtraEnv }}
 - name: {{ $key }}
@@ -81,7 +90,7 @@ Global values will override any chart-specific values.
 Returns a list of _common_ labels to be shared across all
 app deployments and other shared objects.
 */}}
-{{- define "weave.commonLabels" -}}
+{{- define "weaveTrace.commonLabels" -}}
 {{- $commonLabels := default (dict) .Values.common.labels -}}
 {{- if $commonLabels }}
 {{-   range $key, $value := $commonLabels }}
@@ -94,7 +103,7 @@ app deployments and other shared objects.
 Returns a list of _pod_ labels to be shared across all
 app deployments.
 */}}
-{{- define "weave.podLabels" -}}
+{{- define "weaveTrace.podLabels" -}}
 {{- range $key, $value := .Values.pod.labels }}
 {{ $key }}: {{ $value | quote }}
 {{- end }}
