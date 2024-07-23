@@ -1,0 +1,68 @@
+{{ if .Values.migration.useHook }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "weaveTraceMigrate.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "weaveTrace.commonLabels" . | nindent 4 }}
+    {{- include "weaveTrace.labels" . | nindent 4 }}
+    {{- if .Values.migration.labels -}}
+    {{-   toYaml .Values.migration.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    {{- if .Values.migration.annotations -}}
+    {{-   toYaml .Values.migration.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 240
+  template:
+    metadata:
+      labels:
+        {{- include "wandb.podLabels" . | nindent 8 }}
+        {{- include "weaveTrace.commonLabels" . | nindent 8 }}
+        {{- include "weaveTrace.podLabels" . | nindent 8 }}
+        {{- include "weaveTrace.labels" . | nindent 8 }}
+        {{- if .Values.migration.labels -}}
+        {{-   toYaml .Values.migration.labels | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- if .Values.pod.annotations -}}
+        {{-   toYaml .Values.pod.annotations | nindent 4 }}
+        {{- end }}
+    spec:
+      {{- if .tolerations }}
+      tolerations:
+        {{- toYaml .tolerations | nindent 8 }}
+      {{- end }}
+      {{- include "wandb.nodeSelector" . | nindent 6 }}
+      {{- include "wandb.priorityClassName" . | nindent 6 }}
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      containers:
+        - name: {{ include "weaveTraceMigrate.fullname" . }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          command:
+            - "python"
+            - "migrator.py"
+          env:
+            - name: WF_CLICKHOUSE_HOST
+              value: "{{ .Values.global.clickhouse.host }}"
+            - name: WF_CLICKHOUSE_PORT
+              value: "{{ .Values.global.clickhouse.port }}"
+            - name: WF_CLICKHOUSE_DATABASE
+              value: "{{ .Values.global.clickhouse.database }}"
+            - name: WF_CLICKHOUSE_USER
+              value: "{{ .Values.global.clickhouse.user }}"
+            - name: WF_CLICKHOUSE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.clickhouse.passwordSecret" . }}
+                  key: CLICKHOUSE_PASSWORD
+            {{- include "weaveTrace.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
+            {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+      restartPolicy: "Never"
+{{ end }}
