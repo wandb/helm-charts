@@ -1,7 +1,9 @@
+{{- if .Values.enabled }}
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: Role
 metadata:
   name: {{ include "console.fullname" . }}
+  namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "console.commonLabels" . | nindent 4 }}
@@ -13,11 +15,9 @@ metadata:
     {{- if .Values.clusterRole.annotations -}}
     {{-   toYaml .Values.clusterRole.annotations | nindent 4 }}
     {{- end }}
-roleRef:
-  kind: ClusterRole
-  apiGroup: rbac.authorization.k8s.io
-  name: {{ include "console.fullname" . }}
-subjects:
-  - kind: ServiceAccount
-    name: {{ include "console.fullname" . }}
-    namespace: {{ .Release.Namespace }}
+rules:
+  # We can scope these permissions down later
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+{{- end }}
