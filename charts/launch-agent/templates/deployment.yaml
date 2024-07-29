@@ -106,6 +106,14 @@ spec:
             - name: WANDB_LAUNCH_KANIKO_PVC_MOUNT_PATH
               value: /home/launch_agent/kaniko
             {{- end }}
+            {{- if .Values.codeMountPvcName }}
+            - name: WANDB_LAUNCH_CODE_PVC_NAME
+              value: {{ .Values.codeMountPvcName }}
+            - name: WANDB_LAUNCH_CODE_PVC_MOUNT_PATH
+              value: /home/launch_agent/code
+            {{- end }}
+            {{- if .Values.kanikoDockerConfigSecret }}
+            {{- end}}
             {{- if .Values.kanikoDockerConfigSecret }}
             - name: WANDB_LAUNCH_KANIKO_AUTH_SECRET
               value: {{ .Values.kanikoDockerConfigSecret }}
@@ -148,6 +156,10 @@ spec:
             - name: kaniko-pvc
               mountPath: /home/launch_agent/kaniko
             {{ end }}
+            {{- if .Values.codeMountPvcName }}
+            - name: code-mount-pvc
+              mountPath: /home/launch_agent/code
+            {{ end }}
       volumes:
         - name: ssh-dir
           emptyDir: {}
@@ -187,6 +199,11 @@ spec:
         - name: kaniko-pvc
           persistentVolumeClaim:
             claimName: {{ .Values.kanikoPvcName }}
+        {{- end }}
+        {{ if .Values.codeMountPvcName }}
+        - name: code-mount-pvc
+          persistentVolumeClaim:
+            claimName: {{ .Values.codeMountPvcName }}
         {{- end }}
       nodeSelector:
         {{- toYaml .Values.agent.nodeSelector | nindent 8 }}
