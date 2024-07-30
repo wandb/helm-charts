@@ -1,61 +1,26 @@
+{{- if .Values.namespaceIsolation.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "name" . }}-manager-role
+  namespace: {{ .Release.Namespace }}
+rules:
+{{ toYaml .Values.role.rules | indent 2 }}
+  {{- range .Values.namespaceIsolation.additionalNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "name" $ }}-manager-role
+  namespace: {{ . }}
+rules:
+{{ toYaml $.Values.role.rules | indent 2 }}
+  {{- end }}
+{{- else }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ include "name" . }}-manager-role
 rules:
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-      - secrets
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - update
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - events
-    verbs:
-      - create
-      - patch
-  - apiGroups:
-      - app
-    resources:
-      - deployments
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - update
-      - watch
-  - apiGroups:
-      - apps.wandb.com
-    resources:
-      - weightsandbiases
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - apps.wandb.com
-    resources:
-      - weightsandbiases/finalizers
-    verbs:
-      - update
-  - apiGroups:
-      - apps.wandb.com
-    resources:
-      - weightsandbiases/status
-    verbs:
-      - get
-      - patch
-      - update
+{{ toYaml .Values.role.rules | indent 2 }}
+{{- end }}
