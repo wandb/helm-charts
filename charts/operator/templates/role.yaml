@@ -1,6 +1,26 @@
+{{- if .Values.namespaceIsolation.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "name" . }}-manager-role
+  namespace: {{ .Release.Namespace }}
+rules:
+{{ toYaml .Values.role.rules | indent 2 }}
+  {{- range .Values.namespaceIsolation.additionalNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "name" $ }}-manager-role
+  namespace: {{ . }}
+rules:
+{{ toYaml $.Values.role.rules | indent 2 }}
+  {{- end }}
+{{- else }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ include "name" . }}-manager-role
 rules:
-{{ toYaml .Values.clusterRole.rules | indent 2 }}
+{{ toYaml .Values.role.rules | indent 2 }}
+{{- end }}
