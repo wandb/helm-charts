@@ -113,7 +113,7 @@ app deployments.
 {{- define "app.bucket" -}}
 {{- $bucketValues := .Values.global.defaultBucket }}
 {{- if .Values.global.bucket.provider }}
-{{- $bucketValues := .Values.global.bucket }}
+{{- $bucketValues = .Values.global.bucket }}
 {{- end }}
 {{- $bucket := "" -}} 
 {{- if eq $bucketValues.provider "az" -}}
