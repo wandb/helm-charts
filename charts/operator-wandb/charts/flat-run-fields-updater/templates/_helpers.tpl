@@ -109,7 +109,7 @@ Create the name of the service account to use
 {{- define "flat-run-fields-updater.bucket" -}}
 {{- $bucketValues := .Values.global.defaultBucket }}
 {{- if .Values.global.bucket.provider }}
-{{- $bucketValues := .Values.global.bucket }}
+{{- $bucketValues = .Values.global.bucket }}
 {{- end }}
 {{- $bucket := "" -}}
 {{- if eq $bucketValues.provider "az" -}}
