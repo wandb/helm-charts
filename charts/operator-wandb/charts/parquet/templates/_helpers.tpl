@@ -87,6 +87,34 @@ Global values will override any chart-specific values.
 {{- end -}}
 {{- end -}}
 
+
+{{/*
+Returns the extraEnv keys and values to inject into the parquet deployment.
+
+Global values will override any chart-specific values.
+*/}}
+{{- define "parquet.deploymentExtraEnv" -}}
+{{- $allExtraEnv := merge (default (dict) .local.deploymentExtraEnv) .global.extraEnv -}}
+{{- range $key, $value := $allExtraEnv }}
+- name: {{ $key }}
+  value: {{ $value | quote }}
+{{- end -}}
+{{- end -}}
+
+
+{{/*
+Returns the extraEnv keys and values to inject into the parquet backfill cronjob.
+
+Global values will override any chart-specific values.
+*/}}
+{{- define "parquet.cronjobExtraEnv" -}}
+{{- $allExtraEnv := merge (default (dict) .local.cronjobExtraEnv) .global.extraEnv -}}
+{{- range $key, $value := $allExtraEnv }}
+- name: {{ $key }}
+  value: {{ $value | quote }}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Returns a list of _common_ labels to be shared across all
 app deployments and other shared objects.
