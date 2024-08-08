@@ -94,7 +94,7 @@ Returns the extraEnv keys and values to inject into the parquet deployment.
 Global values will override any chart-specific values.
 */}}
 {{- define "parquet.deploymentExtraEnv" -}}
-{{- $allExtraEnv := default (dict) .local.deploymentExtraEnv -}}
+{{- $allExtraEnv := default (dict) .local.deployment.extraEnv -}}
 {{- range $key, $value := $allExtraEnv }}
 - name: {{ $key }}
   value: {{ $value | quote }}
@@ -107,8 +107,8 @@ Returns the extraEnv keys and values to inject into the parquet backfill cronjob
 
 Global values will override any chart-specific values.
 */}}
-{{- define "parquet.cronjobExtraEnv" -}}
-{{- $allExtraEnv := default (dict) .local.cronjobExtraEnv -}}
+{{- define "parquet.cronJobExtraEnv" -}}
+{{- $allExtraEnv := default (dict) .local.cronJob.extraEnv -}}
 {{- range $key, $value := $allExtraEnv }}
 - name: {{ $key }}
   value: {{ $value | quote }}
