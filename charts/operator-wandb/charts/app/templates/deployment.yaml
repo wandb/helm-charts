@@ -73,6 +73,11 @@ spec:
               mountPath: /etc/ssl/certs/redis_ca.pem
               subPath: redis_ca.pem
             {{- end }}
+            {{- range $index, $v := .Values.global.customCACerts }}
+            - name: wandb-ca-certs
+              mountPath: /usr/local/share/ca-certificates/customCA{{$index}}.crt
+              subPath: customCA{{$index}}.crt
+            {{- end }}
           ports:
             - name: http
               containerPort: 8080
@@ -184,9 +189,9 @@ spec:
             - name: BUCKET
               value: "{{ include "app.bucket" . }}"
             - name: AWS_REGION
-              value: {{ .Values.global.bucket.region }}
+              value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
             - name: AWS_S3_KMS_ID
-              value: "{{ .Values.global.bucket.kmsKey }}"
+              value: "{{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}"
 
             - name: OPERATOR_ENABLED
               value: 'true'
@@ -280,5 +285,10 @@ spec:
             items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
+        {{- end }}
+        {{- if .Values.global.customCACerts }}
+        - name: wandb-ca-certs
+          configMap:
+            name: {{ include "wandb.fullname" . }}-ca-certs
         {{- end }}
 {{- end }}

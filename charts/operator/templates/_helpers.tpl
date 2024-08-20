@@ -61,3 +61,12 @@ Create the name of the manager service account to use
 {{- default "default" .Values.manager.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Return isolated namespaces as a comma seperated list
+*/}}
+{{- define "operator.isolatedNamespaces" -}}
+{{- if .Values.namespaceIsolation.enabled }}
+{{- join "," (append .Values.namespaceIsolation.additionalNamespaces .Release.Namespace) }}
+{{- end }}
+{{- end }}

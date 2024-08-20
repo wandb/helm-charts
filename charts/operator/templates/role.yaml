@@ -1,85 +1,39 @@
+{{- if .Values.namespaceIsolation.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "name" . }}-manager-role
+  namespace: {{ .Release.Namespace }}
+rules:
+{{ toYaml .Values.role.rules | indent 2 }}
+  {{- range .Values.namespaceIsolation.additionalNamespaces }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "name" $ }}-manager-role
+  namespace: {{ . }}
+rules:
+{{ toYaml $.Values.role.rules | indent 2 }}
+  {{- end }}
+{{- else }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: {{ include "name" . }}-manager-role
 rules:
-- apiGroups:
-  - '*'
-  resources:
-  - '*'
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  - services
-  - services/finalizers
-  - secrets
-  - persistentvolumeclaims
-  - persistentvolumes
-  - configmaps
-  - pods
-  - events
-  verbs:
-  - create
-  - patch
-  - delete
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  - daemonsets
-  verbs:
-  - create
-  - patch
-  - delete
-  - update
-- apiGroups:
-  - apps.wandb.com
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
-  - clusterroles
-  - clusterrolebindings
-  - roles
-  - rolebindings
-  verbs:
-  - create
-  - update
-  - delete
-  - patch
-  - bind
-  - escalate
-- apiGroups:
-  - autoscaling
-  resources:
-  - horizontalpodautoscalers
-  verbs:
-  - create
-  - update
-  - delete
-  - patch
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - ingresses
-  - ingressclasses
-  verbs:
-  - create
-  - patch
-  - update
-  - delete
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - ingresses/status
-  verbs:
-  - update
+{{ toYaml .Values.role.rules | indent 2 }}
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - clusterroles
+      - clusterrolebindings
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+{{- end }}
