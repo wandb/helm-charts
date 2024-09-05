@@ -5,6 +5,7 @@ kind: Deployment
 metadata:
   name: {{ include "parquet.fullname" . }}
   labels:
+    app.kubernetes.io/component: "service"
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "parquet.commonLabels" . | nindent 4 }}
     {{- include "parquet.labels" . | nindent 4 }}
@@ -25,6 +26,7 @@ spec:
   template:
     metadata:
       labels:
+        app.kubernetes.io/component: "service"
         {{- include "wandb.podLabels" . | nindent 8 }}
         {{- include "parquet.commonLabels" . | nindent 8 }}
         {{- include "parquet.podLabels" . | nindent 8 }}
@@ -55,6 +57,10 @@ spec:
               containerPort: 8087
               protocol: TCP
           env:
+            {{- if ne .Values.traceRatio 0.0 }}
+            - name: GORILLA_TRACER
+              value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
+            {{- end }}
             - name: ONLY_SERVICE
               value: gorilla-parquet
             - name: LOGGING_ENABLED
