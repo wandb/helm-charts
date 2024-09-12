@@ -64,31 +64,33 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.resources | nindent 10 }}
-        {{- if .Values.airgapped }}
+        {{- if or .Values.airgapped .Values.customCACerts }}
         volumeMounts:
-        - name: {{ include "name" . }}-charts
-          mountPath: /charts
-        {{- end }}
-        {{- if .Values.customCACerts }}
-        {{- range $index, $v := .Values.customCACerts }}
-        volumeMounts:
+          {{- if or .Values.airgapped }}
+          - name: {{ include "name" . }}-charts
+            mountPath: /charts
+          {{- end }}
+          {{- if .Values.customCACerts }}
+            {{- range $index, $v := .Values.customCACerts }}
           - name: wandb-ca-certs
             mountPath: /certs/customCA{{$index}}.crt
             subPath: customCA{{$index}}.crt
+            {{- end }}
+          {{- end }}
         {{- end }}
+      {{- if or .Values.airgapped .Values.customCACerts }}
+      volumes:
+        {{- if .Values.airgapped }}
+        - name: {{ include "name" . }}-charts
+          configMap:
+            name: {{ include "name" . }}-charts
+            optional: true
         {{- end }}
-      {{- if .Values.airgapped }}
-      volumes:
-      - name: {{ include "name" . }}-charts
-        configMap:
-          name: {{ include "name" . }}-charts
-          optional: true
-      {{- end }}
-      {{- if .Values.customCACerts }}
-      volumes:
-      - name: wandb-ca-certs
-        configMap:
-          name: {{ include "operator.fullname" . }}-ca-certs
+        {{- if .Values.customCACerts }}
+        - name: wandb-ca-certs
+          configMap:
+            name: {{ include "operator.fullname" . }}-ca-certs
+        {{- end }}
       {{- end }}
       serviceAccountName: {{ include "manager.serviceAccount.name" . }}
       terminationGracePeriodSeconds: 10
