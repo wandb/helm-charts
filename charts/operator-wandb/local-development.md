@@ -55,7 +55,7 @@ cd helm-charts
 Extract the current values from the deployed Helm chart and scale down the `wandb-controller-manager` deployment:
 
 ```bash
-helm get values wandb > operator-spec.yaml
+helm get values wandb > secret.operator-spec.yaml
 kubectl scale --replicas=0 deployment -n wandb wandb-controller-manager
 ```
 
