@@ -61,7 +61,7 @@ kubectl scale --replicas=0 deployment -n wandb wandb-controller-manager
 
 ### 4. Develop and Test Your Changes
 
-After extracting the current chart values into `operator-spec.yaml`, you can start making your changes to the chart or the operator specifications.
+After extracting the current chart values into `secret.operator-spec.yaml`, you can start making your changes to the chart or the operator specifications.
 
 #### Building Dependencies
 
@@ -78,12 +78,12 @@ To apply your changes, upgrade the Helm release with your modified specification
 ```bash
 # Helm template command
 helm template wandb \
-    ./charts/operator-wandb -f ./operator-spec.yaml
+    ./charts/operator-wandb -f ./secret.operator-spec.yaml > secret.template.yaml
 
 # Helm upgrade command
 helm upgrade \
     --install wandb \
-    ./charts/operator-wandb -f ./operator-spec.yaml
+    ./charts/operator-wandb -f ./secret.operator-spec.yaml
 
 ```
 
