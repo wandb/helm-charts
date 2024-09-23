@@ -20,7 +20,7 @@ metadata:
     {{- end }}
 spec:
   replicas: 1
-  {{- if and .Values.hpa.enabled .Values.glueSingleton.enabled }}
+  {{- if and .Values.autoscaling.hpa.enabled .Values.glueSingleton.enabled }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
