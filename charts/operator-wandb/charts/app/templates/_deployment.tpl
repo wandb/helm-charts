@@ -20,13 +20,6 @@ metadata:
     {{- end }}
 spec:
   replicas: 1
-  {{- if and .Values.autoscaling.hpa.enabled .Values.glueSingleton.enabled }}
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
-  {{- end }}
   selector:
     matchLabels:
       {{- include "wandb.selectorLabels" . | nindent 6 }}
