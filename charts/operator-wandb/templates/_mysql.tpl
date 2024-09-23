@@ -1,5 +1,5 @@
 {{/*
-Return name of the secret where information is stored, considering if the custom secret is defined
+Return the name of the secret where information is stored, considering if the custom secret is defined
 */}}
 {{- define "wandb.mysql.passwordSecret" -}}
 {{- if .Values.global.mysql.passwordSecret.name }}
@@ -10,15 +10,27 @@ Return name of the secret where information is stored, considering if the custom
 {{- end -}}
 
 {{/*
-Return key of the secret where information is stored, considering if the custom key is defined
+Return the key of the secret where the password is stored, considering if the custom key is defined
 */}}
 {{- define "wandb.mysql.passwordSecret.key" -}}
-{{- if .Values.global.mysql.passwordSecret.key }}
-  {{- .Values.global.mysql.passwordSecret.key -}}
+{{- if .Values.global.mysql.passwordSecret.userKey }}
+  {{- .Values.global.mysql.passwordSecret.userKey -}}
 {{- else }}
   MYSQL_PASSWORD
 {{- end -}}
 {{- end -}}
+
+{{/*
+Return the key of the secret where the root password is stored, considering if the custom root key is defined
+*/}}
+{{- define "wandb.mysql.passwordSecret.rootKey" -}}
+{{- if .Values.global.mysql.passwordSecret.rootKey }}
+  {{- .Values.global.mysql.passwordSecret.rootKey -}}
+{{- else }}
+  MYSQL_ROOT_PASSWORD
+{{- end -}}
+{{- end -}}
+
 
 {{/*
 Return the db port
