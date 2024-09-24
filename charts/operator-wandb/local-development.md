@@ -32,7 +32,6 @@ az account set --subscription <Subscription_ID>
 az aks get-credentials --resource-group <Resource_Group_Name> --name <AKS_Cluster_Name>
 ```
 
-
 #### GCP
 
 Authenticate with the Google Cloud SDK:
@@ -56,13 +55,13 @@ cd helm-charts
 Extract the current values from the deployed Helm chart and scale down the `wandb-controller-manager` deployment:
 
 ```bash
-helm get values wandb > operator-spec.yaml
+helm get values wandb > secret.operator-spec.yaml
 kubectl scale --replicas=0 deployment -n wandb wandb-controller-manager
 ```
 
 ### 4. Develop and Test Your Changes
 
-After extracting the current chart values into `operator-spec.yaml`, you can start making your changes to the chart or the operator specifications.
+After extracting the current chart values into `secret.operator-spec.yaml`, you can start making your changes to the chart or the operator specifications.
 
 #### Building Dependencies
 
@@ -77,9 +76,15 @@ helm dependency build ./charts/operator-wandb
 To apply your changes, upgrade the Helm release with your modified specifications:
 
 ```bash
+# Helm template command
+helm template wandb \
+    ./charts/operator-wandb -f ./secret.operator-spec.yaml > secret.template.yaml
+
+# Helm upgrade command
 helm upgrade \
     --install wandb \
-    ./charts/operator-wandb -f ./operator-spec.yaml
+    ./charts/operator-wandb -f ./secret.operator-spec.yaml
+
 ```
 
 ### 5. Finalizing Development
@@ -89,9 +94,9 @@ After completing your development work:
 1. Ensure to increment the version in `Chart.yaml` of your Helm chart, e.g., `0.10.43`.
 2. Scale the `wandb-controller-manager` deployment back up:
 
-    ```bash
-    kubectl scale --replicas=1 deployment -n wandb wandb-controller-manager
-    ```
+   ```bash
+   kubectl scale --replicas=1 deployment -n wandb wandb-controller-manager
+   ```
 
 ## Contributing
 
