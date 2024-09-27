@@ -46,7 +46,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Selector labels
 */}}
 {{- define "wandb.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "wandb.name" . }}
+app.kubernetes.io/name: {{ include "wandb.name" . }}{{ .suffix }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
