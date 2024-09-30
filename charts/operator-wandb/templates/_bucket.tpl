@@ -1,6 +1,12 @@
 {{/*
-Return name of secret where bucket information is stored
+Return the bucket credentials secret name
 */}}
 {{- define "wandb.bucket.secret" -}}
-{{- print .Release.Name "-bucket" -}}
+{{- if .Values.global.bucket.secretName -}}
+  {{ .Values.global.bucket.secretName }}
+{{- else if .Values.global.defaultBucket.secretName -}}
+  {{ .Values.global.defaultBucket.secretName }}
+{{- else }}
+  {{- print .Release.Name "-bucket" -}}
 {{- end -}}
+{{- end }}
