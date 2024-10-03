@@ -126,13 +126,12 @@ spec:
             - name: WEAVE_TRACES_ENABLED
               value: "true"
             {{- end }}
-            {{- if ne (include "wandb.redis.password" .) "" }}
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.redis.passwordSecret" . }}
+                  optional: true
                   key: REDIS_PASSWORD
-            {{- end }}
             - name: REDIS_PORT
               value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
@@ -271,7 +270,7 @@ spec:
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "app.fullname" . }}-redis-ca
           secret:
-            secretName: "{{ include "wandb.redis.passwordSecret" . }}"
+            secretName: "{{ .Release.Name }}-redis"
             items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
