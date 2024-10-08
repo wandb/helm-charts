@@ -2,7 +2,11 @@
 Return name of secret where redis information is stored
 */}}
 {{- define "wandb.redis.passwordSecret" -}}
-{{- print .Release.Name "-redis" -}}
+{{- if .Values.global.redis.secretName -}}
+  {{ .Values.global.redis.secretName }}
+{{- else -}}
+  {{- print .Release.Name "-redis" -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
@@ -42,7 +46,7 @@ Return the redis to url
 
 {{- define "wandb.redis.connectionString" -}}
 {{- $password := include "wandb.redis.password" . }}
-{{- if $password }}
+{{- if or $password .Values.global.redis.secretName }}
 redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)
 {{- else }}
 redis://$(REDIS_HOST):$(REDIS_PORT)
