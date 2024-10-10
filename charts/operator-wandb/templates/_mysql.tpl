@@ -1,9 +1,14 @@
 {{/*
-Return name of secret where information is stored
+Return the name of the secret where information is stored, considering if the custom secret is defined
 */}}
 {{- define "wandb.mysql.passwordSecret" -}}
-{{- print .Release.Name "-mysql" -}}
+{{- if .Values.global.mysql.passwordSecret.name }}
+  {{- .Values.global.mysql.passwordSecret.name -}}
+{{- else }}
+  {{- print .Release.Name "-mysql" -}}
 {{- end -}}
+{{- end -}}
+
 
 {{/*
 Return the db port
