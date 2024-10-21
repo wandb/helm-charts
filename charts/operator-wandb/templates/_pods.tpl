@@ -72,6 +72,9 @@ securityContext:
   {{- if hasKey $csc "runAsGroup" }}
   runAsGroup: {{ $csc.runAsGroup }}
   {{- end }}
+  {{- if hasKey $csc "privileged" }}
+  privileged: {{ $csc.privileged }}
+  {{- end }}
 {{- end }}
 {{- end -}}
 
