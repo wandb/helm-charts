@@ -11,22 +11,22 @@ Return a PodSecurityContext definition.
 {{- define "wandb.podSecurityContext" -}}
 {{- $psc := . | default dict }}
 securityContext:
-  {{- if not (empty $psc.runAsUser) }}
+  {{- if hasKey $psc "runAsUser" }}
   runAsUser: {{ $psc.runAsUser }}
   {{- end }}
   {{- if hasKey $psc "runAsGroup" }}
   runAsGroup: {{ $psc.runAsGroup }}
   {{- end }}
-  {{- if not (empty $psc.fsGroup) }}
+  {{- if hasKey $psc "fsGroup" }}
   fsGroup: {{ $psc.fsGroup | int }}
   {{- end }}
-  {{- if not (empty $psc.fsGroupChangePolicy) }}
+  {{- if hasKey $psc "fsGroupChangePolicy" }}
   fsGroupChangePolicy: {{ $psc.fsGroupChangePolicy }}
   {{- end }}
-  {{- if not (empty $psc.runAsNonRoot) }}
+  {{- if hasKey $psc "runAsNonRoot" }}
   runAsNonRoot: {{ $psc.runAsNonRoot }}
   {{- end }}
-  {{- if not (empty $psc.allowPrivilegeEscalation) }}
+  {{- if hasKey $psc "allowPrivilegeEscalation" }}
   allowPrivilegeEscalation: {{ $psc.allowPrivilegeEscalation }}
   {{- end }}
   {{- if and (kindIs "map" $psc.seccompProfile) (not (empty $psc.seccompProfile.type)) }}
@@ -42,15 +42,15 @@ Return container-specific securityContext template.
 {{- $csc := . | default dict }}
 {{- if $csc }}
 securityContext:
-  {{- if $csc.capabilities }}
+  {{- if kindIs "map" $csc.capabilities }}
   capabilities:
-    {{- if not (empty $csc.capabilities.add) }}
+    {{- if gt (len $csc.capabilities.add) 0 }}
     add:
-    {{- range $c := $csc.capabilities.add }}
+      {{- range $c := $csc.capabilities.add }}
       - {{ $c }}
+      {{- end }}
     {{- end }}
-    {{- end }}
-    {{- if not (empty $csc.capabilities.drop) }}
+    {{- if gt (len $csc.capabilities.drop) 0 }}
     drop:
     {{- range $c := $csc.capabilities.drop }}
       - {{ $c }}
