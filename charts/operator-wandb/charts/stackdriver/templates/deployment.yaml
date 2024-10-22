@@ -32,10 +32,14 @@ spec:
         {{- if .Values.pod.annotations -}}
         {{-   toYaml .Values.pod.annotations | nindent 8 }}
         {{- end }}
+      {{- include "wandb.nodeSelector" . | nindent 6 }}
+      {{- include "wandb.priorityClassName" . | nindent 6 }}
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
     spec:
       containers:
         - name: {{ .Chart.Name }}
           image:  "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           command: ["stackdriver_exporter"]
           volumeMounts:
           {{- if or .Values.stackdriver.serviceAccountSecret .Values.stackdriver.serviceAccountKey }}
@@ -102,9 +106,6 @@ spec:
       tolerations:
         {{- toYaml .tolerations | nindent 8 }}
       {{- end }}
-      {{- include "wandb.nodeSelector" . | nindent 6 }}
-      {{- include "wandb.priorityClassName" . | nindent 6 }}
-      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       volumes:
       {{- if .Values.stackdriver.serviceAccountSecret }}
         - name: stackdriver-service-account

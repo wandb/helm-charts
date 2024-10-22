@@ -67,6 +67,7 @@ spec:
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           volumeMounts:
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "app.fullname" . }}-redis-ca
