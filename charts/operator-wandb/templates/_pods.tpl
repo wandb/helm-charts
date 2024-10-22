@@ -14,7 +14,7 @@ securityContext:
   {{- if not (empty $psc.runAsUser) }}
   runAsUser: {{ $psc.runAsUser }}
   {{- end }}
-  {{- if not (empty $psc.runAsGroup) }}
+  {{- if hasKey $psc "runAsGroup" }}
   runAsGroup: {{ $psc.runAsGroup }}
   {{- end }}
   {{- if not (empty $psc.fsGroup) }}
