@@ -55,6 +55,14 @@
     {{- toYaml .livenessProbe | nindent 4 }}
   readinessProbe:
     {{- toYaml .readinessProbe | nindent 4 }}
+  {{ if .startupProbe }}
+  startupProbe:
+    {{- toYaml .startupProbe | nindent 4 }}
+  {{ end }}
+  {{ if .lifecycle }}
+  lifecycle:
+    {{- toYaml .lifecycle | nindent 4 }}
+  {{ end }}
   resources:
     {{- toYaml .resources | nindent 4 }}
   {{- with .volumeMounts }}
