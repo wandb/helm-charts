@@ -1,0 +1,196 @@
+{{- if .Values.global.beta.glue.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "glue.fullname" . }}
+  labels:
+    {{- include "glue.labels" . | nindent 4 }}
+    app: {{ include "glue.fullname" . }}
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+  annotations:
+    {{- toYaml .Values.deployment.annotations | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ include "glue.fullname" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "glue.fullname" . }}
+        release: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ include "glue.serviceAccountName" . }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args: ["glue"]
+        volumeMounts:
+        {{- if ne (include "wandb.redis.caCert" .) "" }}
+        - name: {{ include "glue.fullname" . }}-redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+        {{- end }}
+        env:
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
+          value: "true"
+        {{- if ne .Values.global.email.smtp.host "" }}
+        - name: GORILLA_EMAIL_SINK
+          value: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
+        {{- else }}
+        - name: GORILLA_EMAIL_SINK
+          value: "https://api.wandb.ai/email/dispatch"
+        {{- end }}
+        - name: GORILLA_SWEEP_PROVIDER
+          value: "{{ .Values.global.sweepProvider | default (printf "http://127.0.0.1:8082") }}"
+        - name: GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE
+          value: "/usr/local/bin/view-spec-updater-linux"
+        - name: GORILLA_LIMITER
+          value: "noop://"
+        - name: GORILLA_PARQUET_RPC_PATH
+          value: "/_goRPC_"
+        - name: GORILLA_SCHEMA_FILE
+          value: "/schema.graphql"
+        - name: GORILLA_PORT
+          value: "8081"
+        - name: GORILLA_ACTIVITY_STORE_ENABLE
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
+          value: "false"
+        - name: GORILLA_GLUE_TASK_STORE
+          value: "memory://"
+        - name: GORILLA_TASK_QUEUE
+          value: "noop://"
+        {{- if ne .Values.traceRatio 0.0 }}
+        - name: GORILLA_TRACER
+          value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
+        {{- end }}
+        - name: GORILLA_COLLECT_AUDIT_LOGS
+          value: "true"
+        - name: GORILLA_USE_PARQUET_HISTORY_STORE
+          value: "true"
+        - name: GORILLA_PARQUET_PORT
+          value: "8087"
+        - name: GORILLA_RUN_UPDATE_QUEUE_ADDR
+          value: "internal://"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
+          value: "true"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "false"
+        - name: GORILLA_ACTIVITY_STORE_SERVE
+          value: "true"
+        - name: GORILLA_GLUE_TASK_CONFIG_PATH
+          value: /gorilla_glue_tasks_local.yaml
+        - name: GORILLA_ONPREM
+          value: "true"
+        - name: GORILLA_STATSD_PORT
+          value: "8125"
+        - name: GORILLA_ACTIVITY_STORE_BACKFILL_ENABLE
+          value: "true"
+        - name: GORILLA_ARTIFACT_GC_ENABLED
+          value: "false"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
+          value: "true"
+        - name: GORILLA_GLUE_TASK_PROVIDER
+          value: "memory://"
+        - name: MYSQL_PORT
+          value: "{{ include "wandb.mysql.port" . }}"
+        - name: MYSQL_HOST
+          value: "{{ include "wandb.mysql.host" . }}"
+        - name: MYSQL_DATABASE
+          value: "{{ include "wandb.mysql.database" . }}"
+        - name: MYSQL_USER
+          value: "{{ include "wandb.mysql.user" . }}"
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "wandb.mysql.passwordSecret" . }}
+              key: MYSQL_PASSWORD
+        - name: GORILLA_GLUE_TASK_STRATEGY_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_GLUE_TASK_METADATA_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_USAGE_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_METADATA_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_ANALYTICS_SINK
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_CASBIN_ADDRESS
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_RUN_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_HISTORY_STORE
+          value: "http://wandb-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "wandb.redis.passwordSecret" . }}
+              optional: true
+              key: REDIS_PASSWORD
+        - name: REDIS_PORT
+          value: "{{ include "wandb.redis.port" . }}"
+        - name: REDIS_HOST
+          value: "{{ include "wandb.redis.host" . }}"
+        - name: REDIS
+          value: "{{ include "glue.redis" . | trim }}"
+        - name: GORILLA_AUDITOR_CACHE
+          value: "{{ include "glue.redis" . | trim }}"
+        - name: GORILLA_SETTINGS_CACHE
+          value: "{{ include "glue.redis" . | trim }}"
+        - name: GORILLA_LOCKER
+          value: "{{ include "glue.redis" . | trim }}"
+        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
+          value: "{{ include "glue.redis" . | trim }}"
+        - name: GORILLA_CACHE
+          value: "{{ include "glue.redis" . | trim }}"
+        - name: GORILLA_FILE_METADATA_SOURCE
+          value: "{{ include "glue.redis" . | trim }}"
+        - name: BUCKET
+          value: "{{ include "glue.bucket" . }}"
+        - name: AWS_REGION
+          value: "{{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}"
+        - name: GORILLA_DEFAULT_REGION
+          value: "{{ include "glue.cloud" . }}-{{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}"
+        - name: AWS_S3_KMS_ID
+          value: "{{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}"
+        - name: GORILLA_FILE_STORE
+          value: "{{ include "glue.bucket" . }}"
+        - name: GORILLA_STORAGE_BUCKET
+          value: "{{ include "glue.bucket" . }}"
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 1
+          timeoutSeconds: 1
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+      {{- if ne (include "wandb.redis.caCert" .) "" }}
+      - name: {{ include "glue.fullname" . }}-redis-ca
+        secret:
+          secretName: "{{ .Release.Name }}-redis"
+          items:
+            - key: REDIS_CA_CERT
+              path: redis_ca.pem
+      {{- end }}
+{{- end }}
