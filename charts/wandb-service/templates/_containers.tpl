@@ -51,10 +51,14 @@
   ports:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- if .livenessProbe }}
   livenessProbe:
     {{- toYaml .livenessProbe | nindent 4 }}
+  {{- end }}
+  {{- if .readinessProbe }}
   readinessProbe:
     {{- toYaml .readinessProbe | nindent 4 }}
+  {{- end }}
   {{ if .startupProbe }}
   startupProbe:
     {{- toYaml .startupProbe | nindent 4 }}
@@ -63,8 +67,10 @@
   lifecycle:
     {{- toYaml .lifecycle | nindent 4 }}
   {{ end }}
+  {{ if .resources }}
   resources:
     {{- toYaml .resources | nindent 4 }}
+  {{ end }}
   {{- with .volumeMounts }}
   volumeMounts:
     {{- toYaml . | nindent 4 }}
