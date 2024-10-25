@@ -151,6 +151,10 @@ spec:
             - name: LOCAL_LDAP_GROUP_ALLOW_LIST
               value: {{ .Values.ldap.groupAllowList }}
             {{- end }}
+            {{- if .Values.weaveTrace.enabled }}
+            - name: WEAVE_TRACES_ENABLED
+              value: "true"
+            {{- end }}
             {{- if .Values.extraEnv }}
             {{- toYaml .Values.extraEnv | nindent 12 }}
             {{- end }}
@@ -233,21 +237,3 @@ spec:
               - key: {{ .Values.ldap.tlsCert.configMap.key }}
                 path: ca.crt
       {{- end }}
----
-{{- if and (not .Values.bucket) .Values.existingClaim }}
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: {{ include "wandb.volumeClaim" . }}
-  annotations:
-    "helm.sh/resource-policy": keep
-  labels:
-    {{- include "wandb.labels" . | nindent 4 }}
-    app.kubernetes.io/component: local
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 64Gi
-{{- end }}
