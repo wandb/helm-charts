@@ -258,7 +258,7 @@ spec:
             - name: GORILLA_INTERNAL_JWT_ISSUERS
               value: '["https://kubernetes.default.svc.cluster.local"]'
             - name: GORILLA_INTERNAL_JWT_SUBJECTS
-              value: '["system:serviceaccount:default:{{ .Values.global.weave-trace.serviceAccountName }}"]'
+              value: '["system:serviceaccount:default:{{ index .Values.global \"weave-trace\" \"serviceAccountName\" }}"]'
             {{- end }}
             {{- include "app.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
