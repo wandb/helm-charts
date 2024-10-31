@@ -131,14 +131,3 @@ app deployments.
 {{- end -}}
 {{- trimSuffix "/" $bucket -}}
 {{- end -}}
-
-{{/*
-Create the name of the weave-traceservice account to use
-*/}}
-{{- define "weaveTrace.serviceAccountName" -}}
-{{- if .Values.global."weave-trace".serviceAccount.create }}
-{{- default (include "weaveTrace.fullname" .) .Values.global."weave-trace".serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.global."weave-trace".serviceAccount.name }}
-{{- end }}
-{{- end }}
