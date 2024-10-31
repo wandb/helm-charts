@@ -65,9 +65,9 @@ Create the name of the service account to use
 Weave Trace service account name
 */}}
 {{- define "weaveTrace.serviceAccountName" -}}
-{{- if .Values.global."weave-trace".serviceAccount.create }}
-{{- default (include "weaveTrace.fullname" .) .Values.global."weave-trace".serviceAccount.name }}
+{{- if index .Values.global "weave-trace" "serviceAccount" "create" }}
+{{- default (include "weaveTrace.fullname" .) index .Values.global "weave-trace" "serviceAccount" "name" }}
 {{- else }}
-{{- default "default" .Values.global."weave-trace".serviceAccount.name }}
+{{- default "default" index .Values.global "weave-trace" "serviceAccount" "name" }}
 {{- end }}
 {{- end }}
