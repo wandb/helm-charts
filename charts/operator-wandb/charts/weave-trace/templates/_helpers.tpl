@@ -62,6 +62,16 @@ app.kubernetes.io/name: {{ include "weaveTrace.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{/*
+Create the name of the service account to use
+*/}}
+{{- define "weaveTrace.serviceAccountName" -}}
+{{- if .Values.global."weave-trace".serviceAccount.create }}
+{{- default (include "weaveTrace.fullname" .) .Values.global."weave-trace".serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.global."weave-trace".serviceAccount.name }}
+{{- end }}
+{{- end }}
 
 {{/*
 Returns the extraEnv keys and values to inject into containers.

@@ -132,12 +132,13 @@ app deployments.
 {{- trimSuffix "/" $bucket -}}
 {{- end -}}
 
-{{- define "weaveServiceAccountName" -}}
-{{- if index .Values.global "weave-trace" "enabled" }}
-{{- if (not (empty (index .Values.global "weave-trace" "serviceAccountName"))) }}
-{{- index .Values.global "weave-trace" "serviceAccountName" }}
+{{/*
+Create the name of the weave-traceservice account to use
+*/}}
+{{- define "weaveTrace.serviceAccountName" -}}
+{{- if .Values.global."weave-trace".serviceAccount.create }}
+{{- default (include "weaveTrace.fullname" .) .Values.global."weave-trace".serviceAccount.name }}
 {{- else }}
-{{- fail "Values.global.weave-trace.serviceAccountName cannot be empty if serviceAccount.create is true" }}
-{{- end}}
+{{- default "default" .Values.global."weave-trace".serviceAccount.name }}
 {{- end }}
 {{- end }}
