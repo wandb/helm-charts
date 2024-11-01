@@ -260,6 +260,8 @@ spec:
               value: {{ .Values.artifactsGc.NumWorkers | quote }}
             - name: GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
               value: {{ .Values.artifactsGc.DeleteFilesNumWorkers | quote }}
+            - name: GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS
+              value: {{ tpl (include "app.internalJWTMap" .) . }}
             {{- include "app.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           {{- if .healthCheckEnabled }}
