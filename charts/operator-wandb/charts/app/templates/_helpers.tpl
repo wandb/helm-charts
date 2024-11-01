@@ -131,3 +131,11 @@ app deployments.
 {{- end -}}
 {{- trimSuffix "/" $bucket -}}
 {{- end -}}
+
+{{- define "app.internalJWTMap" -}}
+'{
+{{- range $value := .Values.internalJWTMap -}}
+{{- printf "system:serviceaccount:%s:%s" $value.namespace $value.serviceName | quote }}: {{ printf "https://kubernetes.%s.svc.cluster.local" $value.namespace | quote }},
+{{- end -}}
+}'
+{{- end -}}
