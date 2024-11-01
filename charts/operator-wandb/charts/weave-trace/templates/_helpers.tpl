@@ -4,7 +4,7 @@
 Expand the name of the chart.
 */}}
 {{- define "weaveTrace.name" -}}
-{{- default "weave-trace" .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -12,11 +12,11 @@ Create a default fully qualified name for weave-trace. (Should be something like
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "weave-trace.weaveTrace.fullname" -}}
+{{- define "weaveTrace.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- $name := default "weave-trace" .Values.nameOverride }}
+{{- $name := default .Chart.Name .Values.nameOverride }}
 {{- if contains $name .Release.Name }}
 {{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -30,7 +30,7 @@ Create a default fully qualified name for the weave-trace migration. (Should be 
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 */}}
 {{- define "weaveTraceMigrate.fullname" -}}
-{{ printf "%s-migrate" (include "weave-trace.weaveTrace.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{ printf "%s-migrate" (include "weaveTrace.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 
@@ -65,11 +65,11 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "weave-trace.weaveTrace.serviceAccountName" -}}
-{{- if index .Values.global "weave-trace" "serviceAccount" "create" }}
-{{- default (include "weave-trace.weaveTrace.fullname" .) (index .Values.global "weave-trace" "serviceAccount" "name") }}
+{{- define "weaveTrace.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "weaveTrace.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
-{{- default "default" (index .Values.global "weave-trace" "serviceAccount" "name") }}
+{{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
 

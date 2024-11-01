@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "weave-trace.weaveTrace.fullname" . }}
+  name: {{ include "weaveTrace.fullname" . }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "weaveTrace.commonLabels" . | nindent 4 }}
@@ -65,7 +65,7 @@ spec:
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
       {{- end }}
       containers:
-        - name: {{ include "weave-trace.weaveTrace.fullname" .  }}
+        - name: {{ include "weaveTrace.fullname" .  }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           ports:
             - name: http
@@ -129,11 +129,10 @@ spec:
             periodSeconds: 10
           volumeMounts:
             - name: weave-trace-dangerzone-secrets
-              mountPath: /tmp/weave-trace/dangerzone
-
+              mountPath: /tmp/weave-trace/dangerzone    
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      serviceAccountName: {{ include "weave-trace.weaveTrace.serviceAccountName" . }}
+      serviceAccountName: {{ include "weaveTrace.serviceAccountName" . }}
       volumes:
         - name: weave-trace-dangerzone-secrets
           projected:
@@ -146,7 +145,7 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name:  {{ include "weave-trace.weaveTrace.fullname" . }}
+  name:  {{ include "weaveTrace.fullname" . }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "weaveTrace.commonLabels" . | nindent 4 }}
@@ -155,7 +154,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "weave-trace.weaveTrace.fullname" . }}
+    name: {{ include "weaveTrace.fullname" . }}
   minReplicas: 1
   maxReplicas: 5
   metrics:
