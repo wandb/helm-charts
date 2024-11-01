@@ -254,6 +254,12 @@ spec:
                   },
                   "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
                 }
+            - name: GORILLA_ARTIFACTS_GC_BATCH_SIZE
+              value: {{ .Values.artifactsGc.BatchSize | quote }}
+            - name: GORILLA_ARTIFACTS_GC_NUM_WORKERS
+              value: {{ .Values.artifactsGc.NumWorkers | quote }}
+            - name: GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
+              value: {{ .Values.artifactsGc.DeleteFilesNumWorkers | quote }}
             {{- if index .Values.global "weave-trace" "enabled" }}
             - name: GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS
               value: '{"system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace": "https://kubernetes.{{ .Release.Namespace }}.svc.cluster.local"}'
