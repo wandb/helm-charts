@@ -1,0 +1,68 @@
+name: Pre-Release Charts
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.8.1
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.6.1
+        with:
+          version: v3.11.0
+
+      - name: yq - portable yaml processor
+        uses: mikefarah/yq@v4.44.3
+        with:
+          cmd: ''
+
+      - name: Install Helm Deps
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Build deps install script
+        run: |
+          chmod +x ./helm-dep-build.sh
+          ./helm-dep-build.sh
+        shell: bash
+
+      - name: Package charts
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          git_hash=$(git rev-parse --short "$GITHUB_SHA")
+          for chart in $(ct list-changed --config ct.yaml); do
+          helm package --version=$(helm show chart ${chart} | yq .version)-PR${PR_NUMBER}-${git_hash} -d .cr-release-packages ${chart}
+          done
+        shell: bash
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@v1.5.0
+        with:
+          skip_packaging: true
+        env:
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
