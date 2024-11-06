@@ -1,0 +1,36 @@
+{{- if .Values.enabled }}
+{{- $glueSingletonEnabled := .Values.glueSingleton.enabled }}
+{{- $notGlueSingletonEnabled := not $glueSingletonEnabled }}
+
+{{/*
+App deployment
+*/}}
+{{ include "app.deployment" (dict
+  "glueSingletonEnabled" $notGlueSingletonEnabled
+  "onlyService" nil
+  "suffix" ""
+  "healthCheckEnabled" true
+  "Values" .Values
+  "Chart" .Chart
+  "Release" .Release
+  "Template" .Template
+  "Capabilities" .Capabilities
+) | indent 0 }}
+---
+{{- if $glueSingletonEnabled }}
+{{/*
+Glue deployment
+*/}}
+{{ include "app.deployment" (dict
+  "glueSingletonEnabled" $glueSingletonEnabled
+  "onlyService" "gorilla-glue"
+  "suffix" "-glue"
+  "healthCheckEnabled" false
+  "Values" .Values
+  "Chart" .Chart
+  "Release" .Release
+  "Template" .Template
+  "Capabilities" .Capabilities
+) | indent 0 }}
+{{- end }}
+{{- end }}
