@@ -9,6 +9,27 @@ Return the name of the secret where information is stored, considering if the cu
 {{- end -}}
 {{- end -}}
 
+{{/*
+Return the key name for the MySQL root password, with a default fallback
+*/}}
+{{- define "wandb.mysql.rootPasswordKey" -}}
+{{- if .Values.global.mysql.passwordSecret.rootPasswordKey }}
+  {{- .Values.global.mysql.passwordSecret.rootPasswordKey -}}
+{{- else }}
+  MYSQL_ROOT_PASSWORD
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the key name for the MySQL password, with a default fallback
+*/}}
+{{- define "wandb.mysql.passwordKey" -}}
+{{- if .Values.global.mysql.passwordSecret.passwordKey }}
+  {{- .Values.global.mysql.passwordSecret.passwordKey -}}
+{{- else }}
+  MYSQL_PASSWORD
+{{- end -}}
+{{- end -}}
 
 {{/*
 Return the db port
@@ -48,5 +69,3 @@ Return the db password
 {{- define "wandb.mysql.password" -}}
 {{- print $.Values.global.mysql.password -}}
 {{- end -}}
-
-
