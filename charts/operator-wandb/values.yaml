@@ -92,6 +92,10 @@ global:
       authMethod: ""
       issuer: ""
 
+  statsd:
+    host: ""
+    port: 8125
+
   # Storage bucket that will be used by the application by default but can be overridden by the user in the wandb-console.
   defaultBucket:
     # az, s3, gcs
@@ -177,37 +181,37 @@ app:
     GLUE_ENABLED: "false"
     REDIS:
       value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_AUDITOR_CACHE
+    GORILLA_AUDITOR_CACHE:
       value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_SETTINGS_CACHE
+    GORILLA_SETTINGS_CACHE:
       value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_LOCKER
+    GORILLA_LOCKER:
       value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
+    GORILLA_ACTIVITY_STORE_CACHE_ADDRESS:
       value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_CACHE
+    GORILLA_CACHE:
       value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_FILE_METADATA_SOURCE
+    GORILLA_FILE_METADATA_SOURCE:
       value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_GLUE_TASK_STRATEGY_STORE
+    GORILLA_GLUE_TASK_STRATEGY_STORE:
       value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_GLUE_TASK_METADATA_STORE
+    GORILLA_GLUE_TASK_METADATA_STORE:
       value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_USAGE_STORE
+    GORILLA_USAGE_STORE:
       value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_METADATA_STORE
+    GORILLA_METADATA_STORE:
       value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+    GORILLA_PARQUET_LIVE_HISTORY_STORE:
       value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_ANALYTICS_SINK
+    GORILLA_ANALYTICS_SINK:
       value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_CASBIN_ADDRESS
+    GORILLA_CASBIN_ADDRESS:
       value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_RUN_STORE
+    GORILLA_RUN_STORE:
       value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+    GORILLA_FILE_STREAM_STORE_ADDRESS:
       value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_HISTORY_STORE
+    GORILLA_HISTORY_STORE:
       value: "http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include \"wandb.mysql\" . | trim }}"
     AZURE_STORAGE_KEY:
       valueFrom:
@@ -215,15 +219,15 @@ app:
           name: "{{ include \"wandb.bucket.secret\" . }}"
           key: ACCESS_KEY
           optional: true
-    - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
+    GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE:
       valueFrom:
         fieldRef:
           fieldPath: metadata.namespace
-    - name: G_HOST_IP
+    G_HOST_IP:
       valueFrom:
         fieldRef:
           fieldPath: status.hostIP
-    - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
       value: >
         {
           "overflow-bucket": {
@@ -234,30 +238,20 @@ app:
           "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
         }
   envFrom:
-    - secretRef:
-        name: "{{ .Release.Name }}-mysql"
-    - secretRef:
-        name: "{{ .Release.Name }}-redis"
-    - secretRef:
-        name: "{{ .Release.Name }}-kafka"
-    - secretRef:
-        name: "{{ .Release.Name }}-gorilla"
-    - configMapRef:
-        name: "{{ .Release.Name }}-mysql"
-    - configMapRef:
-        name: "{{ .Release.Name }}-redis"
-    - configMapRef:
-        name: "{{ .Release.Name }}-kafka"
-    - configMapRef:
-        name: "{{ .Release.Name }}-gorilla"
+    "{{ .Release.Name }}-mysql-secret": "secretRef"
+    "{{ .Release.Name }}-redis-secret": "secretRef"
+    "{{ .Release.Name }}-kafka-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-secret": "secretRef"
+    "{{ .Release.Name }}-mysql-configMap": "configMapRef"
+    "{{ .Release.Name }}-redis-configMap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configMap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-configMap": "configMapRef"
   initContainers:
     - name: init-db
-      env: [ ]
       envFrom: [ ]
       command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
   containers:
     - name: app
-      env: [ ]
       envFrom: [ ]
       ports:
         - name: http
@@ -319,95 +313,7 @@ gorilla:
 
 glue:
   install: true
-  service:
-    enabled: false
-  env:
-    - name: REDIS
-      value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_AUDITOR_CACHE
-      value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_SETTINGS_CACHE
-      value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_LOCKER
-      value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-      value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_CACHE
-      value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_FILE_METADATA_SOURCE
-      value: "{{ include \"wandb.redis\" . | trim }}"
-    - name: GORILLA_GLUE_TASK_STRATEGY_STORE
-      value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_GLUE_TASK_METADATA_STORE
-      value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_USAGE_STORE
-      value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_METADATA_STORE
-      value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-      value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_ANALYTICS_SINK
-      value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_CASBIN_ADDRESS
-      value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_RUN_STORE
-      value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-      value: "{{ include \"wandb.mysql\" . | trim }}"
-    - name: GORILLA_HISTORY_STORE
-      value: "http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include \"wandb.mysql\" . | trim }}"
-  envFrom:
-    - secretRef:
-        name: "{{ .Release.Name }}-mysql"
-    - secretRef:
-        name: "{{ .Release.Name }}-redis"
-    - secretRef:
-        name: "{{ .Release.Name }}-gorilla"
-    - configMapRef:
-        name: "{{ .Release.Name }}-mysql"
-    - configMapRef:
-        name: "{{ .Release.Name }}-redis"
-    - configMapRef:
-        name: "{{ .Release.Name }}-gorilla"
-  containers:
-    - name: glue
-      args: ["glue"]
-      env: []
-      envFrom: []
-      ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-      livenessProbe:
-        httpGet:
-          path: /healthz
-          port: 8080
-        initialDelaySeconds: 30
-        periodSeconds: 1
-        timeoutSeconds: 1
-        successThreshold: 1
-        failureThreshold: 3
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 1Gi
-      volumeMounts:
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
-  image:
-    repository: wandb/megabinary
-    tag: 0.62.0-pre.0
-  volumes:
-    - name: redis-ca
-      secret:
-        secretName: "{{ .Release.Name }}-redis"
-        items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
+
 
 nginx:
   install: false
@@ -423,24 +329,17 @@ flat-run-fields-updater:
   service:
     enabled: false
   envFrom:
-    - secretRef:
-        name: "{{ .Release.Name }}-mysql"
-    - secretRef:
-        name: "{{ .Release.Name }}-redis"
-    - secretRef:
-        name: "{{ .Release.Name }}-kafka"
-    - secretRef:
-        name: "{{ .Release.Name }}-gorilla"
-    - configMapRef:
-        name: "{{ .Release.Name }}-mysql"
-    - configMapRef:
-        name: "{{ .Release.Name }}-redis"
-    - configMapRef:
-        name: "{{ .Release.Name }}-kafka"
-    - configMapRef:
-        name: "{{ .Release.Name }}-gorilla"
+    "{{ .Release.Name }}-mysql-secret": "secretRef"
+    "{{ .Release.Name }}-redis-secret": "secretRef"
+    "{{ .Release.Name }}-kafka-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-secret": "secretRef"
+    "{{ .Release.Name }}-mysql-configMap": "configMapRef"
+    "{{ .Release.Name }}-redis-configMap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configMap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-configMap": "configMapRef"
   containers:
-    args: ["flat-run-fields-updater"]
+    - name: flat-run-fields-updater
+      args: ["flat-run-fields-updater"]
   image:
     repository: wandb/megabinary
     tag: 0.62.0-pre.0
@@ -448,30 +347,20 @@ flat-run-fields-updater:
 weave:
   install: true
   envFrom:
-    - secretRef:
-        name: "{{ .Release.Name }}-mysql"
-    - secretRef:
-        name: "{{ .Release.Name }}-redis"
-    - secretRef:
-        name: "{{ .Release.Name }}-kafka"
-    - secretRef:
-        name: "{{ .Release.Name }}-gorilla"
-    - configMapRef:
-        name: "{{ .Release.Name }}-mysql"
-    - configMapRef:
-        name: "{{ .Release.Name }}-redis"
-    - configMapRef:
-        name: "{{ .Release.Name }}-kafka"
-    - configMapRef:
-        name: "{{ .Release.Name }}-gorilla"
+    "{{ .Release.Name }}-mysql-secret": "secretRef"
+    "{{ .Release.Name }}-redis-secret": "secretRef"
+    "{{ .Release.Name }}-kafka-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-secret": "secretRef"
+    "{{ .Release.Name }}-mysql-configMap": "configMapRef"
+    "{{ .Release.Name }}-redis-configMap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configMap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-configMap": "configMapRef"
   initContainers:
     - name: init-db
-      env: [ ]
       envFrom: [ ]
       command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
   containers:
     - name: weave
-      env: [ ]
       envFrom: [ ]
       livenessProbe:
         failureThreshold: 3
@@ -519,7 +408,6 @@ weave:
         - python
         - -m
         - weave.clear_cache
-      env: [ ]
       envFrom: [ ]
       resources:
         requests:
@@ -529,10 +417,9 @@ weave:
         - mountPath: /vol/weave/cache
           name: cache
   volumes:
-    volumes:
-      - emptyDir:
-          sizeLimit: 20Gi
-        name: cache
+    - emptyDir:
+        sizeLimit: 20Gi
+      name: cache
   service:
     ports:
       - name: http
@@ -546,50 +433,44 @@ weave:
 weave-trace:
   install: false
   env:
-    - name: WEAVE_ENABLED
+    WEAVE_ENABLED:
       value: "true"
-    - name: WEAVE_CACHE_DURATION_DAYS
+    WEAVE_CACHE_DURATION_DAYS:
       value: "7"
-    - name: PORT
+    PORT:
       value: "8080"
-    - name: API_PATH_PREFIX
+    API_PATH_PREFIX:
       value: /traces
-    - name: WANDB_PUBLIC_BASE_URL
+    WANDB_PUBLIC_BASE_URL:
       value: "{{ .Values.global.host }}"
-    - name: WANDB_BASE_URL
+    WANDB_BASE_URL:
       value: "http://{{ .Release.Name }}-app:8080/"
-    - name: WF_TRACE_SERVER_URL
+    WF_TRACE_SERVER_URL:
       value: "{{ .Values.global.host }}/traces"
-    - name: WF_CLICKHOUSE_HOST
+    WF_CLICKHOUSE_HOST:
       valueFrom:
         configMapKeyRef:
           key: CLICKHOUSE_HOST
           name: wandb-clickhouse
-    - name: WF_CLICKHOUSE_PORT
+    WF_CLICKHOUSE_PORT:
       valueFrom:
         configMapKeyRef:
           key: CLICKHOUSE_PORT
           name: wandb-clickhouse
-    - name: WF_CLICKHOUSE_DATABASE
+    WF_CLICKHOUSE_DATABASE:
       valueFrom:
         configMapKeyRef:
           key: CLICKHOUSE_DATABASE
           name: wandb-clickhouse
-    - name: WF_CLICKHOUSE_HOST
-      valueFrom:
-        configMapKeyRef:
-          key: CLICKHOUSE_HOST
-          name: wandb-clickhouse
-    - name: WF_CLICKHOUSE_PASS
+    WF_CLICKHOUSE_PASS:
       valueFrom:
         secretKeyRef:
           key: CLICKHOUSE_PASSWORD
           name: wandb-clickhouse
-    - name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+    GORILLA_WEAVE_CLICKHOUSE_ADDRESS:
       value: "clickhouse://gorilla_usage_stats@$(WF_CLICKHOUSE_HOST):$(WF_CLICKHOUSE_PORT)/$(WF_CLICKHOUSE_DATABASE)"
   containers:
     - name: weave-trace
-      env: [ ]
       envFrom: [ ]
       livenessProbe:
         failureThreshold: 5
@@ -632,14 +513,13 @@ weave-trace:
   initContainers:
     - name: weave-trace-migrate
       command:
-          - python
-          - migrator.py
-      env: [ ]
+        - python
+        - migrator.py
       envFrom: [ ]
       resources:
-          requests:
-          cpu: 100m
-          memory: 128Mi
+        requests:
+        cpu: 100m
+        memory: 128Mi
   image:
     repository: wandb/weave-trace-dev
     tag: 0.62.0-pre-test-release.0
