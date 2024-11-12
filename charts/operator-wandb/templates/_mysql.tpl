@@ -49,4 +49,11 @@ Return the db password
 {{- print $.Values.global.mysql.password -}}
 {{- end -}}
 
+{{/*
+Return the db password
+*/}}
+{{- define "wandb.mysql" -}}
+mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)
+{{- end -}}
+
 

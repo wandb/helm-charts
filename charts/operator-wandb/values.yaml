@@ -134,6 +134,10 @@ global:
   weave-trace:
     enabled: false
 
+  beta:
+    glue:
+      enabled: false
+
 ingress:
   install: true
   create: true
@@ -324,3 +328,93 @@ kafka:
   metrics:
     jmx:
       enabled: true
+
+glue:
+  # install: false
+  service:
+    enabled: false
+  env:
+    REDIS:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_AUDITOR_CACHE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_SETTINGS_CACHE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_LOCKER:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_ACTIVITY_STORE_CACHE_ADDRESS:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_CACHE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_FILE_METADATA_SOURCE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_GLUE_TASK_STRATEGY_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_GLUE_TASK_METADATA_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_USAGE_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_METADATA_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_PARQUET_LIVE_HISTORY_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_ANALYTICS_SINK:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_CASBIN_ADDRESS:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_RUN_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_FILE_STREAM_STORE_ADDRESS:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_HISTORY_STORE:
+      value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
+  envFrom:
+    "wandb-mysql": "secretRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-secret": "secretRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
+    "{{ .Release.Name }}-glue-secret": "secretRef"
+    "{{ .Release.Name }}-glue-configmap": "configMapRef"
+  containers:
+    - name: glue
+      args: ["glue"]
+      env: {}
+      envFrom: {}
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        initialDelaySeconds: 30
+        periodSeconds: 1
+        timeoutSeconds: 1
+        successThreshold: 1
+        failureThreshold: 3
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      volumeMounts:
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+  image:
+    repository: wandb/megabinary
+    tag: 0.62.2
+  volumes:
+    - name: redis-ca
+      secret:
+        secretName: "{{ .Release.Name }}-redis-secret"
+        items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+        optional: true
