@@ -68,6 +68,8 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           volumeMounts:
+            - name: temp-volume
+              mountPath: /tmp/gorilla
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "app.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
@@ -292,6 +294,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
+        - name: temp-volume
+          emptyDir: {}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "app.fullname" . }}-redis-ca
           secret:
