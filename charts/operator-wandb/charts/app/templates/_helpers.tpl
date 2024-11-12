@@ -131,3 +131,11 @@ app deployments.
 {{- end -}}
 {{- trimSuffix "/" $bucket -}}
 {{- end -}}
+
+{{- define "app.internalJWTMap" -}}
+'{
+{{- range $value := .Values.internalJWTMap -}}
+{{- printf "%q: %q" $value.subject $value.issuer }},
+{{- end -}}
+}'
+{{- end -}}

@@ -127,10 +127,20 @@ spec:
               port: http
             failureThreshold: 12
             periodSeconds: 10
-
+          volumeMounts:
+            - name: weave-trace-internal-jwt
+              mountPath: /tmp/weave-trace/internal-jwt    
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       serviceAccountName: {{ include "weaveTrace.serviceAccountName" . }}
+      volumes:
+        - name: weave-trace-internal-jwt
+          projected:
+            sources:
+              - serviceAccountToken:
+                  audience: internal-service
+                  path: token
+                  expirationSeconds: 600
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
