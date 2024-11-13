@@ -89,6 +89,10 @@ spec:
               containerPort: 8125
               protocol: TCP
           env:
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
             - name: GLUE_ENABLED
               value: "{{ .glueSingletonEnabled }}"
             {{- if .onlyService }}
