@@ -9,7 +9,6 @@ Return the name of the secret where information is stored, considering if the cu
 {{- end -}}
 {{- end -}}
 
-
 {{/*
 Return the db port
 */}}
@@ -48,5 +47,3 @@ Return the db password
 {{- define "wandb.mysql.password" -}}
 {{- print $.Values.global.mysql.password -}}
 {{- end -}}
-
-

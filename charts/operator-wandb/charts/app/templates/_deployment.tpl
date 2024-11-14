@@ -62,7 +62,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
-                  key: MYSQL_PASSWORD
+                  key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
           command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
       containers:
         - name: {{ .Chart.Name }}
@@ -74,10 +74,16 @@ spec:
               mountPath: /etc/ssl/certs/redis_ca.pem
               subPath: redis_ca.pem
             {{- end }}
+            {{- if .Values.global.caCertsConfigMap }}
+            - name: wandb-ca-certs-user
+              mountPath: /usr/local/share/ca-certificates/
+            {{- end }}
+            {{- if .Values.global.customCACerts }}
             {{- range $index, $v := .Values.global.customCACerts }}
             - name: wandb-ca-certs
               mountPath: /usr/local/share/ca-certificates/customCA{{$index}}.crt
               subPath: customCA{{$index}}.crt
+            {{- end }}
             {{- end }}
           ports:
             - name: http
@@ -114,7 +120,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
-                  key: MYSQL_PASSWORD
+                  key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
             - name: WEAVE_SERVICE
@@ -132,7 +138,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.redis.passwordSecret" . }}
                   optional: true
-                  key: REDIS_PASSWORD
+                  key: {{ .Values.global.redis.secretKey }}
             - name: REDIS_PORT
               value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
@@ -212,7 +218,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: "{{ include "wandb.bucket.secret" . }}"
-                  key: ACCESS_KEY
+                  key: {{ .Values.global.bucket.accessKeyName }}
                   optional: true
             - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
               valueFrom:
@@ -255,6 +261,16 @@ spec:
                   },
                   "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
                 }
+            - name: GORILLA_ARTIFACTS_GC_BATCH_SIZE
+              value: {{ .Values.artifactsGc.BatchSize | quote }}
+            - name: GORILLA_ARTIFACTS_GC_NUM_WORKERS
+              value: {{ .Values.artifactsGc.NumWorkers | quote }}
+            - name: GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
+              value: {{ .Values.artifactsGc.DeleteFilesNumWorkers | quote }}
+            {{- if index .Values.global "weave-trace" "enabled" }}
+            - name: GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS
+              value: {{ tpl (include "app.internalJWTMap" .) . }}
+            {{- end }}
             {{- include "app.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           {{- if .healthCheckEnabled }}
@@ -290,6 +306,11 @@ spec:
             items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
+        {{- end }}
+        {{- if .Values.global.caCertsConfigMap }}
+        - name: wandb-ca-certs-user
+          configMap:
+            name: {{ .Values.global.caCertsConfigMap }}
         {{- end }}
         {{- if .Values.global.customCACerts }}
         - name: wandb-ca-certs
