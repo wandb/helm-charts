@@ -73,10 +73,16 @@ spec:
               mountPath: /etc/ssl/certs/redis_ca.pem
               subPath: redis_ca.pem
             {{- end }}
+            {{- if .Values.global.caCertsConfigMap }}
+            - name: wandb-ca-certs-user
+              mountPath: /usr/local/share/ca-certificates/
+            {{- end }}
+            {{- if .Values.global.customCACerts }}
             {{- range $index, $v := .Values.global.customCACerts }}
             - name: wandb-ca-certs
               mountPath: /usr/local/share/ca-certificates/customCA{{$index}}.crt
               subPath: customCA{{$index}}.crt
+            {{- end }}
             {{- end }}
           ports:
             - name: http
@@ -299,6 +305,11 @@ spec:
             items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
+        {{- end }}
+        {{- if .Values.global.caCertsConfigMap }}
+        - name: wandb-ca-certs-user
+          configMap:
+            name: {{ .Values.global.caCertsConfigMap }}
         {{- end }}
         {{- if .Values.global.customCACerts }}
         - name: wandb-ca-certs
