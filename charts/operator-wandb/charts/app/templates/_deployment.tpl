@@ -62,21 +62,28 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
-                  key: MYSQL_PASSWORD
+                  key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
           command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           volumeMounts:
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "app.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
               subPath: redis_ca.pem
             {{- end }}
+            {{- if .Values.global.caCertsConfigMap }}
+            - name: wandb-ca-certs-user
+              mountPath: /usr/local/share/ca-certificates/
+            {{- end }}
+            {{- if .Values.global.customCACerts }}
             {{- range $index, $v := .Values.global.customCACerts }}
             - name: wandb-ca-certs
               mountPath: /usr/local/share/ca-certificates/customCA{{$index}}.crt
               subPath: customCA{{$index}}.crt
+            {{- end }}
             {{- end }}
           ports:
             - name: http
@@ -117,7 +124,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
-                  key: MYSQL_PASSWORD
+                  key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
             - name: WEAVE_SERVICE
@@ -135,7 +142,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.redis.passwordSecret" . }}
                   optional: true
-                  key: REDIS_PASSWORD
+                  key: {{ .Values.global.redis.secretKey }}
             - name: REDIS_PORT
               value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
@@ -215,7 +222,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: "{{ include "wandb.bucket.secret" . }}"
-                  key: ACCESS_KEY
+                  key: {{ .Values.global.bucket.accessKeyName }}
                   optional: true
             - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
               valueFrom:
@@ -303,6 +310,11 @@ spec:
             items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
+        {{- end }}
+        {{- if .Values.global.caCertsConfigMap }}
+        - name: wandb-ca-certs-user
+          configMap:
+            name: {{ .Values.global.caCertsConfigMap }}
         {{- end }}
         {{- if .Values.global.customCACerts }}
         - name: wandb-ca-certs
