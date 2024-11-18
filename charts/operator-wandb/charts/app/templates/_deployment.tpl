@@ -273,6 +273,8 @@ spec:
               value: {{ .Values.artifactsGc.DeleteFilesNumWorkers | quote }}
             - name: GORILLA_TASK_QUEUE
               value: "{{ include "app.redis" . | trim }}"
+            - name: GORILLA_TASK_QUEUE_MONITOR_PORT
+              value: "10000"
             {{- if index .Values.global "weave-trace" "enabled" }}
             - name: GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS
               value: {{ tpl (include "app.internalJWTMap" .) . }}
