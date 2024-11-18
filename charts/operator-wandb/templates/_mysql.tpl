@@ -9,7 +9,6 @@ Return the name of the secret where information is stored, considering if the cu
 {{- end -}}
 {{- end -}}
 
-
 {{/*
 Return the db port
 */}}
@@ -50,7 +49,7 @@ Return the db password
 {{- end -}}
 
 {{/*
-Return the db password
+Return the db connection string
 */}}
 {{- define "wandb.mysql" -}}
 mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)
