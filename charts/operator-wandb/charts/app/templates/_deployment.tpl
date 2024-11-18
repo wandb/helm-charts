@@ -277,6 +277,8 @@ spec:
               value: "{{ include "app.redis" . | trim }}"
             - name: GORILLA_TASK_QUEUE_MONITOR_PORT
               value: "10000"
+            - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
+              value: "false"
             {{- if index .Values.global "weave-trace" "enabled" }}
             - name: GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS
               value: {{ tpl (include "app.internalJWTMap" .) . }}
