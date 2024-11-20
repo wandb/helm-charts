@@ -1,0 +1,152 @@
+{{- if .Values.global.executor.enabled }}
+{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "executor.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "executor.commonLabels" . | nindent 4 }}
+    {{- include "executor.labels" . | nindent 4 }}
+    {{- if .Values.deployment.labels -}}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "wandb.deploymentAnnotations" . | nindent 4 }}
+    {{- if .Values.deployment.annotations -}}
+    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "wandb.selectorLabels" $ | nindent 6 }}
+      {{- include "executor.labels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.pod.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "wandb.podLabels" . | nindent 8 }}
+        {{- include "executor.labels" . | nindent 8 }}
+        {{- include "executor.commonLabels" . | nindent 8 }}
+        {{- include "executor.podLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "executor.serviceAccountName" . }}
+      {{- include "wandb.nodeSelector" . | nindent 6 }}
+      {{- include "wandb.priorityClassName" . | nindent 6 }}
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      # needed to ensure ensure Kafka consumers handle pod termination gracefully and avoid data loss
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          volumeMounts:
+            {{- if ne (include "wandb.redis.caCert" .) "" }}
+            - name: {{ include "executor.fullname" . }}-redis-ca
+              mountPath: /etc/ssl/certs/redis_ca.pem
+              subPath: redis_ca.pem
+            {{- end }}
+          env:
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            {{- if ne .Values.traceRatio 0.0 }}
+            - name: GORILLA_TRACER
+              value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
+            {{- end }}
+            - name: ONLY_SERVICE
+              value: gorilla-executor
+            - name: LOGGING_ENABLED
+              value: 'true'
+            - name: MYSQL_PORT
+              value: "{{ include "wandb.mysql.port" . }}"
+            - name: MYSQL_HOST
+              value: "{{ include "wandb.mysql.host" . }}"
+            - name: MYSQL_DATABASE
+              value: "{{ include "wandb.mysql.database" . }}"
+            - name: MYSQL_USER
+              value: "{{ include "wandb.mysql.user" . }}"
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . }}
+                  key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
+            - name: MYSQL
+              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.redis.passwordSecret" . }}
+                  optional: true
+                  key: REDIS_PASSWORD
+            - name: REDIS_PORT
+              value: "{{ include "wandb.redis.port" . }}"
+            - name: REDIS_HOST
+              value: "{{ include "wandb.redis.host" . }}"
+            - name: REDIS
+              value: "{{ include "executor.redis" . | trim }}"
+
+            - name: GORILLA_SETTINGS_CACHE
+              value: "{{ include "executor.redis" . | trim }}"
+            - name: GORILLA_TASK_QUEUE
+              value: "{{ include "executor.redis" . | trim }}"
+
+            - name: BUCKET
+              value: "{{ include "executor.bucket" . }}"
+            - name: AWS_REGION
+              value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
+            - name: AWS_S3_KMS_ID
+              value: "{{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}"
+            - name: AZURE_STORAGE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "wandb.bucket.secret" . }}"
+                  key: {{ .Values.global.bucket.accessKeyName }}
+                  optional: true
+
+            - name: G_HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+
+            {{- if ne .Values.global.email.smtp.host "" }}
+            - name: GORILLA_EMAIL_SINK
+              value: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
+            {{- end }}
+
+            {{- include "executor.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
+            {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        {{- if ne (include "wandb.redis.caCert" .) "" }}
+        - name: {{ include "executor.fullname" . }}-redis-ca
+          secret:
+            secretName: "{{ .Release.Name }}-redis"
+            items:
+              - key: REDIS_CA_CERT
+                path: redis_ca.pem
+        {{- end }}
+{{- end }}
