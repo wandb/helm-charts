@@ -123,11 +123,13 @@ app deployments.
 {{- $bucket = printf "gs://%s/%s" $bucketValues.name (default "" $bucketValues.path) -}}
 {{- end -}}
 {{- if eq $bucketValues.provider "s3" -}}
-{{- if and $bucketValues.accessKey $bucketValues.secretKey -}}
-{{- $bucket = printf "s3://%s:%s@%s/%s" $bucketValues.accessKey $bucketValues.secretKey $bucketValues.name (default "" $bucketValues.path) -}}
-{{- else -}}
-{{- $bucket = printf "s3://%s/%s" $bucketValues.name (default "" $bucketValues.path) -}}
+{{- $credentials := "" -}}
+{{- if and (not $bucketValues.accessKey) (not $bucketValues.secretKey) $bucketValues.secretName -}}
+{{- $credentials = printf "$(ACCESS_KEY):$(SECRET_KEY)@" -}}
+{{- else if and $bucketValues.accessKey $bucketValues.secretKey -}}
+{{- $credentials = printf "%s:%s@" $bucketValues.accessKey $bucketValues.secretKey -}}
 {{- end -}}
+{{- $bucket = printf "s3://%s%s/%s" $credentials $bucketValues.name (default "" $bucketValues.path) -}}
 {{- end -}}
 {{- trimSuffix "/" $bucket -}}
 {{- end -}}

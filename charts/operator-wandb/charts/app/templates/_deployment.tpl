@@ -208,6 +208,26 @@ spec:
               value: "0.0.0.0"
             {{- end }}
             {{- end }}
+            - name: ACCESS_KEY
+              {{- if .Values.global.bucket.accessKey }}
+              value: "{{ .Values.global.bucket.accessKey | default .Values.global.defaultBucket.accessKey }}"
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "wandb.bucket.secret" . }}"
+                  key: {{ .Values.global.bucket.accessKeyName }}
+                  optional: true
+              {{- end }}
+            - name: SECRET_KEY
+              {{- if .Values.global.bucket.secretKey }}
+              value: "{{ .Values.global.bucket.secretKey | default .Values.global.defaultBucket.secretKey }}"
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "wandb.bucket.secret" . }}"
+                  key: {{ .Values.global.bucket.secretAccessKeyName }}
+                  optional: true
+              {{- end }}
             - name: BUCKET
               value: {{ include "app.bucket" . | quote}}
             - name: AWS_REGION
