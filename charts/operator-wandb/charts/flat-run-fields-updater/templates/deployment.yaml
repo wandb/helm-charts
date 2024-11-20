@@ -75,7 +75,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: "{{ include "wandb.bucket.secret" . }}"
-                  key: {{ .Values.global.bucket.accessKeyName }}
+                  key: {{ .Values.global.bucket.bucketSecret.accessKeyName }}
                   optional: true
             - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
               valueFrom:
@@ -121,6 +121,30 @@ spec:
               value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
             - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
               value: "{{ include "wandb.kafka.runUpdatesShadowNumPartitions" .}}"
+            {{- if or .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.bucketSecret.name }}
+            {{ if .Values.global.bucket.bucketSecret.name }}
+            - name: ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "wandb.bucket.secret" . }}"
+                  key: {{ .Values.global.bucket.bucketSecret.accessKeyName }}
+                  optional: true
+            {{- else if .Values.global.bucket.accessKey }}
+            - name: ACCESS_KEY
+              value: "{{ .Values.global.bucket.accessKey }}"
+            {{- end }}
+            {{- if .Values.global.bucket.bucketSecret.name }}
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ include "wandb.bucket.secret" . }}"
+                  key: {{ .Values.global.bucket.bucketSecret.secretAccessKeyName }}
+                  optional: true
+            {{- else if .Values.global.bucket.secretKey }}
+            - name: SECRET_KEY
+              value: "{{ .Values.global.bucket.secretKey }}"
+            {{- end }}
+            {{- end }}
             - name: BUCKET
               value: "{{ include "flat-run-fields-updater.bucket" .}}"
             - name: AWS_REGION
