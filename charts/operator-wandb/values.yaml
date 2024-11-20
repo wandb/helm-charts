@@ -397,23 +397,6 @@ glue:
     "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
     "{{ .Release.Name }}-glue-secret": "secretRef"
     "{{ .Release.Name }}-glue-configmap": "configMapRef"
-  initContainers:
-    - name: ca-certificates-update
-      image: ubuntu:22.04
-      command: ["/bin/sh", "-c"]
-      args:
-        - |
-          if [[ -f "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt" ]]; then
-            cp /var/run/secrets/kubernetes.io/serviceaccount/ca.crt /usr/local/share/ca-certificates/
-          fi
-          [ "$(ls -A /usr/local/share/ca-certificates)" ] && echo "*** Found custom SSL certificates, updating root trust..." && update-ca-certificates
-      volumeMounts:
-        - name: shared-certs
-          mountPath: /etc/certificate
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/user/
   containers:
     - name: glue
       args: ["glue"]
@@ -440,12 +423,10 @@ glue:
           cpu: "1"
           memory: 1Gi
       volumeMounts:
-        - name: shared-certs
-          mountPath: /etc/certificate
-        # - name: wandb-ca-certs
-        #   mountPath: /usr/local/share/ca-certificates/
-        # - name: wandb-ca-certs-user
-        #   mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
@@ -453,15 +434,13 @@ glue:
     repository: wandb/megabinary
     tag: 0.62.2
   volumes:
-    - name: shared-certs
-      emptyDir: {}
+    - name: wandb-ca-certs
+      configMap:
+        name: "{{ .Release.Name }}-ca-certs"
     - name: wandb-ca-certs-user
       configMap:
         name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
         optional: true
-    - name: wandb-ca-certs
-      configMap:
-        name: "{{ .Release.Name }}-ca-certs"
     - name: redis-ca
       secret:
         secretName: "{{ .Release.Name }}-redis-secret"
