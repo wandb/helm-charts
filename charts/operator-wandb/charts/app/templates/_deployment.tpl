@@ -273,7 +273,7 @@ spec:
               value: {{ .Values.artifactsGc.NumWorkers | quote }}
             - name: GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
               value: {{ .Values.artifactsGc.DeleteFilesNumWorkers | quote }}
-            {{- if eq .Values.global.executor.install true }}
+            {{- if eq (index .Values.global "executor" "install") true }}
             - name: GORILLA_TASK_QUEUE
               value: "{{ include "app.redis" . | trim }}"
             - name: GORILLA_TASK_QUEUE_MONITOR_PORT
