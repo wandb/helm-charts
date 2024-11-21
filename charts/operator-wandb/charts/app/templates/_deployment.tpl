@@ -142,7 +142,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.redis.passwordSecret" . }}
                   optional: true
-                  key: {{ .Values.global.redis.secretKey }}
+                  key: {{ .Values.global.redis.passwordSecret.secretKey }}
             - name: REDIS_PORT
               value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
@@ -208,26 +208,30 @@ spec:
               value: "0.0.0.0"
             {{- end }}
             {{- end }}
+            {{- if or .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.bucketSecret.name }}
+            {{ if .Values.global.bucket.bucketSecret.name }}
             - name: ACCESS_KEY
-              {{- if .Values.global.bucket.accessKey }}
-              value: "{{ .Values.global.bucket.accessKey | default .Values.global.defaultBucket.accessKey }}"
-              {{- else }}
               valueFrom:
                 secretKeyRef:
                   name: "{{ include "wandb.bucket.secret" . }}"
-                  key: {{ .Values.global.bucket.accessKeyName }}
+                  key: {{ .Values.global.bucket.bucketSecret.accessKeyName }}
                   optional: true
-              {{- end }}
+            {{- else if .Values.global.bucket.accessKey }}
+            - name: ACCESS_KEY
+              value: "{{ .Values.global.bucket.accessKey }}"
+            {{- end }}
+            {{- if .Values.global.bucket.bucketSecret.name }}
             - name: SECRET_KEY
-              {{- if .Values.global.bucket.secretKey }}
-              value: "{{ .Values.global.bucket.secretKey | default .Values.global.defaultBucket.secretKey }}"
-              {{- else }}
               valueFrom:
                 secretKeyRef:
                   name: "{{ include "wandb.bucket.secret" . }}"
-                  key: {{ .Values.global.bucket.secretAccessKeyName }}
+                  key: {{ .Values.global.bucket.bucketSecret.secretAccessKeyName }}
                   optional: true
-              {{- end }}
+            {{- else if .Values.global.bucket.secretKey }}
+            - name: SECRET_KEY
+              value: "{{ .Values.global.bucket.secretKey }}"
+            {{- end }}
+            {{- end }}
             - name: BUCKET
               value: {{ include "app.bucket" . | quote}}
             - name: AWS_REGION
@@ -242,7 +246,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: "{{ include "wandb.bucket.secret" . }}"
-                  key: {{ .Values.global.bucket.accessKeyName }}
+                  key: {{ .Values.global.bucket.bucketSecret.accessKeyName }}
                   optional: true
             - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
               valueFrom:
