@@ -238,6 +238,8 @@ spec:
             - name: GORILLA_TRACER
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
             {{- end }}
+            - name: OVERFLOW_BUCKET_ADDR
+              value: "{{ include "app.bucket" .}}"
             {{- if not .Values.global.pubSub.enabled}}
             - name: KAFKA_BROKER_HOST
               value: "{{ include "wandb.kafka.brokerHost" . }}"
@@ -258,21 +260,28 @@ spec:
               value: >
                 {
                   "overflow-bucket": {
-                    "store": "$(OVERFLOW_BUCKET_ADDR)",
+                    "store": "{{ include "app.bucket" .}}",
                     "name": "wandb",
                     "prefix": "wandb-overflow"
                   },
                   "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
                 }
             {{- end }}
-            - name: OVERFLOW_BUCKET_ADDR
-              value: "{{ include "app.bucket" .}}"
+
             - name: GORILLA_ARTIFACTS_GC_BATCH_SIZE
               value: {{ .Values.artifactsGc.BatchSize | quote }}
             - name: GORILLA_ARTIFACTS_GC_NUM_WORKERS
               value: {{ .Values.artifactsGc.NumWorkers | quote }}
             - name: GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
               value: {{ .Values.artifactsGc.DeleteFilesNumWorkers | quote }}
+            {{- if .Values.global.executor.enabled }}
+            - name: GORILLA_TASK_QUEUE
+              value: "{{ include "app.redis" . | trim }}"
+            - name: GORILLA_TASK_QUEUE_MONITOR_PORT
+              value: "10000"
+            - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
+              value: "false"
+            {{- end }}
             {{- if index .Values.global "weave-trace" "enabled" }}
             - name: GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS
               value: {{ tpl (include "app.internalJWTMap" .) . }}
