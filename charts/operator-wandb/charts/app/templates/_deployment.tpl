@@ -271,6 +271,8 @@ spec:
               value: "{{ include "app.historyStore" . }}"
             - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
               value: "{{ include "app.liveHistoryStore" . }}"
+            - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+              value: "{{ include "app.fileStreamStore" . }}"
             - name: GORILLA_ARTIFACTS_GC_BATCH_SIZE
               value: {{ .Values.artifactsGc.BatchSize | quote }}
             - name: GORILLA_ARTIFACTS_GC_NUM_WORKERS

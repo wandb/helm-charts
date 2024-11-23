@@ -164,3 +164,12 @@ kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAF
 {{- end -}}
 mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
 {{- end -}}
+
+{{/* TODO(dpanzella) - Probably need to make this support kafka as well*/}}
+{{- define "app.fileStreamStore" }}
+{{- if .Values.global.pubSub.enabled }}
+pubsub://{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
+{{- else }}
+mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+{{- end -}}
+{{- end -}}
