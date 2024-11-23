@@ -149,7 +149,7 @@ kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAF
 {{- end -}}
 
 {{- define "app.historyStore" -}}
-{{- $historyStore := printf "http://%s-parquet" .Release.Name -}}
+{{- $historyStore := printf "http://%s-parquet:8087/_goRPC_" .Release.Name -}}
 {{- if .Values.global.bigTable.enabled }}
 {{- $historyStore = printf "%s,bigtablev3://%s/%s,bigtablev2://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance .Values.global.bigTable.project .Values.global.bigTable.instance -}}
 {{- else -}}

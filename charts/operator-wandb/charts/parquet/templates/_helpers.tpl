@@ -133,7 +133,7 @@ app deployments.
 {{- end -}}
 
 {{- define "parquet.historyStore" -}}
-{{- $historyStore := printf "http://%s-parquet" .Release.Name -}}
+{{- $historyStore := printf "http://%s-parquet:8087/_goRPC_" .Release.Name -}}
 {{- if .Values.global.bigTable.enabled }}
 {{- $historyStore = printf "%s,bigtablev3://%s/%s,bigtablev2://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance .Values.global.bigTable.project .Values.global.bigTable.instance -}}
 {{- else -}}
