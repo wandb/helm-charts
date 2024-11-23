@@ -131,7 +131,6 @@ Create the name of the service account to use
 {{- define "filestream.fileStreamWorkerSource" -}}
 {{- if .Values.global.pubSub.enabled }}
 pubsub://{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}/{{ .Values.pubSub.subscription }}
-{{- else if .Values.global.s3.enabled }}
 {{- else }}
 {{- end }}
 {{- end }}
