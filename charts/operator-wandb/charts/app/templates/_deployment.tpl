@@ -256,6 +256,7 @@ spec:
               value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
             - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
               value: "{{ include "wandb.kafka.runUpdatesShadowNumPartitions" .}}"
+            {{- end }}
             - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
               value: >
                 {
@@ -264,10 +265,12 @@ spec:
                     "name": "wandb",
                     "prefix": "wandb-overflow"
                   },
-                  "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+                  "addr": "{{ include "app.runUpdateShadowTopic" .}}"
                 }
-            {{- end }}
-
+            - name: GORILLA_HISTORY_STORE
+              value: "{{ include "app.historyStore" . }}"
+            - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+              value: "{{ include "app.liveHistoryStore" . }}"
             - name: GORILLA_ARTIFACTS_GC_BATCH_SIZE
               value: {{ .Values.artifactsGc.BatchSize | quote }}
             - name: GORILLA_ARTIFACTS_GC_NUM_WORKERS

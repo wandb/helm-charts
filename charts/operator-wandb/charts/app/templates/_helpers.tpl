@@ -139,3 +139,28 @@ app deployments.
 {{- end -}}
 }'
 {{- end -}}
+
+{{- define "app.runUpdateShadowTopic" }}
+{{- if .Values.global.pubSub.enabled }}
+pubsub://{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}
+{{- else }}
+kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3
+{{- end -}}
+{{- end -}}
+
+{{- define "app.historyStore" -}}
+{{- $historyStore := printf "http://%s-parquet" .Release.Name -}}
+{{- if .Values.global.bigTable.enabled }}
+{{- $historyStore = printf "%s,bigtablev3://%s/%s,bigtablev2://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+{{- else -}}
+{{- $historyStore = printf "%s,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" $historyStore }}
+{{- end -}}
+{{- $historyStore -}}
+{{- end -}}
+
+{{- define "app.liveHistoryStore" -}}
+{{- if .Values.global.bigTable.enabled }}
+{{- printf "bigtablev3://%s/%s,bigtablev2://%s/%s" .Values.global.bigTable.project .Values.global.bigTable.instance .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+{{- end -}}
+mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+{{- end -}}
