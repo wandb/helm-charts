@@ -144,3 +144,12 @@ Create the name of the service account to use
 {{- end -}}
 mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
 {{- end -}}
+
+{{/* TODO(dpanzella) - Probably need to make this support kafka as well*/}}
+{{- define "executor.fileStreamStore" }}
+{{- if .Values.global.pubSub.enabled }}
+pubsub://{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
+{{- else }}
+mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+{{- end -}}
+{{- end -}}
