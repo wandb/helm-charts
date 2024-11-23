@@ -131,3 +131,29 @@ app deployments.
 {{- end -}}
 {{- trimSuffix "/" $bucket -}}
 {{- end -}}
+
+{{- define "parquet.historyStore" -}}
+{{- $historyStore := printf "http://%s-parquet:8087/_goRPC_" .Release.Name -}}
+{{- if .Values.global.bigTable.enabled }}
+{{- $historyStore = printf "%s,bigtablev3://%s/%s,bigtablev2://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+{{- else -}}
+{{- $historyStore = printf "%s,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" $historyStore }}
+{{- end -}}
+{{- $historyStore -}}
+{{- end -}}
+
+{{- define "parquet.liveHistoryStore" -}}
+{{- if .Values.global.bigTable.enabled }}
+{{- printf "bigtablev3://%s/%s,bigtablev2://%s/%s" .Values.global.bigTable.project .Values.global.bigTable.instance .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+{{- end -}}
+mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+{{- end -}}
+
+{{/* TODO(dpanzella) - Probably need to make this support kafka as well*/}}
+{{- define "parquet.fileStreamStore" }}
+{{- if .Values.global.pubSub.enabled }}
+pubsub://{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
+{{- else }}
+mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+{{- end -}}
+{{- end -}}
