@@ -267,6 +267,10 @@ spec:
                   },
                   "addr": "{{ include "app.runUpdateShadowTopic" .}}"
                 }
+            - name: GORILLA_HISTORY_STORE
+              value: "{{ include "app.historyStore" . }}"
+            - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+              value: "{{ include "app.liveHistoryStore" . }}"
             - name: GORILLA_ARTIFACTS_GC_BATCH_SIZE
               value: {{ .Values.artifactsGc.BatchSize | quote }}
             - name: GORILLA_ARTIFACTS_GC_NUM_WORKERS
