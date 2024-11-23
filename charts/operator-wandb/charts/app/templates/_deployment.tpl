@@ -274,6 +274,7 @@ spec:
               value: {{ .Values.artifactsGc.NumWorkers | quote }}
             - name: GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
               value: {{ .Values.artifactsGc.DeleteFilesNumWorkers | quote }}
+
             {{- if .Values.global.executor.enabled }}
             - name: GORILLA_TASK_QUEUE
               value: "{{ include "app.redis" . | trim }}"
@@ -282,10 +283,12 @@ spec:
             - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
               value: "false"
             {{- end }}
+
             {{- if index .Values.global "weave-trace" "enabled" }}
             - name: GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS
               value: {{ tpl (include "app.internalJWTMap" .) . }}
             {{- end }}
+
             {{- include "app.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           {{- if .healthCheckEnabled }}
