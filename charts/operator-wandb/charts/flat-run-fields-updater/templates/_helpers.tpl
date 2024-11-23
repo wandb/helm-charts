@@ -127,3 +127,14 @@ Create the name of the service account to use
 {{- end -}}
 {{- trimSuffix "/" $bucket -}}
 {{- end -}}
+
+{{- define "flat-run-fields-updater.runUpdateShadowQueue" -}}
+{{- if .Values.global.pubSub.enabled }}
+pubsub://{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}/{{ .Values.pubSub.subscription }}
+{{- else if .Values.global.s3.enabled }}
+{{- else }}
+kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3
+{{- end }}
+{{- end }}
+
+
