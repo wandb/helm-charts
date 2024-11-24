@@ -129,14 +129,14 @@ Create the name of the service account to use
 {{- end -}}
 
 {{- define "filestream.fileStreamWorkerSource" -}}
-{{- if .Values.global.pubSub.enabled }}
+{{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}/{{ .Values.pubSub.subscription }}
 {{- else }}
 {{- end }}
 {{- end }}
 
 {{- define "filestream.fileStreamWorkerStore" -}}
-{{- if .Values.global.bigTable.enabled }}
+{{- if .Values.global.bigTable.enabled -}}
 bigtablev3://{{ .Values.global.bigTable.project }}/{{ .Values.global.bigTable.instance }},bigtablev2://{{ .Values.global.bigTable.project }}/{{ .Values.global.bigTable.instance }}
 {{- else }}
 {{- end }}
