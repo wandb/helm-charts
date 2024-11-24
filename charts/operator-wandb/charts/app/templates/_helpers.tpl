@@ -142,7 +142,7 @@ app deployments.
 
 {{- define "app.runUpdateShadowTopic" -}}
 {{- if .Values.global.pubSub.enabled -}}
-pubsub://{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}
+pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}
 {{- else }}
 kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3
 {{- end -}}
@@ -168,7 +168,7 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
 {{/* TODO(dpanzella) - Probably need to make this support kafka as well*/}}
 {{- define "app.fileStreamStore" -}}
 {{- if .Values.global.pubSub.enabled -}}
-pubsub://{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
+pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
 {{- else -}}
 mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
 {{- end -}}
