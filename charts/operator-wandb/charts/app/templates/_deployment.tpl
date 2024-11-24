@@ -209,7 +209,7 @@ spec:
             {{- end }}
             {{- end }}
             - name: BUCKET
-              value: "{{ include "app.bucket" . }}"
+              value: {{ include "app.bucket" . | quote}}
             - name: AWS_REGION
               value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
             - name: AWS_S3_KMS_ID
@@ -239,7 +239,7 @@ spec:
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
             {{- end }}
             - name: OVERFLOW_BUCKET_ADDR
-              value: "{{ include "app.bucket" .}}"
+              value: {{ include "app.bucket" . | quote }}
             {{- if not .Values.global.pubSub.enabled}}
             - name: KAFKA_BROKER_HOST
               value: "{{ include "wandb.kafka.brokerHost" . }}"
@@ -256,18 +256,23 @@ spec:
               value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
             - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
               value: "{{ include "wandb.kafka.runUpdatesShadowNumPartitions" .}}"
+            {{- end }}
             - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
               value: >
                 {
                   "overflow-bucket": {
-                    "store": "{{ include "app.bucket" .}}",
+                    "store": {{ include "app.bucket" . | quote}},
                     "name": "wandb",
                     "prefix": "wandb-overflow"
                   },
-                  "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+                  "addr": {{ include "app.runUpdateShadowTopic" . | quote }}
                 }
-            {{- end }}
-
+            - name: GORILLA_HISTORY_STORE
+              value: {{ include "app.historyStore" . | quote }}
+            - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+              value: {{ include "app.liveHistoryStore" . | quote }}
+            - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+              value: {{ include "app.fileStreamStore" . | quote }}
             - name: GORILLA_ARTIFACTS_GC_BATCH_SIZE
               value: {{ .Values.artifactsGc.BatchSize | quote }}
             - name: GORILLA_ARTIFACTS_GC_NUM_WORKERS
