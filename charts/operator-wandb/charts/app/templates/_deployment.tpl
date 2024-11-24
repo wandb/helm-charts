@@ -209,7 +209,7 @@ spec:
             {{- end }}
             {{- end }}
             - name: BUCKET
-              value: "{{ include "app.bucket" . }}"
+              value: {{ include "app.bucket" . | quote}}
             - name: AWS_REGION
               value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
             - name: AWS_S3_KMS_ID
@@ -239,7 +239,7 @@ spec:
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
             {{- end }}
             - name: OVERFLOW_BUCKET_ADDR
-              value: "{{ include "app.bucket" .}}"
+              value: {{ include "app.bucket" . | quote }}
             {{- if not .Values.global.pubSub.enabled}}
             - name: KAFKA_BROKER_HOST
               value: "{{ include "wandb.kafka.brokerHost" . }}"
@@ -261,11 +261,11 @@ spec:
               value: >
                 {
                   "overflow-bucket": {
-                    "store": "{{ include "app.bucket" .}}",
+                    "store": {{ include "app.bucket" . | quote}},
                     "name": "wandb",
                     "prefix": "wandb-overflow"
                   },
-                  "addr": "{{ include "app.runUpdateShadowTopic" .}}"
+                  "addr": {{ include "app.runUpdateShadowTopic" . | quote }}
                 }
             - name: GORILLA_HISTORY_STORE
               value: {{ include "app.historyStore" . | quote }}
