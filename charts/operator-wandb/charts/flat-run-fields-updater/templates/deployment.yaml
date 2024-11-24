@@ -122,6 +122,9 @@ spec:
               value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
             - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
               value: "{{ include "wandb.kafka.runUpdatesShadowNumPartitions" .}}"
+            {{- end }}
+            - name: BUCKET
+              value: "{{ include "flat-run-fields-updater.bucket" .}}"
             - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
               value: >
                 {
@@ -131,12 +134,9 @@ spec:
                     "prefix": "wandb-overflow"
                   },
                   "subscriptions": {
-                    "flatRunFieldsUpdater": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+                    "flatRunFieldsUpdater": "{{ include "flat-run-fields-updater.runUpdateShadowQueue" .}}"
                   }
                 }
-            {{- end }}
-            - name: BUCKET
-              value: "{{ include "flat-run-fields-updater.bucket" .}}"
             - name: AWS_REGION
               value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
             - name: AWS_S3_KMS_ID
