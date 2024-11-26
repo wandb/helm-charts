@@ -267,6 +267,10 @@ spec:
                   },
                   "addr": {{ include "app.runUpdateShadowTopic" . | quote }}
                 }
+            - name: GORILLA_SETTINGS_CACHE
+              value: "{{ include "executor.redis" . | trim }}"
+            - name: GORILLA_METADATA_CACHE
+              value: "{{ include "executor.redis" . | trim }}"
             - name: GORILLA_HISTORY_STORE
               value: {{ include "app.historyStore" . | quote }}
             - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
