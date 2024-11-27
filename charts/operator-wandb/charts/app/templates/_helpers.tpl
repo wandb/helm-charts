@@ -151,7 +151,10 @@ kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAF
 {{- define "app.historyStore" -}}
 {{- $historyStore := printf "http://%s-parquet:8087/_goRPC_" .Release.Name -}}
 {{- if .Values.global.bigTable.enabled }}
-{{- $historyStore = printf "%s,bigtablev3://%s/%s,bigtablev2://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+  {{- $historyStore = printf "%s,bigtablev3://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+  {{- if .Values.global.bigTable.useBigtableV2 }}
+    {{- $historyStore = printf "%s,bigtablev2://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+  {{- end -}}
 {{- else -}}
 {{- $historyStore = printf "%s,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" $historyStore }}
 {{- end -}}
@@ -159,10 +162,16 @@ kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAF
 {{- end -}}
 
 {{- define "app.liveHistoryStore" -}}
-{{- if .Values.global.bigTable.enabled }}
-{{- printf "bigtablev3://%s/%s,bigtablev2://%s/%s" .Values.global.bigTable.project .Values.global.bigTable.instance .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+{{- $historyStore := "" -}}
+{{- if .Values.global.bigTable.enabled -}}
+  {{- $historyStore = printf "bigtablev3://%s/%s" .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+  {{- if .Values.global.bigTable.enableV2 -}}
+    {{- $historyStore = printf "%s,bigtablev2://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+  {{- end -}}
+{{- else -}}
+{{- $historyStore = printf "%s,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" $historyStore }}
 {{- end -}}
-mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+{{- $historyStore -}}
 {{- end -}}
 
 {{/* TODO(dpanzella) - Probably need to make this support kafka as well*/}}
