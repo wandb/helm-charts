@@ -39,6 +39,17 @@ Return name of secret where kafka information is stored
 {{- end }}
 
 {{/*
+Return name of secret where kafka information is stored
+*/}}
+{{- define "wandb.kafka.passwordSecret.passwordKey" -}}
+{{- if .Values.global.kafka.passwordSecret.name }}
+  {{- .Values.global.kafka.passwordSecret.passwordKey -}}
+{{- else -}}
+  KAFKA_CLIENT_PASSWORD
+{{- end -}}
+{{- end }}
+
+{{/*
 Return the kafka broker url port
 */}}
 {{- define "wandb.kafka.brokerHost" -}}
