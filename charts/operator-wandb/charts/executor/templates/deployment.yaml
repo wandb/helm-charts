@@ -63,6 +63,16 @@ spec:
               valueFrom:
                 resourceFieldRef:
                   resource: limits.memory
+            {{- if and .Values.global .Values.global.observability }}
+            {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
+            - name: GORILLA_STATSD_PORT
+              value: "8125"
+            - name: GORILLA_STATSD_HOST
+              value: "0.0.0.0"
+            - name: GORILLA_PROFILER_ADDRESS
+              value: "datadog://0.0.0.0:8126"
+            {{- end }}
+            {{- end }}
             {{- if ne .Values.traceRatio 0.0 }}
             - name: GORILLA_TRACER
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
@@ -100,6 +110,8 @@ spec:
               value: "{{ include "executor.redis" . | trim }}"
 
             - name: GORILLA_SETTINGS_CACHE
+              value: "{{ include "executor.redis" . | trim }}"
+            - name: GORILLA_METADATA_CACHE
               value: "{{ include "executor.redis" . | trim }}"
 
             - name: GORILLA_TASK_QUEUE
