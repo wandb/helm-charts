@@ -206,6 +206,8 @@ spec:
               value: "8125"
             - name: GORILLA_STATSD_HOST
               value: "0.0.0.0"
+            - name: GORILLA_PROFILER_ADDRESS
+              value: "datadog://{{ .Release.Name }}-otel-daemonset:8126"
             {{- end }}
             {{- end }}
             - name: BUCKET
