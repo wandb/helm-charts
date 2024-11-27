@@ -206,6 +206,8 @@ spec:
               value: "8125"
             - name: GORILLA_STATSD_HOST
               value: "0.0.0.0"
+            - name: GORILLA_PROFILER_ADDRESS
+              value: "datadog://0.0.0.0:8126"
             {{- end }}
             {{- end }}
             - name: BUCKET
@@ -267,6 +269,10 @@ spec:
                   },
                   "addr": {{ include "app.runUpdateShadowTopic" . | quote }}
                 }
+            - name: GORILLA_SETTINGS_CACHE
+              value: "{{ include "app.redis" . | trim }}"
+            - name: GORILLA_METADATA_CACHE
+              value: "{{ include "app.redis" . | trim }}"
             - name: GORILLA_HISTORY_STORE
               value: {{ include "app.historyStore" . | quote }}
             - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
