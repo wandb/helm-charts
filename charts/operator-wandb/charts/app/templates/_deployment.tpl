@@ -291,6 +291,8 @@ spec:
               value: "10000"
             - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
               value: "false"
+            - name: GORILLA_CLEAR_TASK_DEDUPE_KEY_ENABLED
+              value: "false"
             {{- end }}
 
             {{- if index .Values.global "weave-trace" "enabled" }}
