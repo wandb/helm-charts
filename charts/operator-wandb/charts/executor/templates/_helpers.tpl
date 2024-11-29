@@ -130,10 +130,10 @@ Create the name of the service account to use
 
 {{- define "executor.historyStore" -}}
 {{- $historyStore := printf "http://%s-parquet:8087/_goRPC_" .Release.Name -}}
-{{- if .Values.global.bigTable.enabled }}
-  {{- $historyStore = printf "%s,bigtablev3://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance -}}
-  {{- if .Values.global.bigTable.useBigtableV2 }}
-    {{- $historyStore = printf "%s,bigtablev2://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+{{- if .Values.global.bigtable.enabled }}
+  {{- $historyStore = printf "%s,bigtablev3://%s/%s" $historyStore .Values.global.bigtable.project .Values.global.bigtable.instance -}}
+  {{- if .Values.global.bigtable.usebigtableV2 }}
+    {{- $historyStore = printf "%s,bigtablev2://%s/%s" $historyStore .Values.global.bigtable.project .Values.global.bigtable.instance -}}
   {{- end -}}
 {{- else -}}
 {{- $historyStore = printf "%s,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" $historyStore }}
@@ -143,10 +143,10 @@ Create the name of the service account to use
 
 {{- define "executor.liveHistoryStore" -}}
 {{- $historyStore := "" -}}
-{{- if .Values.global.bigTable.enabled }}
-  {{- $historyStore = printf "bigtablev3://%s/%s" .Values.global.bigTable.project .Values.global.bigTable.instance -}}
-  {{- if .Values.global.bigTable.enableV2 -}}
-    {{- $historyStore = printf "%s,bigtablev2://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+{{- if .Values.global.bigtable.enabled }}
+  {{- $historyStore = printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance -}}
+  {{- if .Values.global.bigtable.enableV2 -}}
+    {{- $historyStore = printf "%s,bigtablev2://%s/%s" $historyStore .Values.global.bigtable.project .Values.global.bigtable.instance -}}
   {{- end -}}
 {{- else -}}
 {{- $historyStore = printf "%s,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" $historyStore }}
