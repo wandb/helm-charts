@@ -131,13 +131,17 @@ Create the name of the service account to use
 {{- define "filestream.fileStreamWorkerSource" -}}
 {{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}/{{ .Values.pubSub.subscription }}
-{{- else }}
-{{- end }}
-{{- end }}
+{{- else -}}
+{{- end -}}
+{{- end -}}
 
 {{- define "filestream.fileStreamWorkerStore" -}}
-{{- if .Values.global.bigTable.enabled -}}
-bigtablev3://{{ .Values.global.bigTable.project }}/{{ .Values.global.bigTable.instance }},bigtablev2://{{ .Values.global.bigTable.project }}/{{ .Values.global.bigTable.instance }}
-{{- else }}
-{{- end }}
-{{- end }}
+{{- $fileStreamStore := "" -}}
+{{- if .Values.global.bigtable.v3.enabled -}}
+  {{- $fileStreamStore = printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance -}}
+  {{- if .Values.global.bigtable.v2.enabled -}}
+    {{- $fileStreamStore = printf "%s,bigtablev2://%s/%s" $fileStreamStore .Values.global.bigtable.project .Values.global.bigtable.instance -}}
+  {{- end -}}
+{{- end -}}
+{{- $fileStreamStore -}}
+{{- end -}}
