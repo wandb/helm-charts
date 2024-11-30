@@ -129,27 +129,38 @@ Create the name of the service account to use
 {{- end -}}
 
 {{- define "executor.historyStore" -}}
-{{- $historyStore := printf "http://%s-parquet:8087/_goRPC_" .Release.Name -}}
-{{- if .Values.global.bigtable.enabled }}
-  {{- $historyStore = printf "%s,bigtablev3://%s/%s" $historyStore .Values.global.bigtable.project .Values.global.bigtable.instance -}}
-  {{- if .Values.global.bigtable.usebigtableV2 }}
-    {{- $historyStore = printf "%s,bigtablev2://%s/%s" $historyStore .Values.global.bigtable.project .Values.global.bigtable.instance -}}
-  {{- end -}}
-{{- else -}}
-{{- $historyStore = printf "%s,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" $historyStore }}
-{{- end -}}
-{{- $historyStore -}}
+    {{- $stores := list -}}
+    {{- $stores = append $stores (printf "http://%s-parquet:8087/_goRPC_" .Release.Name) -}}
+
+    {{- if .Values.global.bigtable.v3.enabled -}}
+        {{- $stores = append $stores (printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
+    {{- end -}}
+
+    {{- if .Values.global.bigtable.v2.enabled -}}
+        {{- $stores = append $stores (printf "bigtablev2://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
+    {{- end -}}
+
+    {{- if not (or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled) -}}
+        {{- $stores = append $stores "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" -}}
+    {{- end -}}
+
+    {{- join "," $stores -}}
 {{- end -}}
 
 {{- define "executor.liveHistoryStore" -}}
-{{- $historyStore := "" -}}
-{{- if .Values.global.bigtable.enabled }}
-  {{- $historyStore = printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance -}}
-  {{- if .Values.global.bigtable.enableV2 -}}
-    {{- $historyStore = printf "%s,bigtablev2://%s/%s" $historyStore .Values.global.bigtable.project .Values.global.bigtable.instance -}}
+{{- $historyStore := printf "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" -}}
+{{- if or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled -}}
+  {{- $stores := list -}}
+
+  {{- if .Values.global.bigtable.v3.enabled -}}
+    {{- $stores = append $stores (printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
   {{- end -}}
-{{- else -}}
-{{- $historyStore = printf "%s,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" $historyStore }}
+
+  {{- if .Values.global.bigtable.v2.enabled -}}
+    {{- $stores = append $stores (printf "bigtablev2://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
+  {{- end -}}
+
+  {{- $historyStore = join "," $stores -}}
 {{- end -}}
 {{- $historyStore -}}
 {{- end -}}
