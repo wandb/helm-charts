@@ -137,9 +137,9 @@ pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamT
 
 {{- define "filestream.fileStreamWorkerStore" -}}
 {{- $fileStreamStore := "" -}}
-{{- if .Values.global.bigtable.enabled -}}
+{{- if .Values.global.bigtable.v3.enabled -}}
   {{- $fileStreamStore = printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance -}}
-  {{- if .Values.global.bigtable.enableV2 -}}
+  {{- if .Values.global.bigtable.v2.enabled -}}
     {{- $fileStreamStore = printf "%s,bigtablev2://%s/%s" $fileStreamStore .Values.global.bigtable.project .Values.global.bigtable.instance -}}
   {{- end -}}
 {{- end -}}
