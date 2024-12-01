@@ -111,10 +111,7 @@ app deployments.
 {{- end -}}
 
 {{- define "parquet.bucket" -}}
-{{- $bucketValues := .Values.global.defaultBucket }}
-{{- if .Values.global.bucket.provider }}
-{{- $bucketValues = .Values.global.bucket }}
-{{- end }}
+{{- $bucketValues := ( include "wandb.resolved.bucket" . ) }}
 {{- $bucket := "" -}}
 {{- if eq $bucketValues.provider "az" -}}
 {{- $bucket = printf "az://%s/%s" $bucketValues.name (default "" $bucketValues.path) -}}
