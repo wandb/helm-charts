@@ -209,11 +209,11 @@ spec:
             {{- end }}
             {{- end }}
             - name: BUCKET
-              value: {{ include "app.bucket" . | quote}}
+              value: {{ include "wandb.resolved.bucket" .url | quote}}
             - name: AWS_REGION
-              value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
+              value: {{ include "wandb.resolved.bucket" .region }}
             - name: AWS_S3_KMS_ID
-              value: "{{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}"
+              value: "{{ include "wandb.resolved.bucket" .kmsKey }}"
             - name: OPERATOR_ENABLED
               value: 'true'
             - name: LOGGING_ENABLED
@@ -222,7 +222,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: "{{ include "wandb.bucket.secret" . }}"
-                  key: {{ .Values.global.bucket.accessKeyName }}
+                  key: {{ include "wandb.resolved.bucket" .accessKeyName }}
                   optional: true
             - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
               valueFrom:
@@ -239,7 +239,7 @@ spec:
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
             {{- end }}
             - name: OVERFLOW_BUCKET_ADDR
-              value: {{ include "app.bucket" . | quote }}
+              value: {{ include "wandb.resolved.bucket" .url | quote }}
             {{- if not .Values.global.pubSub.enabled}}
             - name: KAFKA_BROKER_HOST
               value: "{{ include "wandb.kafka.brokerHost" . }}"
@@ -261,7 +261,7 @@ spec:
               value: >
                 {
                   "overflow-bucket": {
-                    "store": {{ include "app.bucket" . | quote}},
+                    "store": {{ include "wandb.resolved.bucket" .url | quote}},
                     "name": "wandb",
                     "prefix": "wandb-overflow"
                   },
