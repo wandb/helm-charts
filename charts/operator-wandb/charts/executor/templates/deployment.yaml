@@ -1,74 +1,63 @@
-
-{{- if .Values.enabled }}
+{{- if .Values.global.executor.enabled }}
 {{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "parquet.fullname" . }}
+  name: {{ include "executor.fullname" . }}
   labels:
-    app.kubernetes.io/component: "service"
     {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "parquet.commonLabels" . | nindent 4 }}
-    {{- include "parquet.labels" . | nindent 4 }}
+    {{- include "executor.commonLabels" . | nindent 4 }}
+    {{- include "executor.labels" . | nindent 4 }}
     {{- if .Values.deployment.labels -}}
     {{-   toYaml .Values.deployment.labels | nindent 4 }}
     {{- end }}
   annotations:
-    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
+    {{- include "wandb.deploymentAnnotations" . | nindent 4 }}
     {{- if .Values.deployment.annotations -}}
     {{-   toYaml .Values.deployment.annotations | nindent 4 }}
     {{- end }}
 spec:
-  replicas: {{ .Values.replicas }}
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "wandb.selectorLabels" $ | nindent 6 }}
-      {{- include "parquet.labels" . | nindent 6 }}
+      {{- include "executor.labels" . | nindent 6 }}
   template:
     metadata:
-      labels:
-        app.kubernetes.io/component: "service"
-        {{- include "wandb.podLabels" . | nindent 8 }}
-        {{- include "parquet.commonLabels" . | nindent 8 }}
-        {{- include "parquet.podLabels" . | nindent 8 }}
-        {{- include "parquet.labels" . | nindent 8 }}
+      {{- with .Values.pod.annotations }}
       annotations:
-        {{- if .Values.pod.annotations -}}
-        {{-   toYaml .Values.pod.annotations | nindent 4 }}
-        {{- end }}
-    spec:
-      {{- if .tolerations }}
-      tolerations:
-        {{- toYaml .tolerations | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
       {{- end }}
+      labels:
+        {{- include "wandb.podLabels" . | nindent 8 }}
+        {{- include "executor.labels" . | nindent 8 }}
+        {{- include "executor.commonLabels" . | nindent 8 }}
+        {{- include "executor.podLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "executor.serviceAccountName" . }}
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      # needed to ensure ensure Kafka consumers handle pod termination gracefully and avoid data loss
+      terminationGracePeriodSeconds: 60
       containers:
         - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
             {{- if ne (include "wandb.redis.caCert" .) "" }}
-            - name: {{ include "parquet.fullname" . }}-redis-ca
+            - name: {{ include "executor.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
               subPath: redis_ca.pem
             {{- end }}
-            {{- if .Values.global.caCertsConfigMap }}
-            - name: wandb-ca-certs-user
-              mountPath: /usr/local/share/ca-certificates/
-            {{- end }}
-            {{- if .Values.global.customCACerts }}
-            {{- range $index, $v := .Values.global.customCACerts }}
-            - name: wandb-ca-certs
-              mountPath: /usr/local/share/ca-certificates/customCA{{$index}}.crt
-              subPath: customCA{{$index}}.crt
-            {{- end }}
-            {{- end }}
-          ports:
-            - name: parquet
-              containerPort: 8087
-              protocol: TCP
           env:
             - name: GOMEMLIMIT
               valueFrom:
@@ -79,7 +68,7 @@ spec:
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
             {{- end }}
             - name: ONLY_SERVICE
-              value: gorilla-parquet
+              value: gorilla-executor
             - name: LOGGING_ENABLED
               value: 'true'
             - name: MYSQL_PORT
@@ -108,27 +97,25 @@ spec:
             - name: REDIS_HOST
               value: "{{ include "wandb.redis.host" . }}"
             - name: REDIS
-              value: "{{ include "parquet.redis" . | trim }}"
+              value: "{{ include "executor.redis" . | trim }}"
 
             - name: GORILLA_SETTINGS_CACHE
-              value: "{{ include "parquet.redis" . | trim }}"
+              value: "{{ include "executor.redis" . | trim }}"
 
-            {{- if .Values.global.executor.enabled }}
             - name: GORILLA_TASK_QUEUE
-              value: "{{ include "app.redis" . | trim }}"
+              value: "{{ include "executor.redis" . | trim }}"
             - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
-              value: "false"
-            {{- end }}
+              value: "true"
 
             - name: GORILLA_HISTORY_STORE
-              value: {{ include "parquet.historyStore" . | quote }}
+              value: {{ include "executor.historyStore" . | quote }}
             - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-              value: {{ include "parquet.liveHistoryStore" . | quote }}
+              value: {{ include "executor.liveHistoryStore" .| quote }}
             - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-              value: {{ include "parquet.fileStreamStore" . | quote }}
+              value: {{ include "executor.fileStreamStore" . | quote }}
 
             - name: BUCKET
-              value: "{{ include "parquet.bucket" . }}"
+              value: "{{ include "executor.bucket" . }}"
             - name: AWS_REGION
               value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
             - name: AWS_S3_KMS_ID
@@ -144,55 +131,32 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
-            
+
             {{- if ne .Values.global.email.smtp.host "" }}
             - name: GORILLA_EMAIL_SINK
               value: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
             {{- end }}
 
-            {{- include "parquet.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
+            {{- include "executor.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
 
-          livenessProbe:
-            httpGet:
-              path: /ready 
-              port: 8087
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-            successThreshold: 1
-
-          readinessProbe:
-            httpGet:
-              path: /ready 
-              port: 8087
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 3
-            successThreshold: 1
-          
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      serviceAccountName: {{ include "parquet.serviceAccountName" . }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         {{- if ne (include "wandb.redis.caCert" .) "" }}
-        - name: {{ include "parquet.fullname" . }}-redis-ca
+        - name: {{ include "executor.fullname" . }}-redis-ca
           secret:
             secretName: "{{ .Release.Name }}-redis"
             items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
-        {{- end }}
-        {{- if .Values.global.caCertsConfigMap }}
-        - name: wandb-ca-certs-user
-          configMap:
-            name: {{ .Values.global.caCertsConfigMap }}
-        {{- end }}
-        {{- if .Values.global.customCACerts }}
-        - name: wandb-ca-certs
-          configMap:
-            name: {{ include "parquet.fullname" . }}-ca-certs
         {{- end }}
 {{- end }}

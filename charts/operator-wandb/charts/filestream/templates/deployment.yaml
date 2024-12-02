@@ -4,11 +4,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "flat-run-fields-updater.fullname" . }}
+  name: {{ include "filestream.fullname" . }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "flat-run-fields-updater.commonLabels" . | nindent 4 }}
-    {{- include "flat-run-fields-updater.labels" . | nindent 4 }}
+    {{- include "filestream.commonLabels" . | nindent 4 }}
+    {{- include "filestream.labels" . | nindent 4 }}
     {{- if .Values.deployment.labels -}}
     {{-   toYaml .Values.deployment.labels | nindent 4 }}
     {{- end }}
@@ -24,7 +24,7 @@ spec:
   selector:
     matchLabels:
       {{- include "wandb.selectorLabels" $ | nindent 6 }}
-      {{- include "flat-run-fields-updater.labels" . | nindent 6 }}
+      {{- include "filestream.labels" . | nindent 6 }}
   template:
     metadata:
       {{- with .Values.pod.annotations }}
@@ -33,15 +33,15 @@ spec:
       {{- end }}
       labels:
         {{- include "wandb.podLabels" . | nindent 8 }}
-        {{- include "flat-run-fields-updater.labels" . | nindent 8 }}
-        {{- include "flat-run-fields-updater.commonLabels" . | nindent 8 }}
-        {{- include "flat-run-fields-updater.podLabels" . | nindent 8 }}
+        {{- include "filestream.labels" . | nindent 8 }}
+        {{- include "filestream.commonLabels" . | nindent 8 }}
+        {{- include "filestream.podLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "flat-run-fields-updater.serviceAccountName" . }}
+      serviceAccountName: {{ include "filestream.serviceAccountName" . }}
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
@@ -54,7 +54,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
             {{- if ne (include "wandb.redis.caCert" .) "" }}
-            - name: {{ include "flat-run-fields-updater.fullname" . }}-redis-ca
+            - name: {{ include "filestream.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
               subPath: redis_ca.pem
             {{- end }}
@@ -90,7 +90,7 @@ spec:
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
             {{- end }}
             - name: ONLY_SERVICE
-              value: gorilla-flat-run-fields-updater
+              value: gorilla-filestream
             - name: MYSQL_PORT
               value: "{{ include "wandb.mysql.port" . }}"
             - name: MYSQL_HOST
@@ -106,37 +106,8 @@ spec:
                   key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
-            {{- if not .Values.global.pubSub.enabled }}
-            - name: KAFKA_BROKER_HOST
-              value: "{{ include "wandb.kafka.brokerHost" . }}"
-            - name: KAFKA_BROKER_PORT
-              value: "{{ include "wandb.kafka.brokerPort" . }}"
-            - name: KAFKA_CLIENT_USER
-              value: "{{ include "wandb.kafka.user" . }}"
-            - name: KAFKA_CLIENT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "wandb.kafka.passwordSecret" . }}
-                  key: KAFKA_CLIENT_PASSWORD
-            - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
-              value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
-            - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
-              value: "{{ include "wandb.kafka.runUpdatesShadowNumPartitions" .}}"
-            {{- end }}
             - name: BUCKET
-              value: "{{ include "flat-run-fields-updater.bucket" .}}"
-            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
-              value: >
-                {
-                  "overflow-bucket": {
-                    "store": "$(BUCKET)",
-                    "name": "wandb",
-                    "prefix": "wandb-overflow"
-                  },
-                  "subscriptions": {
-                    "flatRunFieldsUpdater": "{{ include "flat-run-fields-updater.runUpdateShadowQueue" .}}"
-                  }
-                }
+              value: "{{ include "filestream.bucket" .}}"
             - name: AWS_REGION
               value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
             - name: AWS_S3_KMS_ID
@@ -152,9 +123,9 @@ spec:
             - name: REDIS_HOST
               value: "{{ include "wandb.redis.host" . }}"
             - name: REDIS
-              value: "{{ include "flat-run-fields-updater.redis" . | trim }}"
+              value: "{{ include "filestream.redis" . | trim }}"
             - name: GORILLA_SETTINGS_CACHE
-              value: "{{ include "flat-run-fields-updater.redis" . | trim }}"
+              value: "{{ include "filestream.redis" . | trim }}"
             {{- if and .Values.global .Values.global.observability }}
             {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
             - name: GORILLA_STATSD_PORT
@@ -163,7 +134,21 @@ spec:
               value: "0.0.0.0"
             {{- end }}
             {{- end }}
-            {{- include "flat-run-fields-updater.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
+            - name: GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS
+              value: {{ include "filestream.fileStreamWorkerSource" . | quote }}
+            - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
+              value: {{ include "filestream.fileStreamWorkerStore" . | quote }}
+            - name: GORILLA_FILE_STREAM_WORKER_STORE_TIMEOUT
+              value: "{{ .Values.env.fileStreamWorkerStoreTimeout }}"
+            - name: GORILLA_METADATA_STORE
+              value: "$(MYSQL)"
+            - name: GORILLA_FILE_METADATA_STORE
+              value: "$(MYSQL)"
+            - name: GORILLA_METADATA_CACHE
+              value: "{{ include "filestream.redis" . | trim }}"
+            - name: GORILLA_MYSQL
+              value: {{ .Values.mysql | toJson | quote }}
+            {{- include "filestream.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
@@ -177,7 +162,7 @@ spec:
       {{- end }}
       volumes:
         {{- if ne (include "wandb.redis.caCert" .) "" }}
-        - name: {{ include "flat-run-fields-updater.fullname" . }}-redis-ca
+        - name: {{ include "filestream.fullname" . }}-redis-ca
           secret:
             secretName: "{{ .Release.Name }}-redis"
             items:

@@ -1,7 +1,7 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "flat-run-fields-updater.name" -}}
+{{- define "executor.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -10,7 +10,7 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 If release name contains chart name it will be used as a full name.
 */}}
-{{- define "flat-run-fields-updater.fullname" -}}
+{{- define "executor.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -26,16 +26,16 @@ If release name contains chart name it will be used as a full name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "flat-run-fields-updater.chart" -}}
+{{- define "executor.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "flat-run-fields-updater.labels" -}}
-helm.sh/chart: {{ include "flat-run-fields-updater.chart" . }}
-{{ include "flat-run-fields-updater.selectorLabels" . }}
+{{- define "executor.labels" -}}
+helm.sh/chart: {{ include "executor.chart" . }}
+{{ include "executor.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -47,7 +47,7 @@ Returns the extraEnv keys and values to inject into containers.
 
 Global values will override any chart-specific values.
 */}}
-{{- define "flat-run-fields-updater.extraEnv" -}}
+{{- define "executor.extraEnv" -}}
 {{- $allExtraEnv := merge (default (dict) .local.extraEnv) .global.extraEnv -}}
 {{- range $key, $value := $allExtraEnv }}
 - name: {{ $key }}
@@ -57,9 +57,9 @@ Global values will override any chart-specific values.
 
 {{/*
 Returns a list of _common_ labels to be shared across all
-flat-run-fields-updater deployments and other shared objects.
+executor deployments and other shared objects.
 */}}
-{{- define "flat-run-fields-updater.commonLabels" -}}
+{{- define "executor.commonLabels" -}}
 {{- $commonLabels := default (dict) .Values.common.labels -}}
 {{- if $commonLabels }}
 {{-   range $key, $value := $commonLabels }}
@@ -70,9 +70,9 @@ flat-run-fields-updater deployments and other shared objects.
 
 {{/*
 Returns a list of _pod_ labels to be shared across all
-flat-run-fields-updater deployments.
+executor deployments.
 */}}
-{{- define "flat-run-fields-updater.podLabels" -}}
+{{- define "executor.podLabels" -}}
 {{- range $key, $value := .Values.pod.labels }}
 {{ $key }}: {{ $value | quote }}
 {{- end }}
@@ -80,23 +80,23 @@ flat-run-fields-updater deployments.
 {{/*
 Selector labels
 */}}
-{{- define "flat-run-fields-updater.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "flat-run-fields-updater.name" . }}
+{{- define "executor.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "executor.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Create the name of the service account to use
 */}}
-{{- define "flat-run-fields-updater.serviceAccountName" -}}
+{{- define "executor.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "flat-run-fields-updater.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "executor.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
 
-{{- define "flat-run-fields-updater.redis" -}}
+{{- define "executor.redis" -}}
 {{- $cs := include "wandb.redis.connectionString" . }}
 {{- $ca := include "wandb.redis.caCert" . }}
 {{- if $ca }}
@@ -106,7 +106,7 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{- define "flat-run-fields-updater.bucket" -}}
+{{- define "executor.bucket" -}}
 {{- $bucketValues := .Values.global.defaultBucket }}
 {{- if .Values.global.bucket.provider }}
 {{- $bucketValues = .Values.global.bucket }}
@@ -128,12 +128,28 @@ Create the name of the service account to use
 {{- trimSuffix "/" $bucket -}}
 {{- end -}}
 
-{{- define "flat-run-fields-updater.runUpdateShadowQueue" -}}
+{{- define "executor.historyStore" -}}
+{{- $historyStore := printf "http://%s-parquet:8087/_goRPC_" .Release.Name -}}
+{{- if .Values.global.bigTable.enabled -}}
+{{- $historyStore = printf "%s,bigtablev3://%s/%s,bigtablev2://%s/%s" $historyStore .Values.global.bigTable.project .Values.global.bigTable.instance .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+{{- else -}}
+{{- $historyStore = printf "%s,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" $historyStore -}}
+{{- end -}}
+{{- $historyStore -}}
+{{- end -}}
+
+{{- define "executor.liveHistoryStore" -}}
+{{- if .Values.global.bigTable.enabled -}}
+{{- printf "bigtablev3://%s/%s,bigtablev2://%s/%s" .Values.global.bigTable.project .Values.global.bigTable.instance .Values.global.bigTable.project .Values.global.bigTable.instance -}}
+{{- end -}}
+mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+{{- end -}}
+
+{{/* TODO(dpanzella) - Probably need to make this support kafka as well*/}}
+{{- define "executor.fileStreamStore" -}}
 {{- if .Values.global.pubSub.enabled -}}
-pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}/{{ .Values.pubSub.subscription }}
-{{- else }}
-kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3
-{{- end }}
-{{- end }}
-
-
+pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
+{{- else -}}
+mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+{{- end -}}
+{{- end -}}
