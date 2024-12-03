@@ -45,6 +45,9 @@ spec:
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      {{- if .Values.topologySpreadConstraints.enabled }}
+        {{- include "wandb.topologySpreadConstraints" (dict "matchLabels" (fromYaml (include "app.labels" .))) | nindent 6 }}
+      {{- end }}
       terminationGracePeriodSeconds: 60
       initContainers:
         - name: init-db
