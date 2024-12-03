@@ -87,6 +87,12 @@ helm upgrade \
 
 ```
 
+Helm diff example
+
+```bash
+helm diff revision wandb 109 107
+```
+
 ### 5. Finalizing Development
 
 After completing your development work:
