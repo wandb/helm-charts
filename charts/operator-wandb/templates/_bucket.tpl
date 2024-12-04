@@ -12,7 +12,7 @@
 {{- end }}
 
 {{- define "wandb.bucket.config" -}}
-{{ .Release.Name }}-bucket-config-secret
+{{ .Release.Name }}-bucket-configmap
 {{- end -}}
 
 
