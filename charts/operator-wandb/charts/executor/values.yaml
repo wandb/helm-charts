@@ -1,12 +1,8 @@
 ---
-# Default values for flat-run-fields-updater.
+# Default values for executor.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 replicaCount: 1
-
-global:
-  pubSub:
-    enabled: false
 
 image:
   repository: wandb/local
@@ -18,6 +14,7 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 traceRatio: 0
+workerConcurrency: 10
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -28,8 +25,12 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
-pubSub:
-  subscription: ""
+env: {}
+
+mysql:
+  max-idle-conns: 10
+  max-open-conns: 10
+  read-timeout: "60s"
 
 pod:
   labels: {}
@@ -64,30 +65,19 @@ service:
   annotations: {}
   labels: {}
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
-
 resources:
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # Executor can be resource intensive due to Parquet exports, so we set defaults compoarable to the Parquet chart.
   requests:
-    cpu: 500m
-    memory: 4Gi
+    cpu: 1
+    memory: 2Gi
   limits:
-    cpu: 4000m
-    memory: 8Gi
+    cpu: 8
+    memory: 16Gi
 
 autoscaling:
   enabled: false
   minReplicas: 1
-  maxReplicas: 10
+  maxReplicas: 100
   targetCPU: 80
   # targetMemory: 80
 

@@ -58,6 +58,10 @@ spec:
                   subPath: redis_ca.pem
                 {{- end }}
               env:
+                - name: GOMEMLIMIT
+                  valueFrom:
+                    resourceFieldRef:
+                      resource: limits.memory
                 - name: GORILLA_GLUE_EXECUTE
                   value: "true"
                 - name: GORILLA_GLUE_EXECUTE_TASK_NAME
@@ -75,7 +79,7 @@ spec:
                   valueFrom:
                     secretKeyRef:
                       name: {{ include "wandb.mysql.passwordSecret" . }}
-                      key:  MYSQL_PASSWORD
+                      key:  {{ .Values.global.mysql.passwordSecret.passwordKey }}
                 - name: MYSQL
                   value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
 
@@ -95,6 +99,15 @@ spec:
 
                 - name: GORILLA_SETTINGS_CACHE
                   value: "{{ include "parquet.redis" . | trim }}"
+
+                {{- if .Values.global.executor.enabled }}
+                - name: GORILLA_TASK_QUEUE
+                  value: "{{ include "app.redis" . | trim }}"
+                - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
+                  value: "false"
+                - name: GORILLA_CLEAR_TASK_DEDUPE_KEY_ENABLED
+                  value: "false"
+                {{- end }}
 
                 - name: WEAVE_SERVICE
                   value: "{{ .Release.Name }}-weave:9994"
@@ -129,7 +142,7 @@ spec:
                   valueFrom:
                     secretKeyRef:
                       name: "{{ include "wandb.bucket.secret" . }}"
-                      key: ACCESS_KEY
+                      key: {{ .Values.global.bucket.accessKeyName }}
                       optional: true
                 
                 - name: G_HOST_IP
