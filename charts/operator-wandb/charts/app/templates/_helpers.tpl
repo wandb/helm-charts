@@ -195,3 +195,11 @@ pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamT
 mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
 {{- end -}}
 {{- end -}}
+
+{{- define "app.envFrom" -}}
+{{- range $key, $value := .Values.envFrom -}}
+- {{ $value }}:
+    name: {{ $key }}
+{{- end -}}
+{{- end -}}
+
