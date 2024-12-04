@@ -135,7 +135,9 @@ app deployments.
 {{- define "app.internalJWTMap" -}}
 '{
 {{- range $value := .Values.internalJWTMap -}}
+{{- if and (not (empty $value.subject)) (not (empty $value.issuer)) }}
 {{- printf "%q: %q" $value.subject $value.issuer }},
+{{- end -}}
 {{- end -}}
 }'
 {{- end -}}
