@@ -148,22 +148,26 @@ global:
     # If the topic already exists then changing the number of partitions is not possible.
     runUpdatesShadowNumPartitions: 12
 
-# To provide custom CA certificates, you can use either:
-# 1. `customCACerts`: a list of certificates provided directly within this Helm chart.
-# 2. `configMapName`: the name of a ConfigMap containing CA certificates.
-#
-# Important:
-# - If using a ConfigMap, each key in the ConfigMap must end with `.crt` (e.g., `my-cert.crt`).
-# - This naming convention is required for `update-ca-certificates` to parse and add each
-#   certificate to the system CA store on Ubuntu-based systems.
+  # To provide custom CA certificates, you can use either:
+  # 1. `customCACerts`: a list of certificates provided directly within this Helm chart.
+  # 2. `configMapName`: the name of a ConfigMap containing CA certificates.
+  #
+  # Important:
+  # - If using a ConfigMap, each key in the ConfigMap must end with `.crt` (e.g., `my-cert.crt`).
+  # - This naming convention is required for `update-ca-certificates` to parse and add each
+  #   certificate to the system CA store on Ubuntu-based systems.
 
-# List of custom CA certificates in PEM format.
+  # List of custom CA certificates in PEM format.
   customCACerts: []
-# Name of a ConfigMap containing additional .crt files for CA certificates.
+  # Name of a ConfigMap containing additional .crt files for CA certificates.
   caCertsConfigMap: ""
 
   weave-trace:
     enabled: false
+
+  beta:
+    glue:
+      enabled: false
 
   executor:
     enabled: false
@@ -374,3 +378,106 @@ kafka:
   metrics:
     jmx:
       enabled: true
+
+glue:
+  # install: false
+  service:
+    enabled: false
+  env:
+    GORILLA_LICENSE_CERT_PATH:
+      value: "/jwks.json"
+    REDIS:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_AUDITOR_CACHE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_SETTINGS_CACHE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_LOCKER:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_ACTIVITY_STORE_CACHE_ADDRESS:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_CACHE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_FILE_METADATA_SOURCE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_GLUE_TASK_STRATEGY_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_GLUE_TASK_METADATA_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_USAGE_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_METADATA_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_PARQUET_LIVE_HISTORY_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_ANALYTICS_SINK:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_CASBIN_ADDRESS:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_RUN_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_FILE_STREAM_STORE_ADDRESS:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_HISTORY_STORE:
+      value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
+  envFrom:
+    "wandb-mysql": "secretRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-secret": "secretRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
+    "{{ .Release.Name }}-glue-secret": "secretRef"
+    "{{ .Release.Name }}-glue-configmap": "configMapRef"
+  containers:
+    - name: glue
+      args: ["glue"]
+      env: {}
+      envFrom: {}
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        initialDelaySeconds: 30
+        periodSeconds: 1
+        timeoutSeconds: 1
+        successThreshold: 1
+        failureThreshold: 3
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      volumeMounts:
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+  image:
+    repository: wandb/megabinary
+    tag: 0.62.2
+  volumes:
+    - name: wandb-ca-certs
+      configMap:
+        name: "{{ .Release.Name }}-ca-certs"
+    - name: wandb-ca-certs-user
+      configMap:
+        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
+        optional: true
+    - name: redis-ca
+      secret:
+        secretName: "{{ .Release.Name }}-redis-secret"
+        items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+        optional: true
