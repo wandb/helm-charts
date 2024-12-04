@@ -200,6 +200,6 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
 {{- range $key, $value := .Values.envFrom -}}
 - {{ $value }}:
     name: {{ $key }}
-{{- end -}}
-{{- end -}}
+{{ end }}
+{{- end }}
 
