@@ -31,7 +31,7 @@ accessKey: {{ $accessKey }}
 {{- $secretKey:= .Values.global.bucket.secretKey | default .Values.global.defaultBucket.secretKey -}}
 secretKey: {{ $secretKey }}
 accessKeyName: {{ .Values.global.bucket.accessKeyName | default (default "ACCESS_KEY" .Values.global.defaultBucket.accessKeyName) }}
-secretAccessKeyName: {{ .Values.global.bucket.secretAccessKeyName | default (default "SECRET_KEY" .Values.global.defaultBucket.secretAccessKeyName) }}
+secretKeyName: {{ .Values.global.bucket.secretKeyName | default (default "SECRET_KEY" .Values.global.defaultBucket.secretKeyName) }}
 secretName: {{ .Value.global.bucket.secretName | default .Values.global.defaultBucket.secretName }}
 {{- if eq $provider "az" -}}
 {{- $url = printf "az://%s/%s" $name $path -}}
