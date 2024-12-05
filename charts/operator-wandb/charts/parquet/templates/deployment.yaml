@@ -114,6 +114,20 @@ spec:
               value: "{{ include "parquet.redis" . | trim }}"
             - name: GORILLA_METADATA_CACHE
               value: "{{ include "parquet.redis" . | trim }}"
+            {{- if .Values.global.executor.enabled }}
+            - name: GORILLA_TASK_QUEUE
+              value: "{{ include "app.redis" . | trim }}"
+            - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
+              value: "false"
+            - name: GORILLA_CLEAR_TASK_DEDUPE_KEY_ENABLED
+              value: "false"
+            {{- end }}
+            - name: GORILLA_HISTORY_STORE
+              value: {{ include "parquet.historyStore" . | quote }}
+            - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+              value: {{ include "parquet.liveHistoryStore" . | quote }}
+            - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+              value: {{ include "parquet.fileStreamStore" . | quote }}
             {{- if or .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.bucketSecret.name }}
             {{ if .Values.global.bucket.bucketSecret.name }}
             - name: ACCESS_KEY
@@ -138,22 +152,6 @@ spec:
               value: "{{ .Values.global.bucket.secretKey }}"
             {{- end }}
             {{- end }}
-            {{- if .Values.global.executor.enabled }}
-            - name: GORILLA_TASK_QUEUE
-              value: "{{ include "app.redis" . | trim }}"
-            - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
-              value: "false"
-            - name: GORILLA_CLEAR_TASK_DEDUPE_KEY_ENABLED
-              value: "false"
-            {{- end }}
-
-            - name: GORILLA_HISTORY_STORE
-              value: {{ include "parquet.historyStore" . | quote }}
-            - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-              value: {{ include "parquet.liveHistoryStore" . | quote }}
-            - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-              value: {{ include "parquet.fileStreamStore" . | quote }}
-
             - name: BUCKET
               value: "{{ include "parquet.bucket" . }}"
             - name: AWS_REGION
