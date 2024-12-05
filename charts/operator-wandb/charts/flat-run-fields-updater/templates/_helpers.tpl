@@ -137,3 +137,9 @@ kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@wandb-kafka:9092/$(KAFKA_T
 {{- end }}
 
 
+{{- define "flat-run-fields-updater.envFrom" -}}
+{{- range $key, $value := .Values.envFrom -}}
+- {{ $value }}:
+    name: {{ $key }}
+{{ end }}
+{{- end }}

@@ -148,3 +148,12 @@ pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamT
 
     {{- join "," $stores -}}
 {{- end -}}
+
+
+{{- define "filestream.envFrom" -}}
+{{- range $key, $value := .Values.envFrom -}}
+- {{ $value }}:
+    name: {{ $key }}
+{{ end }}
+{{- end }}
+

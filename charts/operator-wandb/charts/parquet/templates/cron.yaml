@@ -57,6 +57,10 @@ spec:
                   mountPath: /etc/ssl/certs/redis_ca.pem
                   subPath: redis_ca.pem
                 {{- end }}
+              envFrom:
+              {{- if .Values.envFrom }}
+                {{- tpl (include "parquet.envFrom" . ) . | nindent 16 }}
+              {{- end }}
               env:
                 - name: GOMEMLIMIT
                   valueFrom:
@@ -131,20 +135,12 @@ spec:
                 - name: LOGGING_ENABLED
                   value: 'true'
 
-                - name: BUCKET
-                  value: "{{ include "parquet.bucket" . }}"
-                - name: AWS_REGION
-                  value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
-                - name: AWS_S3_KMS_ID
-                  value: "{{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}"
-
                 - name: AZURE_STORAGE_KEY
                   valueFrom:
                     secretKeyRef:
                       name: "{{ include "wandb.bucket.secret" . }}"
                       key: {{ .Values.global.bucket.accessKeyName }}
                       optional: true
-                
                 - name: G_HOST_IP
                   valueFrom:
                     fieldRef:
