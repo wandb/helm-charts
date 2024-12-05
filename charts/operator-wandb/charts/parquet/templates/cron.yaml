@@ -130,7 +130,30 @@ spec:
 
                 - name: LOGGING_ENABLED
                   value: 'true'
-
+                {{- if or .Values.global.bucket.accessKey .Values.global.bucket.secretKey .Values.global.bucket.bucketSecret.name }}
+                {{ if .Values.global.bucket.bucketSecret.name }}
+                - name: ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: "{{ include "wandb.bucket.secret" . }}"
+                      key: {{ .Values.global.bucket.bucketSecret.accessKeyName }}
+                      optional: true
+                {{- else if .Values.global.bucket.accessKey }}
+                - name: ACCESS_KEY
+                  value: "{{ .Values.global.bucket.accessKey }}"
+                {{- end }}
+                {{- if .Values.global.bucket.bucketSecret.name }}
+                - name: SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: "{{ include "wandb.bucket.secret" . }}"
+                      key: {{ .Values.global.bucket.bucketSecret.secretAccessKeyName }}
+                      optional: true
+                {{- else if .Values.global.bucket.secretKey }}
+                - name: SECRET_KEY
+                  value: "{{ .Values.global.bucket.secretKey }}"
+                {{- end }}
+                {{- end }}
                 - name: BUCKET
                   value: "{{ include "parquet.bucket" . }}"
                 - name: AWS_REGION
@@ -142,7 +165,7 @@ spec:
                   valueFrom:
                     secretKeyRef:
                       name: "{{ include "wandb.bucket.secret" . }}"
-                      key: {{ .Values.global.bucket.accessKeyName }}
+                      key: {{ .Values.global.bucket.bucketSecret.accessKeyName }}
                       optional: true
                 
                 - name: G_HOST_IP
