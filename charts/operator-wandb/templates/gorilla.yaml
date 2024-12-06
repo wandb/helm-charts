@@ -26,10 +26,7 @@ metadata:
   labels:
       {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
-  AWS_REGION: "{{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}"
-  AWS_S3_KMS_ID: "{{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}"
   BANNERS: {{ toJson .Values.global.banners | quote }}
-  BUCKET: "{{ include "wandb.bucket" . }}"
   OPERATOR_ENABLED: 'true'
   LOGGING_ENABLED: 'true'
   {{- if ne .Values.global.auth.oidc.clientId ""  }}
@@ -82,8 +79,6 @@ data:
   GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES: "true"
   GORILLA_GLUE_TASK_PROVIDER: "memory://"
   GORILLA_DEFAULT_REGION: "{{ default .Values.global.cloudProvider "minio" }}-{{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}"
-  GORILLA_FILE_STORE: "{{ include "wandb.bucket" . | trim }}"
-  GORILLA_STORAGE_BUCKET: "{{ include "wandb.bucket" . | trim }}"
   {{- if .Values.global.executor.enabled }}
   GORILLA_TASK_QUEUE: "{{ include "app.redis" . | trim }}"
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
@@ -91,3 +86,7 @@ data:
   GORILLA_TASK_QUEUE: "noop://"
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
   {{- end }}
+{{- with include "wandb.bucket" . | fromYaml }}
+  GORILLA_FILE_STORE: "{{ .url | trim }}"
+  GORILLA_STORAGE_BUCKET: "{{ .url | trim }}"
+{{- end }}
