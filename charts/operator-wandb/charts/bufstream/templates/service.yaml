@@ -1,0 +1,22 @@
+{{- if .Values.bufstream.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bufstream.name" . }}
+  namespace: {{ include "bufstream.namespace" . }}
+  labels:
+    {{- include "bufstream.labels" . | nindent 4 }}
+  {{- with .Values.bufstream.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.bufstream.service.type }}
+  ports:
+    {{- range $k, $v := (include "bufstream.ports" . | fromYaml) }}
+    - port: {{ $v }}
+      name: {{ $k }}
+    {{- end }}
+  selector:
+  {{- include "bufstream.selectorLabels" . | nindent 4 }}
+{{- end }}
