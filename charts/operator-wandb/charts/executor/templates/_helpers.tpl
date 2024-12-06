@@ -106,28 +106,6 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{- define "executor.bucket" -}}
-{{- $bucketValues := .Values.global.defaultBucket }}
-{{- if .Values.global.bucket.provider }}
-{{- $bucketValues = .Values.global.bucket }}
-{{- end }}
-{{- $bucket := "" -}}
-{{- if eq $bucketValues.provider "az" -}}
-{{- $bucket = printf "az://%s/%s" $bucketValues.name (default "" $bucketValues.path) -}}
-{{- end -}}
-{{- if eq $bucketValues.provider "gcs" -}}
-{{- $bucket = printf "gs://%s/%s" $bucketValues.name (default "" $bucketValues.path) -}}
-{{- end -}}
-{{- if eq $bucketValues.provider "s3" -}}
-{{- if and $bucketValues.accessKey $bucketValues.secretKey -}}
-{{- $bucket = printf "s3://%s:%s@%s/%s" $bucketValues.accessKey $bucketValues.secretKey $bucketValues.name (default "" $bucketValues.path) -}}
-{{- else -}}
-{{- $bucket = printf "s3://%s/%s" $bucketValues.name (default "" $bucketValues.path) -}}
-{{- end -}}
-{{- end -}}
-{{- trimSuffix "/" $bucket -}}
-{{- end -}}
-
 {{- define "executor.historyStore" -}}
     {{- $stores := list -}}
     {{- $stores = append $stores (printf "http://%s-parquet:8087/_goRPC_" .Release.Name) -}}
@@ -173,3 +151,10 @@ pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamT
 mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
 {{- end -}}
 {{- end -}}
+
+{{- define "executor.envFrom" -}}
+{{- range $key, $value := .Values.envFrom -}}
+- {{ $value }}:
+    name: {{ $key }}
+{{ end }}
+{{- end }}

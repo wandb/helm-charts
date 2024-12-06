@@ -93,6 +93,10 @@ spec:
             - name: gorilla-statsd
               containerPort: 8125
               protocol: TCP
+          envFrom:
+          {{- if .Values.envFrom }}
+            {{- tpl (include "app.envFrom" . ) . | nindent 12 }}
+          {{- end }}
           env:
             - name: GOMEMLIMIT
               valueFrom:
@@ -202,12 +206,6 @@ spec:
               value: "0.0.0.0"
             {{- end }}
             {{- end }}
-            - name: BUCKET
-              value: {{ include "app.bucket" . | quote}}
-            - name: AWS_REGION
-              value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
-            - name: AWS_S3_KMS_ID
-              value: "{{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}"
             - name: OPERATOR_ENABLED
               value: 'true'
             - name: LOGGING_ENABLED
@@ -215,9 +213,11 @@ spec:
             - name: AZURE_STORAGE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "wandb.bucket.secret" . }}"
-                  key: {{ .Values.global.bucket.accessKeyName }}
+                  {{- with include "wandb.bucket" . | fromYaml }}
+                  name: "{{ .secretName }}"
+                  key: {{ .accessKeyName }}
                   optional: true
+                  {{- end }}
             - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -233,7 +233,7 @@ spec:
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
             {{- end }}
             - name: OVERFLOW_BUCKET_ADDR
-              value: {{ include "app.bucket" . | quote }}
+              value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
             {{- if not .Values.global.pubSub.enabled}}
             - name: KAFKA_BROKER_HOST
               value: "{{ include "wandb.kafka.brokerHost" . }}"
@@ -255,7 +255,7 @@ spec:
               value: >
                 {
                   "overflow-bucket": {
-                    "store": {{ include "app.bucket" . | quote}},
+                    "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
                     "name": "wandb",
                     "prefix": "wandb-overflow"
                   },
