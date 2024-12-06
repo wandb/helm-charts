@@ -42,7 +42,7 @@ Return the kafka broker url port
 {{- if .Values.kafka.install -}}
 {{ printf "%s-%s" .Release.Name "kafka" }}
 {{- else if .Values.bufstream.install -}}
-{{ printf "%s-%s" .Release.Name "bufstream" }}
+bufstream
 {{- end -}}
 {{- else -}}
 {{ .Values.global.kafka.brokerHost }}
