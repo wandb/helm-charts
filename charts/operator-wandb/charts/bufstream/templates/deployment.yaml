@@ -1,0 +1,344 @@
+apiVersion: apps/v1
+kind: {{ .Values.bufstream.deployment.kind | default "Deployment" }}
+metadata:
+  name: {{ include "bufstream.name" . }}
+  namespace: {{ include "bufstream.namespace" . }}
+  labels:
+    {{- include "bufstream.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.bufstream.deployment.autoscaling.enabled }}
+  replicas: {{ .Values.bufstream.deployment.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "bufstream.selectorLabels" . | nindent 6 }}
+  {{- if eq .Values.bufstream.deployment.kind "StatefulSet" }}
+  podManagementPolicy: {{ .Values.bufstream.deployment.podManagementPolicy }}
+  {{- if .Values.bufstream.controlServerService.enabled }}
+  serviceName: {{ default (include "bufstream.controlServerServiceName" .) .Values.bufstream.deployment.serviceName }}
+  {{- else }}
+  serviceName: {{ .Values.bufstream.deployment.serviceName }}
+  {{- end }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "bufstream.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: bufstream
+        bufstream.buf.build/cluster: {{ .Values.cluster | quote }}
+        {{- with .Values.bufstream.deployment.podLabels }}
+          {{- toYaml . | nindent 8 -}}
+        {{- end }}
+      annotations:
+        # Force a new deployment when the config map value changes
+        checksum/config: {{ include "bufstream.config" . | sha256sum }}
+        {{- with .Values.bufstream.deployment.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{ if .Values.bufstream.deployment.shareProcessNamespace }}
+      shareProcessNamespace: true
+      {{- end }}
+      containers:
+        - name: bufstream
+          image: "{{ .Values.bufstream.image.repository }}:{{ .Values.bufstream.image.tag }}"
+          imagePullPolicy: {{ .Values.bufstream.image.pullPolicy }}
+          {{- with .Values.bufstream.deployment.command }}
+          command: {{ . }}
+          {{- end }}
+          args:
+          {{- if .Values.bufstream.deployment.args }}
+            {{- toYaml .Values.bufstream.deployment.args | nindent 12 }}
+          {{- else }}
+            - "--config"
+            - "/config/config.yaml"
+          {{- end }}
+          env:
+          {{- if .Values.discoverZoneFromNode }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          {{- end }}
+          {{- if and (eq .Values.bufstream.deployment.kind "StatefulSet") (.Values.bufstream.controlServerService.enabled) }}
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: BUFSTREAM_CONNECT_TLS_SERVER_NAME
+              value: "$(POD_NAME).{{ default (include "bufstream.controlServerServiceName" .) .Values.bufstream.deployment.serviceName }}.{{ include "bufstream.namespace" . }}.svc.cluster.local"
+          {{- end }}
+            - name: BUFSTREAM_CONNECT_PUBLIC_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: BUFSTREAM_CONNECT_PUBLIC_PORT
+              value: {{ include "bufstream.containerPort" "connect" | quote }}
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  containerName: bufstream
+                  {{- if (.Values.bufstream.deployment.resources.requests).cpu }}
+                  resource: requests.cpu
+                  {{- else }}
+                  resource: limits.cpu
+                  {{- end }}
+                  divisor: 1 # Round up to whole cores, explicitly.
+            - name: BUFSTREAM_AVAILABLE_MEMORY
+              valueFrom:
+                resourceFieldRef:
+                  containerName: bufstream
+                  {{- if (.Values.bufstream.deployment.resources.requests).memory }}
+                  resource: requests.memory
+                  {{- else }}
+                  resource: limits.memory
+                  {{- end }}
+                  divisor: 1 # bytes, explicitly.
+            {{- if .Values.observability.otlpEndpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.observability.otlpEndpoint | quote }}
+            {{- end }}
+            {{- if .Values.observability.metrics.otlpTemporalityPreference }}
+            - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+              value: {{ .Values.observability.metrics.otlpTemporalityPreference | quote }}
+            {{- end }}
+            {{- if and (eq .Values.storage.use "gcs") (.Values.storage.gcs.secretName) }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /config/secrets/google-service-account/credentials.json
+            {{- end }}
+          {{- with .Values.bufstream.deployment.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.bufstream.deployment.resources }}
+          resources:
+            {{- with .requests }}
+            requests:
+              {{- with .cpu }}
+              cpu: {{ . }}
+              {{- end }}
+              {{- with .memory }}
+              memory: {{ . }}
+              {{- end }}
+            {{- end }}
+            {{- with .limits }}
+            limits:
+              {{- with .cpu }}
+              cpu: {{ . }}
+              {{- end }}
+              {{- with .memory }}
+              memory: {{ . }}
+              {{- end }}
+            {{- end }}
+          {{- end }}
+          ports:
+            {{- range $k, $v := .Values.bufstream.deployment.extraContainerPorts }}
+            - name: {{ $k }}
+              containerPort: {{ $v }}
+            {{- end }}
+            {{- range $k, $v := (include "bufstream.containerPorts" . | fromYaml) }}
+            - name: {{ $k }}
+              containerPort: {{ $v }}
+            {{- end }}
+          livenessProbe:
+            {{- with (.Values.bufstream.deployment.livenessProbe).failureThreshold }}
+            failureThreshold: {{ . }}
+            {{- end }}
+            {{- with (.Values.bufstream.deployment.livenessProbe).timeoutSeconds }}
+            timeoutSeconds: {{ . }}
+            {{- end }}
+            httpGet:
+              scheme: "HTTP"
+              path: /health
+              port: {{ include "bufstream.containerPort" "observability" }}
+            periodSeconds: 3
+          readinessProbe:
+            {{- with (.Values.bufstream.deployment.readinessProbe).failureThreshold }}
+            failureThreshold: {{ . }}
+            {{- end }}
+            {{- with (.Values.bufstream.deployment.readinessProbe).timeoutSeconds }}
+            timeoutSeconds: {{ . }}
+            {{- end }}
+            httpGet:
+              scheme: "HTTP"
+              path: /ready
+              port: {{ include "bufstream.containerPort" "observability" }}
+            periodSeconds: 3
+          startupProbe:
+            httpGet:
+              scheme: "HTTP"
+              path: /health
+              port: {{ include "bufstream.containerPort" "observability" }}
+            initialDelaySeconds: 1
+            periodSeconds: 5
+            {{- with (.Values.bufstream.deployment.startupProbe).failureThreshold | default 3 }}
+            failureThreshold: {{ . }}
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          volumeMounts:
+            - mountPath: /config/config.yaml
+              name: config-volume
+              readOnly: true
+              subPath: config.yaml
+            {{- if and (eq .Values.storage.use "s3") (.Values.storage.s3.accessKeyId) }}
+            - name: storage
+              mountPath: /config/secrets/storage
+              readOnly: true
+            {{- end }}
+            {{- if and (eq .Values.storage.use "gcs") (.Values.storage.gcs.secretName) }}
+            - name: google-service-account
+              mountPath: /config/secrets/google-service-account
+              readOnly: true
+            {{- end }}
+            {{- if .Values.kafka.tlsCertificateSecrets }}
+            {{- range $index, $secretName := .Values.kafka.tlsCertificateSecrets }}
+            - name: tls-{{ $index }}
+              mountPath: /config/secrets/tls-{{ $index }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.kafka.tlsClientCasSecret }}
+            - name: tls-client
+              mountPath: /config/secrets/tls-client
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- if .Values.metadata.etcd.tls.rootCaSecret }}
+            - name: tls-etcd-client
+              mountPath: /config/secrets/tls-etcd-client
+              readOnly: true
+            {{- end }}
+            {{- if .Values.connectTLS.server.certificateSecrets }}
+            {{- range $index, $secretName := .Values.connectTLS.server.certificateSecrets }}
+            - name: tls-ctrl-server-{{ $index }}
+              mountPath: /config/secrets/tls-ctrl-server-{{ $index }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- if .Values.connectTLS.client.rootCaSecret }}
+            - name: tls-ctrl-client
+              mountPath: /config/secrets/tls-ctrl-client
+              readOnly: true
+            {{- end }}
+            {{- if .Values.adminTLS.certificateSecrets }}
+            {{- range $index, $secretName := .Values.adminTLS.certificateSecrets }}
+            - name: tls-admin-{{ $index }}
+              mountPath: /config/secrets/tls-admin-{{ $index }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- with .Values.bufstream.deployment.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        {{- with .Values.bufstream.deployment.extraContainers }}
+        {{ include "bufstream.render" (dict "value" . "context" $) | nindent 8 }}
+        {{- end }}
+      serviceAccountName: {{ .Values.bufstream.serviceAccount.name }}
+      terminationGracePeriodSeconds: {{ .Values.bufstream.deployment.terminationGracePeriodSeconds }}
+      volumes:
+        - name: config-volume
+          configMap:
+            items:
+              - key: config.yaml
+                path: config.yaml
+            name: {{ include "bufstream.name" . }}-config
+        {{- if and (eq .Values.storage.use "s3") (.Values.storage.s3.accessKeyId) }}
+        - name: storage
+          secret:
+            secretName: {{ .Values.storage.s3.secretName }}
+            items:
+              - key: secret_access_key
+                path: secret_access_key
+        {{- end }}
+        {{- if and (eq .Values.storage.use "gcs") (.Values.storage.gcs.secretName) }}
+        - name: google-service-account
+          secret:
+            secretName: {{ .Values.storage.gcs.secretName }}
+            items:
+            - key: credentials.json
+              path: credentials.json
+        {{- end }}
+        {{- with .Values.kafka.tlsCertificateSecrets }}
+        {{- range $index, $secretName := . }}
+        - name: tls-{{ $index }}
+          secret:
+            secretName: {{ $secretName }}
+            items:
+            - key: tls.key
+              path: tls.key
+            - key: tls.crt
+              path: tls.crt
+        {{- end }}
+        {{- end }}
+        {{- with .Values.kafka.tlsClientCasSecret }}
+        - name: tls-client
+          secret:
+            secretName: {{ . }}
+            items:
+            - key: tls.crt
+              path: tls.crt
+        {{- end }}
+        {{- with .Values.metadata.etcd.tls.rootCaSecret }}
+        - name: tls-etcd-client
+          secret:
+            secretName: {{ . }}
+            items:
+            - key: ca.crt
+              path: ca.crt
+        {{- end }}
+        {{- with .Values.connectTLS.server.certificateSecrets }}
+        {{- range $index, $secretName := . }}
+        - name: tls-ctrl-server-{{ $index }}
+          secret:
+            secretName: {{ $secretName }}
+            items:
+            - key: tls.key
+              path: tls.key
+            - key: tls.crt
+              path: tls.crt
+        {{- end }}
+        {{- end }}
+        {{- with .Values.connectTLS.client.rootCaSecret }}
+        - name: tls-ctrl-client
+          secret:
+            secretName: {{ . }}
+            items:
+            - key: ca.crt
+              path: ca.crt
+        {{- end }}
+        {{- with .Values.adminTLS.certificateSecrets }}
+        {{- range $index, $secretName := . }}
+        - name: tls-admin-{{ $index }}
+          secret:
+            secretName: {{ $secretName }}
+            items:
+            - key: tls.key
+              path: tls.key
+            - key: tls.crt
+              path: tls.crt
+        {{- end }}
+        {{- end }}
+        {{- with .Values.bufstream.deployment.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.bufstream.deployment.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.bufstream.deployment.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.bufstream.deployment.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.bufstream.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
