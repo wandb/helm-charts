@@ -1,0 +1,304 @@
+# -- Overrides .Chart.Name throughout the chart.
+nameOverride: ""
+# -- Will be used as the namespace for all resources instead of .Release.namespace if set
+namespaceOverride: ""
+# -- Whether to create the namespace where resources are located.
+namespaceCreate: false
+# -- Reference to one or more secrets to be used when pulling images.
+# For more information, see [Pull an Image from a Private Registry](https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/).
+imagePullSecrets: []
+# -- The name of the cluster. Used by bufstream to identify itself.
+cluster: bufstream
+# -- The zone location of brokers, e.g., the datacenter/availability zone where the agent is running.
+# If not given, bustream will try to infer this from node metadata.
+# This is currently for bufstream internal functionality, and does not control cloud providers such as GCP directly.
+zone: ""
+# -- When true it enables additional permissions so Bufstream can get the zone via the Kubernetes API server by reading the zone topology label of the node the bufstream pod is running on. Bufstream won't attempt to do the discovery if the zone option is false.
+discoverZoneFromNode: false
+# -- Configuration for data enforcement via schemas of records flowing in and out of the agent.
+dataEnforcement: {}
+kafka:
+  # -- The address the Kafka server should listen on. This defaults to 0.0.0.0 (any) and 9092 port.
+  address:
+    host: 0.0.0.0
+    port: 9092
+  # -- The public address clients should use to connect to the Kafka server. This defaults to the K8S service DNS and 9092 port.
+  # @default -- `{host: "<service>.<namespace>.svc.cluster.local", port: 9092}`
+  publicAddress: {}
+  # -- Kubernetes secrets containing a `tls.crt` and `tls.key` (as the secret keys, see https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets) to present to the client. The first certificate compatible with the client's requirements is selected automatically.
+  tlsCertificateSecrets: []
+  # -- Declare the policy the server will follow for mutual TLS (mTLS). Supported values are [NO_CERT, REQUEST_CERT, REQUIRE_CERT, VERIFY_CERT_IF_GIVEN, REQUIRE_AND_VERIFY_CERT]. Only supported when using tlsCertificateSecret.
+  # @default -- `"NO_CERT"`
+  tlsClientAuth: ""
+  # -- Kubernetes seccret containing a `tls.crt` (as the secret key) PEM-encoded certificate authorities used by the server to validate the client certificates. This field cannot be empty if tlsClientAuth is set for client performing verification. Only supported when using tlsCertificateSecret.
+  tlsClientCasSecret: ""
+  # -- If a fetch should return as soon as any records are available.
+  fetchEager: true
+  # -- If fetches from different readers should be synchronized to improve cache hit rates.
+  fetchSync: true
+  # -- If records from a producer to different topic/partitions may be sequenced concurrently instead of serially.
+  produceConcurrent: true
+  # -- How to balance clients across zones, when client does not specify a zone. One of: ["BALANCE_STRATEGY_UNSPECIFIED", "BALANCE_STRATEGY_PARTITION", "BALANCE_STRATEGY_HOST", "BALANCE_STRATEGY_CLIENT_ID"]
+  zoneBalanceStrategy: BALANCE_STRATEGY_PARTITION
+  # -- How to balance topic/partitions across bufstream nodes. One of: ["BALANCE_STRATEGY_UNSPECIFIED", "BALANCE_STRATEGY_PARTITION", "BALANCE_STRATEGY_HOST", "BALANCE_STRATEGY_CLIENT_ID"]
+  partitionBalanceStrategy: BALANCE_STRATEGY_PARTITION
+  # -- The number of kafka request to unmarshal and buffer before processing.
+  requestBufferSize: 5
+  # -- How long a Kafka connection can be idle before being closed by the server. If set a value less than or equal to zero, the timeout will be disabled.
+  idleTimeout: 0
+  # -- The default number of partitions to use for a new topic.
+  numPartitions: 1
+  # -- If exact log sizes should be fetched when listing sizes for all topics/partitions.
+  exactLogSizes: true
+  # -- If exact log hwm and start offsets should be computed when fetching records.
+  exactLogOffsets: false
+  # -- The default group consumer session timeout.
+  groupConsumerSessionTimeout: 45s
+  # -- The minimum group consumer session timeout.
+  groupConsumerSessionTimeoutMin: 10s
+  # -- The maximum group consumer session timeout.
+  groupConsumerSessionTimeoutMax: 60s
+# -- connectTLS contains TLS configuration for Control Server which is used for inter-agent communication using Connect protocol.
+connectTLS:
+  # -- Server contains server side TLS configuration.
+  server: {}
+  # server:
+  #   # Kubernetes secrets containing a `tls.crt` and `tls.key` (as the secret keys, see https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets) to present to the client. The first certificate compatible with the client's requirements is selected automatically.
+  #   certificateSecrets: []
+  # -- Client contains client side TLS configuration to connect to the Control Server.
+  client: {}
+  # client:
+  #   # Controls whether a client verifies the server's certificate chain and host name.
+  #   insecureSkipVerify: true
+  #   # The existing secret name that contains ca.crt key of the PEM-encoded root certificate authorities used by the client to validate
+  #   # the server certificates.
+  #   rootCaSecret: ""
+# -- adminTLS contains TLS configuration for Admin Server.
+adminTLS: {}
+# adminTLS:
+#   # Kubernetes secrets containing a `tls.crt` and `tls.key` (as the secret keys, see https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets) to present to the client. The first certificate compatible with the client's requirements is selected automatically.
+#   certificateSecrets: []
+
+metadata:
+  # -- Which metadata storage that bufstream is using.
+  # Currently, only `etcd` is supported.
+  use: etcd
+  etcd:
+    # -- Etcd addresses to connect to.
+    addresses: []
+    # addresses:
+    # - host: ""
+    #   port: 2379
+
+    # -- TLS client configuration for bufstream to connect to etcd.
+    tls: {}
+    # tls:
+    #   # Controls whether a client verifies the server's certificate chain and host name.
+    #   insecureSkipVerify: true
+    #   # The existing secret name that contains ca.crt key of the PEM-encoded root certificate authorities used by the client to validate
+    #   # the server certificates.
+    #   rootCaSecret: ""
+storage:
+  # -- Which object storage that bufstream is using.
+  # Currently, `gcs` and `s3` are supported.
+  use: s3
+  gcs:
+    # -- GCS bucket name.
+    bucket: ""
+    # -- GCS prefix to use for all stored files.
+    prefix: ""
+    # -- Kubernetes secret containing a `credentials.json` (as the secret key) service account key to use instead of the metadata server.
+    secretName: ""
+  s3:
+    # -- S3 bucket name.
+    bucket: ""
+    # -- S3 bucket region.
+    region: ""
+    # -- S3 prefix to use for all stored files.
+    prefix: ""
+    # -- S3 Force Path Style setting. See https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/examples-s3.html.
+    forcePathStyle: false
+    # -- S3 Access Key ID to use instead of the metadata server.
+    accessKeyId: ""
+    # -- Kubernetes secret containing a `secret_access_key` (as the secret key) to use instead of the metadata server.
+    secretName: ""
+observability:
+  # -- Log level to use.
+  logLevel: INFO
+  # -- Open Telemetry base endpoint to push metrics and traces to.
+  # Deprecated: use exporter.address and exporter.insecure instead.
+  otlpEndpoint: ""
+  exporter:
+    # -- Open Telemetry base endpoint to push metrics and traces. The value has a host and an optional port.
+    # It should not include the URL path, such as "/v1/traces" or the scheme.
+    # This can be overriden by metrics.address or tracing.address.
+    address: ""
+    # -- Whether to disable TLS for the exporter's HTTP connection.
+    # This can be overriden by metrics.insecure or tracing.insecure.
+    insecure: false
+  metrics:
+    # -- Open Telemetry exporter. Supports [NONE, STDOUT, HTTP, HTTPS, PROMETHEUS].
+    # Deprecated: use exporterType instead.
+    exporter: ""
+    # -- Open Telemetry exporter. Supports [NONE, STDOUT, OTLP_GRPC, OTLP_HTTP, PROMETHEUS]
+    exporterType: "NONE"
+    # -- The endpoint the exporter connects to. The value has a host and an optional port.
+    # It should not include the URL path, such as "/v1/metrics" or the scheme.
+    # Specify path and insecure instead.
+    address: ""
+    # The URL path appended to address. Defaults to "/v1/metrics".
+    # This can only be specified for the OTLP_HTTP exporter type.
+    path: ""
+    # -- Whether to disable TLS.
+    # This can only be specified for OTLP_HTTP exporter type.
+    insecure: false
+    # This omits metrics that depend on the kafka.topic.partition attribute, which may have high cardinality
+    # depending on the configuration. One example is kafka.topic.partition.offset.high_water_mark.
+    # This omits only the attribute for metrics that have this attribute without depending on it.
+    # One example is kafka.produce.record.size.
+    omitPartitionAttribute: false
+    # Whether to emit bufstream.internal.* metrics. 
+    # @ignored
+    enableInternalMetrics: false
+    # Allows changing the default temporality preference for OTLP metrics.
+    # This is recommended to be set to "delta" for reporting to Datadog agents.
+    # See https://docs.datadoghq.com/opentelemetry/guide/otlp_delta_temporality/ for more details.
+    otlpTemporalityPreference: ""
+  tracing:
+    # -- Open Telemetry exporter. Supports [NONE, STDOUT, HTTP, HTTPS].
+    # Deprecated: use exporterType instead.
+    exporter: ""
+    # -- Open Telemetry exporter. Supports [NONE, STDOUT, OTLP_GRPC, OTLP_HTTP]
+    exporterType: "NONE"
+    # -- The endpoint the exporter connects to. The value has a host and an optional port.
+    # It should not include the URL path, such as "/v1/traces" or the scheme.
+    # Specify path and insecure instead.
+    address: ""
+    # The URL path appended to address. Defaults to "/v1/traces".
+    # This can only be specified for the OTLP_HTTP or OTLP_GRPC exporter type.
+    path: ""
+    # -- Whether to disable TLS.
+    # This can only be specified for OTLP_HTTP exporter type.
+    insecure: false
+    # -- Trace sample ratio.
+    traceRatio: 0.1
+  # -- Redact sensitive information such as topic names, before adding to to metrics, traces and logs.
+  # Supports [NONE, OPAQUE, OMITTED]
+  sensitiveInformationRedaction: "NONE"
+bufstream:
+  service:
+    # -- Whether to create a Kubernetes Service for this bufstream deployment.
+    enabled: true
+    # -- Kubernetes Service type.
+    type: ClusterIP
+    # -- Kubernetes Service annotations.
+    annotations: {}
+  serviceAccount:
+    # -- Whether to create a Kubernetes Service Account for this bufstream deployment.
+    create: true
+    # -- Kubernetes Service Account name.
+    name: bufstream-service-account
+    # -- Kubernetes Service Account annotations.
+    annotations: {}
+  deployment:
+    # -- Bufstream Deployment kind.
+    # Supports [Deployment, StatefulSet]
+    kind: StatefulSet
+    # -- Bufstream Deployment command.
+    # @default -- `["/usr/local/bin/bufstream"]`
+    command: []
+    # -- Bufstream Deployment args to be appended.
+    args: []
+    # -- Bufstream Deployment replica count.
+    replicaCount: 3
+    # -- Bufstream Deployment Pod annotations.
+    podAnnotations: {}
+    # -- Bufstream Deployment Selector labels.
+    selectorLabels: {}
+    # -- Bufstream Deployment Pod labels.
+    podLabels: {}
+    # -- Bufstream Deployment pod management policy to use when StatefulSet kind is used.
+    podManagementPolicy: Parallel
+    # -- Bufstream Deployment service name to link for per pod DNS registration when StatefulSet kind is used.
+    serviceName: ""
+    resources:
+      requests:
+        # -- Bufstream Deployment Resource request CPU.
+        cpu: 2
+        # -- Bufstream Deployment Resource request memory.
+        memory: 8Gi
+      limits:
+        # -- Bufstream Deployment Resource request CPU.
+        cpu: ""
+        # -- Bufstream Deployment Resource limits memory.
+        memory: 8Gi
+    # -- Bufstream Deployment Node selector.
+    nodeSelector: {}
+    # -- Bufstream Deployment Affinity.
+    affinity: {}
+    # -- Bufstream Deployment Tolerations.
+    tolerations: []
+    # -- Bufstream Deployment Extra environment variables for the bufstream container.
+    extraEnv: []
+    # -- Bufstream Deployment Extra volume mounts for the bufstream container.
+    extraVolumeMounts: []
+    # -- Bufstream Deployment Extra volumes.
+    extraVolumes: []
+    # -- Bufstream Deployment Extra container ports for the bufstream container.
+    extraContainerPorts: {}
+    # -- Bufstream Deployment additional containers to run besides the bufstream container.
+    extraContainers: []
+    livenessProbe:
+      # -- Bufstream Deployment Liveness Probe Maximum failure threshold.
+      failureThreshold: 3
+      # -- Bufstream Deployment Liveness Probe timeout.
+      timeoutSeconds: 5
+    readinessProbe:
+      # -- Bufstream Deployment Readiness Probe Maximum failure threshold.
+      failureThreshold: 3
+      # -- Bufstream Deployment Readiness Probe timeout.
+      timeoutSeconds: 5
+    startupProbe:
+      # -- Bufstream Deployment Liveness Probe Configuration
+      failureThreshold: 3
+    # -- Bufstream Deployment termination grace period.
+    terminationGracePeriodSeconds: 420 # 7 minutes
+    # -- Bufstream Deployment setting for sharing the process namespace.
+    shareProcessNamespace: false
+    autoscaling:
+      # -- Whether to enable the horizontal pod autoscaler.
+      enabled: false
+      # -- Minimum number of autoscaler allowed replicas.
+      minReplicas: 6
+      # -- Maximum number of autoscaler allowed replicas.
+      maxReplicas: 18
+      # -- Target CPU threshold for managing replica count.
+      targetCPU: "50"
+      # -- Target memory threshold for managing replica count.
+      targetMemory: ""
+      # -- [Horizontal Pod Autoscaler behavior.](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/#configurable-scaling-behavior)
+      behavior: {}
+  controlServerService:
+    # -- Whether to create a Kubernetes Headless Service for the Bufstream Control Server (inter-agent RPC server using the Connect protocol).
+    enabled: false
+    # -- Kubernetes Service annotations.
+    annotations: {}
+  podDisruptionBudget:
+    # -- Whether to enable pod disruption budget.
+    enabled: false
+    # -- Number of pods that are available after eviction as number or percentage (eg.: 50%).
+    # @default -- `""` (defaults to 0 if not specified)
+    minAvailable: ""
+    # -- Number of pods that are unavailable after eviction as number or percentage (eg.: 50%). Has higher precedence over `minAvailable`
+    maxUnavailable: ""
+  image:
+    # -- Bufstream Deployment container image repository.
+    repository: us-docker.pkg.dev/buf-images-1/bufstream-public/images/bufstream
+    # -- Overrides the image tag whose default is the chart version.
+    tag: "0.3.1"
+    # -- Bufstream Deployment container image pull policy.
+    pullPolicy: IfNotPresent
+# -- Extra Kubernetes objects to install as part of this chart.
+extraObjects: []
+# -- Bufstream configuration overrides. Any value here will be set directly on the bufstream config.yaml, taking precedence over any other helm defined values.
+configOverrides: {}
