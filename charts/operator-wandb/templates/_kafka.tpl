@@ -17,14 +17,18 @@ These are the variables a service can expect
 Return the kafka client user
 */}}
 {{- define "wandb.kafka.user" -}}
+{{- if .Values.kafka.install -}}
 {{ .Values.global.kafka.user }}
+{{- end -}}
 {{- end -}}
 
 {{/*
 Return the kafka client password
 */}}
 {{- define "wandb.kafka.password" -}}
+{{- if .Values.kafka.install -}}
 {{ .Values.global.kafka.password }}
+{{- end -}}
 {{- end -}}
 
 {{/*
