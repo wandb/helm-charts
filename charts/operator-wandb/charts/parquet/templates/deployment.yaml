@@ -72,6 +72,10 @@ spec:
             - name: parquet
               containerPort: 8087
               protocol: TCP
+          envFrom:
+          {{- if .Values.envFrom }}
+            {{- tpl (include "parquet.envFrom" . ) . | nindent 12 }}
+          {{- end }}
           env:
             - name: GOMEMLIMIT
               valueFrom:
@@ -134,18 +138,14 @@ spec:
             - name: GORILLA_FILE_STREAM_STORE_ADDRESS
               value: {{ include "parquet.fileStreamStore" . | quote }}
 
-            - name: BUCKET
-              value: "{{ include "parquet.bucket" . }}"
-            - name: AWS_REGION
-              value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
-            - name: AWS_S3_KMS_ID
-              value: "{{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}"
             - name: AZURE_STORAGE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "wandb.bucket.secret" . }}"
-                  key: {{ .Values.global.bucket.accessKeyName }}
+                  {{- with include "wandb.bucket" . | fromYaml }}
+                  name: "{{ .secretName }}"
+                  key: {{ .accessKeyName }}
                   optional: true
+                  {{- end }}
 
             - name: G_HOST_IP
               valueFrom:

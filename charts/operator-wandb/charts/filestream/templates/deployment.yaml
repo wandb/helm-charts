@@ -61,6 +61,10 @@ spec:
               mountPath: /etc/ssl/certs/redis_ca.pem
               subPath: redis_ca.pem
             {{- end }}
+          envFrom:
+          {{- if .Values.envFrom }}
+            {{- tpl (include "filestream.envFrom" . ) . | nindent 12 }}
+          {{- end }}
           env:
             - name: POD_NAME
               valueFrom:
@@ -77,9 +81,11 @@ spec:
             - name: AZURE_STORAGE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "wandb.bucket.secret" . }}"
-                  key: {{ .Values.global.bucket.accessKeyName }}
+                  {{- with include "wandb.bucket" . | fromYaml }}
+                  name: "{{ .secretName }}"
+                  key: {{ .accessKeyName }}
                   optional: true
+                  {{- end }}
             - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -109,12 +115,6 @@ spec:
                   key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
-            - name: BUCKET
-              value: "{{ include "filestream.bucket" .}}"
-            - name: AWS_REGION
-              value: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
-            - name: AWS_S3_KMS_ID
-              value: "{{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}"
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:

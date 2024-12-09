@@ -2,7 +2,9 @@
 {{- $commonLabels := merge (pluck "labels" (default (dict) .Values.common) | first) .Values.global.common.labels}}
 {{- if $commonLabels }}
 {{-   range $key, $value := $commonLabels }}
+{{- if $key }}
 {{ $key }}: {{ $value | quote }}
+{{- end }}
 {{-   end }}
 {{- end -}}
 {{- end -}}
