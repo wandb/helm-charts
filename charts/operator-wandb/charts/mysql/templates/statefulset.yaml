@@ -29,10 +29,13 @@ spec:
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      {{- if .Values.topologySpreadConstraints.enabled }}
+        {{- include "wandb.topologySpreadConstraints" (dict "matchLabels" (fromYaml (include "mysql.labels" .))) | nindent 6 }}
+      {{- end }}
       containers:
         - name: mysql
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          {{- include "wandb.podSecurityContext" .Values.container.securityContext | nindent 10 }}
+          {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           ports:
           - name: mysql
             containerPort: 3306
