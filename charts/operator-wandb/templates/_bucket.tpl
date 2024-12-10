@@ -38,7 +38,7 @@ secretName: {{ include "wandb.bucket.secret" . }}
 {{- end -}}
 {{- if eq $provider "s3" -}}
 {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
-{{- $url = "s3://$(ACCESS_KEY):$(SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
+{{- $url = "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
 {{- else -}}
 {{- $url = "s3://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
 {{- end -}}
