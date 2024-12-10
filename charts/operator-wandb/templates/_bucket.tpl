@@ -4,8 +4,6 @@
 {{- define "wandb.bucket.secret" -}}
 {{- if .Values.global.bucket.secret.secretName -}}
   {{ .Values.global.bucket.secret.secretName }}
-{{- else if .Values.global.defaultBucket.secret.name -}}
-  {{ .Values.global.defaultBucket.secret.name }}
 {{- else }}
   {{- print .Release.Name "-bucket" -}}
 {{- end -}}
