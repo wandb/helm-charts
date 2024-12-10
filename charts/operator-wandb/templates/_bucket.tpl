@@ -2,10 +2,8 @@
   Assorted bucket related helpers.
 */}}
 {{- define "wandb.bucket.secret" -}}
-{{- if .Values.global.bucket.secretName -}}
-  {{ .Values.global.bucket.secretName }}
-{{- else if .Values.global.defaultBucket.secretName -}}
-  {{ .Values.global.defaultBucket.secretName }}
+{{- if .Values.global.bucket.secret.secretName -}}
+  {{ .Values.global.bucket.secret.secretName }}
 {{- else }}
   {{- print .Release.Name "-bucket" -}}
 {{- end -}}
@@ -15,14 +13,13 @@
 {{ .Release.Name }}-bucket-configmap
 {{- end -}}
 
-
 {{- define "wandb.bucket" -}}
-{{- $url := "" -}} 
+{{- $url := "" -}}
 {{- $provider := .Values.global.bucket.provider -}}
 provider: {{ $provider }}
 {{- $name := .Values.global.bucket.name | default .Values.global.defaultBucket.name }}
 name: {{ $name }}
-{{- $path := .Values.global.bucket.path | default (default "" .Values.global.defaultBucket.path) }} 
+{{- $path := .Values.global.bucket.path | default .Values.global.defaultBucket.path }}
 path: {{ $path }}
 region: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
 kmsKey: {{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}
@@ -30,20 +27,20 @@ kmsKey: {{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.k
 accessKey: {{ $accessKey }}
 {{- $secretKey:= .Values.global.bucket.secretKey | default .Values.global.defaultBucket.secretKey }}
 secretKey: {{ $secretKey }}
-accessKeyName: {{ .Values.global.bucket.accessKeyName | default (default "ACCESS_KEY" .Values.global.defaultBucket.accessKeyName) }}
-secretKeyName: {{ .Values.global.bucket.secretKeyName | default (default "SECRET_KEY" .Values.global.defaultBucket.secretKeyName) }}
+accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
+secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}
 {{- if eq $provider "az" -}}
-{{- $url = printf "az://%s/%s" $name $path -}}
+{{- $url = "az://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
 {{- end -}}
 {{- if eq $provider "gcs" -}}
-{{- $url = printf "gs://%s/%s" $name $path -}}
+{{- $url = "gs://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
 {{- end -}}
 {{- if eq $provider "s3" -}}
-{{- if and $accessKey $secretKey -}}
-{{- $url = printf "s3://%s:%s@%s/%s" $accessKey $secretKey $name $path -}}
+{{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
+{{- $url = "s3://$(ACCESS_KEY):$(SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
 {{- else -}}
-{{- $url = printf "s3://%s/%s" $name $path -}}
+{{- $url = "s3://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
 {{- end -}}
 {{- end -}}
 {{- $url = trimSuffix "/" $url }}
