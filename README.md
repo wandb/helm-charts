@@ -1,5 +1,11 @@
 # Getting Started
 
+## Prerequisites
+
+- Helm v3.16.3 or later
+- Kubernetes cluster
+- Valid W&B license
+
 First download a license from https://deploy.wandb.ai and set it in your environment:
 
 ```shell
