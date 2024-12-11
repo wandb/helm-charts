@@ -97,6 +97,10 @@ spec:
           {{- if .Values.envFrom }}
             {{- tpl (include "app.envFrom" . ) . | nindent 12 }}
           {{- end }}
+          {{- if not .Values.global.pubSub.enabled}}
+            - configMapRef:
+                name: {{ .Release.Name }}-kafka-configmap
+          {{- end }}
           env:
             - name: GOMEMLIMIT
               valueFrom:
@@ -249,21 +253,12 @@ spec:
             - name: OVERFLOW_BUCKET_ADDR
               value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
             {{- if not .Values.global.pubSub.enabled}}
-            - name: KAFKA_BROKER_HOST
-              value: "{{ include "wandb.kafka.brokerHost" . }}"
-            - name: KAFKA_BROKER_PORT
-              value: "{{ include "wandb.kafka.brokerPort" . }}"
-            - name: KAFKA_CLIENT_USER
-              value: "{{ include "wandb.kafka.user" . }}"
             - name: KAFKA_CLIENT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.kafka.passwordSecret" . }}
                   key: KAFKA_CLIENT_PASSWORD
-            - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
-              value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
-            - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
-              value: "{{ include "wandb.kafka.runUpdatesShadowNumPartitions" .}}"
+                  optional: true
             {{- end }}
             - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
               value: >
