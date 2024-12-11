@@ -1,4 +1,3 @@
-
 {{- if .Values.enabled }}
 {{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
 apiVersion: apps/v1
@@ -78,6 +77,20 @@ spec:
               valueFrom:
                 resourceFieldRef:
                   resource: limits.memory
+            - name: BUCKET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}"
+                  optional: true
+            - name: BUCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}"
+                  optional: true
+            - name: BUCKET
+              value: "{{ (include "wandb.bucket" . | fromYaml).url }}"
             {{- if ne .Values.traceRatio 0.0 }}
             - name: GORILLA_TRACER
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
@@ -148,7 +161,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
-            
+
             {{- if ne .Values.global.email.smtp.host "" }}
             - name: GORILLA_EMAIL_SINK
               value: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
@@ -169,14 +182,14 @@ spec:
 
           readinessProbe:
             httpGet:
-              path: /ready 
+              path: /ready
               port: 8087
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
             successThreshold: 1
-          
+
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       serviceAccountName: {{ include "parquet.serviceAccountName" . }}
