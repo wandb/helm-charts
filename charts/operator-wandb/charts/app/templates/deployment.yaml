@@ -104,6 +104,18 @@ spec:
                   resource: limits.memory
             - name: GLUE_ENABLED
               value: "{{ not .Values.global.beta.glue.enabled }}"
+            - name: BUCKET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}"
+            - name: BUCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}"
+            - name: BUCKET
+              value: "{{ (include "wandb.bucket" . | fromYaml).url }}"
             - name: HOST
               value: "{{ .Values.global.host }}"
             {{- if .Values.extraCors }}
@@ -140,7 +152,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.redis.passwordSecret" . }}
                   optional: true
-                  key: {{ .Values.global.redis.secretKey }}
+                  key: {{ .Values.global.redis.secret.secretKey }}
             - name: REDIS_PORT
               value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
