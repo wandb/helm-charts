@@ -33,14 +33,14 @@ spec:
         {{- include "parquet.labels" . | nindent 8 }}
       annotations:
         {{- if .Values.fuse.enabled }}
-          {{- if eq .Values.global.bucket.provider "gs" }}
-          gke-gcsfuse/volumes: "true"
-          gke-gcsfuse/ephemeral-storage-limit: {{ index .Values.fuse.resources.limits "ephemeral-storage" }}
-          gke-gcsfuse/cpu-request: {{ .Values.fuse.resources.requests.cpu }}
-          gke-gcsfuse/cpu-limit: {{ .Values.fuse.resources.limits.cpu }}
-          gke-gcsfuse/memory-request: {{ .Values.fuse.resources.requests.memory }}
-          gke-gcsfuse/memory-limit: {{ .Values.fuse.resources.limits.memory }}
-          {{- end }}
+        {{- if eq (include "wandb.bucket" . | fromYaml).provider "gs" }}
+        gke-gcsfuse/volumes: "true"
+        gke-gcsfuse/ephemeral-storage-limit: {{ index .Values.fuse.resources.limits "ephemeral-storage" }}
+        gke-gcsfuse/cpu-request: {{ .Values.fuse.resources.requests.cpu }}
+        gke-gcsfuse/cpu-limit: {{ .Values.fuse.resources.limits.cpu }}
+        gke-gcsfuse/memory-request: {{ .Values.fuse.resources.requests.memory }}
+        gke-gcsfuse/memory-limit: {{ .Values.fuse.resources.limits.memory }}
+        {{- end }}
         {{- end }}
         {{- if .Values.pod.annotations -}}
         {{-   toYaml .Values.pod.annotations | nindent 4 }}
@@ -235,7 +235,7 @@ spec:
         {{- end }}
         {{- if .Values.fuse.enabled }}
         - name: fuse
-          {{- if eq .Values.global.bucket.provider "gs" }}
+          {{- if eq (include "wandb.bucket" . | fromYaml).provider "gs" }}
           driver: gcsfuse.csi.storage.gke.io
           volumeAttributes:
             bucketName: {{ .Values.global.bucket.name }}
