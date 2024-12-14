@@ -1,4 +1,5 @@
 {{- if .Values.enabled }}
+{{- $bucketProvider := include "wandb.bucket" . | fromYaml | .provider -}}
 {{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -33,7 +34,7 @@ spec:
         {{- include "parquet.labels" . | nindent 8 }}
       annotations:
         {{- if .Values.fuse.enabled }}
-        {{- if eq (include "wandb.bucket" . | fromYaml).provider "gs" }}
+        {{- if eq $bucketProvider "gs" }}
         gke-gcsfuse/volumes: "true"
         gke-gcsfuse/ephemeral-storage-limit: {{ index .Values.fuse.resources.limits "ephemeral-storage" }}
         gke-gcsfuse/cpu-request: {{ .Values.fuse.resources.requests.cpu }}
@@ -235,7 +236,7 @@ spec:
         {{- end }}
         {{- if .Values.fuse.enabled }}
         - name: fuse
-          {{- if eq (include "wandb.bucket" . | fromYaml).provider "gs" }}
+          {{- if eq $bucketProvider "gs" }}
           driver: gcsfuse.csi.storage.gke.io
           volumeAttributes:
             bucketName: {{ .Values.global.bucket.name }}
