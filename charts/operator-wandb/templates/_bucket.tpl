@@ -23,9 +23,9 @@ name: {{ $name }}
 path: {{ $path }}
 region: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
 kmsKey: {{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}
-{{- $accessKey:= .Values.global.bucket.accessKey | default .Values.global.defaultBucket.accessKey }}
+{{- $accessKey := default "" (.Values.global.bucket.accessKey | default .Values.global.defaultBucket.accessKey) }}
 accessKey: {{ $accessKey }}
-{{- $secretKey:= .Values.global.bucket.secretKey | default .Values.global.defaultBucket.secretKey }}
+{{- $secretKey := default "" (.Values.global.bucket.secretKey | default .Values.global.defaultBucket.secretKey) }}
 secretKey: {{ $secretKey }}
 accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
 secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
