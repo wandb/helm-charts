@@ -14,21 +14,22 @@
 {{- end -}}
 
 {{- define "wandb.bucket" -}}
+{{- $bucket := .Values.global.bucket | default dict -}}
 {{- $url := "" -}}
-{{- $provider := .Values.global.bucket.provider -}}
+{{- $provider := $bucket.provider -}}
 provider: {{ $provider }}
-{{- $name := .Values.global.bucket.name | default .Values.global.defaultBucket.name }}
+{{- $name := $bucket.name | default .Values.global.defaultBucket.name }}
 name: {{ $name }}
-{{- $path := .Values.global.bucket.path | default .Values.global.defaultBucket.path }}
+{{- $path := $bucket.path | default .Values.global.defaultBucket.path }}
 path: {{ $path }}
-region: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
-kmsKey: {{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}
-{{- $accessKey:= .Values.global.bucket.accessKey | default .Values.global.defaultBucket.accessKey }}
+region: {{ $bucket.region | default .Values.global.defaultBucket.region }}
+kmsKey: {{ $bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}
+{{- $accessKey:= $bucket.accessKey | default .Values.global.defaultBucket.accessKey }}
 accessKey: {{ $accessKey }}
-{{- $secretKey:= .Values.global.bucket.secretKey | default .Values.global.defaultBucket.secretKey }}
+{{- $secretKey:= $bucket.secretKey | default .Values.global.defaultBucket.secretKey }}
 secretKey: {{ $secretKey }}
-accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
-secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
+accessKeyName: {{ $bucket.secret.accessKeyName }}
+secretKeyName: {{ $bucket.secret.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}
 {{- if eq $provider "az" -}}
 {{- $url = "az://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
@@ -37,7 +38,7 @@ secretName: {{ include "wandb.bucket.secret" . }}
 {{- $url = "gs://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
 {{- end -}}
 {{- if eq $provider "s3" -}}
-{{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
+{{- if or (and $accessKey $secretKey) $bucket.secret.secretName -}}
 {{- $url = "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
 {{- else -}}
 {{- $url = "s3://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
