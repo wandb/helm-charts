@@ -34,7 +34,7 @@ spec:
         {{- include "parquet.labels" . | nindent 8 }}
       annotations:
         {{- if .Values.fuse.enabled }}
-        {{- if eq $bucketProvider "gs" }}
+        {{- if eq $bucketProvider "gcs" }}
         gke-gcsfuse/volumes: "true"
         gke-gcsfuse/ephemeral-storage-limit: {{ index .Values.fuse.resources.limits "ephemeral-storage" }}
         gke-gcsfuse/cpu-request: {{ .Values.fuse.resources.requests.cpu }}
@@ -74,6 +74,10 @@ spec:
               mountPath: /usr/local/share/ca-certificates/customCA{{$index}}.crt
               subPath: customCA{{$index}}.crt
             {{- end }}
+            {{- end }}
+            {{- if .Values.fuse.enabled }}
+            - name: fuse
+              mountPath: "/{{ .Values.global.bucket.name }}"
             {{- end }}
           ports:
             - name: parquet
@@ -205,12 +209,6 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
             successThreshold: 1
-
-          {{- if .Values.fuse.enabled }}
-          volumeMounts:
-            - name: fuse
-              mountPath: "/{{ .Values.global.bucket.name }}"
-          {{- end }}
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
