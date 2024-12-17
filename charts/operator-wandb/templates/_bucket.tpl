@@ -15,7 +15,7 @@
 
 {{- define "wandb.bucket" -}}
 {{- $url := "" -}}
-{{- $provider := .Values.global.bucket.provider -}}
+{{- $provider := .Values.global.bucket.provider | default .Values.global.defaultBucket.provider -}}
 provider: {{ $provider }}
 {{- $name := .Values.global.bucket.name | default .Values.global.defaultBucket.name }}
 name: {{ $name }}
