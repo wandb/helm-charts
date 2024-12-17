@@ -214,6 +214,21 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
       serviceAccountName: {{ include "parquet.serviceAccountName" . }}
       volumes:
+        {{- if .Values.fuse.enabled }}
+        - name: fuse
+          {{- if eq $bucketProvider "gcs" }}
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            readOnly: true
+            volumeAttributes:
+              bucketName: "{{ .Values.global.bucket.name }}"
+              mountOptions: "implicit-dirs"
+              fileCacheCapacity: "-1"
+              fileCacheForRangedRead: "true"
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- end }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "parquet.fullname" . }}-redis-ca
           secret:
@@ -231,16 +246,5 @@ spec:
         - name: wandb-ca-certs
           configMap:
             name: {{ include "parquet.fullname" . }}-ca-certs
-        {{- end }}
-        {{- if .Values.fuse.enabled }}
-        - name: fuse
-          csi:
-            driver: gcsfuse.csi.storage.gke.io
-            readOnly: true
-            volumeAttributes:
-              bucketName: "{{ .Values.global.bucket.name }}"
-              mountOptions: "implicit-dirs"
-              fileCacheCapacity: "-1"
-              fileCacheForRangedRead: "true"
         {{- end }}
 {{- end }}
