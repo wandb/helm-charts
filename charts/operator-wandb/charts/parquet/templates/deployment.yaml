@@ -1,4 +1,5 @@
 {{- if .Values.enabled }}
+{{- $bucketProvider := (include "wandb.bucket" . | fromYaml).provider -}}
 {{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -32,6 +33,16 @@ spec:
         {{- include "parquet.podLabels" . | nindent 8 }}
         {{- include "parquet.labels" . | nindent 8 }}
       annotations:
+        {{- if .Values.fuse.enabled }}
+        {{- if and (eq $bucketProvider "gcs") (eq .Values.global.cloudProvider "gcp") }}
+        gke-gcsfuse/volumes: "true"
+        gke-gcsfuse/ephemeral-storage-limit: "{{ index .Values.fuse.resources.limits "ephemeral-storage" }}"
+        gke-gcsfuse/cpu-request: "{{ .Values.fuse.resources.requests.cpu }}"
+        gke-gcsfuse/cpu-limit: "{{ .Values.fuse.resources.limits.cpu }}"
+        gke-gcsfuse/memory-request: "{{ .Values.fuse.resources.requests.memory }}"
+        gke-gcsfuse/memory-limit: "{{ .Values.fuse.resources.limits.memory }}"
+        {{- end }}
+        {{- end }}
         {{- if .Values.pod.annotations -}}
         {{-   toYaml .Values.pod.annotations | nindent 4 }}
         {{- end }}
@@ -63,6 +74,10 @@ spec:
               mountPath: /usr/local/share/ca-certificates/customCA{{$index}}.crt
               subPath: customCA{{$index}}.crt
             {{- end }}
+            {{- end }}
+            {{- if .Values.fuse.enabled }}
+            - name: fuse
+              mountPath: "/{{ .Values.global.bucket.name }}"
             {{- end }}
           ports:
             - name: parquet
@@ -167,6 +182,11 @@ spec:
               value: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
             {{- end }}
 
+            {{- if .Values.fuse.enabled }}
+            - name: GORILLA_PARQUET_FUSE_ENABLED
+              value: "true"
+            {{- end }}
+
             {{- include "parquet.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
 
@@ -194,6 +214,21 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
       serviceAccountName: {{ include "parquet.serviceAccountName" . }}
       volumes:
+        {{- if .Values.fuse.enabled }}
+        - name: fuse
+          {{- if and (eq $bucketProvider "gcs") (eq .Values.global.cloudProvider "gcp") }}
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            readOnly: true
+            volumeAttributes:
+              bucketName: "{{ .Values.global.bucket.name }}"
+              mountOptions: "implicit-dirs"
+              fileCacheCapacity: "-1"
+              fileCacheForRangedRead: "true"
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- end }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "parquet.fullname" . }}-redis-ca
           secret:
