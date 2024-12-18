@@ -88,3 +88,27 @@ securityContext:
 {{- end }}
 {{- end }}
 
+{{/*
+Return a simplified topologySpreadConstraints definition with dynamic labelSelector and matchLabels passed as a map.
+*/}}
+{{- define "wandb.topologySpreadConstraints" -}}
+{{- $matchLabels := .matchLabels -}}
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        {{- range $key, $value := $matchLabels }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        {{- range $key, $value := $matchLabels }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+{{- end }}
+
