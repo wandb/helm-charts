@@ -1,7 +1,7 @@
 {{/*
 Return name of secret where redis information is stored
 */}}
-{{- define "wandb.redis.passwordSecret" -}}
+{{- define "wandb.redis.secretName" -}}
 {{- if .Values.global.redis.secret.secretName -}}
   {{ .Values.global.redis.secret.secretName }}
 {{- else -}}
