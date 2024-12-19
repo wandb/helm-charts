@@ -67,6 +67,20 @@ spec:
               valueFrom:
                 resourceFieldRef:
                   resource: limits.memory
+            - name: BUCKET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}"
+                  optional: true
+            - name: BUCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}"
+                  optional: true
+            - name: BUCKET
+              value: "{{ (include "wandb.bucket" . | fromYaml).url }}"
             {{- if ne .Values.traceRatio 0.0 }}
             - name: GORILLA_TRACER
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
@@ -95,7 +109,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.redis.passwordSecret" . }}
                   optional: true
-                  key: REDIS_PASSWORD
+                  key: {{ .Values.global.redis.secret.secretKey }}
             - name: REDIS_PORT
               value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
@@ -123,9 +137,11 @@ spec:
             - name: AZURE_STORAGE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: "{{ include "wandb.bucket.secret" . }}"
-                  key: {{ .Values.global.bucket.accessKeyName }}
+                  {{- with include "wandb.bucket" . | fromYaml }}
+                  name: "{{ .secretName }}"
+                  key: {{ .accessKeyName }}
                   optional: true
+                  {{- end }}
 
             - name: G_HOST_IP
               valueFrom:
@@ -154,7 +170,7 @@ spec:
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "executor.fullname" . }}-redis-ca
           secret:
-            secretName: "{{ .Release.Name }}-redis"
+            secretName: "{{ include "wandb.redis.passwordSecret" . }}"
             items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem

@@ -17,14 +17,18 @@ These are the variables a service can expect
 Return the kafka client user
 */}}
 {{- define "wandb.kafka.user" -}}
+{{- if .Values.kafka.install -}}
 {{ .Values.global.kafka.user }}
+{{- end -}}
 {{- end -}}
 
 {{/*
 Return the kafka client password
 */}}
 {{- define "wandb.kafka.password" -}}
+{{- if .Values.kafka.install -}}
 {{ .Values.global.kafka.password }}
+{{- end -}}
 {{- end -}}
 
 {{/*
@@ -54,7 +58,11 @@ Return the kafka broker url port
 */}}
 {{- define "wandb.kafka.brokerHost" -}}
 {{- if eq .Values.global.kafka.brokerHost "" -}}
+{{- if .Values.kafka.install -}}
 {{ printf "%s-%s" .Release.Name "kafka" }}
+{{- else if .Values.bufstream.install -}}
+bufstream
+{{- end -}}
 {{- else -}}
 {{ .Values.global.kafka.brokerHost }}
 {{- end -}}

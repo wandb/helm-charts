@@ -97,6 +97,10 @@ spec:
           {{- if .Values.envFrom }}
             {{- tpl (include "app.envFrom" . ) . | nindent 12 }}
           {{- end }}
+          {{- if not .Values.global.pubSub.enabled}}
+            - configMapRef:
+                name: {{ .Release.Name }}-kafka-configmap
+          {{- end }}
           env:
             - name: GOMEMLIMIT
               valueFrom:
@@ -104,6 +108,20 @@ spec:
                   resource: limits.memory
             - name: GLUE_ENABLED
               value: "{{ not .Values.global.beta.glue.enabled }}"
+            - name: BUCKET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}"
+                  optional: true
+            - name: BUCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}"
+                  optional: true
+            - name: BUCKET
+              value: "{{ (include "wandb.bucket" . | fromYaml).url }}"
             - name: HOST
               value: "{{ .Values.global.host }}"
             {{- if .Values.extraCors }}
@@ -140,7 +158,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.redis.passwordSecret" . }}
                   optional: true
-                  key: {{ .Values.global.redis.secretKey }}
+                  key: {{ .Values.global.redis.secret.secretKey }}
             - name: REDIS_PORT
               value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
@@ -235,12 +253,6 @@ spec:
             - name: OVERFLOW_BUCKET_ADDR
               value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
             {{- if not .Values.global.pubSub.enabled}}
-            - name: KAFKA_BROKER_HOST
-              value: "{{ include "wandb.kafka.brokerHost" . }}"
-            - name: KAFKA_BROKER_PORT
-              value: "{{ include "wandb.kafka.brokerPort" . }}"
-            - name: KAFKA_CLIENT_USER
-              value: "{{ include "wandb.kafka.user" . }}"
             - name: KAFKA_CLIENT_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -297,7 +309,6 @@ spec:
 
             {{- include "app.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
-          {{- if .healthCheckEnabled }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -320,7 +331,6 @@ spec:
             preStop:
               exec:
                 command: ["sleep", "25"]
-          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
