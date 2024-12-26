@@ -2,8 +2,8 @@
   wandb-base.containers should be passed a dict with key `containers` containing the map of containers and a key `root`
   containing the . from the calling context
  */}}
-{{- define "wandb-base.containers" }}
-{{- range $containerName, $containerSource := .containers}}
+{{- define "wandb-base.containers" -}}
+{{- range $containerName, $containerSource := .containers -}}
 {{- $container := dict }}
 {{- $_ := deepCopy $containerSource | merge $container }}
 {{- $_ = set $container "name" $containerName }}
@@ -16,7 +16,7 @@
 {{- end }}
 {{- end }}
 
-{{- define "wandb-base.container" -}}
+{{- define "wandb-base.container" }}
 - name: {{ .name }}
   {{- if .command }}
   command:
@@ -70,19 +70,19 @@
   {{- end }}
 {{- end }}
 
-{{- define "wandb-base.env" }}
-{{- range $key, $value := .env }}
+{{- define "wandb-base.env" -}}
+{{- range $key, $value := .env -}}
 {{- if kindIs "string" $value }}
 - name: {{ $key }}
   value: {{ $value | quote }}
 {{- else }}
 - name: {{ $key }}
 {{- toYaml $value | nindent 2 }}
-{{- end }}
-{{- end }}
-{{- end }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 
-{{- define "wandb-base.envFrom" }}
+{{- define "wandb-base.envFrom" -}}
 {{- range $key, $value := .envFrom }}
 - {{ $value }}:
     name: {{ $key }}
