@@ -1,0 +1,56 @@
+{{- range $cronJobName, $cronJob := .Values.cronJobs }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ printf "%s-%s" .Release.Name $cronJobName }}
+  labels:
+    {{- include "wandb-base.labels" . | nindent 4 }}
+spec:
+  schedule: "{{ $cronJob.schedule }}"
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          {{- with $cronJob.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+          labels:
+            {{- include "wandb-base.labels" . | nindent 8 }}
+            {{- with $cronJob.podLabels }}
+            {{- toYaml . | nindent 8 }}
+            {{- end }}
+        spec:
+          {{- with $.Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+          serviceAccountName: {{ include "wandb-base.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+          {{- if $cronJob.initContainers }}
+          initContainers:
+            {{- include "wandb-base.containers" (dict "containers" $cronJob.initContainers "root" $) | nindent 8 }}
+          {{- end }}
+          containers:
+            {{- include "wandb-base.containers" (dict "containers" $cronJob.containers "root" $) | nindent 8 }}
+          restartPolicy: Never
+    {{/*  TODO: enable this as needed
+          volumes:
+            {{- tpl (toYaml . | nindent 8) $ }}
+          {{- end }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 8 }}
+          {{- end }}
+    */}}
+---
+{{- end }}
