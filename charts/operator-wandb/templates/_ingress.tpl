@@ -50,7 +50,7 @@ It expects a dictionary with two entries:
       port:
         number: 8082
       {{- else }}
-      name: {{ $.Release.Name }}-app
+      name: {{ $.Release.Name }}-frontend
       port: 
         number: 8080
       {{- end }}
