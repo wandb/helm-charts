@@ -50,11 +50,11 @@ It expects a dictionary with two entries:
       port:
         number: 8082
       {{- else }}
-      name: {{ $.Release.Name }}-frontend
+      name: {{ $.Release.Name }}-app
       port: 
         number: 8080
       {{- end }}
-{{- if .Values.beta.api.enabled }}
+{{- if .Values.global.beta.api.enabled }}
 - pathType: Prefix
   path: /api
   backend:
