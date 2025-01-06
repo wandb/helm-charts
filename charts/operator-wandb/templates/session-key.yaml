@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-gorilla-session-key
+  annotations:
+    "helm.sh/resource-policy": keep
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+stringData:
+  GORILLA_SESSION_KEY: |
+    {{- $existingSecret := lookup "v1" "Secret" .Release.Namespace (printf "%s-gorilla-session-key" .Release.Name) }}
+    {{- if $existingSecret }}
+        {{- $existingSecret.data.GORILLA_SESSION_KEY | b64dec }}
+    {{- else }}
+        {{ randAlphaNum 32 }}
+    {{- end }}
