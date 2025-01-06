@@ -176,6 +176,8 @@ global:
   beta:
     glue:
       enabled: false
+    api:
+      enabled: false
 
   executor:
     enabled: false
@@ -495,6 +497,51 @@ glue:
     "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
     "{{ .Release.Name }}-glue-secret": "secretRef"
     "{{ .Release.Name }}-glue-configmap": "configMapRef"
+  initContainers:
+    init-db:
+      image:
+        repository: wandb/megabinary
+        tag: 0.62.2
+      env:
+        MYSQL_HOST:
+          value: '{{ include "wandb.mysql.host" . }}'
+        MYSQL_DATABASE:
+          value: '{{ include "wandb.mysql.database" . }}'
+        MYSQL_USER:
+          value: '{{ include "wandb.mysql.user" . }}'
+        MYSQL_PASSWORD:
+          valueFrom:
+            secretKeyRef:
+              name: '{{ include "wandb.mysql.passwordSecret" . }}'
+              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+      command:
+        [
+          "bash",
+          "-c",
+          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+        ]
+    migrate-db:
+      image:
+        repository: wandb/megabinary
+        tag: 0.62.2
+      env:
+        MYSQL_HOST:
+          value: '{{ include "wandb.mysql.host" . }}'
+        MYSQL_DATABASE:
+          value: '{{ include "wandb.mysql.database" . }}'
+        MYSQL_USER:
+          value: '{{ include "wandb.mysql.user" . }}'
+        MYSQL_PASSWORD:
+          valueFrom:
+            secretKeyRef:
+              name: '{{ include "wandb.mysql.passwordSecret" . }}'
+              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+      command:
+        [
+          "bash",
+          "-c",
+          "megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE; megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE",
+        ]
   containers:
     glue:
       args: ["glue"]
@@ -619,6 +666,28 @@ api:
           "bash",
           "-c",
           'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+        ]
+    migrate-db:
+      image:
+        repository: wandb/megabinary
+        tag: 0.62.2
+      env:
+        MYSQL_HOST:
+          value: '{{ include "wandb.mysql.host" . }}'
+        MYSQL_DATABASE:
+          value: '{{ include "wandb.mysql.database" . }}'
+        MYSQL_USER:
+          value: '{{ include "wandb.mysql.user" . }}'
+        MYSQL_PASSWORD:
+          valueFrom:
+            secretKeyRef:
+              name: '{{ include "wandb.mysql.passwordSecret" . }}'
+              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+      command:
+        [
+          "bash",
+          "-c",
+          "megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE; megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE",
         ]
   containers:
     api:
