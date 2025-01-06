@@ -3,14 +3,14 @@ kind: Secret
 metadata:
   name: {{ .Release.Name }}-gorilla-session-key
   annotations:
-    "helm.sh/resource-policy": keep
+    "helm.sh/resource-policy": "keep"
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-stringData:
-  GORILLA_SESSION_KEY: |
-    {{- $existingSecret := lookup "v1" "Secret" .Release.Namespace (printf "%s-gorilla-session-key" .Release.Name) }}
-    {{- if $existingSecret }}
-        {{- $existingSecret.data.GORILLA_SESSION_KEY | b64dec }}
-    {{- else }}
-        {{ randAlphaNum 32 }}
-    {{- end }}
+type: Opaque
+data:
+  # Retrieve the secret data using lookup function and when not exists, return an empty dictionary / map as result
+  {{- $secretObj := (lookup "v1" "Secret" .Release.Namespace (printf "%s-gorilla-session-key" .Release.Name)) | default dict }}
+  {{- $secretData := (get $secretObj "data") | default dict }}
+  # Set $gorillaSessionKey to existing secret data or generate a random one when not exists
+  {{- $gorillaSessionKey := (get $secretData "GORILLA_SESSION_KEY") | default (randAlphaNum 32 | b64enc) }}
+  GORILLA_SESSION_KEY: {{ $gorillaSessionKey | quote }}
