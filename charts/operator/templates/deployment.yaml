@@ -47,7 +47,7 @@ spec:
               fieldPath: spec.serviceAccountName
         - name: AIRGAPPED
           value: {{ .Values.airgapped | quote }}
-        {{- if .Values.customCACerts }}
+        {{- if or .Values.customCACerts .Values.caCertsConfigMap }}
         - name: SSL_CERT_DIR
           value: /certs
         {{- end }}
@@ -64,11 +64,15 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.resources | nindent 10 }}
-        {{- if or .Values.airgapped .Values.customCACerts }}
+        {{- if or .Values.airgapped .Values.customCACerts .Values.caCertsConfigMap }}
         volumeMounts:
           {{- if or .Values.airgapped }}
           - name: {{ include "name" . }}-charts
             mountPath: /charts
+          {{- end }}
+          {{- if .Values.caCertsConfigMap }}
+          - name: wandb-ca-certs-user
+            mountPath: /certs/
           {{- end }}
           {{- if .Values.customCACerts }}
             {{- range $index, $v := .Values.customCACerts }}
@@ -78,13 +82,18 @@ spec:
             {{- end }}
           {{- end }}
         {{- end }}
-      {{- if or .Values.airgapped .Values.customCACerts }}
+      {{- if or .Values.airgapped .Values.customCACerts .Values.caCertsConfigMap }}
       volumes:
         {{- if .Values.airgapped }}
         - name: {{ include "name" . }}-charts
           configMap:
             name: {{ include "name" . }}-charts
             optional: true
+        {{- end }}
+        {{- if .Values.caCertsConfigMap }}
+        - name: wandb-ca-certs-user
+          configMap:
+            name: {{ .Values.caCertsConfigMap }}
         {{- end }}
         {{- if .Values.customCACerts }}
         - name: wandb-ca-certs
