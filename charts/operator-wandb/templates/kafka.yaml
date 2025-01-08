@@ -1,3 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-kafka-configmap
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  KAFKA_BROKER_HOST: "{{ include "wandb.kafka.brokerHost" . }}"
+  KAFKA_BROKER_PORT: "{{ include "wandb.kafka.brokerPort" . }}"
+  KAFKA_CLIENT_USER: "{{ include "wandb.kafka.user" . }}"
+  KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE: {{ include "wandb.kafka.runUpdatesShadowTopic" . | quote }}
+  KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS: {{ include "wandb.kafka.runUpdatesShadowNumPartitions" . | quote}}
+---
+{{- if not .Values.global.kafka.passwordSecret.name }}
 {{- $secretName := (include "wandb.kafka.passwordSecret" .)  }}
 apiVersion: v1
 kind: Secret
@@ -7,3 +21,4 @@ metadata:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
   KAFKA_CLIENT_PASSWORD: {{ include "wandb.kafka.password" . | b64enc }}
+{{- end }}

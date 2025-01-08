@@ -70,7 +70,20 @@ spec:
                   value: "true"
                 - name: GORILLA_GLUE_EXECUTE_TASK_NAME
                   value: "EXPORTHISTORYTOPARQUET"
-
+                - name: BUCKET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                      key: "{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}"
+                      optional: true
+                - name: BUCKET_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                      key: "{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}"
+                      optional: true
+                - name: BUCKET
+                  value: "{{ (include "wandb.bucket" . | fromYaml).url }}"
                 - name: MYSQL_PORT
                   value: "{{ include "wandb.mysql.port" . }}"
                 - name: MYSQL_HOST
@@ -154,7 +167,7 @@ spec:
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "parquet.fullname" . }}-redis-ca
               secret:
-                secretName: "{{ .Release.Name }}-redis"
+                secretName: "{{ include "wandb.redis.passwordSecret" . }}"
                 items:
                   - key: REDIS_CA_CERT
                     path: redis_ca.pem

@@ -76,6 +76,9 @@ global:
     host: ""
     port: 8443
     password: "fake"
+    passwordSecret:
+      name: ""
+      passwordKey: "CLICKHOUSE_PASSWORD"
     database: "weave_trace_db"
     user: "default"
 
@@ -102,15 +105,13 @@ global:
     path: ""
     region: ""
     kmsKey: ""
-    secretKey: ""
-    accessKey: ""
-    secretName: ""
 
   # If specified the application will use this bucket for all storage operations, and will not be overridable by the user.
   bucket:
-    secretName: ""
-    accessKeyName: "ACCESS_KEY"
-    secretAccessKeyName: "SECRET_KEY"
+    secret:
+      secretName: ""
+      accessKeyName: "ACCESS_KEY"
+      secretKeyName: "SECRET_KEY"
 
   redis:
     host: ""
@@ -118,9 +119,9 @@ global:
     password: ""
     parameters: {}
     caCert: ""
-    # The name of the user supplied secret containing the password for the redis instance.
-    secretName: ""
-    secretKey: "REDIS_PASSWORD"
+    secret:
+      secretName: ""
+      secretKey: "REDIS_PASSWORD"
 
   bigtable:
     v3:
@@ -141,6 +142,13 @@ global:
     # the kafka dependency chart.
     user: &kafkaUser "wandb"
     password: &kafkaPassword "wandb"
+## The secret can be created using the following command:
+## "kubectl create secret generic SECRET_NAME --from-literal=client-passwords=CLIENT_PASSWORD1 --from-literal=inter-broker-password=INTER_BROKER_PASSWORD --from-literal=controller-password=CONTROLLER_PASSWORD"
+## Replace SECRET_NAME, CLIENT_PASSWORD1, INTER_BROKER_PASSWORD, and CONTROLLER_PASSWORD with appropriate values.
+    passwordSecret:
+      name: &kafkaSecretName ""
+      # This (client-passwords) should match the key name used in the secret
+      passwordKey: "client-passwords"
     brokerHost: ""
     brokerPort: 9092
     runUpdatesShadowTopic: ""
@@ -243,6 +251,12 @@ console:
   image:
     repository: wandb/console
     tag: latest
+  extraEnv:
+    # This value is used to expose the IAM identity (of the app) to the user in console for
+    # adding the correct cross account permissions
+    # ex: AWS("arn:aws:iam::{acc_number}:role/{customer_namespace}-node")
+    BUCKET_ACCESS_IDENTITY: unknown
+
 
 flat-run-fields-updater:
   install: false
@@ -384,12 +398,58 @@ kafka:
       users:
         - *kafkaUser
       passwords: *kafkaPassword
+    existingSecret: *kafkaSecretName
+
   kraft:
     # This field is a UUID. It is *strongly* recommended to supply a new UUID yourself for production installs.
     clusterId: "ffFF1H3AQKGdBnsqAbJKew"
   metrics:
     jmx:
       enabled: true
+
+etcd:
+  replicaCount: 3
+  persistence:
+    enabled: true
+    size: 10Gi
+  autoCompactionMode: periodic
+  autoCompactionRetention: 30s
+  removeMemberOnContainerTermination: false
+  resourcesPreset: none
+  auth:
+    rbac:
+      create: false
+      enabled: false
+    token:
+      enabled: false
+  metrics:
+    useSeparateEndpoint: true
+  customLivenessProbe:
+    httpGet:
+      port: 9090
+      path: /livez
+      scheme: "HTTP"
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 15
+    failureThreshold: 10
+  customReadinessProbe:
+    httpGet:
+      port: 9090
+      path: /readyz
+      scheme: "HTTP"
+    initialDelaySeconds: 20
+    timeoutSeconds: 10
+  extraEnvVars:
+    - name: ETCD_LISTEN_CLIENT_HTTP_URLS
+      value: "http://0.0.0.0:8080"
+
+bufstream:
+  install: false
+  metadata:
+    use: ""
+  storage:
+    use: ""
 
 glue:
   # install: false

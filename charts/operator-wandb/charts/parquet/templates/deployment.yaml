@@ -1,5 +1,5 @@
-
 {{- if .Values.enabled }}
+{{- $bucketProvider := (include "wandb.bucket" . | fromYaml).provider -}}
 {{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -33,6 +33,16 @@ spec:
         {{- include "parquet.podLabels" . | nindent 8 }}
         {{- include "parquet.labels" . | nindent 8 }}
       annotations:
+        {{- if .Values.fuse.enabled }}
+        {{- if and (eq $bucketProvider "gcs") (eq .Values.global.cloudProvider "gcp") }}
+        gke-gcsfuse/volumes: "true"
+        gke-gcsfuse/ephemeral-storage-limit: "{{ index .Values.fuse.resources.limits "ephemeral-storage" }}"
+        gke-gcsfuse/cpu-request: "{{ .Values.fuse.resources.requests.cpu }}"
+        gke-gcsfuse/cpu-limit: "{{ .Values.fuse.resources.limits.cpu }}"
+        gke-gcsfuse/memory-request: "{{ .Values.fuse.resources.requests.memory }}"
+        gke-gcsfuse/memory-limit: "{{ .Values.fuse.resources.limits.memory }}"
+        {{- end }}
+        {{- end }}
         {{- if .Values.pod.annotations -}}
         {{-   toYaml .Values.pod.annotations | nindent 4 }}
         {{- end }}
@@ -65,6 +75,10 @@ spec:
               subPath: customCA{{$index}}.crt
             {{- end }}
             {{- end }}
+            {{- if .Values.fuse.enabled }}
+            - name: fuse
+              mountPath: "/{{ .Values.global.bucket.name }}"
+            {{- end }}
           ports:
             - name: parquet
               containerPort: 8087
@@ -78,6 +92,20 @@ spec:
               valueFrom:
                 resourceFieldRef:
                   resource: limits.memory
+            - name: BUCKET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}"
+                  optional: true
+            - name: BUCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}"
+                  optional: true
+            - name: BUCKET
+              value: "{{ (include "wandb.bucket" . | fromYaml).url }}"
             {{- if ne .Values.traceRatio 0.0 }}
             - name: GORILLA_TRACER
               value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
@@ -148,10 +176,15 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
-            
+
             {{- if ne .Values.global.email.smtp.host "" }}
             - name: GORILLA_EMAIL_SINK
               value: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
+            {{- end }}
+
+            {{- if .Values.fuse.enabled }}
+            - name: GORILLA_PARQUET_FUSE_ENABLED
+              value: "true"
             {{- end }}
 
             {{- include "parquet.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
@@ -169,22 +202,37 @@ spec:
 
           readinessProbe:
             httpGet:
-              path: /ready 
+              path: /ready
               port: 8087
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
             successThreshold: 1
-          
+
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       serviceAccountName: {{ include "parquet.serviceAccountName" . }}
       volumes:
+        {{- if .Values.fuse.enabled }}
+        - name: fuse
+          {{- if and (eq $bucketProvider "gcs") (eq .Values.global.cloudProvider "gcp") }}
+          csi:
+            driver: gcsfuse.csi.storage.gke.io
+            readOnly: true
+            volumeAttributes:
+              bucketName: "{{ .Values.global.bucket.name }}"
+              mountOptions: "implicit-dirs"
+              fileCacheCapacity: "-1"
+              fileCacheForRangedRead: "true"
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- end }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "parquet.fullname" . }}-redis-ca
           secret:
-            secretName: "{{ .Release.Name }}-redis"
+            secretName: "{{ include "wandb.redis.passwordSecret" . }}"
             items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem

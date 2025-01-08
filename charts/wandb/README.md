@@ -4,7 +4,7 @@ This chart contains all the required components to get started and can scale to
 large deployments.
 
 The default Helm chart configuration is intended for PoCs and in cases where components cannot be provisioned outside of kubernetes.
- 
+
 > For a production deployment, you should have strong working knowledge of Kubernetes. This method of deployment has different management, observability,
 > and administrative requirements than traditional deployments.
 
@@ -41,7 +41,6 @@ Valid configuration for external Redis are:
 - `redis: "redis://<USER>:<PASSWORD>@<HOST>:<PORT>?tls=true"`
 
 Or via command line using `--set redis=<REDIS CONFIG>`
-
 
 ## Use extneral stateful data
 
@@ -81,4 +80,3 @@ ldap:
       name: "ldap-tls-cert"
       key: "certificate.crt"
 ```
-

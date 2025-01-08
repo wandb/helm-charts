@@ -75,6 +75,20 @@ spec:
               value: 'true'
             - name: LOGGING_ENABLED
               value: 'true'
+            - name: BUCKET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}"
+                  optional: true
+            - name: BUCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}"
+                  optional: true
+            - name: BUCKET
+              value: "{{ (include "wandb.bucket" . | fromYaml).url }}"
             - name: AZURE_STORAGE_KEY
               valueFrom:
                 secretKeyRef:
@@ -164,7 +178,7 @@ spec:
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "filestream.fullname" . }}-redis-ca
           secret:
-            secretName: "{{ .Release.Name }}-redis"
+            secretName: "{{ include "wandb.redis.passwordSecret" . }}"
             items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
