@@ -1,3 +1,17 @@
+{{- if .Values.global.createGCPLoadBalancerBackend }}
+{{- if eq .Values.global.cloudProvider "google" }}
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ .Release.Name }}-console-backend-config
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+spec:
+  timeoutSec: 120
+{{- end }}
+{{- end }}
+---
 {{- if .Values.enabled }}
 apiVersion: v1
 kind: Service
@@ -11,6 +25,10 @@ metadata:
     {{-   toYaml .Values.service.labels | nindent 4 }}
     {{- end }}
   annotations:
+    {{- if and .Values.global.createGCPLoadBalancerBackend (eq .Values.global.cloudProvider "google") }}
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "{{ $.Release.Name }}-console-backend-config"}'
+    {{- end }}
     {{- if eq .Values.global.cloudProvider "aws" }}
     alb.ingress.kubernetes.io/healthcheck-path: /console/api/ready
     {{- end }}
