@@ -49,7 +49,7 @@ spec:
           value: {{ .Values.airgapped | quote }}
         {{- if or .Values.customCACerts .Values.caCertsConfigMap }}
         - name: SSL_CERT_DIR
-          value: /certs
+          value: /certs/
         {{- end }}
         livenessProbe:
           httpGet:
@@ -71,15 +71,8 @@ spec:
             mountPath: /charts
           {{- end }}
           {{- if .Values.caCertsConfigMap }}
-          - name: wandb-ca-certs-user
-            mountPath: /certs/
-          {{- end }}
-          {{- if .Values.customCACerts }}
-            {{- range $index, $v := .Values.customCACerts }}
           - name: wandb-ca-certs
-            mountPath: /certs/customCA{{$index}}.crt
-            subPath: customCA{{$index}}.crt
-            {{- end }}
+            mountPath: /certs/
           {{- end }}
         {{- end }}
       {{- if or .Values.airgapped .Values.customCACerts .Values.caCertsConfigMap }}
@@ -90,16 +83,17 @@ spec:
             name: {{ include "name" . }}-charts
             optional: true
         {{- end }}
-        {{- if .Values.caCertsConfigMap }}
-        - name: wandb-ca-certs-user
-          configMap:
-            name: {{ .Values.caCertsConfigMap }}
-        {{- end }}
-        {{- if .Values.customCACerts }}
         - name: wandb-ca-certs
-          configMap:
-            name: {{ include "operator.fullname" . }}-ca-certs
-        {{- end }}
+          projected:
+            sources:
+          {{- if .Values.caCertsConfigMap }}
+              - configMap:
+                  name: {{ .Values.caCertsConfigMap }}
+          {{- end }}
+          {{- if .Values.customCACerts }}
+              - configMap:
+                  name: {{ include "operator.fullname" . }}-ca-certs
+          {{- end }}
       {{- end }}
       serviceAccountName: {{ include "manager.serviceAccount.name" . }}
       {{- if .Values.nodeSelector }}
