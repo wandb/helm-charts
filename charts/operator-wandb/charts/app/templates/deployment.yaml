@@ -108,6 +108,8 @@ spec:
                   resource: limits.memory
             - name: GLUE_ENABLED
               value: "{{ not .Values.global.beta.glue.enabled }}"
+            - name: GORILLA_ENABLED
+              value: "{{ not .Values.global.beta.api.enabled }}"
             - name: BUCKET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
@@ -309,6 +311,7 @@ spec:
 
             {{- include "app.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+          {{- if not .Values.global.beta.api.enabled }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -326,6 +329,28 @@ spec:
             initialDelaySeconds: 20
             periodSeconds: 5
             failureThreshold: 120
+          {{- else }}
+          # If we disabled the api, we still want to have a healthcheck fror the frontend/nginx
+          # We also can't just disable the migrations which would make the health endpint return 200
+          # because glue, parquet, and filemeta are still running in the local container.
+          livenessProbe:
+            httpGet:
+              path: /proxy/healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /proxy/healthz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          startupProbe:
+            httpGet:
+              path: /proxy/healthz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 120
+          {{- end }}
           # Increase the sleep before SIGTERM to 25s. I had this as 5s previously and it wasn't enough.
           lifecycle:
             preStop:
