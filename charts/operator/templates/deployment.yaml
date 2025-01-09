@@ -47,9 +47,9 @@ spec:
               fieldPath: spec.serviceAccountName
         - name: AIRGAPPED
           value: {{ .Values.airgapped | quote }}
-        {{- if .Values.customCACerts }}
+        {{- if or .Values.customCACerts .Values.caCertsConfigMap }}
         - name: SSL_CERT_DIR
-          value: /certs
+          value: /certs/
         {{- end }}
         livenessProbe:
           httpGet:
@@ -64,21 +64,18 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.resources | nindent 10 }}
-        {{- if or .Values.airgapped .Values.customCACerts }}
+        {{- if or .Values.airgapped .Values.customCACerts .Values.caCertsConfigMap }}
         volumeMounts:
           {{- if or .Values.airgapped }}
           - name: {{ include "name" . }}-charts
             mountPath: /charts
           {{- end }}
-          {{- if .Values.customCACerts }}
-            {{- range $index, $v := .Values.customCACerts }}
+          {{- if .Values.caCertsConfigMap }}
           - name: wandb-ca-certs
-            mountPath: /certs/customCA{{$index}}.crt
-            subPath: customCA{{$index}}.crt
-            {{- end }}
+            mountPath: /certs/
           {{- end }}
         {{- end }}
-      {{- if or .Values.airgapped .Values.customCACerts }}
+      {{- if or .Values.airgapped .Values.customCACerts .Values.caCertsConfigMap }}
       volumes:
         {{- if .Values.airgapped }}
         - name: {{ include "name" . }}-charts
@@ -86,11 +83,17 @@ spec:
             name: {{ include "name" . }}-charts
             optional: true
         {{- end }}
-        {{- if .Values.customCACerts }}
         - name: wandb-ca-certs
-          configMap:
-            name: {{ include "operator.fullname" . }}-ca-certs
-        {{- end }}
+          projected:
+            sources:
+          {{- if .Values.caCertsConfigMap }}
+              - configMap:
+                  name: {{ .Values.caCertsConfigMap }}
+          {{- end }}
+          {{- if .Values.customCACerts }}
+              - configMap:
+                  name: {{ include "operator.fullname" . }}-ca-certs
+          {{- end }}
       {{- end }}
       serviceAccountName: {{ include "manager.serviceAccount.name" . }}
       {{- if .Values.nodeSelector }}
