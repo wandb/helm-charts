@@ -1,3 +1,17 @@
+{{- if .Values.global.createGCPLoadBalancerBackend }}
+{{- if eq .Values.global.cloudProvider "gcp" }}
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ .Release.Name }}-app-backend-config
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+spec:
+  timeoutSec: 120
+{{- end }}
+{{- end }}
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -13,6 +27,10 @@ metadata:
     prometheus.io/scrape: 'true'
     prometheus.io/path: '/metrics'
     prometheus.io/port: '8181'
+    {{- if and .Values.global.createGCPLoadBalancerBackend (eq .Values.global.cloudProvider "gcp") }}
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "{{ $.Release.Name }}-app-backend-config"}'
+    {{- end }}
     {{- if .Values.service.annotations -}}
     {{-   toYaml .Values.service.annotations | nindent 4 }}
     {{- end }}
