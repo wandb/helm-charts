@@ -63,6 +63,13 @@ It expects a dictionary with two entries:
       port: 
         number: 8080
 - pathType: Prefix
+  path: /ready
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port: 
+        number: 8080
+- pathType: Prefix
   path: /graphql
   backend:
     service:
