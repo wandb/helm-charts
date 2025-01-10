@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-gorilla-session-key
+  annotations:
+    "helm.sh/resource-policy": "keep"
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+type: Opaque
+data:
+  # Retrieve the secret data using lookup function and when not exists, return an empty dictionary / map as result
+  {{- $secretObj := (lookup "v1" "Secret" .Release.Namespace (printf "%s-gorilla-session-key" .Release.Name)) | default dict }}
+  {{- $secretData := (get $secretObj "data") | default dict }}
+  # Set $gorillaSessionKey to existing secret data or generate a random one when not exists
+  {{- $gorillaSessionKey := (get $secretData "GORILLA_SESSION_KEY") | default (randAlphaNum 32 | b64enc) }}
+  GORILLA_SESSION_KEY: {{ $gorillaSessionKey | quote }}
