@@ -54,92 +54,92 @@ It expects a dictionary with two entries:
       port: 
         number: 8080
       {{- end }}
-{{- if .Values.global.beta.api.enabled }}
-- pathType: Prefix
-  path: /api
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /ready
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /graphql
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /proxy
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /files
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /debug
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /service-redirect
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /service-dangerzone
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /artifacts
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /oidc
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /analytics
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-- pathType: Prefix
-  path: /scim
-  backend:
-    service:
-      name: {{ $.Release.Name }}-api
-      port: 
-        number: 8080
-{{- end }}
+# {{- if .Values.global.beta.api.enabled }}
+# - pathType: Prefix
+#   path: /api
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /ready
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /graphql
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /proxy
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /files
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /debug
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /service-redirect
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /service-dangerzone
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /artifacts
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /oidc
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /analytics
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# - pathType: Prefix
+#   path: /scim
+#   backend:
+#     service:
+#       name: {{ $.Release.Name }}-api
+#       port: 
+#         number: 8080
+# {{- end }}
 - pathType: Prefix
   path: /console
   backend:
