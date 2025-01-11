@@ -1,26 +1,18 @@
-{{- define "wandb-base.containers" }}
-{{- range .Values.containers}}
+{{/*
+  wandb-base.containers should be passed a dict with key `containers` containing the map of containers and a key `root`
+  containing the . from the calling context
+ */}}
+{{- define "wandb-base.containers" -}}
+{{- range $containerName, $containerSource := .containers -}}
 {{- $container := dict }}
-{{- $_ := deepCopy . | merge $container }}
-{{- $_ = set $container "securityContext" (coalesce $container.securityContext $.Values.securityContext) }}
-{{- $_ = set $container "image" (coalesce $container.image $.Values.image) }}
-{{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.Values.envFrom))) }}
-{{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.Values.env))) }}
-{{- $_ = set $container "root" $ }}
-{{- include "wandb-base.container" $container }}
-{{- end }}
-{{- end }}
-
-{{- define "wandb-base.initContainers" }}
-{{- range .Values.initContainers}}
-{{- $container := dict }}
-{{- $_ := deepCopy . | merge $container }}
-{{- $_ = set $container "securityContext" (coalesce $container.securityContext $.Values.securityContext) }}
-{{- $_ = set $container "image" (coalesce $container.image $.Values.image) }}
-{{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.Values.envFrom))) }}
-{{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.Values.env))) }}
-{{- $_ = set $container "root" $ }}
-{{- include "wandb-base.container" $container }}
+{{- $_ := deepCopy $containerSource | merge $container }}
+{{- $_ = set $container "name" $containerName }}
+{{- $_ = set $container "securityContext" (coalesce $container.securityContext $.root.Values.securityContext) }}
+{{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
+{{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
+{{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env))) }}
+{{- $_ = set $container "root" $.root }}
+{{- include "wandb-base.container" $container -}}
 {{- end }}
 {{- end }}
 
@@ -78,19 +70,19 @@
   {{- end }}
 {{- end }}
 
-{{- define "wandb-base.env" }}
-{{- range $key, $value := .env }}
+{{- define "wandb-base.env" -}}
+{{- range $key, $value := .env -}}
 {{- if kindIs "string" $value }}
 - name: {{ $key }}
   value: {{ $value | quote }}
 {{- else }}
 - name: {{ $key }}
 {{- toYaml $value | nindent 2 }}
-{{- end }}
-{{- end }}
-{{- end }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 
-{{- define "wandb-base.envFrom" }}
+{{- define "wandb-base.envFrom" -}}
 {{- range $key, $value := .envFrom }}
 - {{ $value }}:
     name: {{ $key }}

@@ -31,34 +31,12 @@ spec:
       serviceAccountName: {{ include "wandb-base.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.initContainers }}
+      initContainers:
+        {{- include "wandb-base.containers" (dict "containers" .Values.initContainers "root" .) | nindent 8 }}
+      {{- end }}
       containers:
-        - name: {{ .Chart.Name }}
-          {{ with .Values.envFrom }}
-          envFrom:
-              {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{ with .Values.env }}
-          env:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
-            - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
-          livenessProbe:
-            {{- toYaml .Values.livenessProbe | nindent 12 }}
-          readinessProbe:
-            {{- toYaml .Values.readinessProbe | nindent 12 }}
-          resources:
-            {{- toYaml .Values.resources | nindent 12 }}
-          {{- with .Values.volumeMounts }}
-          volumeMounts:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+        {{- include "wandb-base.containers" (dict "containers" .Values.containers "root" .) | nindent 8 }}
       {{- with .Values.volumes }}
       volumes:
         {{- toYaml . | nindent 8 }}
