@@ -147,6 +147,12 @@ observability:
     {{- if .Values.observability.metrics.enableInternalMetrics }}
     enable_internal_metrics: {{ .Values.observability.metrics.enableInternalMetrics }}
     {{- end }}
+    {{- if or .Values.observability.metrics.aggregation.topics .Values.observability.metrics.aggregation.partitions .Values.observability.metrics.aggregation.consumerGroups }}
+    aggregation:
+      topics: {{ .Values.observability.metrics.aggregation.topics }}
+      partitions: {{ .Values.observability.metrics.aggregation.partitions }}
+      consumer_groups: {{ .Values.observability.metrics.aggregation.consumerGroups }}
+    {{- end }}
   {{- end }}
   debug_address:
     host: 0.0.0.0
