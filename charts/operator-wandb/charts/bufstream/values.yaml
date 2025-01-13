@@ -30,7 +30,7 @@ kafka:
   # -- Declare the policy the server will follow for mutual TLS (mTLS). Supported values are [NO_CERT, REQUEST_CERT, REQUIRE_CERT, VERIFY_CERT_IF_GIVEN, REQUIRE_AND_VERIFY_CERT]. Only supported when using tlsCertificateSecret.
   # @default -- `"NO_CERT"`
   tlsClientAuth: ""
-  # -- Kubernetes seccret containing a `tls.crt` (as the secret key) PEM-encoded certificate authorities used by the server to validate the client certificates. This field cannot be empty if tlsClientAuth is set for client performing verification. Only supported when using tlsCertificateSecret.
+  # -- Kubernetes secret containing a `tls.crt` (as the secret key) PEM-encoded certificate authorities used by the server to validate the client certificates. This field cannot be empty if tlsClientAuth is set for client performing verification. Only supported when using tlsCertificateSecret.
   tlsClientCasSecret: ""
   # -- If a fetch should return as soon as any records are available.
   fetchEager: true
@@ -156,6 +156,8 @@ observability:
     # depending on the configuration. One example is kafka.topic.partition.offset.high_water_mark.
     # This omits only the attribute for metrics that have this attribute without depending on it.
     # One example is kafka.produce.record.size.
+    # Deprecated: set aggregation.partitions to true instead.
+    # @ignored
     omitPartitionAttribute: false
     # Whether to emit bufstream.internal.* metrics. 
     # @ignored
@@ -164,6 +166,20 @@ observability:
     # This is recommended to be set to "delta" for reporting to Datadog agents.
     # See https://docs.datadoghq.com/opentelemetry/guide/otlp_delta_temporality/ for more details.
     otlpTemporalityPreference: ""
+    # This option, typically set to reduce cardinality, aggregates some metrics over certain attributes, such as kafka.topic.name.
+    aggregation:
+      # Aggregate metrics across all topics to avoid cardinality issues with clusters with a large number of topics.
+      # Metrics that support this aggregation will report the 'kafka.topic.name' attribute as '_all_topics_'.
+      # NOTE: This implies partitions aggregation, which omits metrics like 'bufstream.kafka.topic.partition.offset.high_water_mark'.
+      topics: false
+      # Aggregate metrics across all parttions to avoid cardinality issues with clusters with a large number of partitions.
+      # Metrics that support aggregation will report the 'kafka.partition.id' attribute as -1, while some metrics, such as
+      # 'bufstream.kafka.topic.partition.offset.high_water_mark' will be omitted if partition level aggregation is enabled.
+      partitions: false
+      # Aggregate metrics across all consumer groups to avoid cardinality issues with clusters with a large number of groups.
+      # Metrics that support aggregation will report the 'kafka.consumer.group.id' as '_all_groups_', while some metrics
+      # such as 'bufstream.kafka.consumer.group.generation' will be omitted if consumer group level aggregation is enabled.
+      consumerGroups: false
   tracing:
     # -- Open Telemetry exporter. Supports [NONE, STDOUT, HTTP, HTTPS].
     # Deprecated: use exporterType instead.
@@ -183,7 +199,7 @@ observability:
     # -- Trace sample ratio.
     traceRatio: 0.1
   # -- Redact sensitive information such as topic names, before adding to to metrics, traces and logs.
-  # Supports [NONE, OPAQUE, OMITTED]
+  # Supports [NONE, OPAQUE]
   sensitiveInformationRedaction: "NONE"
 bufstream:
   service:
@@ -295,7 +311,7 @@ bufstream:
     # -- Bufstream Deployment container image repository.
     repository: us-docker.pkg.dev/buf-images-1/bufstream-public/images/bufstream
     # -- Overrides the image tag whose default is the chart version.
-    tag: "0.3.1"
+    tag: "0.3.5"
     # -- Bufstream Deployment container image pull policy.
     pullPolicy: IfNotPresent
 # -- Extra Kubernetes objects to install as part of this chart.

@@ -41,7 +41,7 @@
 | bufstream.deployment.tolerations | list | `[]` | Bufstream Deployment Tolerations. |
 | bufstream.image.pullPolicy | string | `"IfNotPresent"` | Bufstream Deployment container image pull policy. |
 | bufstream.image.repository | string | `"us-docker.pkg.dev/buf-images-1/bufstream-public/images/bufstream"` | Bufstream Deployment container image repository. |
-| bufstream.image.tag | string | `"0.3.1"` | Overrides the image tag whose default is the chart version. |
+| bufstream.image.tag | string | `"0.3.5"` | Overrides the image tag whose default is the chart version. |
 | bufstream.podDisruptionBudget.enabled | bool | `false` | Whether to enable pod disruption budget. |
 | bufstream.podDisruptionBudget.maxUnavailable | string | `""` | Number of pods that are unavailable after eviction as number or percentage (eg.: 50%). Has higher precedence over `minAvailable` |
 | bufstream.podDisruptionBudget.minAvailable | string | `""` (defaults to 0 if not specified) | Number of pods that are available after eviction as number or percentage (eg.: 50%). |
@@ -76,7 +76,7 @@
 | kafka.requestBufferSize | int | `5` | The number of kafka request to unmarshal and buffer before processing. |
 | kafka.tlsCertificateSecrets | list | `[]` | Kubernetes secrets containing a `tls.crt` and `tls.key` (as the secret keys, see https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets) to present to the client. The first certificate compatible with the client's requirements is selected automatically. |
 | kafka.tlsClientAuth | string | `"NO_CERT"` | Declare the policy the server will follow for mutual TLS (mTLS). Supported values are [NO_CERT, REQUEST_CERT, REQUIRE_CERT, VERIFY_CERT_IF_GIVEN, REQUIRE_AND_VERIFY_CERT]. Only supported when using tlsCertificateSecret. |
-| kafka.tlsClientCasSecret | string | `""` | Kubernetes seccret containing a `tls.crt` (as the secret key) PEM-encoded certificate authorities used by the server to validate the client certificates. This field cannot be empty if tlsClientAuth is set for client performing verification. Only supported when using tlsCertificateSecret. |
+| kafka.tlsClientCasSecret | string | `""` | Kubernetes secret containing a `tls.crt` (as the secret key) PEM-encoded certificate authorities used by the server to validate the client certificates. This field cannot be empty if tlsClientAuth is set for client performing verification. Only supported when using tlsCertificateSecret. |
 | kafka.zoneBalanceStrategy | string | `"BALANCE_STRATEGY_PARTITION"` | How to balance clients across zones, when client does not specify a zone. One of: ["BALANCE_STRATEGY_UNSPECIFIED", "BALANCE_STRATEGY_PARTITION", "BALANCE_STRATEGY_HOST", "BALANCE_STRATEGY_CLIENT_ID"] |
 | metadata.etcd.addresses | list | `[]` | Etcd addresses to connect to. |
 | metadata.etcd.tls | object | `{}` | TLS client configuration for bufstream to connect to etcd. |
@@ -88,14 +88,16 @@
 | observability.exporter.insecure | bool | `false` | Whether to disable TLS for the exporter's HTTP connection. This can be overriden by metrics.insecure or tracing.insecure. |
 | observability.logLevel | string | `"INFO"` | Log level to use. |
 | observability.metrics.address | string | `""` | The endpoint the exporter connects to. The value has a host and an optional port. It should not include the URL path, such as "/v1/metrics" or the scheme. Specify path and insecure instead. |
+| observability.metrics.aggregation.consumerGroups | bool | `false` |  |
+| observability.metrics.aggregation.partitions | bool | `false` |  |
+| observability.metrics.aggregation.topics | bool | `false` |  |
 | observability.metrics.exporter | string | `""` | Open Telemetry exporter. Supports [NONE, STDOUT, HTTP, HTTPS, PROMETHEUS]. Deprecated: use exporterType instead. |
 | observability.metrics.exporterType | string | `"NONE"` | Open Telemetry exporter. Supports [NONE, STDOUT, OTLP_GRPC, OTLP_HTTP, PROMETHEUS] |
 | observability.metrics.insecure | bool | `false` | Whether to disable TLS. This can only be specified for OTLP_HTTP exporter type. |
-| observability.metrics.omitPartitionAttribute | bool | `false` |  |
 | observability.metrics.otlpTemporalityPreference | string | `""` |  |
 | observability.metrics.path | string | `""` |  |
 | observability.otlpEndpoint | string | `""` | Open Telemetry base endpoint to push metrics and traces to. Deprecated: use exporter.address and exporter.insecure instead. |
-| observability.sensitiveInformationRedaction | string | `"NONE"` | Redact sensitive information such as topic names, before adding to to metrics, traces and logs. Supports [NONE, OPAQUE, OMITTED] |
+| observability.sensitiveInformationRedaction | string | `"NONE"` | Redact sensitive information such as topic names, before adding to to metrics, traces and logs. Supports [NONE, OPAQUE] |
 | observability.tracing.address | string | `""` | The endpoint the exporter connects to. The value has a host and an optional port. It should not include the URL path, such as "/v1/traces" or the scheme. Specify path and insecure instead. |
 | observability.tracing.exporter | string | `""` | Open Telemetry exporter. Supports [NONE, STDOUT, HTTP, HTTPS]. Deprecated: use exporterType instead. |
 | observability.tracing.exporterType | string | `"NONE"` | Open Telemetry exporter. Supports [NONE, STDOUT, OTLP_GRPC, OTLP_HTTP] |
