@@ -142,9 +142,9 @@ global:
     # the kafka dependency chart.
     user: &kafkaUser "wandb"
     password: &kafkaPassword "wandb"
-## The secret can be created using the following command:
-## "kubectl create secret generic SECRET_NAME --from-literal=client-passwords=CLIENT_PASSWORD1 --from-literal=inter-broker-password=INTER_BROKER_PASSWORD --from-literal=controller-password=CONTROLLER_PASSWORD"
-## Replace SECRET_NAME, CLIENT_PASSWORD1, INTER_BROKER_PASSWORD, and CONTROLLER_PASSWORD with appropriate values.
+    ## The secret can be created using the following command:
+    ## "kubectl create secret generic SECRET_NAME --from-literal=client-passwords=CLIENT_PASSWORD1 --from-literal=inter-broker-password=INTER_BROKER_PASSWORD --from-literal=controller-password=CONTROLLER_PASSWORD"
+    ## Replace SECRET_NAME, CLIENT_PASSWORD1, INTER_BROKER_PASSWORD, and CONTROLLER_PASSWORD with appropriate values.
     passwordSecret:
       name: &kafkaSecretName ""
       # This (client-passwords) should match the key name used in the secret
@@ -176,11 +176,20 @@ global:
   beta:
     glue:
       enabled: false
+    api:
+      enabled: false
     bufstream:
       enabled: false
 
   executor:
     enabled: false
+
+  settingsMigrationHook:
+    debug: false
+    dryRun: true
+    helmHookAnnotations: &helmHookAnnotations
+      "helm.sh/hook": pre-install,pre-upgrade
+      "helm.sh/hook-delete-policy": before-hook-creation
 
   # Creates a backend config to set custom values to used by the gke load balancer
   # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#create_backendconfig
@@ -232,6 +241,7 @@ app:
     tag: latest
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-session-key": "secretRef"
 
 nginx:
   install: false
@@ -260,7 +270,6 @@ console:
     # adding the correct cross account permissions
     # ex: AWS("arn:aws:iam::{acc_number}:role/{customer_namespace}-node")
     BUCKET_ACCESS_IDENTITY: unknown
-
 
 flat-run-fields-updater:
   install: false
@@ -496,6 +505,10 @@ glue:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_HISTORY_STORE:
       value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
+    GORILLA_FILE_STORE:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_STORAGE_BUCKET:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
   envFrom:
     "wandb-mysql": "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
@@ -507,8 +520,51 @@ glue:
     "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
     "{{ .Release.Name }}-glue-secret": "secretRef"
     "{{ .Release.Name }}-glue-configmap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-session-key": "secretRef"
+  initContainers:
+    init-db:
+      image:
+        repository: wandb/local
+        tag: latest
+      env:
+        MYSQL_HOST:
+          value: '{{ include "wandb.mysql.host" . }}'
+        MYSQL_DATABASE:
+          value: '{{ include "wandb.mysql.database" . }}'
+        MYSQL_USER:
+          value: '{{ include "wandb.mysql.user" . }}'
+        MYSQL_PASSWORD:
+          valueFrom:
+            secretKeyRef:
+              name: '{{ include "wandb.mysql.passwordSecret" . }}'
+              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+      command:
+        [
+          "bash",
+          "-c",
+          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+        ]
+    migrate-db:
+      env:
+        MYSQL_HOST:
+          value: '{{ include "wandb.mysql.host" . }}'
+        MYSQL_DATABASE:
+          value: '{{ include "wandb.mysql.database" . }}'
+        MYSQL_USER:
+          value: '{{ include "wandb.mysql.user" . }}'
+        MYSQL_PASSWORD:
+          valueFrom:
+            secretKeyRef:
+              name: '{{ include "wandb.mysql.passwordSecret" . }}'
+              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+      command:
+        [
+          "bash",
+          "-c",
+          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE",
+        ]
   containers:
-    - name: glue
+    glue:
       args: ["glue"]
       env: {}
       envFrom: {}
@@ -542,7 +598,7 @@ glue:
           subPath: redis_ca.pem
   image:
     repository: wandb/megabinary
-    tag: 0.62.2
+    tag: latest
   volumes:
     - name: wandb-ca-certs
       configMap:
@@ -558,3 +614,213 @@ glue:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
         optional: true
+
+api:
+  # install: false
+  service:
+    enabled: true
+    type: ClusterIP
+    ports:
+      - port: 8081
+        targetPort: http
+        protocol: TCP
+        name: http
+  env:
+    GORILLA_LICENSE_CERT_PATH:
+      value: "/jwks.json"
+    REDIS:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_AUDITOR_CACHE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_SETTINGS_CACHE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_LOCKER:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_ACTIVITY_STORE_CACHE_ADDRESS:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_CACHE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_FILE_METADATA_SOURCE:
+      value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_GLUE_TASK_STRATEGY_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_GLUE_TASK_METADATA_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_USAGE_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_METADATA_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_PARQUET_LIVE_HISTORY_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_ANALYTICS_SINK:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_CASBIN_ADDRESS:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_RUN_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_FILE_STREAM_STORE_ADDRESS:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_HISTORY_STORE:
+      value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
+    GORILLA_FILE_STORE:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_STORAGE_BUCKET:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_PORT:
+      value: "8080"
+  envFrom:
+    "wandb-mysql": "secretRef"
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-secret": "secretRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-session-key": "secretRef"
+  initContainers:
+    init-db:
+      image:
+        repository: wandb/local
+        tag: latest
+      env:
+        MYSQL_HOST:
+          value: '{{ include "wandb.mysql.host" . }}'
+        MYSQL_DATABASE:
+          value: '{{ include "wandb.mysql.database" . }}'
+        MYSQL_USER:
+          value: '{{ include "wandb.mysql.user" . }}'
+        MYSQL_PASSWORD:
+          valueFrom:
+            secretKeyRef:
+              name: '{{ include "wandb.mysql.passwordSecret" . }}'
+              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+      command:
+        [
+          "bash",
+          "-c",
+          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+        ]
+    migrate-db:
+      env:
+        MYSQL_HOST:
+          value: '{{ include "wandb.mysql.host" . }}'
+        MYSQL_DATABASE:
+          value: '{{ include "wandb.mysql.database" . }}'
+        MYSQL_USER:
+          value: '{{ include "wandb.mysql.user" . }}'
+        MYSQL_PASSWORD:
+          valueFrom:
+            secretKeyRef:
+              name: '{{ include "wandb.mysql.passwordSecret" . }}'
+              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+      command:
+        [
+          "bash",
+          "-c",
+          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE",
+        ]
+  containers:
+    api:
+      args: ["gorilla"]
+      env: {}
+      envFrom: {}
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        initialDelaySeconds: 30
+        periodSeconds: 1
+        timeoutSeconds: 1
+        successThreshold: 1
+        failureThreshold: 3
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      volumeMounts:
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  volumes:
+    - name: wandb-ca-certs
+      configMap:
+        name: "{{ .Release.Name }}-ca-certs"
+    - name: wandb-ca-certs-user
+      configMap:
+        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
+        optional: true
+    - name: redis-ca
+      secret:
+        secretName: "{{ .Release.Name }}-redis-secret"
+        items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+        optional: true
+
+settingsMigrationHook:
+  install: false
+  service:
+    enabled: false
+  role:
+    create: true
+    rules:
+      - apiGroups:
+          - ""
+        resources:
+          - secrets
+        verbs:
+          - get
+          - list
+          - update
+          - patch
+  env:
+    SMH_FILE_STORE:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    SMH_K8S_ACTIVE_SPEC_SECRET_NAME:
+      value: "wandb-spec-active"
+    SMH_K8S_USER_SPEC_SECRET_NAME:
+      value: "wandb-spec-user"
+    SMH_K8S_NAMESPACE:
+      value: "default"
+    AZURE_STORAGE_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-bucket": "secretRef"
+  kind: Job
+  helmHookAnnotations:
+    <<: *helmHookAnnotations
+  jobs:
+    smh:
+      ttlSecondsAfterFinished: 3600
+      annotations:
+        <<: *helmHookAnnotations
+        # This ensures that the job is created last
+        "helm.sh/hook-weight": "10"
+      containers:
+        smh:
+          image:
+            repository: wandb/megabinary
+            tag: latest
+          envFrom:
+            "{{ .Release.Name }}-smh-secret": "secretRef"
+          args: ["settings-migration-hook"]
