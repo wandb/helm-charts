@@ -1,0 +1,60 @@
+{{- range $jobName, $job := .Values.jobs }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-%s" $.Release.Name $jobName }}
+  labels:
+    {{- include "wandb-base.labels" $ | nindent 4 }}
+  {{- with $job.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $job.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . }}
+  {{- end }}
+  template:
+    metadata:
+      {{- with $job.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "wandb-base.labels" $ | nindent 8 }}
+        {{- with $job.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "wandb-base.serviceAccountName" $ }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      {{- if $job.initContainers }}
+      initContainers:
+        {{- include "wandb-base.containers" (dict "containers" $job.initContainers "root" $) | nindent 8 }}
+      {{- end }}
+      containers:
+        {{- include "wandb-base.containers" (dict "containers" $job.containers "root" $) | nindent 8 }}
+      restartPolicy: Never
+{{/*  TODO: enable this as needed
+      volumes:
+        {{- tpl (toYaml . | nindent 8) $ }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+*/}}
+---
+{{- end }}
