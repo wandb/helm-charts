@@ -54,6 +54,22 @@ It expects a dictionary with two entries:
       port: 
         number: 8080
       {{- end }}
+{{- if .Values.global.beta.api.enabled }}
+- pathType: Prefix
+  path: /api
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port: 
+        number: 8080
+- pathType: Prefix
+  path: /graphql
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port: 
+        number: 8080
+{{- end }}
 - pathType: Prefix
   path: /console
   backend:

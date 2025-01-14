@@ -1,0 +1,19 @@
+{{- if .Values.settingsMigrationHook.install }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-smh-secret
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+  {{- with .Values.global.settingsMigrationHook.helmHookAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+stringData:
+  SMH_DEBUG: {{ .Values.global.settingsMigrationHook.debug | quote }}
+  SMH_DRY_RUN: {{ .Values.global.settingsMigrationHook.dryRun | quote }}
+  {{- with include "wandb.bucket" . | fromYaml }}
+  AWS_REGION: "{{ .region }}"
+  AWS_S3_KMS_ID: "{{ .kmsKey }}"
+  {{- end }}
+{{- end }}
