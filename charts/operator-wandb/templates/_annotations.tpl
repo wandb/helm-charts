@@ -26,13 +26,13 @@ It also includes error handling to ensure the lookup result is valid.
 
 {{- define "wandb.ownerReference" -}}
 {{- if .Values.global.enableOwnerReferences }}
-{{- $resource := (lookup "apps.wandb.com/v1" "WeightsAndBaises" .Release.Namespace "") }}
+{{- $resource := (lookup "apps.wandb.com/v1" "WeightsAndBiases" .Release.Namespace "wandb") }}
 {{- if $resource }}
 ownerReferences:
   - apiVersion: apps.wandb.com/v1
     blockOwnerDeletion: true
     controller: true
-    kind: WeightsAndBaises
+    kind: WeightsAndBiases
     name: {{ $resource.metadata.name }}
     uid: {{ $resource.metadata.uid }}
 {{- end }}
