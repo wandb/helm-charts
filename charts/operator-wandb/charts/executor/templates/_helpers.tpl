@@ -152,6 +152,16 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
 {{- end -}}
 {{- end -}}
 
+{{- define "executor.runUpdateShadowQueue" -}}
+{{- if .Values.global.pubSub.enabled -}}
+pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}/{{ .Values.pubSub.subscription }}
+{{- else if .Values.global.beta.bufstream.enabled -}}
+kafka://$(KAFKA_BROKER_HOST):9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3
+{{- else -}}
+kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3
+{{- end -}}
+{{- end -}}
+
 {{- define "executor.envFrom" -}}
 {{- range $key, $value := .Values.envFrom -}}
 - {{ $value }}:

@@ -126,6 +126,19 @@ spec:
               value: "{{ include "executor.redis" . | trim }}{{- if .Values.workerConcurrency }}&concurrency={{ .Values.workerConcurrency }}{{- end }}"
             - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
               value: "true"
+            
+            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
+              value: >
+                {
+                  "overflow-bucket": {
+                    "store": "$(BUCKET)",
+                    "name": "wandb",
+                    "prefix": "wandb-overflow"
+                  },
+                  "subscriptions": {
+                    "flatRunFieldsUpdater": {{ include "executor.runUpdateShadowQueue" . | quote }}
+                  }
+                }
 
             - name: GORILLA_HISTORY_STORE
               value: {{ include "executor.historyStore" . | quote }}
