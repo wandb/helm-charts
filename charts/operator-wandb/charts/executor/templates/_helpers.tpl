@@ -152,7 +152,7 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
 {{- end -}}
 {{- end -}}
 
-{{- define "app.runUpdateShadowTopic" -}}
+{{- define "executor.runUpdateShadowTopic" -}}
 {{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}
 {{- else if .Values.global.beta.bufstream.enabled -}}
