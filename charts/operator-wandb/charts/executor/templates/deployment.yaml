@@ -127,17 +127,27 @@ spec:
             - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
               value: "true"
             
+            {{- if not .Values.global.pubSub.enabled}}
+            - name: KAFKA_CLIENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.kafka.passwordSecret" . }}
+                  key: {{ include "wandb.kafka.passwordSecret.passwordKey" .}}
+                  optional: true
+            - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
+              value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
+            - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
+              value: "{{ include "wandb.kafka.runUpdatesShadowNumPartitions" .}}"
+            {{- end }}
             - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
               value: >
                 {
                   "overflow-bucket": {
-                    "store": "$(BUCKET)",
+                    "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
                     "name": "wandb",
                     "prefix": "wandb-overflow"
                   },
-                  "subscriptions": {
-                    "flatRunFieldsUpdater": {{ include "executor.runUpdateShadowQueue" . | quote }}
-                  }
+                  "addr": {{ include "app.runUpdateShadowTopic" . | quote }}
                 }
 
             - name: GORILLA_HISTORY_STORE
