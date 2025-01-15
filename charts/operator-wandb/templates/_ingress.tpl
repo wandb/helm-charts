@@ -61,14 +61,14 @@ It expects a dictionary with two entries:
     service:
       name: {{ $.Release.Name }}-api
       port: 
-        number: 8080
+        number: 8081
 - pathType: Prefix
   path: /graphql
   backend:
     service:
       name: {{ $.Release.Name }}-api
       port: 
-        number: 8080
+        number: 8081
 {{- end }}
 - pathType: Prefix
   path: /console
