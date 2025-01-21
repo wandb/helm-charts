@@ -1,4 +1,18 @@
 {{- if .Values.service.enabled }}
+{{- if .Values.global.createGCPLoadBalancerBackend }}
+{{- if eq .Values.global.cloudProvider "gcp" }}
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ include "wandb-base.fullname" . }}-backend-config
+  labels:
+    {{- include "wandb-base.labels" . | nindent 4 }}
+spec:
+  timeoutSec: 120
+{{- end }}
+{{- end }}
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,6 +22,10 @@ metadata:
   {{- if eq .Values.global.cloudProvider "aws" }}
   annotations:
     alb.ingress.kubernetes.io/healthcheck-path: /ready
+    {{- if and .Values.global.createGCPLoadBalancerBackend (eq .Values.global.cloudProvider "gcp") }}
+    cloud.google.com/neg: '{"ingress": true, "healthCheck": {"path": "/health"}}'
+    cloud.google.com/backend-config: '{"default": "{{ include "wandb-base.fullname" . }}-backend-config"}'
+    {{- end }}
   {{- end }}
 spec:
   type: {{ .Values.service.type }}
@@ -17,4 +35,4 @@ spec:
     {{- end }}
   selector:
     {{- include "wandb-base.selectorLabels" . | nindent 4 }}
-  {{ end }}
+{{- end }}
