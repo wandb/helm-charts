@@ -622,8 +622,14 @@ glue:
 
 api:
   # install: false
+  autoscaling:
+    horizontal:
+      enabled: true
+      maxReplicas: 3
+      minReplicas: 2
   service:
     enabled: true
+    loadBalancerHealthCheckPath: "/ready"
     type: ClusterIP
     ports:
       - port: 8081
@@ -673,6 +679,21 @@ api:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     GORILLA_STORAGE_BUCKET:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
+      value: >
+        {
+          "overflow-bucket": {
+            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+            "name": "wandb",
+            "prefix": "wandb-overflow"
+          },
+          "addr": {{ include "wandb.runUpdateShadowTopicProducer" . | quote }}
+        }
+    KAFKA_CLIENT_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.kafka.passwordSecret" . }}'
+          key: '{{ include "wandb.kafka.passwordSecret.passwordKey" . }}'
     GORILLA_PORT:
       value: "8081"
     AZURE_STORAGE_KEY:
@@ -687,6 +708,7 @@ api:
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-secret": "secretRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-gorilla-secret": "secretRef"
     "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
@@ -747,10 +769,17 @@ api:
           path: /healthz
           port: 8081
         initialDelaySeconds: 30
-        periodSeconds: 1
+        periodSeconds: 5
         timeoutSeconds: 1
         successThreshold: 1
         failureThreshold: 3
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: api
+        periodSeconds: 5
+        successThreshold: 1
+        failureThreshold: 5
       resources:
         limits:
           cpu: "2"
