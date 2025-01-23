@@ -15,17 +15,30 @@
 
 {{- define "wandb.bucket" -}}
 {{- $url := "" -}}
-{{- $provider := .Values.global.bucket.provider | default .Values.global.defaultBucket.provider -}}
+{{- $path := "" -}}
+{{- $provider := "" -}}
+{{- $accessKey := "" -}}
+{{- $secretKey := "" -}}
+{{- if .Values.global.bucket.name -}}
+{{- $provider = .Values.global.bucket.provider -}}
+{{- $path = .Values.global.bucket.path -}}
+{{- $accessKey = default "" .Values.global.bucket.accessKey -}}
+{{- $secretKey = default "" .Values.global.bucket.secretKey -}}
+name: {{ .Values.global.bucket.name }}
+region: {{ .Values.global.bucket.region }}
+kmsKey: {{ .Values.global.bucket.kmsKey }}
+{{- else -}}
+{{- $provider = .Values.global.defaultBucket.provider -}}
+{{- $path = .Values.global.defaultBucket.path -}}
+{{- $accessKey = default "" .Values.global.defaultBucket.accessKey -}}
+{{- $secretKey = default "" .Values.global.defaultBucket.secretKey -}}
+name: {{ .Values.global.defaultBucket.name }}
+region: {{ .Values.global.defaultBucket.region }}
+kmsKey: {{ .Values.global.defaultBucket.kmsKey }}
+{{- end }}
 provider: {{ $provider }}
-{{- $name := .Values.global.bucket.name | default .Values.global.defaultBucket.name }}
-name: {{ $name }}
-{{- $path := .Values.global.bucket.path | default .Values.global.defaultBucket.path }}
 path: {{ $path }}
-region: {{ .Values.global.bucket.region | default .Values.global.defaultBucket.region }}
-kmsKey: {{ .Values.global.bucket.kmsKey | default .Values.global.defaultBucket.kmsKey }}
-{{- $accessKey := default "" (.Values.global.bucket.accessKey | default .Values.global.defaultBucket.accessKey) }}
 accessKey: {{ $accessKey }}
-{{- $secretKey := default "" (.Values.global.bucket.secretKey | default .Values.global.defaultBucket.secretKey) }}
 secretKey: {{ $secretKey }}
 accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
 secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
