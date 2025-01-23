@@ -65,9 +65,9 @@ Create the name of the service account to use
 Return the endpoint to send otel traces to (only works when called within a subchart or traceRatio will not be present)
 */}}
 {{- define "wandb.otelTracesEndpoint" -}}
-{{- if .Values.global.otel.traces.host }}
+{{- if .Values.global.otel.traces.host -}}
 otlp+{{ .Values.global.otel.traces.proto }}://{{ .Values.global.otel.traces.host }}:{{ .Values.global.otel.traces.port }}?trace_ratio={{ .Values.traceRatio }}
-{{- else }}
+{{- else -}}
 otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset:{{ .Values.global.otel.traces.port }}?trace_ratio={{ .Values.traceRatio }}
-{{- end }}
-{{- end }}
+{{- end -}}
+{{- end -}}
