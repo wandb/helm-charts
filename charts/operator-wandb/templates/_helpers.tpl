@@ -60,3 +60,12 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Create the name of the imagePullSecret to use
+*/}}
+{{- define "wandb.imagePullSecrets" -}}
+{{- if .Values.global.imagePullSecrets }}
+{{- toYaml .Values.global.imagePullSecrets | nindent 6 }}
+{{- end }}
+{{- end }}
