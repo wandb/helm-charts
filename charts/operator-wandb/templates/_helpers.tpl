@@ -66,8 +66,8 @@ Return the endpoint to send otel traces to (only works when called within a subc
 */}}
 {{- define "wandb.otelTracesEndpoint" -}}
 {{- if .Values.global.otel.traces.host -}}
-otlp+{{ .Values.global.otel.traces.proto }}://{{ .Values.global.otel.traces.host }}:{{ .Values.global.otel.traces.port }}?trace_ratio={{ .Values.traceRatio }}
+otlp+{{ .Values.global.otel.traces.proto }}://{{ .Values.global.otel.traces.host }}:{{ .Values.global.otel.traces.port }}?trace_ratio={{ default 0.0 .Values.traceRatio }}
 {{- else -}}
-otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset:{{ .Values.global.otel.traces.port }}?trace_ratio={{ .Values.traceRatio }}
+otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset:{{ .Values.global.otel.traces.port }}?trace_ratio={{ default 0.0 .Values.traceRatio }}
 {{- end -}}
 {{- end -}}
