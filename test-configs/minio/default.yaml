@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minio # Change this value if you want a different namespace name
+  labels:
+    name: minio # Change this value to match metadata.name
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: minio
+  name: minio
+  namespace: minio
+spec:
+  containers:
+    - name: minio
+      image: quay.io/minio/minio:latest
+      env:
+        - name: MINIO_ACCESS_KEY
+          value: "minio"
+        - name: MINIO_SECRET_KEY
+          value: "minio123"
+      command:
+        - /bin/bash
+        - -c
+      args:
+        - mkdir -p /data/bucket && minio server /data --console-address :9090
+      ports:
+        - containerPort: 9000
+          name: minio
+      volumeMounts:
+        - mountPath: /data
+          name: localvolume #
+  volumes:
+    - name: localvolume
+      hostPath:
+        path: /mnt/minio/data
+        type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: minio # Change this value to match the namespace metadata.name
+spec:
+  selector:
+    app: minio
+  ports:
+    - port: 9000
+      name: minio
