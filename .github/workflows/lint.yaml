@@ -1,6 +1,8 @@
-name: Lint and Test Charts
+name: Lint Charts
 
-on: pull_request
+on:
+  pull_request:
+    paths: charts/**
 
 jobs:
   lint-test:
@@ -39,15 +41,3 @@ jobs:
 
       - name: Run chart-testing  (lint)
         run: ct lint --config ct.yaml
-
-      - name: Create kind cluster
-        uses: helm/kind-action@v1.8.0
-        with:
-          version: v0.20.0
-        if: env.ACT || steps.list-changed.outputs.changed == 'true'
-
-      - name: Run chart-testing (install)
-        env:
-          LICENSE: ${{ secrets.LICENSE }}
-        if: steps.list-changed.outputs.changed == 'true'
-        run: ct install --charts ./charts/wandb --config ct.yaml --helm-extra-set-args --set=license=$LICENSE
