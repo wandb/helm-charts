@@ -71,6 +71,12 @@ global:
     secret: ""
     clientId: ""
 
+  otel:
+    traces:
+      host: ""       # defaults to the otel-daemonset service
+      port: 4317     # grpc default is 4317, http default is 4318
+      proto: "grpc"  # grpc, http
+
   clickhouse:
     install: false
     host: ""
@@ -189,9 +195,9 @@ global:
     debug: false
     dryRun: true
 
-  # Creates a backend config to set custom values to used by the gke load balancer
-  # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#create_backendconfig
-  createGCPLoadBalancerBackend: false
+  # GCP only value: a CloudArmor policy to be attached to the gce LoadBalancer via a BackendConfig.
+  # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#cloud_armor
+  gcpSecurityPolicy: ""
 
 ingress:
   install: true
@@ -501,6 +507,8 @@ glue:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_RUN_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_TRACER:
+      value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
     GORILLA_FILE_STREAM_STORE_ADDRESS:
       value: '{{ include "wandb.fileStreamStoreProducer" . }}'
     GORILLA_HISTORY_STORE:
@@ -672,6 +680,8 @@ api:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_RUN_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_TRACER:
+      value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
     GORILLA_FILE_STREAM_STORE_ADDRESS:
       value: '{{ include "wandb.fileStreamStoreProducer" . }}'
     GORILLA_HISTORY_STORE:
