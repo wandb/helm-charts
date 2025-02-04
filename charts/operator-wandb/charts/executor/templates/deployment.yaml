@@ -47,12 +47,13 @@ spec:
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       # needed to ensure ensure Kafka consumers handle pod termination gracefully and avoid data loss
       terminationGracePeriodSeconds: 60
+      imagePullSecrets: 
+      {{- include "wandb.imagePullSecrets" . }}
       containers:
         - name: {{ .Chart.Name }}
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          imagePullSecrets: {{- include "wandb.imagePullSecrets" . }}
           volumeMounts:
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "executor.fullname" . }}-redis-ca
