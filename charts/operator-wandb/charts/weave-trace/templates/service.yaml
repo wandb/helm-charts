@@ -1,3 +1,19 @@
+{{- if eq .Values.global.cloudProvider "gcp" }}
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ .Release.Name }}-weave-trace-backend-config
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+spec:
+  {{- if .Values.global.gcpSecurityPolicy }}
+  securityPolicy:
+    name: {{ .Values.global.gcpSecurityPolicy }}
+  {{- end }}
+  timeoutSec: 120
+{{- end }}
+---
 apiVersion: v1
 kind: Service
 metadata:
@@ -12,6 +28,10 @@ metadata:
   annotations:
     {{- if eq .Values.global.cloudProvider "aws" }}
     alb.ingress.kubernetes.io/healthcheck-path: /traces/health
+    {{- end }}
+    {{- if eq .Values.global.cloudProvider "gcp" }}
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "{{ $.Release.Name }}-weave-trace-backend-config"}'
     {{- end }}
     {{- if .Values.service.annotations -}}
     {{-   toYaml .Values.service.annotations | nindent 4 }}
