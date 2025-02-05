@@ -5,7 +5,7 @@ Return name of secret where redis information is stored
 {{- if .Values.global.redis.secret.secretName -}}
   {{ .Values.global.redis.secret.secretName }}
 {{- else -}}
-  {{- print .Release.Name "-redis-secret" -}}
+  {{- print .Release.Name "-redis" -}}
 {{- end -}}
 {{- end -}}
 
