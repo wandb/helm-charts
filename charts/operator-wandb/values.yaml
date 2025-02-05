@@ -73,9 +73,9 @@ global:
 
   otel:
     traces:
-      host: ""       # defaults to the otel-daemonset service
-      port: 4317     # grpc default is 4317, http default is 4318
-      proto: "grpc"  # grpc, http
+      host: "" # defaults to the otel-daemonset service
+      port: 4317 # grpc default is 4317, http default is 4318
+      proto: "grpc" # grpc, http
 
   clickhouse:
     install: false
@@ -97,6 +97,7 @@ global:
 
   auth:
     sessionLengthHours: 720
+    jwkUrl: "" # Internal URL for the auth service should be using oidc or auth0
     oidc:
       clientId: ""
       secret: ""
@@ -514,6 +515,8 @@ glue:
       value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
     GORILLA_FILE_STORE:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_AUTH_JWK_URL:
+      value: '{{ .Values.global.auth.jwkUrl | default (printf "http://%s-app:8083/api/jwks.json" .Release.Name) | quote }}'
     GORILLA_STORAGE_BUCKET:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     AZURE_STORAGE_KEY:
@@ -687,6 +690,8 @@ api:
       value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
     GORILLA_FILE_STORE:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_AUTH_JWK_URL:
+      value: '{{ .Values.global.auth.jwkUrl | default (printf "http://%s-app:8083/api/jwks.json" .Release.Name) | quote }}'
     GORILLA_STORAGE_BUCKET:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     A_KAFKA_CLIENT_PASSWORD:
