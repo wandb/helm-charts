@@ -83,7 +83,7 @@ spec:
               value: "{{ (include "wandb.bucket" . | fromYaml).url }}"
             {{- if ne .Values.traceRatio 0.0 }}
             - name: GORILLA_TRACER
-              value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
+              value: {{ include "wandb.otelTracesEndpoint" . | quote }}
             {{- end }}
             - name: ONLY_SERVICE
               value: gorilla-executor
@@ -126,6 +126,29 @@ spec:
               value: "{{ include "executor.redis" . | trim }}{{- if .Values.workerConcurrency }}&concurrency={{ .Values.workerConcurrency }}{{- end }}"
             - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
               value: "true"
+            
+            {{- if not .Values.global.pubSub.enabled}}
+            - name: KAFKA_CLIENT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.kafka.passwordSecret" . }}
+                  key: {{ include "wandb.kafka.passwordSecret.passwordKey" .}}
+                  optional: true
+            - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
+              value: {{ include "wandb.kafka.runUpdatesShadowTopic" .}}
+            - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
+              value: "{{ include "wandb.kafka.runUpdatesShadowNumPartitions" .}}"
+            {{- end }}
+            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
+              value: >
+                {
+                  "overflow-bucket": {
+                    "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+                    "name": "wandb",
+                    "prefix": "wandb-overflow"
+                  },
+                  "addr": {{ include "executor.runUpdateShadowTopic" . | quote }}
+                }
 
             - name: GORILLA_HISTORY_STORE
               value: {{ include "executor.historyStore" . | quote }}

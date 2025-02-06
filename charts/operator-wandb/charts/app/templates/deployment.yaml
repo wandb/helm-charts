@@ -91,6 +91,12 @@ spec:
             - name: prometheus
               containerPort: 8181
               protocol: TCP
+            - name: anaconda
+              containerPort: 8082
+              protocol: TCP
+            - name: local
+              containerPort: 8083
+              protocol: TCP
             - name: gorilla-statsd
               containerPort: 8125
               protocol: TCP
@@ -116,6 +122,8 @@ spec:
             # - name: PROXY_PASS_BACKEND_HOST
             #   value: "$({{.Release.Name | upper | replace "-" "_" }}_API_SERVICE_HOST):$({{.Release.Name | upper | replace "-" "_" }}_API_SERVICE_PORT)"
             # {{- end }}
+            - name: GORILLA_GLUE_CONTAINER_PORT
+              value: "9173"
             - name: BUCKET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
@@ -213,7 +221,7 @@ spec:
                   optional: true
             {{- end }}
             {{- if ne .Values.global.auth.oidc.clientId ""  }}
-            - name: OIDC_CLIENT_ID            
+            - name: OIDC_CLIENT_ID
               value: {{ .Values.global.auth.oidc.clientId }}
             - name: OIDC_AUTH_METHOD
               value: {{ .Values.global.auth.oidc.authMethod }}
@@ -256,7 +264,7 @@ spec:
               value: {{ toJson .Values.global.banners | quote }}
             {{- if ne .Values.traceRatio 0.0 }}
             - name: GORILLA_TRACER
-              value: "otlp+grpc://{{ .Release.Name }}-otel-daemonset:4317?trace_ratio={{ .Values.traceRatio }}"
+              value: {{ include "wandb.otelTracesEndpoint" . | quote }}
             {{- end }}
             - name: OVERFLOW_BUCKET_ADDR
               value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
@@ -284,6 +292,8 @@ spec:
                 }
             - name: GORILLA_SETTINGS_CACHE
               value: "{{ include "app.redis" . | trim }}"
+            - name: GORILLA_SWEEP_PROVIDER
+              value: "{{ .Values.global.sweepProvider | default (printf "http://%s-app:8082" .Release.Name) }}"
             - name: GORILLA_METADATA_CACHE
               value: "{{ include "app.redis" . | trim }}"
             - name: GORILLA_HISTORY_STORE

@@ -71,6 +71,15 @@ global:
     secret: ""
     clientId: ""
 
+  otel:
+    traces:
+      # defaults to the otel-daemonset service
+      host: ""
+      # grpc default is 4317, http default is 4318
+      port: 4317
+      # grpc, http
+      proto: "grpc"
+
   clickhouse:
     install: false
     host: ""
@@ -91,6 +100,8 @@ global:
 
   auth:
     sessionLengthHours: 720
+    # Internal URL for the auth service should be using oidc or auth0
+    jwkUrl: ""
     oidc:
       clientId: ""
       secret: ""
@@ -192,8 +203,9 @@ global:
   # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#create_backendconfig
   createGCPLoadBalancerBackend: false
   enableOwnerReferences: true
+  # GCP only value: a CloudArmor policy to be attached to the gce LoadBalancer via a BackendConfig.
+  # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#cloud_armor
   gcpSecurityPolicy: ""
-  
 ingress:
   install: true
   create: true
@@ -484,6 +496,8 @@ glue:
       value: '{{ include "wandb.redis" . | trim }}'
     GORILLA_FILE_METADATA_SOURCE:
       value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_TASK_QUEUE:
+      value: '{{ include "wandb.redis" . | trim }}'
     GORILLA_GLUE_TASK_STRATEGY_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_GLUE_TASK_METADATA_STORE:
@@ -500,8 +514,10 @@ glue:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_RUN_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_TRACER:
+      value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
     GORILLA_FILE_STREAM_STORE_ADDRESS:
-      value: '{{ include "wandb.mysql" . | trim }}'
+      value: '{{ include "wandb.fileStreamStoreProducer" . }}'
     GORILLA_HISTORY_STORE:
       value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
     GORILLA_FILE_STORE:
@@ -515,7 +531,7 @@ glue:
           key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
           optional: true
   envFrom:
-    "wandb-mysql": "secretRef"
+    "{{ .Release.Name }}-mysql": "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-secret": "secretRef"
@@ -566,7 +582,7 @@ glue:
         [
           "bash",
           "-c",
-          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE",
+          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
         ]
   containers:
     glue:
@@ -622,12 +638,18 @@ glue:
 
 api:
   # install: false
+  autoscaling:
+    horizontal:
+      enabled: true
+      maxReplicas: 3
+      minReplicas: 2
   service:
     enabled: true
+    loadBalancerHealthCheckPath: "/ready"
     type: ClusterIP
     ports:
       - port: 8081
-        targetPort: http
+        targetPort: api
         protocol: TCP
         name: http
   env:
@@ -647,6 +669,8 @@ api:
       value: '{{ include "wandb.redis" . | trim }}'
     GORILLA_FILE_METADATA_SOURCE:
       value: '{{ include "wandb.redis" . | trim }}'
+    GORILLA_TASK_QUEUE:
+      value: '{{ include "wandb.redis" . | trim }}'
     GORILLA_GLUE_TASK_STRATEGY_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_GLUE_TASK_METADATA_STORE:
@@ -663,16 +687,34 @@ api:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_RUN_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_TRACER:
+      value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
     GORILLA_FILE_STREAM_STORE_ADDRESS:
-      value: '{{ include "wandb.mysql" . | trim }}'
+      value: '{{ include "wandb.fileStreamStoreProducer" . }}'
     GORILLA_HISTORY_STORE:
       value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
     GORILLA_FILE_STORE:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     GORILLA_STORAGE_BUCKET:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    A_KAFKA_CLIENT_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.kafka.passwordSecret" . }}'
+          key: '{{ include "wandb.kafka.passwordSecret.passwordKey" . }}'
+          optional: true
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
+      value: >
+        {
+          "overflow-bucket": {
+            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+            "name": "wandb",
+            "prefix": "wandb-overflow"
+          },
+          "addr": {{ include "wandb.runUpdateShadowTopicProducer" . | quote }}
+        }
     GORILLA_PORT:
-      value: "8080"
+      value: "8081"
     AZURE_STORAGE_KEY:
       valueFrom:
         secretKeyRef:
@@ -680,11 +722,12 @@ api:
           key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
           optional: true
   envFrom:
-    "wandb-mysql": "secretRef"
+    "{{ .Release.Name }}-mysql": "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-secret": "secretRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-gorilla-secret": "secretRef"
     "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
@@ -729,7 +772,7 @@ api:
         [
           "bash",
           "-c",
-          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE",
+          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
         ]
   containers:
     api:
@@ -737,24 +780,31 @@ api:
       env: {}
       envFrom: {}
       ports:
-        - name: http
-          containerPort: 8080
+        - name: api
+          containerPort: 8081
           protocol: TCP
       livenessProbe:
         httpGet:
           path: /healthz
-          port: 8080
+          port: 8081
         initialDelaySeconds: 30
-        periodSeconds: 1
+        periodSeconds: 5
         timeoutSeconds: 1
         successThreshold: 1
         failureThreshold: 3
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: api
+        periodSeconds: 5
+        successThreshold: 1
+        failureThreshold: 5
       resources:
         limits:
-          cpu: "2"
-          memory: 4Gi
+          cpu: "4"
+          memory: 8Gi
         requests:
-          cpu: "1"
+          cpu: 500m
           memory: 1Gi
       volumeMounts:
         - name: wandb-ca-certs
@@ -796,6 +846,7 @@ settingsMigrationJob:
           - secrets
         verbs:
           - get
+          - create
           - list
           - update
           - patch
@@ -820,7 +871,8 @@ settingsMigrationJob:
   kind: Job
   jobs:
     smj:
-      ttlSecondsAfterFinished: 3600
+      ttlSecondsAfterFinished: 60
+      backoffLimit: 1
       containers:
         smj:
           image:

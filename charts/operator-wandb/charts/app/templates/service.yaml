@@ -1,4 +1,3 @@
-{{- if .Values.global.createGCPLoadBalancerBackend }}
 {{- if eq .Values.global.cloudProvider "gcp" }}
 ---
 apiVersion: cloud.google.com/v1
@@ -8,8 +7,11 @@ metadata:
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 spec:
+  {{- if .Values.global.gcpSecurityPolicy }}
+  securityPolicy:
+    name: {{ .Values.global.gcpSecurityPolicy }}
+  {{- end }}
   timeoutSec: 120
-{{- end }}
 {{- end }}
 ---
 apiVersion: v1
@@ -27,7 +29,7 @@ metadata:
     prometheus.io/scrape: 'true'
     prometheus.io/path: '/metrics'
     prometheus.io/port: '8181'
-    {{- if and .Values.global.createGCPLoadBalancerBackend (eq .Values.global.cloudProvider "gcp") }}
+    {{- if eq .Values.global.cloudProvider "gcp" }}
     cloud.google.com/neg: '{"ingress": true}'
     cloud.google.com/backend-config: '{"default": "{{ $.Release.Name }}-app-backend-config"}'
     {{- end }}
@@ -43,5 +45,11 @@ spec:
     - port: 8181
       protocol: TCP
       name: prometheus
+    - port: 8082
+      protocol: TCP
+      name: anaconda
+    - port: 8083
+      protocol: TCP
+      name: local
   selector:
     {{- include "app.labels" . | nindent 4 }}
