@@ -36,6 +36,10 @@ spec:
         {{- end }}
     spec:
       serviceAccountName: {{ include "otelAgent.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       {{- if .tolerations }}
       tolerations:
         {{- toYaml .tolerations | nindent 8 }}
@@ -108,28 +112,19 @@ spec:
             - name: varlogpods
               mountPath: /var/log/pods
               readOnly: true
-            - name: varlibdockercontainers
-              mountPath: /var/lib/docker/containers
+            - name: varlibcontainers
+              mountPath: /var/lib/containers
               readOnly: true
-            - name: hostfs
-              mountPath: /hostfs
-              readOnly: true
-              mountPropagation: HostToContainer
       volumes:
-        - name: hostfs
-          hostPath:
-            path: /
-        - name: varlogpods
-          hostPath:
-            path: /var/log/pods
         - name: config
           configMap:
             name: {{ include "otelAgent.fullname" . }}
             items:
               - key: config
                 path: config.yaml
-        - name: varlibdockercontainers
-          hostPath:
-            path: /var/lib/docker/containers
+        - name: varlogpods
+          emptyDir: {}
+        - name: varlibcontainers
+          emptyDir: {}
       hostNetwork: false
 {{- end }}
