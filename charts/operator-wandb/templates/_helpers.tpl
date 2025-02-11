@@ -76,7 +76,9 @@ otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset
 Create the name of the imagePullSecret to use
 */}}
 {{- define "wandb.imagePullSecrets" -}}
+{{- if .Values.global.imagePullSecrets }}
 {{- range .Values.global.imagePullSecrets }}
 - name: {{ . }}
+{{- end }}
 {{- end }}
 {{- end }}
