@@ -24,7 +24,7 @@ storage:
   {{- end }}
   {{- if .Values.storage.s3.accessKeyId }}
   access_key_id:
-    string: {{ .Values.storage.s3.accessKeyId | quote }}
+    string: {{ tpl .Values.storage.s3.accessKeyId . | quote }}
   secret_access_key:
     path: /config/secrets/storage/secret_access_key
   {{- end }}
@@ -40,7 +40,7 @@ storage:
 etcd:
   addresses:
 {{- range .Values.metadata.etcd.addresses }}
-  - host: {{ .host | quote }}
+  - host: {{ tpl .host $ | quote }}
     port: {{ .port }}
 {{- end }}
 {{- with .Values.metadata.etcd.tls }}
