@@ -54,6 +54,8 @@ spec:
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      imagePullSecrets:
+      {{- include "wandb.imagePullSecrets" . }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -77,7 +79,7 @@ spec:
             {{- end }}
             {{- if .Values.fuse.enabled }}
             - name: fuse
-              mountPath: "/{{ .Values.global.bucket.name }}"
+              mountPath: "/{{ (include "wandb.bucket" . | fromYaml).name }}"
             {{- end }}
           ports:
             - name: parquet
@@ -187,6 +189,9 @@ spec:
               value: "true"
             {{- end }}
 
+            - name: GORILLA_PARQUET_ARROW_BUFFER_SIZE
+              value: "2147483648" # 2GB
+
             {{- include "parquet.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
 
@@ -221,7 +226,7 @@ spec:
             driver: gcsfuse.csi.storage.gke.io
             readOnly: true
             volumeAttributes:
-              bucketName: "{{ .Values.global.bucket.name }}"
+              bucketName: {{ (include "wandb.bucket" . | fromYaml).name }}
               mountOptions: "implicit-dirs"
               fileCacheCapacity: "-1"
               fileCacheForRangedRead: "true"

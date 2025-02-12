@@ -37,16 +37,14 @@ spec:
         {{- include "executor.commonLabels" . | nindent 8 }}
         {{- include "executor.podLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       serviceAccountName: {{ include "executor.serviceAccountName" . }}
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       # needed to ensure ensure Kafka consumers handle pod termination gracefully and avoid data loss
       terminationGracePeriodSeconds: 60
+      imagePullSecrets:
+      {{- include "wandb.imagePullSecrets" . }}
       containers:
         - name: {{ .Chart.Name }}
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
@@ -156,6 +154,9 @@ spec:
               value: {{ include "executor.liveHistoryStore" .| quote }}
             - name: GORILLA_FILE_STREAM_STORE_ADDRESS
               value: {{ include "executor.fileStreamStore" . | quote }}
+
+            - name: GORILLA_PARQUET_ARROW_BUFFER_SIZE
+              value: "2147483648" # 2GB
 
             - name: AZURE_STORAGE_KEY
               valueFrom:

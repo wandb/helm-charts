@@ -46,6 +46,8 @@ spec:
       # Extend the pods shutdown grace period from the default of 30s to 60s.
       # This goes in the pod template spec.
       terminationGracePeriodSeconds: 60
+      imagePullSecrets:
+      {{- include "wandb.imagePullSecrets" . }}
       initContainers:
         - name: init-db
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -92,6 +94,9 @@ spec:
               protocol: TCP
             - name: anaconda
               containerPort: 8082
+              protocol: TCP
+            - name: local
+              containerPort: 8083
               protocol: TCP
             - name: gorilla-statsd
               containerPort: 8125
@@ -304,6 +309,9 @@ spec:
               value: {{ .Values.artifactsGc.NumWorkers | quote }}
             - name: GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
               value: {{ .Values.artifactsGc.DeleteFilesNumWorkers | quote }}
+
+            - name: GORILLA_PARQUET_ARROW_BUFFER_SIZE
+              value: "2147483648" # 2GB
 
             {{- if .Values.global.executor.enabled }}
             - name: GORILLA_TASK_QUEUE
