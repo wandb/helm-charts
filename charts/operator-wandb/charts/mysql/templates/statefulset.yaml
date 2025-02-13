@@ -22,13 +22,15 @@ spec:
         {{- include "mysql.podLabels" . | nindent 8 }}
         {{- include "mysql.labels" . | nindent 8 }}
     spec:
-      {{- if .tolerations }}
+      {{- if .Values.tolerations }}
       tolerations:
-        {{- toYaml .tolerations | nindent 8 }}
+        {{- toYaml .Values.tolerations | nindent 8 }}
       {{- end }}
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      imagePullSecrets:
+      {{- include "wandb.imagePullSecrets" . }}
       containers:
         - name: mysql
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -59,17 +61,17 @@ spec:
             {{- include "mysql.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           livenessProbe:
-            exec:
-              command:
-              - sh
-              - -c
-              - "mysqladmin ping -u root -p${MYSQL_ROOT_PASSWORD}"
+            tcpSocket:
+              port: 3306
           readinessProbe:
-            exec:
-              command:
-              - sh
-              - -c
-              - "mysqladmin ping -u root -p${MYSQL_ROOT_PASSWORD}"
+            tcpSocket:
+              port: 3306
+          startupProbe:
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            failureThreshold: 60
+            tcpSocket:
+              port: 3306
           volumeMounts:
             - name: data
               mountPath: /var/lib/mysql

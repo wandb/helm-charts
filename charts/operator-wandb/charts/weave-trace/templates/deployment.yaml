@@ -30,17 +30,19 @@ spec:
         {{- include "weaveTrace.labels" . | nindent 8 }}
       annotations:
         {{- if .Values.pod.annotations -}}
-        {{-   toYaml .Values.pod.annotations | nindent 4 }}
+        {{-   toYaml .Values.pod.annotations | nindent 8 }}
         {{- end }}
     spec:
-      {{- if .tolerations }}
+      {{- if .Values.tolerations }}
       tolerations:
-        {{- toYaml .tolerations | nindent 8 }}
+        {{- toYaml .Values.tolerations | nindent 8 }}
       {{- end }}
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       {{- if not .Values.migration.useHook }}
+      imagePullSecrets:
+      {{- include "wandb.imagePullSecrets" . }}
       initContainers:
         - name: {{ include "weaveTraceMigrate.fullname" . }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

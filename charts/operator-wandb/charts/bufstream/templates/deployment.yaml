@@ -36,10 +36,8 @@ spec:
           {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "wandb.imagePullSecrets" . }}
       {{ if .Values.bufstream.deployment.shareProcessNamespace }}
       shareProcessNamespace: true
       {{- end }}
@@ -250,9 +248,9 @@ spec:
         {{- if and (eq .Values.storage.use "s3") (.Values.storage.s3.accessKeyId) }}
         - name: storage
           secret:
-            secretName: {{ .Values.storage.s3.secretName }}
+            secretName: {{ tpl .Values.storage.s3.secretName . }}
             items:
-              - key: secret_access_key
+              - key: {{ tpl .Values.storage.s3.secretKeyName . }}
                 path: secret_access_key
         {{- end }}
         {{- if and (eq .Values.storage.use "gcs") (.Values.storage.gcs.secretName) }}

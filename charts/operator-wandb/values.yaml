@@ -17,6 +17,11 @@ global:
   licenseSecret:
     name: ""
     key: ""
+  # List of image pull secrets for accessing private container registries.
+  # Example:
+  # imagePullSecrets:
+  #   - name: my-registry-secret
+  imagePullSecrets: []
 
   cloudProvider: ""
 
@@ -331,7 +336,9 @@ redis:
   nameOverride: "redis"
   architecture: standalone
   auth:
-    enabled: false
+    enabled: true
+    existingSecret: '{{ include "wandb.redis.passwordSecret" . }}'
+    existingSecretPasswordKey: '{{ .Values.global.redis.secret.secretKey }}'
   metrics:
     enabled: false
     service:
@@ -480,6 +487,8 @@ glue:
   service:
     enabled: false
   env:
+    GORILLA_FRONTEND_HOST:
+      value: '{{ .Values.global.host }}'
     GORILLA_LICENSE_CERT_PATH:
       value: "/jwks.json"
     REDIS:
@@ -534,7 +543,7 @@ glue:
     "{{ .Release.Name }}-mysql": "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-secret": "secretRef"
+    '{{ include "wandb.redis.passwordSecret" . }}': "secretRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-gorilla-secret": "secretRef"
@@ -630,7 +639,7 @@ glue:
         optional: true
     - name: redis-ca
       secret:
-        secretName: "{{ .Release.Name }}-redis-secret"
+        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
         items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -653,6 +662,8 @@ api:
         protocol: TCP
         name: http
   env:
+    GORILLA_FRONTEND_HOST:
+      value: '{{ .Values.global.host }}'
     GORILLA_LICENSE_CERT_PATH:
       value: "/jwks.json"
     REDIS:
@@ -725,7 +736,7 @@ api:
     "{{ .Release.Name }}-mysql": "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-secret": "secretRef"
+    '{{ include "wandb.redis.passwordSecret" . }}': "secretRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
@@ -827,7 +838,7 @@ api:
         optional: true
     - name: redis-ca
       secret:
-        secretName: "{{ .Release.Name }}-redis-secret"
+        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
         items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
