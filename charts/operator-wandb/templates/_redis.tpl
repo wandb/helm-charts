@@ -69,3 +69,11 @@ Return the redis caCert
 {{- print $cs -}}
 {{- end }}
 {{- end }}
+
+{{- define "wandb.redis.taskQueue" -}}
+{{- if .Values.global.executor.enabled }}
+{{- include "wandb.redis" .}}
+{{- else }}
+{{- "noop://" }}
+{{- end }}
+{{- end }}
