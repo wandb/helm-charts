@@ -1,0 +1,276 @@
+{{- if .Values.install }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "wandb.fullname" . }}-ch-server-config
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+data:
+  ch-server-0.xml: |
+    <clickhouse replace="true">
+        <max_partition_size_to_drop>0</max_partition_size_to_drop>
+        <profiles>
+            <default></default>
+        </profiles>
+        <users>
+            <default>
+                <password>{{ .Values.container.clickhouse.configmap.password }}</password>
+                <access_management>1</access_management>
+                <profile>default</profile>
+            </default>
+        </users>
+        <logger>
+            <level>debug</level>
+            <console>true</console>
+            <log remove="remove"/>
+            <errorlog remove="remove"/>
+        </logger>
+        <display_name>wandb_weave node_1</display_name>
+        <listen_host>0.0.0.0</listen_host>
+        <http_port>{{ .Values.container.clickhouse.configmap.httpPort }}</http_port>
+        <tcp_port>{{ .Values.container.clickhouse.configmap.tcpPort }}</tcp_port>
+        <interserver_http_port>{{ .Values.container.clickhouse.configmap.interserverHttpPort }}</interserver_http_port>
+        <distributed_ddl>
+            <path>/clickhouse/task_queue/ddl</path>
+        </distributed_ddl>
+        <remote_servers>
+            <wandb_weave>
+                <shard>
+                    <internal_replication>true</internal_replication>
+                    {{- range .Values.container.clickhouse.configmap.replicas }}
+                    <replica>
+                        <host>{{ .host }}</host>
+                        <port>{{ .port }}</port>
+                    </replica>
+                    {{- end }}
+                </shard>
+            </wandb_weave>
+        </remote_servers>
+        <zookeeper>
+            {{- range .Values.container.clickhouse.configmap.zookeeper.nodes }}
+            <node>
+                <host>{{ .host }}</host>
+                <port>{{ .port }}</port>
+            </node>
+            {{- end }}
+        </zookeeper>
+        <macros>
+            <shard>{{ .Values.container.clickhouse.configmap.macros.shard }}</shard>
+            <replica>01</replica>
+            <cluster>{{ .Values.container.clickhouse.configmap.macros.cluster }}</cluster>
+        </macros>
+        <merge_tree>
+            <storage_policy> s3_main</storage_policy>
+        </merge_tree>
+        <storage_configuration>
+            <disks>
+                <s3_disk>
+                    <type>s3</type>
+                    <endpoint>https://s3.{{ .Values.buckets.region }}.amazonaws.com/{{ .Values.buckets.bucketName1 }}</endpoint>
+                    {{- if .Values.buckets.accessKeyId }}
+                    <access_key_id>{{ .Values.buckets.accessKeyId }}</access_key_id>
+                    <secret_access_key>{{ .Values.buckets.secretAccessKey }}</secret_access_key>
+                    {{- else }}
+                    <use_environment_credentials>true</use_environment_credentials>
+                    {{- end }}
+                    <metadata_path>/var/lib/clickhouse/disks/s3_disk/</metadata_path>
+                </s3_disk>
+                <s3_cache>
+                    <type>cache</type>
+                    <disk>s3_disk</disk>
+                    <path>/var/lib/clickhouse/disks/s3_cache/</path>
+                    <max_size>20Gi</max_size>
+                    <enable_filesystem_cache_on_write_operations>1</enable_filesystem_cache_on_write_operations>
+                    <cache_on_write_operations>1</cache_on_write_operations>
+                </s3_cache>
+            </disks>
+            <policies>
+                <s3_main>
+                    <volumes>
+                    <main>
+                        <disk>s3_cache</disk>
+                    </main>
+                    </volumes>
+                </s3_main>
+            </policies>
+        </storage_configuration>
+    </clickhouse>
+  ch-server-1.xml: |
+    <clickhouse replace="true">
+        <max_partition_size_to_drop>0</max_partition_size_to_drop>
+        <profiles>
+            <default></default>
+        </profiles>
+        <users>
+            <default>
+                <password>{{ .Values.container.clickhouse.configmap.password }}</password>
+                <access_management>1</access_management>
+                <profile>default</profile>
+            </default>
+        </users>
+        <logger>
+            <level>debug</level>
+            <console>true</console>
+            <log remove="remove"/>
+            <errorlog remove="remove"/>
+        </logger>
+        <display_name>wandb_weave node_2</display_name>
+        <listen_host>0.0.0.0</listen_host>
+        <http_port>{{ .Values.container.clickhouse.configmap.httpPort }}</http_port>
+        <tcp_port>{{ .Values.container.clickhouse.configmap.tcpPort }}</tcp_port>
+        <interserver_http_port>{{ .Values.container.clickhouse.configmap.interserverHttpPort }}</interserver_http_port>
+        <distributed_ddl>
+            <path>/clickhouse/task_queue/ddl</path>
+        </distributed_ddl>
+        <remote_servers>
+            <wandb_weave>
+                <shard>
+                    <internal_replication>true</internal_replication>
+                    {{- range .Values.container.clickhouse.configmap.replicas }}
+                    <replica>
+                        <host>{{ .host }}</host>
+                        <port>{{ .port }}</port>
+                    </replica>
+                    {{- end }}
+                </shard>
+            </wandb_weave>
+        </remote_servers>
+        <zookeeper>
+            {{- range .Values.container.clickhouse.configmap.zookeeper.nodes }}
+            <node>
+                <host>{{ .host }}</host>
+                <port>{{ .port }}</port>
+            </node>
+            {{- end }}
+        </zookeeper>
+        <macros>
+            <shard>{{ .Values.container.clickhouse.configmap.macros.shard }}</shard>
+            <replica>02</replica>
+            <cluster>{{ .Values.container.clickhouse.configmap.macros.cluster }}</cluster>
+        </macros>
+        <merge_tree>
+            <storage_policy> s3_main</storage_policy>
+        </merge_tree>
+        <storage_configuration>
+            <disks>
+                <s3_disk>
+                    <type>s3</type>
+                    <endpoint>https://s3.{{ .Values.buckets.region }}.amazonaws.com/{{ .Values.buckets.bucketName2 }}</endpoint>
+                    {{- if .Values.buckets.accessKeyId }}
+                    <access_key_id>{{ .Values.buckets.accessKeyId }}</access_key_id>
+                    <secret_access_key>{{ .Values.buckets.secretAccessKey }}</secret_access_key>
+                    {{- else }}
+                    <use_environment_credentials>true</use_environment_credentials>
+                    {{- end }}
+                    <metadata_path>/var/lib/clickhouse/disks/s3_disk/</metadata_path>
+                </s3_disk>
+                <s3_cache>
+                    <type>cache</type>
+                    <disk>s3_disk</disk>
+                    <path>/var/lib/clickhouse/disks/s3_cache/</path>
+                    <max_size>20Gi</max_size>
+                    <enable_filesystem_cache_on_write_operations>1</enable_filesystem_cache_on_write_operations>
+                    <cache_on_write_operations>1</cache_on_write_operations>
+                </s3_cache>
+            </disks>
+            <policies>
+                <s3_main>
+                    <volumes>
+                    <main>
+                        <disk>s3_cache</disk>
+                    </main>
+                    </volumes>
+                </s3_main>
+            </policies>
+        </storage_configuration>
+    </clickhouse>
+  ch-server-2.xml: |
+    <clickhouse replace="true">
+        <max_partition_size_to_drop>0</max_partition_size_to_drop>
+        <profiles>
+            <default></default>
+        </profiles>
+        <users>
+            <default>
+                <password>{{ .Values.container.clickhouse.configmap.password }}</password>
+                <access_management>1</access_management>
+                <profile>default</profile>
+            </default>
+        </users>
+        <logger>
+            <level>debug</level>
+            <console>true</console>
+            <log remove="remove"/>
+            <errorlog remove="remove"/>
+        </logger>
+        <display_name>wandb_weave node_3</display_name>
+        <listen_host>0.0.0.0</listen_host>
+        <http_port>{{ .Values.container.clickhouse.configmap.httpPort }}</http_port>
+        <tcp_port>{{ .Values.container.clickhouse.configmap.tcpPort }}</tcp_port>
+        <interserver_http_port>{{ .Values.container.clickhouse.configmap.interserverHttpPort }}</interserver_http_port>
+        <distributed_ddl>
+            <path>/clickhouse/task_queue/ddl</path>
+        </distributed_ddl>
+        <remote_servers>
+            <wandb_weave>
+                <shard>
+                    <internal_replication>true</internal_replication>
+                    {{- range .Values.container.clickhouse.configmap.replicas }}
+                    <replica>
+                        <host>{{ .host }}</host>
+                        <port>{{ .port }}</port>
+                    </replica>
+                    {{- end }}
+                </shard>
+            </wandb_weave>
+        </remote_servers>
+        <zookeeper>
+            {{- range .Values.container.clickhouse.configmap.zookeeper.nodes }}
+            <node>
+                <host>{{ .host }}</host>
+                <port>{{ .port }}</port>
+            </node>
+            {{- end }}
+        </zookeeper>
+        <macros>
+            <shard>{{ .Values.container.clickhouse.configmap.macros.shard }}</shard>
+            <replica>03</replica>
+            <cluster>{{ .Values.container.clickhouse.configmap.macros.cluster }}</cluster>
+        </macros>
+        <merge_tree>
+            <storage_policy> s3_main</storage_policy>
+        </merge_tree>
+        <storage_configuration>
+            <disks>
+                <s3_disk>
+                    <type>s3</type>
+                    <endpoint>https://s3.{{ .Values.buckets.region }}.amazonaws.com/{{ .Values.buckets.bucketName3 }}</endpoint>
+                    {{- if .Values.buckets.accessKeyId }}
+                    <access_key_id>{{ .Values.buckets.accessKeyId }}</access_key_id>
+                    <secret_access_key>{{ .Values.buckets.secretAccessKey }}</secret_access_key>
+                    {{- else }}
+                    <use_environment_credentials>true</use_environment_credentials>
+                    {{- end }}
+                    <metadata_path>/var/lib/clickhouse/disks/s3_disk/</metadata_path>
+                </s3_disk>
+                <s3_cache>
+                    <type>cache</type>
+                    <disk>s3_disk</disk>
+                    <path>/var/lib/clickhouse/disks/s3_cache/</path>
+                    <max_size>20Gi</max_size>
+                    <enable_filesystem_cache_on_write_operations>1</enable_filesystem_cache_on_write_operations>
+                    <cache_on_write_operations>1</cache_on_write_operations>
+                </s3_cache>
+            </disks>
+            <policies>
+                <s3_main>
+                    <volumes>
+                    <main>
+                        <disk>s3_cache</disk>
+                    </main>
+                    </volumes>
+                </s3_main>
+            </policies>
+        </storage_configuration>
+    </clickhouse>
+{{- end }}

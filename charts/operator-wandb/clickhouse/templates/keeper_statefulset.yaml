@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "clickhouse.fullname" . }}-keeper
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "clickhouse.commonLabels" . | nindent 4 }}
+    {{- include "clickhouse.labels" . | nindent 4 }}
+    {{- if .Values.deployment.labels }}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
+    {{- if .Values.deployment.annotations -}}
+    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.replicas }}
+  podManagementPolicy: "{{ .Values.common.podManagementPolicy }}"
+  selector:
+    matchLabels:
+      {{ include "wandb.selectorLabels" $ | nindent 6 }}
+      {{ include "clickhouse.labels" . | nindent 6 }}
+  serviceName: {{ .Values.keeper_image.serviceName }}
+  template:
+    metadata:
+      labels:
+        {{ include "wandb.podLabels" . | nindent 8 }}
+        {{ include "clickhouse.commonLabels" . | nindent 8 }}
+        {{ include "clickhouse.podLabels" . | nindent 8 }}
+        {{ include "clickhouse.labels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.pod.annotations -}}
+        {{-   toYaml .Values.pod.annotations | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "clickhouse.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.common.automountServiceAccountToken }}
+      securityContext:
+        fsGroup: {{ .Values.common.podSecurityContext.fsGroup }}
+        fsGroupChangePolicy: {{ .Values.common.podSecurityContext.fsGroup }}
+      containers:
+        - name: keeper
+          image: "{{ .Values.keeper_image.repository }}:{{ .Values.keeper_image.tag }}"
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: processed-config
+              mountPath: /etc/clickhouse-keeper
+            - name: keeper-data
+              mountPath: /var/lib/clickhouse
+            - name: keeper-data
+              mountPath: /var/lib/clickhouse-keeper
+            - name: keeper-data
+              mountPath: /var/log/clickhouse-keeper
+              mountPath: /etc/clickhouse-keeper
+            - name: config-volume
+              mountPath: /etc/clickhouse-keeper/keeper_config.xml
+              subPathExpr: "$(POD_NAME).xml"
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: {{ .Values.common.containerSecurityContext.allowPrivilegeEscalation }}
+            capabilities:
+              drop:
+                - {{ .Values.common.containerSecurityContext.capabilities.drop | join "\n                - " }}
+            privileged: {{ .Values.common.containerSecurityContext.privileged }}
+            readOnlyRootFilesystem: {{ .Values.common.containerSecurityContext.readOnlyRootFilesystem }}
+            runAsGroup: {{ .Values.common.containerSecurityContext.runAsGroup }}
+            runAsNonRoot: {{ .Values.common.containerSecurityContext.runAsNonRoot }}
+            runAsUser: {{ .Values.common.containerSecurityContext.runAsUser }}
+            seLinuxOptions:
+              level: "{{ .Values.common.containerSecurityContext.seLinuxOptions.level }}"
+            seccompProfile:
+              type: {{ .Values.common.containerSecurityContext.seccompProfile.type }}
+          resources:
+            limits:
+              cpu: {{ .Values.container.keeper.resources.limits.cpu }}
+              ephemeral-storage: {{ .Values.container.keeper.resources.limits.ephemeralStorage }}
+              memory: {{ .Values.container.keeper.resources.limits.memory }}
+            requests:
+              cpu: {{ .Values.container.keeper.resources.requests.cpu }}
+              ephemeral-storage: {{ .Values.container.keeper.resources.requests.ephemeralStorage }}
+              memory: {{ .Values.container.keeper.resources.requests.memory }}
+          ports:
+            {{- range .Values.container.keeper.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .port }}
+              protocol: {{ .protocol }}
+            {{- end }}
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+            tcpSocket:
+              port: http
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+            httpGet:
+              path: /ready
+              port: http
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ include "wandb.fullname" . }}-config
+        - name: processed-config
+          emptyDir: {}
+
+  volumeClaimTemplates:
+    - metadata:
+        name: keeper-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi

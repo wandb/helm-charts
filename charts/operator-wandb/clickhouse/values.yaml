@@ -1,0 +1,162 @@
+install: true
+
+replicas: 3
+
+server_image:
+  repository: "clickhouse/clickhouse-server"
+  tag: "24.8"
+
+keeper_image:
+  repository: "clickhouse/clickhouse-keeper"
+  tag: "24.8"
+
+container:
+  clickhouse:
+    resources:
+      limits:
+        cpu: 6
+        ephemeralStorage: 100Gi
+        memory: 12288Mi
+      requests:
+        cpu: 1
+        ephemeralStorage: 500Mi
+        memory: 3072Mi
+    ports:
+      - name: http
+        targetPort: http
+        port: 8123
+        protocol: TCP
+      - name: tcp
+        targetPort: tcp
+        port: 9000
+        protocol: TCP
+      - name: intrsrvhttp
+        targetPort: intrsrvhttp
+        port: 9009
+        protocol: TCP
+    configmap:
+      password: "default"
+      httpPort: 8123
+      tcpPort: 9000
+      interserverHttpPort: 9009
+      replicas:
+        - host: "ch-server-0.ch-server-headless.wandb-cr.svc.cluster.local"
+          port: 9000
+        - host: "ch-server-1.ch-server-headless.wandb-cr.svc.cluster.local"
+          port: 9000
+        - host: "ch-server-2.ch-server-headless.wandb-cr.svc.cluster.local"
+          port: 9000
+      zookeeper:
+        nodes:
+          - host: "ch-keeper-0.keeper-headless.wandb-cr.svc.cluster.local"
+            port: 9181
+          - host: "ch-keeper-1.keeper-headless.wandb-cr.svc.cluster.local"
+            port: 9181
+          - host: "ch-keeper-2.keeper-headless.wandb-cr.svc.cluster.local"
+            port: 9181
+      macros:
+        shard: "1"
+        cluster: "wandb_cluster"
+
+  keeper:
+    resources:
+      limits:
+        cpu: 2
+        ephemeralStorage: 50Gi
+        memory: 4096Mi
+      requests:
+        cpu: "0.5"
+        ephemeralStorage: 1Gi
+        memory: 512Mi
+    ports:
+      - name: keeper
+        targetPort: keeper
+        port: 9181
+        protocol: TCP
+      - name: http
+        targetPort: http
+        port: 9182
+        protocol: TCP
+      - name: raft
+        targetPort: raft
+        port: 9234
+        protocol: TCP
+    configmap:
+      httpPort: 9182
+      tcpPort: 9181
+      replicas:
+        - host: "ch-server-0.ch-server-headless.wandb-cr.svc.cluster.local"
+          port: 9234
+        - host: "ch-server-1.ch-server-headless.wandb-cr.svc.cluster.local"
+          port: 9234
+        - host: "ch-server-2.ch-server-headless.wandb-cr.svc.cluster.local"
+          port: 9234
+      macros:
+        shard: "1"
+        cluster: "wandb_cluster"
+
+  service:
+    type: ClusterIP
+    annotations: {}
+    labels: {}
+    
+common:
+  labels: {}
+  podManagementPolicy: "Parallel"
+  automountServiceAccountToken: true
+  podSecurityContext:
+    fsGroup: 1000710000
+    runAsGroup: 1000710000
+    runAsUser: 1000710000
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    privileged: false
+    readOnlyRootFilesystem: true
+    seLinuxOptions:
+      level: "s0:c27,c4"
+    seccompProfile:
+      type: RuntimeDefault
+
+deployment:
+  labels: {}
+  annotations: {}
+
+pod:
+  labels: {}
+  annotations: {}
+
+logLevel: information
+
+# Node selector for the StatefulSet pods (for scheduling pods on specific nodes)
+nodeSelector: {}
+
+# Tolerations for the StatefulSet pods (for allowing pods to be scheduled on tainted nodes)
+tolerations: []
+
+# Affinity settings for the StatefulSet pods (for custom scheduling rules)
+affinity: {}
+
+# Persistent volume claim settings for the StatefulSet
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+serviceAccount:
+  name: "clickhouse"
+  create: true
+  annotations: {}
+
+localStorage: "100Gi"
+
+buckets:
+  access_key_id: ""  # Use Vault or env variables for secret management
+  secret_access_key: ""  # Same as above
+  region: eu-central-1
+  bucketName1: "bucketA/replica1"
+  bucketName2: "bucketA/replica2"
+  bucketName3: "bucketA/replica3"
