@@ -1,3 +1,6 @@
+nameOverride: ""
+fullnameOverride: ""
+
 install: true
 
 replicas: 3
@@ -10,111 +13,50 @@ keeper_image:
   repository: "clickhouse/clickhouse-keeper"
   tag: "24.8"
 
-container:
-  clickhouse:
-    resources:
-      limits:
-        cpu: 6
-        ephemeralStorage: 100Gi
-        memory: 12288Mi
-      requests:
-        cpu: 1
-        ephemeralStorage: 500Mi
-        memory: 3072Mi
-    ports:
-      - name: http
-        targetPort: http
-        port: 8123
-        protocol: TCP
-      - name: tcp
-        targetPort: tcp
-        port: 9000
-        protocol: TCP
-      - name: intrsrvhttp
-        targetPort: intrsrvhttp
-        port: 9009
-        protocol: TCP
-    configmap:
-      password: "default"
-      httpPort: 8123
-      tcpPort: 9000
-      interserverHttpPort: 9009
-      replicas:
-        - host: "ch-server-0.ch-server-headless.wandb-cr.svc.cluster.local"
-          port: 9000
-        - host: "ch-server-1.ch-server-headless.wandb-cr.svc.cluster.local"
-          port: 9000
-        - host: "ch-server-2.ch-server-headless.wandb-cr.svc.cluster.local"
-          port: 9000
-      zookeeper:
-        nodes:
-          - host: "ch-keeper-0.keeper-headless.wandb-cr.svc.cluster.local"
-            port: 9181
-          - host: "ch-keeper-1.keeper-headless.wandb-cr.svc.cluster.local"
-            port: 9181
-          - host: "ch-keeper-2.keeper-headless.wandb-cr.svc.cluster.local"
-            port: 9181
-      macros:
-        shard: "1"
-        cluster: "wandb_cluster"
+clickhouse:
+  httpPort: 8123
+  tcpPort : 9000
+  intrsrvhttpPort: 9009
+  zookeeperPort: 9181
+  cluster: "wandb_cluster"
+  resources:
+    limits:
+      cpu: 6
+      ephemeralStorage: 100Gi
+      memory: 12288Mi
+    requests:
+      cpu: "1"
+      ephemeralStorage: 500Mi
+      memory: 3072Mi
 
-  keeper:
-    resources:
-      limits:
-        cpu: 2
-        ephemeralStorage: 50Gi
-        memory: 4096Mi
-      requests:
-        cpu: "0.5"
-        ephemeralStorage: 1Gi
-        memory: 512Mi
-    ports:
-      - name: keeper
-        targetPort: keeper
-        port: 9181
-        protocol: TCP
-      - name: http
-        targetPort: http
-        port: 9182
-        protocol: TCP
-      - name: raft
-        targetPort: raft
-        port: 9234
-        protocol: TCP
-    configmap:
-      httpPort: 9182
-      tcpPort: 9181
-      replicas:
-        - host: "ch-server-0.ch-server-headless.wandb-cr.svc.cluster.local"
-          port: 9234
-        - host: "ch-server-1.ch-server-headless.wandb-cr.svc.cluster.local"
-          port: 9234
-        - host: "ch-server-2.ch-server-headless.wandb-cr.svc.cluster.local"
-          port: 9234
-      macros:
-        shard: "1"
-        cluster: "wandb_cluster"
+keeper:
+  tcpPort: 9181
+  httpPort : 9182
+  raftPort: 9234
+  resources:
+    limits:
+      cpu: "1"
+      ephemeralStorage: 20Gi
+      memory: 2048Mi
+    requests:
+      cpu: "0.2"
+      ephemeralStorage: 500Mi
+      memory: 512Mi
 
-  service:
-    type: ClusterIP
-    annotations: {}
-    labels: {}
+service:
+  annotations: {}
+  labels: {}
     
 common:
   labels: {}
   podManagementPolicy: "Parallel"
-  automountServiceAccountToken: true
-  podSecurityContext:
-    fsGroup: 1000710000
-    runAsGroup: 1000710000
-    runAsUser: 1000710000
   containerSecurityContext:
     allowPrivilegeEscalation: false
     capabilities:
       drop:
         - ALL
     privileged: false
-    readOnlyRootFilesystem: true
+    readOnlyRootFilesystem: false
     seLinuxOptions:
       level: "s0:c27,c4"
     seccompProfile:
@@ -148,6 +90,7 @@ persistence:
 
 serviceAccount:
   name: "clickhouse"
+  automountServiceAccountToken: false
   create: true
   annotations: {}
 

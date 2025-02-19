@@ -1,3 +1,4 @@
+{{- if .Values.install }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -34,11 +35,11 @@ spec:
         {{-   toYaml .Values.pod.annotations | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "clickhouse.serviceAccountName" . }}
-      automountServiceAccountToken: {{ .Values.common.automountServiceAccountToken }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       securityContext:
-        fsGroup: {{ .Values.common.podSecurityContext.fsGroup }}
-        fsGroupChangePolicy: {{ .Values.common.podSecurityContext.fsGroup }}
+        fsGroup: 1000710000
+        fsGroupChangePolicy: Always
       containers:
         - name: clickhouse
           image: "{{ .Values.server_image.repository }}:{{ .Values.server_image.tag }}"
@@ -47,9 +48,14 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: CLICKHOUSE_USER
+              value: "default"  
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: testing-clickhouse
+                  key: CLICKHOUSE_PASSWORD
           volumeMounts:
-            - name: processed-config
-              mountPath: /etc/clickhouse-server
             - name: config-volume
               mountPath: /etc/clickhouse-server/config.xml
               subPathExpr: "$(POD_NAME).xml"
@@ -57,7 +63,7 @@ spec:
             - name: clickhouse-data
               mountPath: /var/lib/clickhouse
               readOnly: false
-            - name: clickhouse-data
+            - name: clickhouse-log
               mountPath: /var/log/clickhouse-server
               readOnly: false
           securityContext:
@@ -67,28 +73,29 @@ spec:
                 - {{ .Values.common.containerSecurityContext.capabilities.drop | join "\n                - " }}
             privileged: {{ .Values.common.containerSecurityContext.privileged }}
             readOnlyRootFilesystem: {{ .Values.common.containerSecurityContext.readOnlyRootFilesystem }}
-            runAsGroup: {{ .Values.common.containerSecurityContext.runAsGroup }}
-            runAsNonRoot: {{ .Values.common.containerSecurityContext.runAsNonRoot }}
-            runAsUser: {{ .Values.common.containerSecurityContext.runAsUser }}
+            runAsGroup: 1000710000
+            runAsNonRoot: true
+            runAsUser: 1000710000
             seLinuxOptions:
               level: "{{ .Values.common.containerSecurityContext.seLinuxOptions.level }}"
             seccompProfile:
               type: {{ .Values.common.containerSecurityContext.seccompProfile.type }}
           resources:
             limits:
-              cpu: {{ .Values.container.clickhouse.resources.limits.cpu }}
-              ephemeral-storage: {{ .Values.container.clickhouse.resources.limits.ephemeralStorage }}
-              memory: {{ .Values.container.clickhouse.resources.limits.memory }}
+              cpu: {{ .Values.clickhouse.resources.limits.cpu }}
+              ephemeral-storage: {{ .Values.clickhouse.resources.limits.ephemeralStorage }}
+              memory: {{ .Values.clickhouse.resources.limits.memory }}
             requests:
-              cpu: {{ .Values.container.clickhouse.resources.requests.cpu }}
-              ephemeral-storage: {{ .Values.container.clickhouse.resources.requests.ephemeralStorage }}
-              memory: {{ .Values.container.clickhouse.resources.requests.memory }}
+              cpu: {{ .Values.clickhouse.resources.requests.cpu }}
+              ephemeral-storage: {{ .Values.clickhouse.resources.requests.ephemeralStorage }}
+              memory: {{ .Values.clickhouse.resources.requests.memory }}
           ports:
-            {{- range .Values.container.clickhouse.ports }}
-            - name: {{ .name }}
-              containerPort: {{ .port }}
-              protocol: {{ .protocol }}
-            {{- end }}
+            - name: http
+              containerPort: {{ .Values.clickhouse.httpPort }}
+            - name: tcp
+              containerPort: {{ .Values.clickhouse.tcpPort }}
+            - name: intrsrvhttp
+              containerPort: {{ .Values.clickhouse.intrsrvhttpPort }}
           livenessProbe:
             failureThreshold: 3
             initialDelaySeconds: 10
@@ -109,9 +116,12 @@ spec:
       volumes:
         - name: config-volume
           configMap:
-            name: {{ include "wandb.fullname" . }}-config
-        - name: processed-config
-          emptyDir: {}
+            name: {{ include "wandb.fullname" . }}-ch-server-config
+        - name: clickhouse-data
+          persistentVolumeClaim:
+            claimName: clickhouse-pvc  # PVC for persistent data
+        - name: clickhouse-log
+          emptyDir: {}  # Or use a PVC if logs need persistence
 
   volumeClaimTemplates:
     - metadata:
@@ -122,3 +132,4 @@ spec:
         resources:
           requests:
             storage: {{ .Values.persistence.size }}
+{{- end }}

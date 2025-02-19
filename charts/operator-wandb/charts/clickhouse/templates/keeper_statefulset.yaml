@@ -1,7 +1,8 @@
+{{- if .Values.install }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "clickhouse.fullname" . }}-keeper
+  name: {{ include "clickhouse.fullname" . }}-ch-keeper
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "clickhouse.commonLabels" . | nindent 4 }}
@@ -21,7 +22,7 @@ spec:
     matchLabels:
       {{ include "wandb.selectorLabels" $ | nindent 6 }}
       {{ include "clickhouse.labels" . | nindent 6 }}
-  serviceName: {{ .Values.keeper_image.serviceName }}
+  serviceName: {{ include "clickhouse.fullname" . }}-ch-keeper-headless
   template:
     metadata:
       labels:
@@ -34,11 +35,11 @@ spec:
         {{-   toYaml .Values.pod.annotations | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "clickhouse.serviceAccountName" . }}
-      automountServiceAccountToken: {{ .Values.common.automountServiceAccountToken }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       securityContext:
-        fsGroup: {{ .Values.common.podSecurityContext.fsGroup }}
-        fsGroupChangePolicy: {{ .Values.common.podSecurityContext.fsGroup }}
+        fsGroup: 1000710000
+        fsGroupChangePolicy: Always
       containers:
         - name: keeper
           image: "{{ .Values.keeper_image.repository }}:{{ .Values.keeper_image.tag }}"
@@ -47,6 +48,13 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: CLICKHOUSE_USER
+              value: "default"
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: testing-clickhouse
+                  key: CLICKHOUSE_PASSWORD
           volumeMounts:
             - name: processed-config
               mountPath: /etc/clickhouse-keeper
@@ -56,7 +64,6 @@ spec:
               mountPath: /var/lib/clickhouse-keeper
             - name: keeper-data
               mountPath: /var/log/clickhouse-keeper
-              mountPath: /etc/clickhouse-keeper
             - name: config-volume
               mountPath: /etc/clickhouse-keeper/keeper_config.xml
               subPathExpr: "$(POD_NAME).xml"
@@ -68,35 +75,37 @@ spec:
                 - {{ .Values.common.containerSecurityContext.capabilities.drop | join "\n                - " }}
             privileged: {{ .Values.common.containerSecurityContext.privileged }}
             readOnlyRootFilesystem: {{ .Values.common.containerSecurityContext.readOnlyRootFilesystem }}
-            runAsGroup: {{ .Values.common.containerSecurityContext.runAsGroup }}
-            runAsNonRoot: {{ .Values.common.containerSecurityContext.runAsNonRoot }}
-            runAsUser: {{ .Values.common.containerSecurityContext.runAsUser }}
+            runAsGroup: 1000710000
+            runAsNonRoot: true
+            runAsUser: 1000710000
             seLinuxOptions:
               level: "{{ .Values.common.containerSecurityContext.seLinuxOptions.level }}"
             seccompProfile:
               type: {{ .Values.common.containerSecurityContext.seccompProfile.type }}
           resources:
             limits:
-              cpu: {{ .Values.container.keeper.resources.limits.cpu }}
-              ephemeral-storage: {{ .Values.container.keeper.resources.limits.ephemeralStorage }}
-              memory: {{ .Values.container.keeper.resources.limits.memory }}
+              cpu: {{ .Values.keeper.resources.limits.cpu }}
+              ephemeral-storage: {{ .Values.keeper.resources.limits.ephemeralStorage }}
+              memory: {{ .Values.keeper.resources.limits.memory }}
             requests:
-              cpu: {{ .Values.container.keeper.resources.requests.cpu }}
-              ephemeral-storage: {{ .Values.container.keeper.resources.requests.ephemeralStorage }}
-              memory: {{ .Values.container.keeper.resources.requests.memory }}
+              cpu: {{ .Values.keeper.resources.requests.cpu }}
+              ephemeral-storage: {{ .Values.keeper.resources.requests.ephemeralStorage }}
+              memory: {{ .Values.keeper.resources.requests.memory }}
           ports:
-            {{- range .Values.container.keeper.ports }}
-            - name: {{ .name }}
-              containerPort: {{ .port }}
-              protocol: {{ .protocol }}
-            {{- end }}
+            - name: tcp
+              containerPort: {{ .Values.keeper.tcpPort }}
+            - name: raft
+              containerPort: {{ .Values.keeper.raftPort }}
+            - name: http
+              containerPort: {{ .Values.keeper.httpPort }}
           livenessProbe:
             failureThreshold: 3
             initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 1
-            tcpSocket:
+            httpGet:
+              path: /ready
               port: http
           readinessProbe:
             failureThreshold: 3
@@ -110,9 +119,11 @@ spec:
       volumes:
         - name: config-volume
           configMap:
-            name: {{ include "wandb.fullname" . }}-config
+            name: {{ include "wandb.fullname" . }}-ch-keeper-config
         - name: processed-config
           emptyDir: {}
+        - name: keeper-logs
+          emptyDir: {} 
 
   volumeClaimTemplates:
     - metadata:
@@ -122,4 +133,5 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 20Gi
+            storage: {{ .Values.persistence.size }}
+{{- end }}
