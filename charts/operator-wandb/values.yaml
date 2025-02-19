@@ -211,7 +211,7 @@ global:
   gcpSecurityPolicy: ""
 
 ingress:
-  install: false
+  install: true
   create: true
   nameOverride: ""
   defaultBackend: "app"
@@ -227,7 +227,7 @@ ingress:
     email: support@wandb.com
   secondary:
     create: false
-    install: false
+    install: true
     nameOverride: ""
     defaultBackend: "app"
     annotations: {}
@@ -242,7 +242,7 @@ ingress:
       email: support@wandb.com
 
 parquet:
-  install: false
+  install: true
   image:
     repository: wandb/local
     tag: latest
@@ -250,7 +250,7 @@ parquet:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
 
 app:
-  install: false
+  install: true
   image:
     repository: wandb/local
     tag: latest
@@ -262,27 +262,30 @@ nginx:
   install: false
 
 clickhouse:
-  install: true
+  install: false
+  replicas: 3
   server_image:
     repository: "clickhouse/clickhouse-server"
-    tag: "24.8"
+    tag: "latest"
   keeper_image:
     repository: "clickhouse/clickhouse-keeper"
-    tag: "24.8"
+    tag: "latest"
   local_storage: "100Gi"
+  database: "weave_trace_db"
+  password: "default"
   buckets:
     access_key_id: ""
     secret_access_key: ""
-    region: eu-central-1
+    region: us-east-1
     replica1: 
-      - bucketName: "bucketA/replica1"
+      - bucketName: "clickhouse-backend-bucket/replica1"
     replica2: 
-      - bucketName: "bucketA/replica2"
+      - bucketName: "clickhouse-backend-bucketreplica2"
     replica3: 
-      - bucketName: "bucketA/replica3"
+      - bucketName: "clickhouse-backend-bucket/replica3"
       
 weave:
-  install: false
+  install: true
   image:
     repository: wandb/local
     tag: latest
@@ -296,7 +299,7 @@ weave-trace:
     enabled: false
 
 console:
-  install: false
+  install: true
   image:
     repository: wandb/console
     tag: latest
@@ -351,13 +354,13 @@ yace:
       prometheus.io/scheme: http
 
 redis:
-  install: false
+  install: true
   nameOverride: "redis"
   architecture: standalone
   auth:
     enabled: true
     existingSecret: '{{ include "wandb.redis.passwordSecret" . }}'
-    existingSecretPasswordKey: '{{ .Values.global.redis.secret.secretKey }}'
+    existingSecretPasswordKey: "{{ .Values.global.redis.secret.secretKey }}"
   metrics:
     enabled: false
     service:
@@ -367,16 +370,16 @@ redis:
         prometheus.io/path: "/metrics"
 
 prometheus:
-  install: false
+  install: true
 
   instance:
-    install: false
+    install: true
 
   redis-exporter:
-    install: false
+    install: true
 
   mysql-exporter:
-    install: false
+    install: true
 
 stackdriver:
   install: false
@@ -388,13 +391,13 @@ stackdriver:
       prometheus.io/scheme: http
 
 otel:
-  install: false
+  install: true
 
   # Consider deploying with a deployment rather than a daemonset to avoid
   # redundant metrics. In setups where both are scraping the same endpoints,
   # this redundancy occurs as both scrape the same points.
   daemonset:
-    install: false
+    install: true
 
   # By default, we use only the daemonset which, along with the Prometheus
   # receiver, gathers most necessary metrics.
@@ -507,7 +510,7 @@ glue:
     enabled: false
   env:
     GORILLA_FRONTEND_HOST:
-      value: '{{ .Values.global.host }}'
+      value: "{{ .Values.global.host }}"
     GORILLA_LICENSE_CERT_PATH:
       value: "/jwks.json"
     REDIS:
@@ -525,7 +528,7 @@ glue:
     GORILLA_FILE_METADATA_SOURCE:
       value: '{{ include "wandb.redis" . | trim }}'
     GORILLA_TASK_QUEUE:
-      value: '{{ include "wandb.redis" . | trim }}'
+      value: '{{ include "wandb.redis.taskQueue" . | trim }}'
     GORILLA_GLUE_TASK_STRATEGY_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_GLUE_TASK_METADATA_STORE:
@@ -682,7 +685,7 @@ api:
         name: http
   env:
     GORILLA_FRONTEND_HOST:
-      value: '{{ .Values.global.host }}'
+      value: "{{ .Values.global.host }}"
     GORILLA_LICENSE_CERT_PATH:
       value: "/jwks.json"
     REDIS:
@@ -700,7 +703,7 @@ api:
     GORILLA_FILE_METADATA_SOURCE:
       value: '{{ include "wandb.redis" . | trim }}'
     GORILLA_TASK_QUEUE:
-      value: '{{ include "wandb.redis" . | trim }}'
+      value: '{{ include "wandb.redis.taskQueue" . | trim }}'
     GORILLA_GLUE_TASK_STRATEGY_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_GLUE_TASK_METADATA_STORE:

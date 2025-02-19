@@ -162,13 +162,14 @@ ClickHouse Server Configuration
 {{- range $i, $e := until (.Values.replicas | int) }}
 {{ include "clickhouse.fullname" $ }}-ch-server-{{ $i }}.xml: |
     <clickhouse replace="true">
+        <default_database>{{ $.Values.database }}</default_database>
         <max_partition_size_to_drop>0</max_partition_size_to_drop>
         <profiles>
             <default></default>
         </profiles>
         <users>
             <default>
-                <password>default</password>
+                <password>{{ $.Values.password }}</password>
                 <access_management>1</access_management>
                 <profile>default</profile>
             </default>
