@@ -6,24 +6,6 @@ Expand the name of the chart.
 {{- end }}
 
 {{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
-*/}}
-{{- define "clickhouse.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
-{{- end }}
-
-{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "clickhouse.chart" -}}
@@ -75,7 +57,7 @@ Create the name of the service account to use
 */}}
 {{- define "clickhouse.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "clickhouse.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "wandb.clickhouse.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
@@ -125,7 +107,7 @@ ClickHouse Server Nodes
 {{- define "clickhouse.serverNodes.replicas" }}
 {{- range $i, $e := until (.Values.replicas | int) }}
 <replica>
-    <host>{{- include "clickhouse.fullname" $ }}-ch-server-{{ $i }}.{{- include "clickhouse.fullname" $ }}-ch-server-headless.{{ $.Release.Namespace }}.svc.cluster.local</host>
+    <host>{{- include "wandb.clickhouse.fullname" $ }}-ch-server-{{ $i }}.{{ include "wandb.clickhouse.host" $ }}.{{ $.Release.Namespace }}.svc.cluster.local</host>
     <port>{{ $.Values.clickhouse.tcpPort }}</port>
 </replica>
 {{- end }}
@@ -137,7 +119,7 @@ Clickhouse Keeper Nodes
 {{- define "clickhouse.keeperNodes" -}}
 {{- range $i, $e := until (.Values.replicas | int) }}
 <node>
-    <host>{{- include "clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{- include "clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</host>
+    <host>{{- include "wandb.clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{- include "wandb.clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</host>
     <port>{{ $.Values.clickhouse.zookeeperPort }}</port></node>
 {{- end }}
 {{- end }}
@@ -149,7 +131,7 @@ ClickHouse Keeper Raft Configuration
 {{- range $i, $e := until (.Values.replicas | int) }}
 <server>
     <id>{{ $i }}</id>
-    <hostname>{{ include "clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{ include "clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</hostname>
+    <hostname>{{ include "wandb.clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{ include "wandb.clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</hostname>
     <port>{{ $.Values.keeper.raftPort }}</port>
 </server>
 {{- end }}
@@ -160,7 +142,7 @@ ClickHouse Server Configuration
 */}}
 {{- define "clickhouse.serverConfig" -}}
 {{- range $i, $e := until (.Values.replicas | int) }}
-{{ include "clickhouse.fullname" $ }}-ch-server-{{ $i }}.xml: |
+{{ include "wandb.clickhouse.fullname" $ }}-ch-server-{{ $i }}.xml: |
     <clickhouse replace="true">
         <default_database>{{ $.Values.database }}</default_database>
         <max_partition_size_to_drop>0</max_partition_size_to_drop>
@@ -169,7 +151,7 @@ ClickHouse Server Configuration
         </profiles>
         <users>
             <default>
-                <password>{{ $.Values.password }}</password>
+                <password>{{ include "wandb.clickhouse.password" $ }}</password>
                 <access_management>1</access_management>
                 <profile>default</profile>
             </default>
@@ -215,7 +197,7 @@ ClickHouse Server Configuration
             <disks>
                 <s3_disk>
                     <type>s3</type>
-                    <endpoint>https://s3.{{ $.Values.buckets.region }}.amazonaws.com/{{ $.Values.buckets.bucketName1 }}</endpoint>
+                    <endpoint>https://s3.{{ $.Values.buckets.region }}.amazonaws.com/{{ index $.Values.buckets.replicaBucketNames $i }}</endpoint>
                     {{- if $.Values.buckets.accessKeyId }}
                     <access_key_id>{{ $.Values.buckets.accessKeyId }}</access_key_id>
                     <secret_access_key>{{ $.Values.buckets.secretAccessKey }}</secret_access_key>
@@ -252,7 +234,7 @@ ClickHouse Keeper Instance Configuration
 */}}
 {{- define "clickhouse.keeperConfig" -}}
 {{- range $i, $e := until (.Values.replicas | int) }}
-  {{ include "clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.xml: |
+  {{ include "wandb.clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.xml: |
     <clickhouse replace="true">
         <path>/var/lib/clickhouse/coordination/keeper</path>
         <logger>

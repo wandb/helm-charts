@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "clickhouse.fullname" . }}-ch-server
+  name: {{ include "wandb.clickhouse.fullname" . }}-ch-server
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "clickhouse.commonLabels" . | nindent 4 }}
@@ -22,7 +22,7 @@ spec:
     matchLabels:
       {{ include "wandb.selectorLabels" $ | nindent 6 }}
       {{ include "clickhouse.labels" . | nindent 6 }}
-  serviceName: {{ include "clickhouse.fullname" . }}-ch-server-headless
+  serviceName: {{ include "wandb.clickhouse.host" . }}
   template:
     metadata:
       labels:
@@ -35,6 +35,8 @@ spec:
         {{-   toYaml .Values.pod.annotations | nindent 8 }}
         {{- end }}
     spec:
+      imagePullSecrets:
+      {{- include "wandb.imagePullSecrets" . }}
       serviceAccountName: {{ .Values.serviceAccount.name }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       securityContext:
@@ -48,12 +50,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-            - name: CLICKHOUSE_USER
-              value: "default"  
             - name: CLICKHOUSE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: testing-clickhouse
+                  name: {{ include "wandb.clickhouse.passwordSecret" . }}
                   key: CLICKHOUSE_PASSWORD
           volumeMounts:
             - name: config-volume
