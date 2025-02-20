@@ -70,15 +70,15 @@ Clickhouse Server Service Port
 {{- define "clickhouse.servicePorts" -}}
 - name: http
   targetPort: http
-  port: {{ .Values.clickhouse.httpPort }}
+  port: {{ .Values.server.httpPort }}
   protocol: TCP
 - name: tcp
   targetPort: tcp
-  port: {{ .Values.clickhouse.tcpPort }}
+  port: {{ .Values.server.tcpPort }}
   protocol: TCP
 - name: intrsrvhttp
   targetPort: intrsrvhttp
-  port: {{ .Values.clickhouse.intrsrvhttpPort }}
+  port: {{ .Values.server.intrsrvhttpPort }}
   protocol: TCP
 {{- end }}
 
@@ -108,7 +108,7 @@ ClickHouse Server Nodes
 {{- range $i, $e := until (.Values.replicas | int) }}
 <replica>
     <host>{{- include "wandb.clickhouse.fullname" $ }}-ch-server-{{ $i }}.{{ include "wandb.clickhouse.host" $ }}.{{ $.Release.Namespace }}.svc.cluster.local</host>
-    <port>{{ $.Values.clickhouse.tcpPort }}</port>
+    <port>{{ $.Values.server.tcpPort }}</port>
 </replica>
 {{- end }}
 {{- end }}
@@ -120,7 +120,7 @@ Clickhouse Keeper Nodes
 {{- range $i, $e := until (.Values.replicas | int) }}
 <node>
     <host>{{- include "wandb.clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{- include "wandb.clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</host>
-    <port>{{ $.Values.clickhouse.zookeeperPort }}</port></node>
+    <port>{{ $.Values.server.zookeeperPort }}</port></node>
 {{- end }}
 {{- end }}
 
@@ -168,9 +168,9 @@ ClickHouse Server Configuration
         </logger>
         <display_name>wandb_weave node_{{ $i }}</display_name>
         <listen_host>0.0.0.0</listen_host>
-        <http_port>{{ $.Values.clickhouse.httpPort }}</http_port>
-        <tcp_port>{{ $.Values.clickhouse.tcpPort }}</tcp_port>
-        <interserver_http_port>{{ $.Values.clickhouse.intrsrvhttpPort }}</interserver_http_port>
+        <http_port>{{ $.Values.server.httpPort }}</http_port>
+        <tcp_port>{{ $.Values.server.tcpPort }}</tcp_port>
+        <interserver_http_port>{{ $.Values.server.intrsrvhttpPort }}</interserver_http_port>
         <distributed_ddl>
             <path>/clickhouse/task_queue/ddl</path>
         </distributed_ddl>
@@ -188,7 +188,7 @@ ClickHouse Server Configuration
         <macros>
             <shard>01</shard>
             <replica>0{{ $i }}</replica>
-            <cluster>{{ $.Values.clickhouse.cluster }}</cluster>
+            <cluster>{{ $.Values.server.cluster }}</cluster>
         </macros>
         <merge_tree>
             <storage_policy>s3_main</storage_policy>

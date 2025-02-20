@@ -45,9 +45,33 @@ Return name of secret where clickhouse information is stored
 {{- end }}
 
 {{- define "wandb.clickhouse.host" -}}
-{{- if eq .Values.global.clickhouse.host "" -}}
-{{ include "wandb.clickhouse.fullname" . }}-ch-headless  # Using the defined variable
+{{- if eq .Values.clickhouse.install true -}}
+{{- printf "%s-ch-headless" (include "wandb.clickhouse.fullname" .) -}}
 {{- else -}}
 {{ .Values.global.clickhouse.host }}
 {{- end -}}
 {{- end }}
+
+{{- define "wandb.clickhouse.port " -}}
+{{- if eq .Values.clickhouse.install true -}}
+{{ .Values.clickhouse.server.httpPort }}
+{{- else -}}
+{{ .Values.global.clickhouse.port }}
+{{- end -}}
+{{- end -}}
+
+{{- define "wandb.clickhouse.database " -}}
+{{- if eq .Values.clickhouse.install true -}}
+{{ .Values.clickhouse.database }}
+{{- else -}}
+{{ .Values.global.clickhouse.database }}
+{{- end -}}
+{{- end -}}
+
+{{- define "wandb.clickhouse.user " -}}
+{{- if eq .Values.clickhouse.install true -}}
+{{- printf "default" -}}
+{{- else -}}
+{{ .Values.global.clickhouse.database }}
+{{- end -}}
+{{- end -}}
