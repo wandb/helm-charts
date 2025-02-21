@@ -15,7 +15,7 @@
 {{- if .Values.global.clickhouse.external -}}
   {{- .Values.global.clickhouse.host | default "default-host" -}}
 {{- else -}}
-  {{- include "wandb.clickhouse.fullname" . }}-ch-headless
+  {{- include "wandb.clickhouse.fullname" . }}-ch-server-headless.{{ .Release.Name }}.svc.cluster.local
 {{- end }}
 {{- end }}
 
@@ -26,18 +26,9 @@ Return name of secret where ClickHouse information is stored
 {{- if .Values.global.clickhouse.passwordSecret.name -}}
   {{- .Values.global.clickhouse.passwordSecret.name -}}
 {{- else -}}
-  default
+  {{- printf "%s-clickhouse-secret" .Release.Name -}}
 {{- end -}}
 {{- end -}}
-
-{{- define "wandb.clickhouse.imagePullSecrets" -}}
-{{- if .Values.global.clickhouse.imagePullSecrets.name -}}
-  {{- .Values.global.clickhouse.imagePullSecrets.name -}}
-{{- else -}}
-  {{- printf "%s-clickhouse" .Release.Name -}}
-{{- end -}}
-{{- end -}}
-
 
 {{/*
 Return name of secret where ClickHouse information is stored
@@ -46,7 +37,7 @@ Return name of secret where ClickHouse information is stored
 {{- if .Values.global.clickhouse.passwordSecret.name }}
   {{- .Values.global.clickhouse.passwordSecret.passwordKey | default "default" -}}
 {{- else -}}
-  default
+  CLICKHOUSE_PASSWORD
 {{- end -}}
 {{- end }}
 

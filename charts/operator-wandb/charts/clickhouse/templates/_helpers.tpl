@@ -161,7 +161,7 @@ ClickHouse Server Configuration
             <default>
                 <password>{{ include "wandb.clickhouse.password" $ }}</password>
                 <access_management>1</access_management>
-                <profile>default</profile>
+                <profile>{{ include "wandb.clickhouse.user" $ }}</profile>
             </default>
         </users>
         <path>/var/lib/clickhouse/</path>
