@@ -6,6 +6,25 @@ Expand the name of the chart.
 {{- end }}
 
 {{/*
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+If release name contains chart name it will be used as a full name.
+*/}}
+{{- define "clickhouse.fullname" -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- if contains $name .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "clickhouse.chart" -}}
@@ -52,17 +71,6 @@ app.kubernetes.io/name: {{ include "clickhouse.name" . }}{{ .suffix }}
 app.kubernetes.io/instance: {{ .Release.Name }}{{ .suffix }}
 {{- end }}
 
-{{/*
-Create the name of the service account to use
-*/}}
-{{- define "clickhouse.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "wandb.clickhouse.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
-{{- end }}
-
 
 {{/*
 Clickhouse Server Service Port
@@ -70,7 +78,7 @@ Clickhouse Server Service Port
 {{- define "clickhouse.servicePorts" -}}
 - name: http
   targetPort: http
-  port: {{ .Values.server.httpPort }}
+  port: {{ include "wandb.clickhouse.port" . }}
   protocol: TCP
 - name: tcp
   targetPort: tcp
@@ -107,7 +115,7 @@ ClickHouse Server Nodes
 {{- define "clickhouse.serverNodes.replicas" }}
 {{- range $i, $e := until (.Values.replicas | int) }}
 <replica>
-    <host>{{- include "wandb.clickhouse.fullname" $ }}-ch-server-{{ $i }}.{{ include "wandb.clickhouse.host" $ }}.{{ $.Release.Namespace }}.svc.cluster.local</host>
+    <host>{{- include "clickhouse.fullname" $ }}-ch-server-{{ $i }}.{{- include "clickhouse.fullname" $ }}-ch-server-headless.{{ $.Release.Namespace }}.svc.cluster.local</host>
     <port>{{ $.Values.server.tcpPort }}</port>
 </replica>
 {{- end }}
@@ -119,7 +127,7 @@ Clickhouse Keeper Nodes
 {{- define "clickhouse.keeperNodes" -}}
 {{- range $i, $e := until (.Values.replicas | int) }}
 <node>
-    <host>{{- include "wandb.clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{- include "wandb.clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</host>
+    <host>{{- include "clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{- include "clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</host>
     <port>{{ $.Values.server.zookeeperPort }}</port></node>
 {{- end }}
 {{- end }}
@@ -131,7 +139,7 @@ ClickHouse Keeper Raft Configuration
 {{- range $i, $e := until (.Values.replicas | int) }}
 <server>
     <id>{{ $i }}</id>
-    <hostname>{{ include "wandb.clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{ include "wandb.clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</hostname>
+    <hostname>{{ include "clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{ include "clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</hostname>
     <port>{{ $.Values.keeper.raftPort }}</port>
 </server>
 {{- end }}
@@ -142,9 +150,9 @@ ClickHouse Server Configuration
 */}}
 {{- define "clickhouse.serverConfig" -}}
 {{- range $i, $e := until (.Values.replicas | int) }}
-{{ include "wandb.clickhouse.fullname" $ }}-ch-server-{{ $i }}.xml: |
+{{ include "clickhouse.fullname" $ }}-ch-server-{{ $i }}.xml: |
     <clickhouse replace="true">
-        <default_database>{{ $.Values.database }}</default_database>
+        <default_database>{{ include "wandb.clickhouse.database" $ }}</default_database>
         <max_partition_size_to_drop>0</max_partition_size_to_drop>
         <profiles>
             <default></default>
@@ -168,7 +176,7 @@ ClickHouse Server Configuration
         </logger>
         <display_name>wandb_weave node_{{ $i }}</display_name>
         <listen_host>0.0.0.0</listen_host>
-        <http_port>{{ $.Values.server.httpPort }}</http_port>
+        <http_port>{{ include "wandb.clickhouse.port" $ }}</http_port>
         <tcp_port>{{ $.Values.server.tcpPort }}</tcp_port>
         <interserver_http_port>{{ $.Values.server.intrsrvhttpPort }}</interserver_http_port>
         <distributed_ddl>
@@ -234,7 +242,7 @@ ClickHouse Keeper Instance Configuration
 */}}
 {{- define "clickhouse.keeperConfig" -}}
 {{- range $i, $e := until (.Values.replicas | int) }}
-  {{ include "wandb.clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.xml: |
+  {{ include "clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.xml: |
     <clickhouse replace="true">
         <path>/var/lib/clickhouse/coordination/keeper</path>
         <logger>

@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "wandb.clickhouse.fullname" . }}-ch-server
+  name: {{ include "clickhouse.fullname" . }}-ch-server
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
     {{- include "clickhouse.commonLabels" . | nindent 4 }}
@@ -22,7 +22,7 @@ spec:
     matchLabels:
       {{ include "wandb.selectorLabels" $ | nindent 6 }}
       {{ include "clickhouse.labels" . | nindent 6 }}
-  serviceName: {{ include "wandb.clickhouse.host" . }}
+  serviceName: {{ include "clickhouse.fullname" . }}-ch-server-headless
   template:
     metadata:
       labels:
@@ -54,7 +54,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.clickhouse.passwordSecret" . }}
-                  key: CLICKHOUSE_PASSWORD
+                  key: {{ include "wandb.clickhouse.passwordSecret.passwordKey" . }}
           volumeMounts:
             - name: config-volume
               mountPath: /etc/clickhouse-server/config.xml
@@ -91,7 +91,7 @@ spec:
               memory: {{ .Values.server.resources.requests.memory }}
           ports:
             - name: http
-              containerPort: {{ .Values.server.httpPort }}
+              containerPort: {{ include "wandb.clickhouse.port" . }}
             - name: tcp
               containerPort: {{ .Values.server.tcpPort }}
             - name: intrsrvhttp
@@ -116,7 +116,7 @@ spec:
       volumes:
         - name: config-volume
           configMap:
-            name: {{ include "wandb.fullname" . }}-ch-server-config
+            name: {{ include "clickhouse.fullname" . }}-ch-server-config
         - name: clickhouse-data
           persistentVolumeClaim:
             claimName: clickhouse-pvc  # PVC for persistent data
