@@ -39,6 +39,8 @@ By default, the W&B Server chart includes an in-cluster Redis deployment that is
 provided by bitnami/Redis. This deployment is for trial purposes only and not
 recommended for use in production.
 
+The `external` field should always remain `false`. It is for W&B internal use only.
+
 ## Use external stateful data
 
 You can configure the W&B Server Helm chart to point to external stateful
