@@ -164,6 +164,11 @@ ClickHouse Server Configuration
                 <profile>{{ include "wandb.clickhouse.user" $ }}</profile>
             </default>
         </users>
+        <user_directories>
+            <users_xml>
+                <path>/etc/clickhouse-server/users.xml</path>
+            </users_xml>
+        </user_directories>
         <path>/var/lib/clickhouse/</path>
         <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
         <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>

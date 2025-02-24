@@ -2,12 +2,7 @@
 {{- if .Values.fullnameOverride }}
   {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else -}}
-  {{- $name := .Values.nameOverride | default .Chart.Name }}
-  {{- if contains $name .Release.Name }}
-    {{- .Release.Name | trunc 63 | trimSuffix "-" }}
-  {{- else  -}}
-    {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-  {{- end }}
+  {{- .Release.Name | trunc 63 | trimSuffix "-" }}-clickhouse
 {{- end }}
 {{- end }}
 
@@ -15,7 +10,7 @@
 {{- if .Values.global.clickhouse.external -}}
   {{- .Values.global.clickhouse.host | default "default-host" -}}
 {{- else -}}
-  {{- include "wandb.clickhouse.fullname" . }}-ch-server-headless.{{ .Release.Name }}.svc.cluster.local
+  {{- include "wandb.clickhouse.fullname" . }}-ch-server-headless.{{ .Release.Namespace }}.svc.cluster.local
 {{- end }}
 {{- end }}
 
@@ -26,7 +21,7 @@ Return name of secret where ClickHouse information is stored
 {{- if .Values.global.clickhouse.passwordSecret.name -}}
   {{- .Values.global.clickhouse.passwordSecret.name -}}
 {{- else -}}
-  {{- printf "%s-clickhouse-secret" .Release.Name -}}
+  {{- printf "%s-clickhouse" .Release.Name -}}
 {{- end -}}
 {{- end -}}
 
