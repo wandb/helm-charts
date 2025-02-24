@@ -1,0 +1,102 @@
+nameOverride: ""
+fullnameOverride: ""
+
+replicas: 3
+
+server_image:
+  repository: "clickhouse/clickhouse-server"
+  tag: "24.8"
+
+keeper_image:
+  repository: "clickhouse/clickhouse-keeper"
+  tag: "24.8"
+
+database: "weave_trace_db"
+
+server:
+  tcpPort : 9000
+  intrsrvhttpPort: 9009
+  zookeeperPort: 9181
+  cluster: "wandb_cluster"
+  resources:
+    limits:
+      cpu: 6
+      ephemeralStorage: 100Gi
+      memory: 12288Mi
+    requests:
+      cpu: "1"
+      ephemeralStorage: 500Mi
+      memory: 3072Mi
+
+keeper:
+  tcpPort: 9181
+  httpPort : 9182
+  raftPort: 9234
+  resources:
+    limits:
+      cpu: "1.5"
+      ephemeralStorage: 20Gi
+      memory: 4096Mi
+    requests:
+      cpu: "0.5"
+      ephemeralStorage: 500Mi
+      memory: 1024Mi
+
+service:
+  annotations: {}
+  labels: {}
+    
+common:
+  labels: {}
+  podManagementPolicy: "Parallel"
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    privileged: false
+    readOnlyRootFilesystem: false
+    seLinuxOptions:
+      level: "s0:c27,c4"
+    seccompProfile:
+      type: RuntimeDefault
+
+deployment:
+  labels: {}
+  annotations: {}
+
+pod:
+  labels: {}
+  annotations: {}
+
+logLevel: information
+
+# Node selector for the StatefulSet pods (for scheduling pods on specific nodes)
+nodeSelector: {}
+
+# Tolerations for the StatefulSet pods (for allowing pods to be scheduled on tainted nodes)
+tolerations: []
+
+# Affinity settings for the StatefulSet pods (for custom scheduling rules)
+affinity: {}
+
+# Persistent volume claim settings for the StatefulSet
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+serviceAccount:
+  name: "clickhouse"
+  automountServiceAccountToken: false
+  create: true
+  annotations: {}
+
+localStorage: "100Gi"
+
+buckets:
+  access_key_id: ""  # Use Vault or env variables for secret management
+  secret_access_key: ""  # Same as above
+  region: eu-central-1
+  replicaBucketNames: ["bucketA/replica1", "bucketA/replica2", "bucketA/replica3"]

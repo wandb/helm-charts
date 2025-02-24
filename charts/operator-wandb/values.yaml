@@ -85,8 +85,11 @@ global:
       # grpc, http
       proto: "grpc"
 
+  # clickhouse configuration for the wandb weave-trace service
   clickhouse:
-    install: false
+    # if this is true, the configuration should be set with externally installed clickhouse
+    # if this is false, the clickhouse is installed by the operator and the weave-trace would be configured to use it
+    external: false
     host: ""
     port: 8443
     password: "fake"
@@ -262,6 +265,26 @@ app:
 nginx:
   install: false
 
+# configuration passed to install clickhouse with the operator
+clickhouse:
+  # install has to be set to true to get clickhouse installed using operator
+  install: false
+  replicas: 3
+  server_image:
+    repository: "clickhouse/clickhouse-server"
+    tag: "latest"
+  keeper_image:
+    repository: "clickhouse/clickhouse-keeper"
+    tag: "latest"
+  local_storage: "100Gi"
+  buckets:
+    # if access key & secret key are not passed make sure the instance has correct role access
+    # and the clickhouse would be configured with `use_environment_credentials`
+    access_key_id: ""
+    secret_access_key: ""
+    region: us-east-1
+    replicaBucketNames: ["clickhouse-backend-bucket/replica1", "clickhouse-backend-bucket/replica2", "clickhouse-backend-bucket/replica3"]
+
 weave:
   install: true
   image:
@@ -375,7 +398,7 @@ otel:
   # redundant metrics. In setups where both are scraping the same endpoints,
   # this redundancy occurs as both scrape the same points.
   daemonset:
-    install: true
+    install: false
 
   # By default, we use only the daemonset which, along with the Prometheus
   # receiver, gathers most necessary metrics.
