@@ -36,6 +36,8 @@ if settings.get("installMinio"):
 k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("values")]))
 k8s_resource('wandb-app', port_forwards=8080, objects=['wandb-app:ServiceAccount:default', 'wandb-app-config:secret:default'])
 k8s_resource('wandb-console', port_forwards=8082, objects=['wandb-console:ServiceAccount:default', 'wandb-console:clusterrole:default', 'wandb-console:clusterrolebinding:default'])
+k8s_resource('wandb-executor',objects=['wandb-executor:ServiceAccount:default'])
+k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)
 k8s_resource('wandb-otel-daemonset',objects=['wandb-otel-daemonset:ServiceAccount:default', 'wandb-otel-daemonset:clusterrole:default', 'wandb-otel-daemonset:clusterrolebinding:default'])
 k8s_resource('wandb-parquet',objects=['wandb-parquet:ServiceAccount:default'])
 k8s_resource('wandb-prometheus-server',objects=['wandb-prometheus-server:ServiceAccount:default', 'wandb-prometheus-server:clusterrole:default', 'wandb-prometheus-server:clusterrolebinding:default'])
@@ -60,5 +62,5 @@ k8s_resource(
         'wandb-redis-secret:secret:default',
     ]
 )
-k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:default', 'wandb-gorilla-session-key:secret:default'])
-k8s_resource(new_name='PVCs', objects=['wandb-mysql-data:PersistentVolumeClaim:default', 'wandb-prometheus-server:PersistentVolumeClaim:default'])
+k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:default', 'wandb-gorilla-session-key:secret:default'], trigger_mode=TRIGGER_MODE_MANUAL)
+k8s_resource(new_name='PVCs', objects=['wandb-mysql-data:PersistentVolumeClaim:default', 'wandb-prometheus-server:PersistentVolumeClaim:default'], trigger_mode=TRIGGER_MODE_MANUAL)
