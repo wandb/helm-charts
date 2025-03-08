@@ -8,6 +8,7 @@
 {{- $_ := deepCopy $containerSource | merge $container }}
 {{- $_ = set $container "name" $containerName }}
 {{- $_ = set $container "securityContext" (coalesce $container.securityContext $.root.Values.securityContext) }}
+{{- $_ = set $container "terminationGracePeriodSeconds" (coalesce $container.terminationGracePeriodSeconds $.root.Values.terminationGracePeriodSeconds) }}
 {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
 {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
 {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env))) }}
