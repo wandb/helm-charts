@@ -71,14 +71,3 @@ otlp+{{ .Values.global.otel.traces.proto }}://{{ .Values.global.otel.traces.host
 otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset:{{ .Values.global.otel.traces.port }}?trace_ratio={{ default 0.0 .Values.traceRatio }}
 {{- end -}}
 {{- end -}}
-
-{{/*
-Create the name of the imagePullSecret to use
-*/}}
-{{- define "wandb.imagePullSecrets" -}}
-{{- if .Values.global.imagePullSecrets }}
-{{- range .Values.global.imagePullSecrets }}
-- name: {{ . }}
-{{- end }}
-{{- end }}
-{{- end }}
