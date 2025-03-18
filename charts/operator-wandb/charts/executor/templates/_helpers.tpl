@@ -106,6 +106,18 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{- define "executor.taskQueue" -}}
+{{- $cs := include "executor.redis" . }}
+
+{{- if .Values.workerConcurrency -}}
+  {{- if not (contains "?" $cs) }}
+    {{- $cs = printf "%s?" $cs -}}
+  {{- end }}
+  {{- $cs = printf "%s&workerConcurrency=%d" $cs .Values.workerConcurrency -}}
+{{- end }}
+{{- print $cs }}
+{{- end }}
+
 {{- define "executor.historyStore" -}}
     {{- $stores := list -}}
     {{- $stores = append $stores (printf "http://%s-parquet:8087/_goRPC_" .Release.Name) -}}

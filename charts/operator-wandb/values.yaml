@@ -48,7 +48,16 @@ global:
     labels: {}
     annotations: {}
   deployment:
-    annotations: {}
+    annotations:
+      reloader.stakater.com/auto: "true"
+    labels: {}
+  daemonset:
+    annotations:
+      reloader.stakater.com/auto: "true"
+    labels: {}
+  statefulset:
+    annotations:
+      reloader.stakater.com/auto: "true"
     labels: {}
   service:
     labels: {}
@@ -139,6 +148,8 @@ global:
     host: ""
     port: 6379
     password: ""
+    # external should remain false; it is for W&B internal use only.
+    external: false
     parameters: {}
     caCert: ""
     secret:
@@ -304,6 +315,11 @@ console:
   image:
     repository: wandb/console
     tag: latest
+  proxy:
+    httpProxy: ""
+    httpsProxy: ""
+    noProxy: ""
+    debug: false
   extraEnv:
     # This value is used to expose the IAM identity (of the app) to the user in console for
     # adding the correct cross account permissions
@@ -323,8 +339,8 @@ flat-run-fields-updater:
 filestream:
   install: false
   image:
-    repository: wandb/local-dev
-    tag: 0.63.0-danielpanzella-filestream-local.1
+    repository: wandb/local
+    tag: latest
   pubSub:
     subscription: ""
   envFrom:
@@ -359,7 +375,7 @@ redis:
   nameOverride: "redis"
   architecture: standalone
   auth:
-    enabled: true
+    enabled: false
     existingSecret: '{{ include "wandb.redis.passwordSecret" . }}'
     existingSecretPasswordKey: "{{ .Values.global.redis.secret.secretKey }}"
   metrics:
@@ -915,3 +931,11 @@ settingsMigrationJob:
           envFrom:
             "{{ .Release.Name }}-smj-secret": "secretRef"
           args: ["settings-migration-job"]
+
+reloader:
+  install: false
+  watchGlobally: false
+  reloadOnCreate: true
+  reloadOnDelete: true
+  serviceAccount:
+    create: false
