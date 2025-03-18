@@ -37,14 +37,16 @@ spec:
         {{- include "flat-run-fields-updater.commonLabels" . | nindent 8 }}
         {{- include "flat-run-fields-updater.podLabels" . | nindent 8 }}
     spec:
-      imagePullSecrets:
-      {{- include "wandb.imagePullSecrets" . }}
       serviceAccountName: {{ include "flat-run-fields-updater.serviceAccountName" . }}
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       # needed to ensure ensure Kafka consumers handle pod termination gracefully and avoid data loss
       terminationGracePeriodSeconds: 60
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
