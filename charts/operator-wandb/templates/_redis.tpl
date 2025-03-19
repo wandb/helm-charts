@@ -40,7 +40,7 @@ Return the redis password
 
 
 {{- define "_portParams" }}
-    {{- $rawPortVal := $.Values.global.redis.port }}
+    {{- $rawPortVal := $.Values.global.redis.port | toString }}
     {{- $queryParams := dict }}
     {{- if contains "?" $rawPortVal }}
         {{- $queryString := splitList "?" $rawPortVal | last }}
