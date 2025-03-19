@@ -96,24 +96,17 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{- define "executor.redis" -}}
-{{- $cs := include "wandb.redis.connectionString" . }}
-{{- $ca := include "wandb.redis.caCert" . }}
-{{- if $ca }}
-{{- printf "%s?tls=true&caCertPath=/etc/ssl/certs/redis_ca.pem&ttlInSeconds=604800" $cs -}}
-{{- else }}
-{{- print $cs -}}
-{{- end }}
-{{- end }}
-
 {{- define "executor.taskQueue" -}}
-{{- $cs := include "executor.redis" . }}
-
-{{- if .Values.workerConcurrency -}}
-  {{- if not (contains "?" $cs) }}
+{{- $cs := include "wandb.redis.connectionString" . }}
+{{- $params := include "wandb.redis.parametersQuery" . }}
+{{- $concur := .Values.workerConcurrency}}
+{{- if $concur -}}
+  {{- if $params }}
+    {{- $cs = printf "%s&" $cs -}}
+  {{- else }}
     {{- $cs = printf "%s?" $cs -}}
   {{- end }}
-  {{- $cs = printf "%s&workerConcurrency=%d" $cs .Values.workerConcurrency -}}
+  {{- $cs = printf "%sworkerConcurrency=%s" $cs $concur -}}
 {{- end }}
 {{- print $cs }}
 {{- end }}
