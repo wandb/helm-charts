@@ -13,7 +13,7 @@ Return name of secret where redis information is stored
 Return the redis port, if it contains a query string, only return the port
 */}}
 {{- define "wandb.redis.port" -}}
-{{- $port := $.Values.global.redis.port -}}
+{{- $port := $.Values.global.redis.port | toString -}}
 {{- if contains "?" $port -}}
 {{- $port = splitList "?" $port | first -}}
 {{- end -}}
