@@ -97,13 +97,16 @@ Create the name of the service account to use
 {{- end }}
 
 {{- define "executor.taskQueue" -}}
-{{- $cs := include "wandb.redis" . }}
+{{- $cs := include "wandb.redis.connectionString" . }}
+{{- $params := include "wandb.redis.parametersQuery" . }}
 
 {{- if .Values.workerConcurrency -}}
-  {{- if not (contains "?" $cs) }}
+  {{- if $params }}
     {{- $cs = printf "%s?" $cs -}}
+  {{- else }}
+    {{- $cs = printf "%s&" $cs -}}
   {{- end }}
-  {{- $cs = printf "%s&workerConcurrency=%d" $cs .Values.workerConcurrency -}}
+  {{- $cs = printf "%sworkerConcurrency=%d" $cs .Values.workerConcurrency -}}
 {{- end }}
 {{- print $cs }}
 {{- end }}

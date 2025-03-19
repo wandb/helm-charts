@@ -10,14 +10,18 @@ Return name of secret where redis information is stored
 {{- end -}}
 
 {{/*
-Return the redis port
+Return the redis port, if it contains a query string, only return the port
 */}}
 {{- define "wandb.redis.port" -}}
-{{- print $.Values.global.redis.port -}}
+{{- $port := $.Values.global.redis.port -}}
+{{- if contains "?" $port -}}
+{{- $port = splitList "?" $port | first -}}
+{{- end -}}
+{{- print $port -}}
 {{- end -}}
 
 {{/*
-Return the redis host
+Return the redis host, defaulting to the release name prefix if available.
 */}}
 {{- define "wandb.redis.host" -}}
 {{- if eq .Values.global.redis.host "" -}}
@@ -34,28 +38,76 @@ Return the redis password
 {{- print $.Values.global.redis.password -}}
 {{- end -}}
 
+
+{{- define "_portParams" }}
+    {{- $rawPortVal := $.Values.global.redis.port }}
+    {{- $queryParams := dict }}
+    {{- if contains "?" $rawPortVal }}
+        {{- $queryString := splitList "?" $rawPortVal | last }}
+        {{- $pairs := splitList "&" $queryString }}
+        {{- range $pairs }}
+            {{- $pair := splitList "=" . }}
+            {{- $queryParams = merge $queryParams (dict (index $pair 0) (index $pair 1)) }}
+        {{- end }}
+    {{- end }}
+    {{- $queryParams | toJson -}}
+{{- end }}
+
 {{/*
-compute the query parameters for the redis connection string from a supplied dictionary
+if a caCert is present, hardcode the caCertPath!
+*/}}
+{{- define "_caParams" }}
+    {{- $ca := include "wandb.redis.caCert" . }}
+    {{- $result := dict }}
+    {{- if $ca }}
+        {{- $result = merge $result (dict "caCertPath" "/etc/ssl/certs/redis_ca.pem") }}
+    {{- end }}
+    {{- $result | toJson -}}
+{{- end }}
+
+{{- define "_defaultParams" }}
+    {{- $ca := include "wandb.redis.caCert" . }}
+        {{- if $ca }}
+            {{- (dict "ttlInSeconds" 604800 "tls" "true") | toJson -}}
+        {{- else }}
+            {{- (dict "ttlInSeconds" 604800 "tls" "false") | toJson -}}
+        {{- end }}
+{{- end }}
+
+
+{{/*
+Compute the query parameters for the redis connection string from a supplied dictionary.
+The precedence order (highest to lowest) in which the query parameters are chosen:
 1. if a caCert is present, hardcode the caCertPath!
-2. values from params/parameters dict, but ignore caCertPath
-3. queryString in port, but ignore caCertPath
-4. assume ttlInSeconds=604800, as a default
+2. values from params/parameters dict
+3. queryString in port
+4. defaults: ttlInSeconds=604800
 */}}
 {{- define "wandb.redis.parametersQuery" }}
-{{- $params := merge $.Values.global.redis.params $.Values.global.redis.parameters }}
-{{- $len := len $params }}
-{{- $count := 1 }}
-{{- range $key, $val := $params }}
-  {{- $valStr := $val | toString }}
-  {{- if $valStr }}
-    {{- $count = add1 $count }}
-    {{- if lt $count $len }}
-      {{- printf "%s=%s&" $key $valStr -}}
-    {{- else }}
-      {{- printf "%s=%s" $key $valStr -}}
+    {{- $portParams := include "_portParams" . | fromJson }}
+    {{/* Both `params` and `parameters` have been used, historically */}}
+    {{- $valueParams := merge $.Values.global.redis.params $.Values.global.redis.parameters }}
+    {{- $caParams := include "_caParams" . | fromJson }}
+    {{- $defaultParams := include "_defaultParams" . | fromJson }}
+
+    {{- $finalParams := merge $defaultParams $valueParams $portParams $caParams }}
+
+    {{- $len := len $finalParams }}
+    {{- $count := 1 }}
+    {{- if gt $len 0 }}
+        {{- print "?" -}}
     {{- end }}
-  {{- end }}
-{{- end }}
+    {{- range $key, $val := $finalParams }}
+        {{- $valStr := $val | toString }}
+        {{- if $valStr }}
+            {{- $count = add1 $count }}
+            {{- if lt $count $len }}
+                {{- printf "%s=%s&" $key $valStr -}}
+            {{- else }}
+                {{- printf "%s=%s" $key $valStr -}}
+            {{- end }}
+        {{- end }}
+    {{- end }}
 {{- end }}
 
 
@@ -66,9 +118,9 @@ include the proprietary query parameters used by WandB.
 {{- define "wandb.redis.connectionString" -}}
 {{- $password := include "wandb.redis.password" . }}
 {{- if or $password .Values.global.redis.secret.secretName }}
-redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)
+redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
 {{- else }}
-redis://$(REDIS_HOST):$(REDIS_PORT)
+redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
 {{- end }}
 {{- end }}
 
@@ -79,33 +131,10 @@ Return the redis caCert
 {{- print $.Values.global.redis.caCert -}}
 {{- end -}}
 
-{{/*
-This redis connection string includes the proprietary query parameters used by WandB.
-The precedence order in which the query parameters are added is:
-- if the connection string already has a query string *INSIDE* it, use only those query parameters
-- else if the supplied parametersQuery is not empty, use only those for the query parameters
-- else if the caCert is set, use the legacy default values for the query string
-- else use the connection string as is
-*/}}
-{{- define "wandb.redis" -}}
-{{- $cs := include "wandb.redis.connectionString" . }}
-{{- $ca := include "wandb.redis.caCert" . }}
-{{- $query := include "wandb.redis.parametersQuery" . }}
-{{- if contains "?" $cs }}
-{{- print $cs -}}
-{{- else if $query }}
-{{- printf "%s?%s" $cs $query -}}
-{{- else if $ca }}
-{{- printf "%s?tls=true&caCertPath=/etc/ssl/certs/redis_ca.pem&ttlInSeconds=604800" $cs -}}
-{{- else }}
-{{- print $cs -}}
-{{- end }}
-{{- end }}
-
 
 {{- define "wandb.redis.taskQueue" -}}
 {{- if .Values.global.executor.enabled }}
-{{- include "wandb.redis" .}}
+{{- include "wandb.redis.connectionString" .}}
 {{- else }}
 {{- "noop://" }}
 {{- end }}
