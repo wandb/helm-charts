@@ -93,15 +93,15 @@ The precedence order (highest to lowest) in which the query parameters are chose
     {{- $finalParams := merge $defaultParams $portParams $valueParams $caParams }}
 
     {{- $len := len $finalParams }}
-    {{- $count := 1 }}
+    {{- $count := 0 }}
     {{- if gt $len 0 }}
         {{- print "?" -}}
     {{- end }}
     {{- range $key, $val := $finalParams }}
+        {{- $count = add $count 1 }}
         {{- $valStr := $val | toString }}
         {{- if $valStr }}
-            {{- $count = add1 $count }}
-            {{- if lt $count $len }}
+            {{- if gt $len $count  }}
                 {{- printf "%s=%s&" $key $valStr -}}
             {{- else }}
                 {{- printf "%s=%s" $key $valStr -}}
