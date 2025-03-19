@@ -96,16 +96,6 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{- define "flat-run-fields-updater.redis" -}}
-{{- $cs := include "wandb.redis.connectionString" . }}
-{{- $ca := include "wandb.redis.caCert" . }}
-{{- if $ca }}
-{{- printf "%s?tls=true&caCertPath=/etc/ssl/certs/redis_ca.pem&ttlInSeconds=604800" $cs -}}
-{{- else }}
-{{- print $cs -}}
-{{- end }}
-{{- end }}
-
 {{- define "flat-run-fields-updater.runUpdateShadowQueue" -}}
 {{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}/{{ .Values.pubSub.subscription }}

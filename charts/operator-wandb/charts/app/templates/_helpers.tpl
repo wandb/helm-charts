@@ -100,16 +100,6 @@ app deployments.
 {{- end }}
 {{- end -}}
 
-{{- define "app.redis" -}}
-{{- $cs := include "wandb.redis.connectionString" . }}
-{{- $ca := include "wandb.redis.caCert" . }}
-{{- if $ca }}
-{{- printf "%s?tls=true&caCertPath=/etc/ssl/certs/redis_ca.pem&ttlInSeconds=604800" $cs -}}
-{{- else }}
-{{- print $cs -}}
-{{- end }}
-{{- end }}
-
 {{- define "app.internalJWTMap" -}}
 '{
 {{- range $value := .Values.internalJWTMap -}}
