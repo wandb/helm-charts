@@ -84,13 +84,13 @@ The precedence order (highest to lowest) in which the query parameters are chose
 4. defaults: ttlInSeconds=604800
 */}}
 {{- define "wandb.redis.parametersQuery" }}
-    {{- $portParams := include "_portParams" . | fromJson }}
+    {{- $caParams := include "_caParams" . | fromJson }}
     {{/* Both `params` and `parameters` have been used, historically */}}
     {{- $valueParams := merge $.Values.global.redis.params $.Values.global.redis.parameters }}
-    {{- $caParams := include "_caParams" . | fromJson }}
+    {{- $portParams := include "_portParams" . | fromJson }}
     {{- $defaultParams := include "_defaultParams" . | fromJson }}
 
-    {{- $finalParams := merge $defaultParams $valueParams $portParams $caParams }}
+    {{- $finalParams := merge $defaultParams $portParams $valueParams $caParams }}
 
     {{- $len := len $finalParams }}
     {{- $count := 1 }}
