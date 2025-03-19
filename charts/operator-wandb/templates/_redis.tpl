@@ -70,7 +70,7 @@ if a caCert is present, hardcode the caCertPath!
         {{- if $ca }}
             {{- (dict "ttlInSeconds" 604800 "tls" "true") | toJson -}}
         {{- else }}
-            {{- (dict "ttlInSeconds" 604800 "tls" "false") | toJson -}}
+            {{- (dict "ttlInSeconds" 604800) | toJson -}}
         {{- end }}
 {{- end }}
 
