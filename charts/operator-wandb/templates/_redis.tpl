@@ -81,7 +81,7 @@ The precedence order (highest to lowest) in which the query parameters are chose
 1. if a caCert is present, hardcode the caCertPath!
 2. values from params/parameters dict
 3. queryString in port
-4. defaults: ttlInSeconds=604800
+4. defaults: ttlInSeconds=604800, also tls=true only if caCert is present
 */}}
 {{- define "wandb.redis.parametersQuery" }}
     {{- $caParams := include "_caParams" . | fromJson }}
