@@ -37,14 +37,16 @@ spec:
         {{- include "filestream.commonLabels" . | nindent 8 }}
         {{- include "filestream.podLabels" . | nindent 8 }}
     spec:
-      imagePullSecrets:
-      {{- include "wandb.imagePullSecrets" . }}
       serviceAccountName: {{ include "filestream.serviceAccountName" . }}
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.priorityClassName" . | nindent 6 }}
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       # needed to ensure ensure Kafka consumers handle pod termination gracefully and avoid data loss
       terminationGracePeriodSeconds: 60
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
@@ -134,12 +136,14 @@ spec:
               value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
               value: "{{ include "wandb.redis.host" . }}"
+            - name: REDIS_PARAMS
+              value: "{{ include "wandb.redis.parametersQuery" . | trim }}"
             - name: REDIS
-              value: "{{ include "filestream.redis" . | trim }}"
+              value: "{{ include "wandb.redis.connectionString" . | trim }}"
             - name: GORILLA_CACHE
-              value: "{{ include "filestream.redis" . | trim }}"
+              value: "{{ include "wandb.redis.connectionString" . | trim }}"
             - name: GORILLA_SETTINGS_CACHE
-              value: "{{ include "filestream.redis" . | trim }}"
+              value: "{{ include "wandb.redis.connectionString" . | trim }}"
             {{- if and .Values.global .Values.global.observability }}
             {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
             - name: GORILLA_STATSD_PORT
@@ -159,7 +163,7 @@ spec:
             - name: GORILLA_FILE_METADATA_STORE
               value: "$(MYSQL)"
             - name: GORILLA_METADATA_CACHE
-              value: "{{ include "filestream.redis" . | trim }}"
+              value: "{{ include "wandb.redis.connectionString" . | trim }}"
             - name: GORILLA_MYSQL
               value: {{ .Values.mysql | toJson | quote }}
             {{- include "filestream.extraEnv" (dict "global" $.Values.global "local" .Values) | nindent 12 }}
