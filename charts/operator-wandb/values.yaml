@@ -101,15 +101,23 @@ global:
     external: false
     host: ""
     port: 8443
-    password: "fake"
+    # Password should be provided via secret in production
+    # Example: kubectl create secret generic clickhouse-password --from-literal=password=your-secure-password
+    password: ""  # Will be populated from secret if passwordSecret is configured
     passwordSecret:
-      name: ""
-      passwordKey: "CLICKHOUSE_PASSWORD"
+      name: ""  # Name of the secret containing the ClickHouse password
+      passwordKey: "CLICKHOUSE_PASSWORD"  # Key in the secret containing the password
     database: "weave_trace_db"
     user: "default"
     # Required when using replicated services on self-managed ClickHouse (not ClickHouse Cloud).
     # Flag will substitute MergeTree() with ReplicatedMergeTree() and use `ON CLUSTER` on table creation.
     replicated: false
+    # TLS configuration for secure communication
+    tls:
+      enabled: false
+      secretName: ""  # Name of the secret containing TLS certificates
+      certKey: "tls.crt"  # Key in the secret containing the certificate
+      keyKey: "tls.key"   # Key in the secret containing the private key
 
   email:
     smtp:
@@ -278,23 +286,31 @@ nginx:
 
 # configuration passed to install clickhouse with the operator
 clickhouse:
-  # install has to be set to true to get clickhouse installed using operator
+  # Enable or disable ClickHouse installation by the operator
   install: false
-  replicas: 3
+  
+  # ClickHouse server image configuration
   server_image:
     repository: "clickhouse/clickhouse-server"
-    tag: "latest"
+    # Use a specific version tag instead of 'latest' for stability
+    tag: "24.8.14"
+  
+  # ClickHouse keeper image configuration
   keeper_image:
     repository: "clickhouse/clickhouse-keeper"
-    tag: "latest"
-  local_storage: "100Gi"
+    # Use a specific version tag instead of 'latest' for stability
+    tag: "24.8.14"
+  
+  # S3 bucket configuration for ClickHouse data
   buckets:
-    # if access key & secret key are not passed make sure the instance has correct role access
-    # and the clickhouse would be configured with `use_environment_credentials`
-    access_key_id: ""
-    secret_access_key: ""
-    region: us-east-1
-    replicaBucketNames: ["clickhouse-backend-bucket/replica1", "clickhouse-backend-bucket/replica2", "clickhouse-backend-bucket/replica3"]
+    # Access credentials should be provided via secret in production
+    # Example: kubectl create secret generic clickhouse-s3-credentials --from-literal=access_key_id=your-key --from-literal=secret_access_key=your-secret
+    secret:
+      name: ""  # Name of the secret containing S3 credentials
+      accessKeyKey: "ACCESS_KEY_ID"  # Key in the secret containing the access key
+      secretKeyKey: "SECRET_ACCESS_KEY"  # Key in the secret containing the secret key
+    region: ""  # Required: AWS region for S3 buckets (e.g., us-east-1, eu-central-1)
+    replicaBucketNames: []  # Required: List of S3 bucket names for each replica
 
 weave:
   install: true
@@ -414,7 +430,7 @@ otel:
   # redundant metrics. In setups where both are scraping the same endpoints,
   # this redundancy occurs as both scrape the same points.
   daemonset:
-    install: false
+    install: true
 
   # By default, we use only the daemonset which, along with the Prometheus
   # receiver, gathers most necessary metrics.

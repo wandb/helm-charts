@@ -16,7 +16,7 @@ metadata:
     {{-   toYaml .Values.deployment.annotations | nindent 4 }}
     {{- end }}
 spec:
-  replicas: {{ .Values.replicas }}
+  replicas: {{ include "clickhouse.keeper.replicas" . }}
   podManagementPolicy: "{{ .Values.common.podManagementPolicy }}"
   selector:
     matchLabels:
@@ -39,12 +39,11 @@ spec:
       {{- include "wandb.imagePullSecrets" . }}
       serviceAccountName: {{ .Values.serviceAccount.name }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
-      securityContext:
-        fsGroup: 1000710000
-        fsGroupChangePolicy: Always
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       containers:
         - name: keeper
           image: "{{ .Values.keeper_image.repository }}:{{ .Values.keeper_image.tag }}"
+          {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           env:
             - name: POD_NAME
               valueFrom:
@@ -70,20 +69,6 @@ spec:
               mountPath: /etc/clickhouse-keeper/keeper_config.xml
               subPathExpr: "$(POD_NAME).xml"
               readOnly: true
-          securityContext:
-            allowPrivilegeEscalation: {{ .Values.common.containerSecurityContext.allowPrivilegeEscalation }}
-            capabilities:
-              drop:
-                - {{ .Values.common.containerSecurityContext.capabilities.drop | join "\n                - " }}
-            privileged: {{ .Values.common.containerSecurityContext.privileged }}
-            readOnlyRootFilesystem: {{ .Values.common.containerSecurityContext.readOnlyRootFilesystem }}
-            runAsGroup: 1000710000
-            runAsNonRoot: true
-            runAsUser: 1000710000
-            seLinuxOptions:
-              level: "{{ .Values.common.containerSecurityContext.seLinuxOptions.level }}"
-            seccompProfile:
-              type: {{ .Values.common.containerSecurityContext.seccompProfile.type }}
           resources:
             limits:
               cpu: {{ .Values.keeper.resources.limits.cpu }}
