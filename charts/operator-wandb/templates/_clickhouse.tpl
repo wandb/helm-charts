@@ -7,7 +7,7 @@
 {{- end }}
 
 {{- define "wandb.clickhouse.host" -}}
-{{- if .Values.global.clickhouse.external -}}
+{{- if .Values.global.clickhouse.host -}}
   {{- .Values.global.clickhouse.host | default "default-host" -}}
 {{- else -}}
   {{- include "wandb.clickhouse.fullname" . }}-ch-server-headless.{{ .Release.Namespace }}.svc.cluster.local
@@ -38,7 +38,7 @@ Return name of secret where ClickHouse information is stored
 
 
 {{- define "wandb.clickhouse.port" -}}
-{{- if .Values.global.clickhouse.external -}}
+{{- if .Values.global.clickhouse.host -}}
   {{- .Values.global.clickhouse.port | default 8123 -}}
 {{- else -}}
   8123
@@ -65,7 +65,7 @@ Return name of secret where ClickHouse information is stored
 
 
 {{- define "wandb.clickhouse.password" -}}
-{{- if .Values.global.clickhouse.external -}}
+{{- if .Values.global.clickhouse.password -}}
   {{- .Values.global.clickhouse.password | default "default" -}}
 {{- else -}}
   default

@@ -41,24 +41,17 @@ keeper:
       ephemeralStorage: 500Mi
       memory: 1024Mi
 
+cache:
+  size: 20Gi
+  path: /var/lib/clickhouse/cache
+
 service:
   annotations: {}
   labels: {}
-    
+
 common:
+  annotations: {}
   labels: {}
-  podManagementPolicy: "Parallel"
-  containerSecurityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-    privileged: false
-    readOnlyRootFilesystem: false
-    seLinuxOptions:
-      level: "s0:c27,c4"
-    seccompProfile:
-      type: RuntimeDefault
 
 deployment:
   labels: {}
@@ -67,6 +60,23 @@ deployment:
 pod:
   labels: {}
   annotations: {}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 0
+    fsGroup: 999
+    fsGroupChangePolicy: "OnRootMismatch"
+    seccompProfile:
+      type: ""
+
+container:
+  securityContext:
+    capabilities:
+      add: []
+      drop: []
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    privileged: false
 
 logLevel: information
 
@@ -92,14 +102,13 @@ serviceAccount:
   create: true
   annotations: {}
 
-localStorage: "100Gi"
-
-buckets:
-  # Access credentials should be provided via secret in production
-  # Example: kubectl create secret generic clickhouse-s3-credentials --from-literal=access_key_id=your-key --from-literal=secret_access_key=your-secret
+bucket:
   secret:
-    name: ""  # Name of the secret containing S3 credentials
-    accessKeyKey: "ACCESS_KEY_ID"  # Key in the secret containing the access key
-    secretKeyKey: "SECRET_ACCESS_KEY"  # Key in the secret containing the secret key
+    secretName: ""
+    accessKeyName: "ACCESS_KEY"
+    secretKeyName: "SECRET_KEY"
   region: ""  # Required: AWS region for S3 buckets (e.g., us-east-1, eu-central-1)
-  replicaBucketNames: []  # Required: List of S3 bucket names for each replica
+  endpoints:  # Required: List of S3 bucket names for each replica
+    - ""
+    - ""
+    - ""

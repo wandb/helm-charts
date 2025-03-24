@@ -125,7 +125,7 @@ ClickHouse Server Nodes
 Clickhouse Keeper Nodes 
 */}}
 {{- define "clickhouse.keeperNodes" -}}
-{{- range $i, $e := until (.Values.replicas | int) }}
+{{- range $i, $e := until 3 }}
 <node>
     <host>{{- include "clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{- include "clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</host>
     <port>{{ $.Values.server.zookeeperPort }}</port></node>
@@ -136,7 +136,7 @@ Clickhouse Keeper Nodes
 ClickHouse Keeper Raft Configuration
 */}}
 {{- define "clickhouse.raftNodes" -}}
-{{- range $i, $e := until (.Values.replicas | int) }}
+{{- range $i, $e := until 3 }}
 <server>
     <id>{{ $i }}</id>
     <hostname>{{ include "clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.{{ include "clickhouse.fullname" $ }}-ch-keeper-headless.{{ $.Release.Namespace }}.svc.cluster.local</hostname>
@@ -144,6 +144,60 @@ ClickHouse Keeper Raft Configuration
 </server>
 {{- end }}
 {{- end }}
+
+{{/*
+Validate required S3 configuration
+*/}}
+{{- define "clickhouse.validateS3Config" -}}
+{{- if not .Values.bucket.region -}}
+{{- fail "buckets.region is required" -}}
+{{- end -}}
+{{- if not .Values.bucket.endpoints -}}
+{{- fail "buckets.endpoints is required" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Get S3 access key from secret
+*/}}
+{{- define "clickhouse.s3.accessKey" -}}
+  {{- $secretName := .Values.bucket.secret.secretName -}}
+  {{- $accessKey := .Values.bucket.secret.accessKeyName -}}
+  {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
+  {{- printf "secretName: %s, accessKey: %s, secret: %v" $secretName $accessKey $secret -}}
+  {{- if and $secret $secret.data }}
+    {{- $value := index $secret.data $accessKey | b64dec -}}
+    {{- if $value }}
+      {{- $value -}}
+    {{- else }}
+      {{- fail (printf "Key %s not found in Secret %s" $accessKey $secretName) -}}
+    {{- end }}
+  {{- else }}
+    {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
+  {{- end }}
+{{- end -}}
+
+
+{{/*
+Get S3 secret key from secret
+*/}}
+{{- define "clickhouse.s3.secretKey" -}}
+  {{- include "clickhouse.validateS3Config" . -}}
+  {{- $secretName := .Values.bucket.secret.secretName -}}
+  {{- $secretKey := .Values.bucket.secret.secretKeyName -}}
+  {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
+  {{- printf "secretName: %s, secretKey: %s, secret: %v" $secretName $secretKey $secret -}}
+  {{- if and $secret $secret.data }}
+    {{- $value := index $secret.data $secretKey | b64dec -}}
+    {{- if $value }}
+      {{- $value -}}
+    {{- else }}
+      {{- fail (printf "Key %s not found in Secret %s" $secretKey $secretName) -}}
+    {{- end }}
+  {{- else }}
+    {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
+  {{- end }}
+{{- end -}}
 
 {{/*
 ClickHouse Server Configuration
@@ -208,34 +262,22 @@ ClickHouse Server Configuration
         </merge_tree>
         <storage_configuration>
             <disks>
-                <s3_disk>
+                <s3_express>
                     <type>s3</type>
-                    <endpoint>https://s3.{{ $.Values.buckets.region }}.amazonaws.com/{{ index $.Values.buckets.replicaBucketNames $i }}</endpoint>
-                    {{- if $.Values.buckets.secret.name }}
+                    <endpoint>{{ index $.Values.bucket.endpoints $i }}</endpoint>
+                    <region>{{ $.Values.bucket.region }}</region>
                     <access_key_id>{{ include "clickhouse.s3.accessKey" $ }}</access_key_id>
                     <secret_access_key>{{ include "clickhouse.s3.secretKey" $ }}</secret_access_key>
-                    {{- else }}
-                    <use_environment_credentials>true</use_environment_credentials>
-                    {{- end }}
-                    <metadata_path>/var/lib/clickhouse/disks/s3_disk/</metadata_path>
                 </s3_disk>
-                <s3_cache>
-                    <type>cache</type>
-                    <disk>s3_disk</disk>
-                    <path>/var/lib/clickhouse/disks/s3_cache/</path>
-                    <max_size>20Gi</max_size>
-                    <enable_filesystem_cache_on_write_operations>1</enable_filesystem_cache_on_write_operations>
-                    <cache_on_write_operations>1</cache_on_write_operations>
-                </s3_cache>
             </disks>
             <policies>
-                <s3_main>
+                <s3_express>
                     <volumes>
                         <main>
-                            <disk>s3_cache</disk>
+                            <disk>s3_express</disk>
                         </main>
                     </volumes>
-                </s3_main>
+                </s3_express>
             </policies>
         </storage_configuration>
     </clickhouse>
@@ -246,7 +288,7 @@ ClickHouse Server Configuration
 ClickHouse Keeper Instance Configuration
 */}}
 {{- define "clickhouse.keeperConfig" -}}
-{{- range $i, $e := until (.Values.replicas | int) }}
+{{- range $i, $e := until 3 }}
   {{ include "clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.xml: |
     <clickhouse replace="true">
         <path>/var/lib/clickhouse/coordination/keeper</path>
@@ -283,75 +325,3 @@ ClickHouse Keeper Instance Configuration
     </clickhouse>
 {{- end }}
 {{- end }}
-
-{{/*
-Get the number of replicas for ClickHouse server
-*/}}
-{{- define "clickhouse.replicas" -}}
-{{- $replicas := .Values.replicas | default 3 -}}
-{{- if not (kindIs "int" $replicas) -}}
-{{- fail "replicas must be an integer" -}}
-{{- end -}}
-{{- if lt $replicas 1 -}}
-{{- fail "replicas must be greater than 0" -}}
-{{- end -}}
-{{- $replicas -}}
-{{- end -}}
-
-{{/*
-Get the number of replicas for ClickHouse keeper
-*/}}
-{{- define "clickhouse.keeper.replicas" -}}
-{{- $replicas := .Values.replicas | default 3 -}}
-{{- if not (kindIs "int" $replicas) -}}
-{{- fail "replicas must be an integer" -}}
-{{- end -}}
-{{- if lt $replicas 1 -}}
-{{- fail "replicas must be greater than 0" -}}
-{{- end -}}
-{{- $replicas -}}
-{{- end -}}
-
-{{/*
-Validate required S3 configuration
-*/}}
-{{- define "clickhouse.validateS3Config" -}}
-{{- if not .Values.buckets.region -}}
-{{- fail "buckets.region is required" -}}
-{{- end -}}
-{{- if not .Values.buckets.replicaBucketNames -}}
-{{- fail "buckets.replicaBucketNames is required" -}}
-{{- end -}}
-{{- if ne (len .Values.buckets.replicaBucketNames) (.Values.replicas | int) -}}
-{{- fail (printf "Number of replicaBucketNames (%d) must match number of replicas (%d)" (len .Values.buckets.replicaBucketNames) (.Values.replicas | int)) -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Get S3 access key from secret
-*/}}
-{{- define "clickhouse.s3.accessKey" -}}
-{{- include "clickhouse.validateS3Config" . -}}
-{{- $secretName := .Values.buckets.secret.name -}}
-{{- $secretKey := .Values.buckets.secret.accessKeyKey -}}
-{{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
-{{- if $secret -}}
-{{- index $secret.data $secretKey | b64dec -}}
-{{- else -}}
-{{- fail (printf "Secret %s not found in namespace %s" $secretName .Release.Namespace) -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Get S3 secret key from secret
-*/}}
-{{- define "clickhouse.s3.secretKey" -}}
-{{- $secretName := .Values.buckets.secret.name -}}
-{{- $secretKey := .Values.buckets.secret.secretKeyKey -}}
-{{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
-{{- if $secret -}}
-{{- index $secret.data $secretKey | b64dec -}}
-{{- else -}}
-{{- fail (printf "Secret %s not found in namespace %s" $secretName .Release.Namespace) -}}
-{{- end -}}
-{{- end -}}
