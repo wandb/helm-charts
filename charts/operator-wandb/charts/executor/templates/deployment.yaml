@@ -42,8 +42,10 @@ spec:
       {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
       # needed to ensure ensure Kafka consumers handle pod termination gracefully and avoid data loss
       terminationGracePeriodSeconds: 60
+      {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
-      {{- include "wandb.imagePullSecrets" . }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
@@ -111,13 +113,15 @@ spec:
               value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
               value: "{{ include "wandb.redis.host" . }}"
+            - name: REDIS_PARAMS
+              value: "{{ include "wandb.redis.parametersQuery" . | trim }}"
             - name: REDIS
-              value: "{{ include "executor.redis" . | trim }}"
+              value: "{{ include "wandb.redis.connectionString" . | trim }}"
 
             - name: GORILLA_SETTINGS_CACHE
-              value: "{{ include "executor.redis" . | trim }}"
+              value: "{{ include "wandb.redis.connectionString" . | trim }}"
             - name: GORILLA_METADATA_CACHE
-              value: "{{ include "executor.redis" . | trim }}"
+              value: "{{ include "wandb.redis.connectionString" . | trim }}"
 
             - name: GORILLA_TASK_QUEUE
               value: "{{ include "executor.taskQueue" . | trim }}"
