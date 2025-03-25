@@ -52,7 +52,17 @@ Return the db password
 Return the db connection string
 */}}
 {{- define "wandb.mysql" -}}
-mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+  {{- print "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?" -}}
+  {{- if .Values.global.mysql.tlsSecret.name }}
+    {{- print "tls=custom&ssl-cert=/tbd/tls.crt&ssl-key=/tbd/tls.key" -}}
+    {{- $secretObj := (lookup "v1" "Secret" .Release.Namespace .Values.global.mysql.tlsSecret.name) | default dict }}
+    {{- $ca := (get $secretObj .Values.global.mysql.tlsSecret.caKeyName) }}
+    {{- if $ca }}
+      {{- print "&ssl-ca=/tbd/ca.crt" -}}
+    {{- end }}
+  {{- else -}}
+    {{- print "tls=preferred" -}}
+  {{- end -}}
 {{- end -}}
 
 
