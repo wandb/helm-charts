@@ -74,12 +74,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key:  {{ .Values.global.mysql.passwordSecret.passwordKey }}
-
-          {{- if ne .Values.global.mysql.tlsSecret.name "" }}
-          command: ['bash', '-c', "SSL_CA_PARAM=$([ -f \"$SSL_PATH/ca.crt\" ] && echo \"--ssl-ca=$SSL_PATH/ca.crt\" || echo \"\"); until mysql --ssl-cert=$SSL_PATH/tls.crt --ssl-key=$SSL_PATH/tls.key $SSL_CA_PARAM -h \"$MYSQL_HOST\" -u \"$MYSQL_USER\" -p\"$MYSQL_PASSWORD\" -D \"$MYSQL_DATABASE\" -P \"$MYSQL_PORT\" --execute=\"SELECT 1\"; do echo \"waiting for db\"; sleep 2; done"]
-          {{- else }}
-          command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
-          {{- end }}
+          command: ['bash', '-c', "{{ include "wandb.waitForMySQL" }}"]
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
