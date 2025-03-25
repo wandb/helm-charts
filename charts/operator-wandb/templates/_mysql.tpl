@@ -52,7 +52,32 @@ Return the db password
 Return the db connection string
 */}}
 {{- define "wandb.mysql" -}}
-mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+  {{- print "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?" -}}
+  {{- if .Values.global.mysql.tlsSecret.name }}
+    {{- print "tls=custom&ssl-cert=/etc/ssl/certs/mysql/tls.crt&ssl-key=/etc/ssl/certs/mysql/tls.key" -}}
+    {{- $secretObj := (lookup "v1" "Secret" .Release.Namespace .Values.global.mysql.tlsSecret.name) | default dict -}}
+    {{- $ca := (get $secretObj .Values.global.mysql.tlsSecret.caKeyName) -}}
+    {{- if ne $ca "" -}}
+      {{- print "&ssl-ca=/etc/ssl/certs/mysql/ca.crt" -}}
+    {{- end -}}
+  {{- else -}}
+    {{- print "tls=preferred" -}}
+  {{- end -}}
 {{- end -}}
 
+{{- define "wandb.waitForMySQL" -}}
+{{- print "until mysql " -}}
+{{- print "-h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT " -}}
+  {{- if .Values.global.mysql.tlsSecret.name }}
+    {{- print "--ssl-cert=/etc/ssl/certs/mysql/tls.crt --ssl-key=/etc/ssl/certs/mysql/tls.crt " }}
+
+    {{- $secretObj := (lookup "v1" "Secret" .Release.Namespace .Values.global.mysql.tlsSecret.name) | default dict }}
+    {{- $ca := (get $secretObj .Values.global.mysql.tlsSecret.caKeyName) }}
+    {{- if $ca }}
+      {{- print "--ssl-ca=/etc/ssl/certs/mysql/ca.crt " -}}
+    {{- end }}
+  {{- end }}
+{{- print "--execute=\"SELECT 1\"; " -}}
+{{- print "do echo waiting for db; sleep 2; done" -}}
+{{- end -}}
 
