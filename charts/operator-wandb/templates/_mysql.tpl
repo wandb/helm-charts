@@ -50,9 +50,29 @@ Return the db password
 
 {{/*
 Return the db connection string
+TODO: In the future there might a ssl key+crt w/o CA or just a CA.
 */}}
 {{- define "wandb.mysql" -}}
-mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+  {{- print "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?" -}}
+  {{- if .Values.global.mysql.tlsSecret.name }}
+    {{- print "tls=custom" -}}
+    {{- print "&ssl-cert=/etc/ssl/certs/mysql/tls.crt" -}}
+    {{- print "&ssl-key=/etc/ssl/certs/mysql/tls.key" -}}
+    {{- print "&ssl-ca=/etc/ssl/certs/mysql/ca.crt" -}}
+  {{- else -}}
+    {{- print "tls=preferred" -}}
+  {{- end -}}
 {{- end -}}
 
+{{- define "wandb.waitForMySQL" -}}
+{{- print "until mysql " -}}
+{{- print "-h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT " -}}
+  {{- if .Values.global.mysql.tlsSecret.name }}
+    {{- print "--ssl-cert=/etc/ssl/certs/mysql/tls.crt " -}}
+    {{- print "--ssl-key=/etc/ssl/certs/mysql/tls.key " -}}
+    {{- print "--ssl-ca=/etc/ssl/certs/mysql/ca.crt " -}}
+  {{- end }}
+{{- print "--execute=\"SELECT 1\"; " -}}
+{{- print "do echo waiting for db; sleep 2; done" -}}
+{{- end -}}
 
