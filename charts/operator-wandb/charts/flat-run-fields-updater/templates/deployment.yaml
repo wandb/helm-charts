@@ -53,6 +53,10 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
+            {{- if ne .Values.global.mysql.tlsSecret.name "" }}
+            - name: mysql-certs
+              mountPath: /etc/ssl/certs/mysql/
+            {{- end }}
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "flat-run-fields-updater.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
@@ -129,7 +133,7 @@ spec:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
-              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+              value: "{{ include "wandb.mysql" . }}"
             {{- if not .Values.global.pubSub.enabled }}
             - name: KAFKA_CLIENT_PASSWORD
               valueFrom:
@@ -189,6 +193,19 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
+        {{- if ne .Values.global.mysql.tlsSecret.name "" }}
+        - name: mysql-certs
+          secret:
+            secretName: {{ .Values.global.mysql.tlsSecret.name }}
+            optional: true
+            items:
+              - key: {{ .Values.global.mysql.tlsSecret.keyKeyName }}
+                path: tls.key
+              - key: {{ .Values.global.mysql.tlsSecret.crtKeyName }}
+                path: tls.crt
+              - key: {{ .Values.global.mysql.tlsSecret.caKeyName }}
+                path: ca.crt 
+        {{- end }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "flat-run-fields-updater.fullname" . }}-redis-ca
           secret:
