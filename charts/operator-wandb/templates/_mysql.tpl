@@ -76,3 +76,26 @@ TODO: In the future there might a ssl key+crt w/o CA or just a CA.
 {{- print "do echo waiting for db; sleep 2; done" -}}
 {{- end -}}
 
+{{- define "wandb.mysql.volumeMount" -}}
+{{- if ne .Values.global.mysql.tlsSecret.name "" -}}
+- name: mysql-certs
+  mountPath: /etc/ssl/certs/mysql/
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{- define "wandb.mysql.volume" -}}
+{{- if ne .Values.global.mysql.tlsSecret.name "" -}}
+- name: mysql-certs
+  secret:
+    secretName: {{ .Values.global.mysql.tlsSecret.name }}
+    optional: true
+    items:
+      - key: {{ .Values.global.mysql.tlsSecret.keyKeyName }}
+        path: tls.key
+      - key: {{ .Values.global.mysql.tlsSecret.crtKeyName }}
+        path: tls.crt
+      - key: {{ .Values.global.mysql.tlsSecret.caKeyName }}
+        path: ca.crt
+{{- end -}}
+{{- end -}}

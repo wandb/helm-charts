@@ -55,8 +55,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           {{- if ne .Values.global.mysql.tlsSecret.name "" }}
           volumeMounts:
-            - name: mysql-certs
-              mountPath: /etc/ssl/certs/mysql/
+            {{- include "wandb.mysql.volumeMount" . | nindent 12 }}
           {{- end }}
           env:
             - name: MYSQL_PORT
@@ -78,10 +77,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           volumeMounts:
-            {{- if ne .Values.global.mysql.tlsSecret.name "" }}
-            - name: mysql-certs
-              mountPath: /etc/ssl/certs/mysql/
-            {{- end }}
+            {{- include "wandb.mysql.volumeMount" . | nindent 12 }}
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "app.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
@@ -170,7 +166,7 @@ spec:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key:  {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
-              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+              value: "{{ include "wandb.mysql" . }}"
             - name: WEAVE_SERVICE
               value: "{{ .Release.Name }}-weave:9994"
             - name: PARQUET_HOST
@@ -393,19 +389,7 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
-        {{- if ne .Values.global.mysql.tlsSecret.name "" }}
-        - name: mysql-certs
-          secret:
-            secretName: {{ .Values.global.mysql.tlsSecret.name }}
-            optional: true
-            items:
-              - key: {{ .Values.global.mysql.tlsSecret.keyKeyName }}
-                path: tls.key
-              - key: {{ .Values.global.mysql.tlsSecret.crtKeyName }}
-                path: tls.crt
-              - key: {{ .Values.global.mysql.tlsSecret.caKeyName }}
-                path: ca.crt 
-        {{- end }}
+        {{- include "wandb.mysql.volume" . | nindent 8 }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "app.fullname" . }}-redis-ca
           secret:
