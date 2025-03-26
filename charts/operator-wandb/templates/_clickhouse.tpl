@@ -59,7 +59,7 @@ Return name of secret where ClickHouse information is stored
 {{- if .Values.global.clickhouse.external -}}
   {{- .Values.global.clickhouse.user | default "default" -}}
 {{- else -}}
-  default
+  wandb-user
 {{- end -}}
 {{- end -}}
 
@@ -68,6 +68,6 @@ Return name of secret where ClickHouse information is stored
 {{- if .Values.global.clickhouse.password -}}
   {{- .Values.global.clickhouse.password | default "default" -}}
 {{- else -}}
-  default
+  {{ randAlphaNum 16 | quote }}
 {{- end -}}
 {{- end -}}

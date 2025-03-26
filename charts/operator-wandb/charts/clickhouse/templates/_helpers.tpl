@@ -164,7 +164,6 @@ Get S3 access key from secret
   {{- $secretName := .Values.bucket.secret.secretName -}}
   {{- $accessKey := .Values.bucket.secret.accessKeyName -}}
   {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
-  {{- printf "secretName: %s, accessKey: %s, secret: %v" $secretName $accessKey $secret -}}
   {{- if and $secret $secret.data }}
     {{- $value := index $secret.data $accessKey | b64dec -}}
     {{- if $value }}
@@ -186,7 +185,6 @@ Get S3 secret key from secret
   {{- $secretName := .Values.bucket.secret.secretName -}}
   {{- $secretKey := .Values.bucket.secret.secretKeyName -}}
   {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
-  {{- printf "secretName: %s, secretKey: %s, secret: %v" $secretName $secretKey $secret -}}
   {{- if and $secret $secret.data }}
     {{- $value := index $secret.data $secretKey | b64dec -}}
     {{- if $value }}
@@ -268,7 +266,7 @@ ClickHouse Server Configuration
                     <region>{{ $.Values.bucket.region }}</region>
                     <access_key_id>{{ include "clickhouse.s3.accessKey" $ }}</access_key_id>
                     <secret_access_key>{{ include "clickhouse.s3.secretKey" $ }}</secret_access_key>
-                </s3_disk>
+                </s3_express>
             </disks>
             <policies>
                 <s3_express>
