@@ -53,6 +53,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
+            {{- include "wandb.mysql.volumeMount" . | nindent 12 }}
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "flat-run-fields-updater.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
@@ -129,7 +130,7 @@ spec:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
-              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+              value: "{{ include "wandb.mysql" . }}"
             {{- if not .Values.global.pubSub.enabled }}
             - name: KAFKA_CLIENT_PASSWORD
               valueFrom:
@@ -189,6 +190,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
+        {{- include "wandb.mysql.volume" . | nindent 8 }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "flat-run-fields-updater.fullname" . }}-redis-ca
           secret:

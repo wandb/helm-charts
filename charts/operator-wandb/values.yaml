@@ -76,6 +76,13 @@ global:
     database: "wandb_local"
     user: "wandb"
     password: ""
+    # tlsSecret is used to optionally pass certs which the services will use to connect to mysql
+    tlsSecret:
+      # the name of the secret which is managed by the end user
+      name: ""
+      keyKeyName: "tls.key"
+      crtKeyName: "tls.crt"
+      caKeyName: "ca.crt"
     passwordSecret:
       name: ""
       rootPasswordKey: "MYSQL_ROOT_PASSWORD"
@@ -780,11 +787,9 @@ api:
               name: '{{ include "wandb.mysql.passwordSecret" . }}'
               key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
       command:
-        [
-          "bash",
-          "-c",
-          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
-        ]
+        - "bash"
+        - "-c"
+        - '{{ include "wandb.waitForMySQL" . }}'
     migrate-db:
       env:
         MYSQL_HOST:
@@ -836,17 +841,20 @@ api:
         requests:
           cpu: 500m
           memory: 1Gi
-      volumeMounts:
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
   image:
     repository: wandb/megabinary
     tag: latest
+  volumeMounts:
+    - name: wandb-ca-certs
+      mountPath: /usr/local/share/ca-certificates/inline
+    - name: wandb-ca-certs-user
+      mountPath: /usr/local/share/ca-certificates/configmap
+    - name: redis-ca
+      mountPath: /etc/ssl/certs/redis_ca.pem
+      subPath: redis_ca.pem
+    - name: mysql-certs
+      mountPath: /etc/ssl/certs/mysql/
+      readOnly: true
   volumes:
     - name: wandb-ca-certs
       configMap:
@@ -862,6 +870,17 @@ api:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
         optional: true
+    - name: mysql-certs
+      secret:
+        secretName: "{{ .Values.global.mysql.tlsSecret.name }}"
+        optional: true
+        items:
+          - key: "{{ .Values.global.mysql.tlsSecret.keyKeyName }}"
+            path: tls.key
+          - key: "{{ .Values.global.mysql.tlsSecret.crtKeyName }}"
+            path: tls.crt
+          - key: "{{ .Values.global.mysql.tlsSecret.caKeyName }}"
+            path: ca.crt 
 
 settingsMigrationJob:
   install: false
