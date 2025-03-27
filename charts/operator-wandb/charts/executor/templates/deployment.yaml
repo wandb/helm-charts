@@ -52,6 +52,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
+            {{- include "wandb.mysql.volumeMount" . | nindent 12 }}
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "executor.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
@@ -102,7 +103,7 @@ spec:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
-              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+              value: "{{ include "wandb.mysql" . }}"
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -117,17 +118,14 @@ spec:
               value: "{{ include "wandb.redis.parametersQuery" . | trim }}"
             - name: REDIS
               value: "{{ include "wandb.redis.connectionString" . | trim }}"
-
             - name: GORILLA_SETTINGS_CACHE
               value: "{{ include "wandb.redis.connectionString" . | trim }}"
             - name: GORILLA_METADATA_CACHE
               value: "{{ include "wandb.redis.connectionString" . | trim }}"
-
             - name: GORILLA_TASK_QUEUE
               value: "{{ include "executor.taskQueue" . | trim }}"
             - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
               value: "true"
-            
             {{- if not .Values.global.pubSub.enabled}}
             - name: KAFKA_CLIENT_PASSWORD
               valueFrom:
@@ -157,10 +155,8 @@ spec:
               value: {{ include "executor.liveHistoryStore" .| quote }}
             - name: GORILLA_FILE_STREAM_STORE_ADDRESS
               value: {{ include "executor.fileStreamStore" . | quote }}
-
             - name: GORILLA_PARQUET_ARROW_BUFFER_SIZE
               value: "2147483648" # 2GB
-
             - name: AZURE_STORAGE_KEY
               valueFrom:
                 secretKeyRef:
@@ -169,20 +165,16 @@ spec:
                   key: {{ .accessKeyName }}
                   optional: true
                   {{- end }}
-
             - name: G_HOST_IP
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP
-
             {{- if ne .Values.global.email.smtp.host "" }}
             - name: GORILLA_EMAIL_SINK
               value: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
             {{- end }}
-
             {{- include "executor.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
-
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.affinity }}
@@ -194,6 +186,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
+        {{- include "wandb.mysql.volume" . | nindent 8 }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "executor.fullname" . }}-redis-ca
           secret:

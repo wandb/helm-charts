@@ -11,6 +11,7 @@
 {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
 {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
 {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env))) }}
+{{- $_ = set $container "volumeMounts" (concat (default (list) $container.volumeMounts) (default (list) $.root.Values.volumeMounts)) }}
 {{- $_ = set $container "root" $.root }}
 {{- include "wandb-base.container" $container -}}
 {{- end }}
@@ -20,7 +21,7 @@
 - name: {{ .name }}
   {{- if .command }}
   command:
-    {{- toYaml .command | nindent 4 }}
+    {{- tpl (toYaml .command | nindent 4) $.root }}
   {{- end }}
   {{- if .args }}
   args:
