@@ -125,7 +125,8 @@ requiredDuringSchedulingIgnoredDuringExecution:
 {{- end -}}
 
 {{/*
-Return a nodeAffinity definition
+Return a nodeAffinity type definition based on the provided type parameter.
+Accepts "type" as either "soft" or "hard" and delegates to the appropriate template.
 */}}
 {{- define "wandb.nodeAffinity.type" -}}
   {{- if eq .type "soft" }}
