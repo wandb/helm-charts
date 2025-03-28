@@ -106,7 +106,7 @@ spec:
             - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
               value: {{ .Values.observability.metrics.otlpTemporalityPreference | quote }}
             {{- end }}
-            {{- if and (eq .Values.storage.use "gcs") (.Values.storage.gcs.secretName) }}
+            {{- if and (eq (tpl .Values.storage.use .) "gcs") (.Values.storage.gcs.secretName) }}
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /config/secrets/google-service-account/credentials.json
             {{- end }}
@@ -186,12 +186,12 @@ spec:
               name: config-volume
               readOnly: true
               subPath: config.yaml
-            {{- if and (eq .Values.storage.use "s3") (.Values.storage.s3.accessKeyId) }}
+            {{- if and (eq (tpl .Values.storage.use .) "s3") (.Values.storage.s3.accessKeyId) }}
             - name: storage
               mountPath: /config/secrets/storage
               readOnly: true
             {{- end }}
-            {{- if and (eq .Values.storage.use "gcs") (.Values.storage.gcs.secretName) }}
+            {{- if and (eq (tpl .Values.storage.use .) "gcs") (.Values.storage.gcs.secretName) }}
             - name: google-service-account
               mountPath: /config/secrets/google-service-account
               readOnly: true
@@ -238,7 +238,7 @@ spec:
         {{- with .Values.bufstream.deployment.extraContainers }}
         {{ include "bufstream.render" (dict "value" . "context" $) | nindent 8 }}
         {{- end }}
-      serviceAccountName: {{ .Values.bufstream.serviceAccount.name }}
+      serviceAccountName: {{ tpl .Values.bufstream.serviceAccount.name . }}
       terminationGracePeriodSeconds: {{ .Values.bufstream.deployment.terminationGracePeriodSeconds }}
       volumes:
         - name: config-volume
@@ -247,7 +247,7 @@ spec:
               - key: config.yaml
                 path: config.yaml
             name: {{ include "bufstream.name" . }}-config
-        {{- if and (eq .Values.storage.use "s3") (.Values.storage.s3.accessKeyId) }}
+        {{- if and (eq (tpl .Values.storage.use .) "s3") (.Values.storage.s3.accessKeyId) }}
         - name: storage
           secret:
             secretName: {{ tpl .Values.storage.s3.secretName . }}
@@ -255,7 +255,7 @@ spec:
               - key: {{ tpl .Values.storage.s3.secretKeyName . }}
                 path: secret_access_key
         {{- end }}
-        {{- if and (eq .Values.storage.use "gcs") (.Values.storage.gcs.secretName) }}
+        {{- if and (eq (tpl .Values.storage.use .) "gcs") (.Values.storage.gcs.secretName) }}
         - name: google-service-account
           secret:
             secretName: {{ .Values.storage.gcs.secretName }}
