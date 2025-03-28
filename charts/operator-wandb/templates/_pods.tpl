@@ -88,3 +88,49 @@ securityContext:
 {{- end }}
 {{- end }}
 
+
+{{/*
+Return a soft nodeAffinity definition
+{{ include "wandb.nodeAffinity.soft" (dict "key" "FOO" "values" (list "BAR" "BAZ")) -}}
+*/}}
+
+{{- define "wandb.nodeAffinity.soft" -}}
+preferredDuringSchedulingIgnoredDuringExecution:
+  - preference:
+      matchExpressions:
+        - key: {{ .key }}
+          operator: In
+          values:
+            {{- range .values }}
+            - {{ . | quote }}
+            {{- end }}
+    weight: 1
+{{- end -}}
+
+{{/*
+Return a hard nodeAffinity definition
+{{ include "wandb.nodeAffinity.hard" (dict "key" "FOO" "values" (list "BAR" "BAZ")) -}}
+*/}}
+
+{{- define "wandb.nodeAffinity.hard" -}}
+requiredDuringSchedulingIgnoredDuringExecution:
+  nodeSelectorTerms:
+    - matchExpressions:
+        - key: {{ .key }}
+          operator: In
+          values:
+            {{- range .values }}
+            - {{ . | quote }}
+            {{- end }}
+{{- end -}}
+
+{{/*
+Return a nodeAffinity definition
+*/}}
+{{- define "wandb.nodeAffinity.type" -}}
+  {{- if eq .type "soft" }}
+    {{- include "wandb.nodeAffinity.soft" . -}}
+  {{- else if eq .type "hard" }}
+    {{- include "wandb.nodeAffinity.hard" . -}}
+  {{- end -}}
+{{- end -}}
