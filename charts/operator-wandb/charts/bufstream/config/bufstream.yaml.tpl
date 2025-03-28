@@ -4,14 +4,14 @@ cluster: {{ .Values.cluster }}
 zone: {{ . | quote }}
 {{- end }}
 
-{{- if eq .Values.storage.use "gcs" }}
+{{- if eq (tpl .Values.storage.use .) "gcs" }}
 storage:
   provider: GCS
   bucket: {{ tpl .Values.storage.gcs.bucket . | required ".Values.storage.gcs.bucket is required when using gcs." }}
   {{- if .Values.storage.gcs.prefix }}
   prefix: {{ tpl .Values.storage.gcs.prefix . }}
   {{- end }}
-{{- else if eq .Values.storage.use "s3" }}
+{{- else if eq (tpl .Values.storage.use .) "s3" }}
 storage:
   provider: S3
   bucket: {{ tpl .Values.storage.s3.bucket . | required ".Values.storage.s3.bucket is required when using s3." }}
