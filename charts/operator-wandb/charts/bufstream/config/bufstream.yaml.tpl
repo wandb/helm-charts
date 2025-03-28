@@ -7,15 +7,15 @@ zone: {{ . | quote }}
 {{- if eq .Values.storage.use "gcs" }}
 storage:
   provider: GCS
-  bucket: {{ tpl .Values.storage.gcs.bucket . }}
+  bucket: {{ tpl .Values.storage.gcs.bucket . | required ".Values.storage.gcs.bucket is required when using gcs." }}
   {{- if .Values.storage.gcs.prefix }}
   prefix: {{ tpl .Values.storage.gcs.prefix . }}
   {{- end }}
 {{- else if eq .Values.storage.use "s3" }}
 storage:
   provider: S3
-  bucket: {{ tpl .Values.storage.s3.bucket . }}
-  region: {{ tpl .Values.storage.s3.region . }}
+  bucket: {{ tpl .Values.storage.s3.bucket . | required ".Values.storage.s3.bucket is required when using s3." }}
+  region: {{ tpl .Values.storage.s3.region . | required ".Values.storage.s3.region is required when using s3." }}
   {{- if .Values.storage.s3.prefix }}
   prefix: {{ tpl .Values.storage.s3.prefix . }}
   {{- end }}
