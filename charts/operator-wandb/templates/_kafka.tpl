@@ -100,6 +100,20 @@ kafka://$(KAFKA_CLIENT_USER):$(A_KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(K
 {{- end -}}
 {{- end -}}
 
+
+{{/*
+TODO(Zachary B) - Check with dpanzella to see if this is correct. 
+*/}}
+{{- define "wandb.runUpdateShadowQueue" -}}
+{{- if .Values.global.pubSub.enabled -}}
+pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}/{{ .Values.pubSub.subscription }}
+{{- else if .Values.global.beta.bufstream.enabled -}}
+kafka://$(KAFKA_BROKER_HOST):9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3
+{{- else -}}
+kafka://$(KAFKA_CLIENT_USER):$(A_KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=default-group&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3
+{{- end -}}
+{{- end -}}
+
 {{/* TODO(dpanzella) - Probably need to make this support kafka as well*/}}
 {{- define "wandb.fileStreamStoreProducer" -}}
 {{- if .Values.global.pubSub.enabled -}}
