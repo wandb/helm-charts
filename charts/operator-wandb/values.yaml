@@ -316,6 +316,7 @@ console:
 
 flat-run-fields-updater:
   install: true
+  deploymentPostfix: "bc"
   service:
     enabled: false
   autoscaling:
@@ -1018,42 +1019,3 @@ reloader:
   reloadOnDelete: true
   serviceAccount:
     create: false
-
-pre-hook:
-  install: true
-  service:
-    enabled: false
-  role:
-    create: true
-    rules:
-      - apiGroups:
-          - "apps"
-        resources:
-          - deployments
-        verbs:
-          - get
-          - list
-          - delete
-  kind: Job
-  jobs:
-    pre-hook:
-      annotations:
-        "helm.sh/hook": pre-install,pre-upgrade
-        "helm.sh/hook-delete-policy": hook-succeeded
-      containers:
-        pre-hook:
-          image:
-            repository: bitnami/kubectl
-            tag: latest
-          command:
-            - bash
-            - -c
-            - |
-              OLD_VERSION=$(kubectl get deployment wandb-flat-run-fields-updater -o jsonpath="{.metadata.labels.app\.kubernetes\.io/version}" 2>/dev/null || echo "none")
-              if [ "$OLD_VERSION" = "0.33.0" ]; then
-                echo "Old deployment found with version $OLD_VERSION. Deleting..."
-                kubectl delete deployment wandb-flat-run-fields-updater --ignore-not-found
-              else
-                echo "Old deployment not found or already updated. Skipping deletion."
-              fi
-          restartPolicy: Never
