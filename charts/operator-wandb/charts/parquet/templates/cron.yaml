@@ -42,6 +42,10 @@ spec:
           {{- include "wandb.nodeSelector" . | nindent 10 }}
           {{- include "wandb.priorityClassName" . | nindent 10 }}
           {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 10 }}
+          {{- with .Values.global.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           containers:
             - name: backfill-job
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -111,15 +115,17 @@ spec:
                   value: "{{ include "wandb.redis.port" . }}"
                 - name: REDIS_HOST
                   value: "{{ include "wandb.redis.host" . }}"
+                - name: REDIS_PARAMS
+                  value: "{{ include "wandb.redis.parametersQuery" . | trim }}"
                 - name: REDIS
-                  value: "{{ include "parquet.redis" . | trim }}"
+                  value: "{{ include "wandb.redis.connectionString" . | trim }}"
 
                 - name: GORILLA_SETTINGS_CACHE
-                  value: "{{ include "parquet.redis" . | trim }}"
+                  value: "{{ include "wandb.redis.connectionString" . | trim }}"
 
                 {{- if .Values.global.executor.enabled }}
                 - name: GORILLA_TASK_QUEUE
-                  value: "{{ include "app.redis" . | trim }}"
+                  value: "{{ include "wandb.redis.connectionString" . | trim }}"
                 - name: GORILLA_TASK_QUEUE_WORKER_ENABLED
                   value: "false"
                 - name: GORILLA_CLEAR_TASK_DEDUPE_KEY_ENABLED
