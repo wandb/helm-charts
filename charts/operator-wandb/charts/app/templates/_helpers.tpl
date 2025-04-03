@@ -1,5 +1,3 @@
-{{/* vim: set filetype=mustache: */}}
-
 {{/*
 Expand the name of the chart.
 */}}
@@ -85,7 +83,7 @@ app deployments and other shared objects.
 {{- $commonLabels := default (dict) .Values.common.labels -}}
 {{- if $commonLabels }}
 {{-   range $key, $value := $commonLabels }}
-{{ $key }}: {{ $value | quote }}
+{{ $key }}: {{ $value | trunc 63 | quote }}
 {{-   end }}
 {{- end -}}
 {{- end -}}
@@ -96,7 +94,7 @@ app deployments.
 */}}
 {{- define "app.podLabels" -}}
 {{- range $key, $value := .Values.pod.labels }}
-{{ $key }}: {{ $value | quote }}
+{{ $key }}: {{ $value | trunc 63 | quote }}
 {{- end }}
 {{- end -}}
 

@@ -37,7 +37,7 @@ Common labels
 helm.sh/chart: {{ include "wandb-base.chart" . }}
 {{ include "wandb-base.selectorLabels" . }}
 {{- if .Values.image.tag }}
-app.kubernetes.io/version: {{ .Values.image.tag | quote }}
+app.kubernetes.io/version: {{ .Values.image.tag | trunc 63 | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
