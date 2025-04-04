@@ -60,7 +60,12 @@ jobs:
         if: env.ACT || steps.list-changed.outputs.changed == 'true'
 
       - name: Apply user defined secrets
-        run: kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} apply -f test-configs/additional-resources/${{matrix.configuration}}
+        run: |
+          if [[ -d test-configs/additional-resources/${{matrix.configuration}} ]]; then
+            kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} apply -f test-configs/additional-resources/${{matrix.configuration}}
+          else
+            echo "No additional resources to be applied for ${{matrix.configuration}}"
+          fi
         if: env.ACT || steps.list-changed.outputs.changed == 'true'
 
       - name: Run chart-testing (install)
