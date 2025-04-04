@@ -3,25 +3,15 @@ fullnameOverride: ""
 
 # Number of ClickHouse server replicas
 # ClickHouse Keeper will always have 3 replicas for high availability
-replicas: { { .Values.clickhouse.replicas | default 3 } }
+replicas: 3
 
 server_image:
-  repository:
-    {
-      {
-        .Values.clickhouse.server_image.repository | default "clickhouse/clickhouse-server" | quote,
-      },
-    }
-  tag: { { .Values.clickhouse.server_image.tag | default "24.8.14" | quote } }
+  repository: "clickhouse/clickhouse-server"
+  tag: "24.8.14"
 
 keeper_image:
-  repository:
-    {
-      {
-        .Values.clickhouse.keeper_image.repository | default "clickhouse/clickhouse-keeper" | quote,
-      },
-    }
-  tag: { { .Values.clickhouse.keeper_image.tag | default "24.8.14" | quote } }
+  repository: "clickhouse/clickhouse-keeper"
+  tag: "24.8.14"
 
 # Note: database, user, and password are configured via top-level wandb.clickhouse helpers
 server:
@@ -54,9 +44,8 @@ keeper:
 
 # Local cache configuration
 cache:
-  size: { { .Values.clickhouse.cache.size | default "20Gi" } }
-  path:
-    { { .Values.clickhouse.cache.path | default "/var/lib/clickhouse/cache" } }
+  size: "20Gi"
+  path: "/var/lib/clickhouse/cache"
 
 service:
   annotations: {}
@@ -111,12 +100,12 @@ persistence:
     accessModes:
       - ReadWriteOnce
     # Size will be automatically calculated based on cache size + 10Gi
-    size: '{{ if .Values.clickhouse.cache.size }}{{ include "clickhouse.calculateStorageSize" . }}{{ else }}30Gi{{ end }}'
+    size: "30Gi"
   # Keeper persistence (for ClickHouse Keeper nodes)
   keeper:
     accessModes:
       - ReadWriteOnce
-    size: { { .Values.clickhouse.persistence.keeper.size | default "10Gi" } }
+    size: "10Gi"
 
 serviceAccount:
   name: "clickhouse"
@@ -127,37 +116,21 @@ serviceAccount:
 # S3 bucket configuration derived from global values
 bucket:
   # Use single bucket or multiple buckets
-  useSingleBucket:
-    { { .Values.clickhouse.bucket.useSingleBucket | default false } }
+  useSingleBucket: false
   # Path prefix for single bucket mode
-  path: { { .Values.clickhouse.bucket.path | default "clickhouse" } }
+  path: "clickhouse"
   # Credentials configuration
-  accessKeyId:
-    { { .Values.clickhouse.bucket.accessKeyId | default "" | quote } }
-  secretAccessKey:
-    { { .Values.clickhouse.bucket.secretAccessKey | default "" | quote } }
-  useInstanceMetadata:
-    { { .Values.clickhouse.bucket.useInstanceMetadata | default false } }
+  accessKeyId: ""
+  secretAccessKey: ""
+  useInstanceMetadata: false
   # Secret configuration
   secret:
-    secretName:
-      { { .Values.clickhouse.bucket.secret.secretName | default "" | quote } }
-    accessKeyName:
-      {
-        {
-          .Values.clickhouse.bucket.secret.accessKeyName | default "ACCESS_KEY" | quote,
-        },
-      }
-    secretKeyName:
-      {
-        {
-          .Values.clickhouse.bucket.secret.secretKeyName | default "SECRET_KEY" | quote,
-        },
-      }
+    secretName: ""
+    accessKeyName: "ACCESS_KEY"
+    secretKeyName: "SECRET_KEY"
   # AWS region
-  region: { { .Values.clickhouse.bucket.region | default "" | quote } }
+  region: ""
   # Multiple bucket endpoints (used when useSingleBucket is false)
-  endpoints:
-    { { .Values.clickhouse.bucket.endpoints | default (list) | toJson } }
+  endpoints: []
   # Single bucket endpoint (used when useSingleBucket is true)
-  endpoint: { { .Values.clickhouse.bucket.endpoint | default "" | quote } }
+  endpoint: ""
