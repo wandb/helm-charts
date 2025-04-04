@@ -22,6 +22,8 @@ else:
 
 allow_k8s_contexts(settings.get("allowed_k8s_contexts"))
 
+current_values = read_yaml(settings.get("values"))
+
 if settings.get("installMinio"):
     k8s_yaml('./test-configs/minio/default.yaml')
     k8s_resource(
@@ -36,12 +38,15 @@ if settings.get("installMinio"):
 k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("values")]))
 k8s_resource('wandb-app', port_forwards=8080, objects=['wandb-app:ServiceAccount:default', 'wandb-app-config:secret:default'])
 k8s_resource('wandb-console', port_forwards=8082, objects=['wandb-console:ServiceAccount:default', 'wandb-console:clusterrole:default', 'wandb-console:clusterrolebinding:default'])
-k8s_resource('wandb-executor',objects=['wandb-executor:ServiceAccount:default'])
+if current_values.get('executor', {}).get('install', False):
+    k8s_resource('wandb-executor',objects=['wandb-executor:ServiceAccount:default'])
 k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)
 k8s_resource('wandb-otel-daemonset',objects=['wandb-otel-daemonset:ServiceAccount:default', 'wandb-otel-daemonset:clusterrole:default', 'wandb-otel-daemonset:clusterrolebinding:default'])
 k8s_resource('wandb-parquet',objects=['wandb-parquet:ServiceAccount:default'])
 k8s_resource('wandb-prometheus-server',objects=['wandb-prometheus-server:ServiceAccount:default', 'wandb-prometheus-server:clusterrole:default', 'wandb-prometheus-server:clusterrolebinding:default'])
 k8s_resource('wandb-redis-master',objects=['wandb-redis-master:ServiceAccount:default'])
+if current_values.get('reloader', {}).get('install', False):
+    k8s_resource('wandb-reloader',objects=['wandb-reloader:ServiceAccount:default'])
 k8s_resource('wandb-weave',objects=['wandb-weave:ServiceAccount:default'])
 k8s_resource(
     new_name='wandb-configs',
