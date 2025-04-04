@@ -1,0 +1,183 @@
+{{- if eq (include "clickhouse.shouldInstall" .) "true" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "clickhouse.fullname" . }}-ch-server
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "clickhouse.commonLabels" . | nindent 4 }}
+    {{- include "clickhouse.labels" . | nindent 4 }}
+    {{- if .Values.deployment.labels }}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
+    {{- if .Values.deployment.annotations -}}
+    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.replicas }}
+  podManagementPolicy: "{{ .Values.common.podManagementPolicy | default "Parallel" }}"
+  selector:
+    matchLabels:
+      {{ include "wandb.selectorLabels" $ | nindent 6 }}
+      {{ include "clickhouse.labels" . | nindent 6 }}
+  serviceName: {{ include "clickhouse.fullname" . }}-ch-server-headless
+  template:
+    metadata:
+      labels:
+        {{ include "wandb.podLabels" . | nindent 8 }}
+        {{ include "clickhouse.commonLabels" . | nindent 8 }}
+        {{ include "clickhouse.podLabels" . | nindent 8 }}
+        {{ include "clickhouse.labels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.pod.annotations -}}
+        {{-   toYaml .Values.pod.annotations | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      containers:
+        - name: clickhouse
+          image: "{{ .Values.server_image.repository }}:{{ .Values.server_image.tag }}"
+          {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: REPLICA_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+                  {{- /* Extract the replica index from the pod name */}}
+              {{- /* Will extract the ordinal from pod name like clickhouse-ch-server-0 */}}
+            - name: CLICKHOUSE_USER
+              value: {{ include "wandb.clickhouse.user" . | quote }}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.clickhouse.passwordSecret" . }}
+                  key: {{ include "wandb.clickhouse.passwordSecret.passwordKey" . }}
+            - name: CLICKHOUSE_DATABASE
+              value: {{ include "wandb.clickhouse.database" . | quote }}
+            {{- /* S3 bucket configuration */}}
+            - name: S3_REGION
+              value: {{ .Values.bucket.region | quote }}
+            {{- if .Values.bucket.useSingleBucket }}
+            {{- /* For single bucket configuration */}}
+            - name: S3_ENDPOINT
+              value: {{ .Values.bucket.endpoint | quote }}
+            - name: S3_BUCKET_PATH
+              value: "{{ .Values.bucket.path }}/replica-$(echo $REPLICA_INDEX | sed 's/.*-//')"
+            {{- else }}
+            {{- /* For multiple bucket configuration */}}
+            - name: S3_ENDPOINT
+              value: "{{ .Values.bucket.endpoints }}"
+            {{- end }}
+            {{- /* Credentials configuration */}}
+            {{- if .Values.bucket.useInstanceMetadata }}
+            - name: USE_INSTANCE_METADATA
+              value: "true"
+            {{- else if and .Values.bucket.accessKeyId .Values.bucket.secretAccessKey }}
+            - name: AWS_ACCESS_KEY_ID
+              value: {{ .Values.bucket.accessKeyId | quote }}
+            - name: AWS_SECRET_ACCESS_KEY
+              value: {{ .Values.bucket.secretAccessKey | quote }}
+            {{- else if .Values.bucket.secret.secretName }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucket.secret.secretName }}
+                  key: {{ .Values.bucket.secret.accessKeyName }}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucket.secret.secretName }}
+                  key: {{ .Values.bucket.secret.secretKeyName }}
+            {{- end }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/clickhouse-server/config.xml
+              subPathExpr: "$(POD_NAME).xml"
+              readOnly: true
+            - name: clickhouse-data
+              mountPath: /var/lib/clickhouse
+              readOnly: false
+            - name: clickhouse-log
+              mountPath: /var/log/clickhouse-server
+              readOnly: false
+            - name: clickhouse-cache
+              mountPath: {{ .Values.cache.path }}
+              readOnly: false
+          resources:
+            limits:
+              cpu: {{ .Values.server.resources.limits.cpu }}
+              ephemeral-storage: {{ .Values.server.resources.limits.ephemeralStorage }}
+              memory: {{ .Values.server.resources.limits.memory }}
+            requests:
+              cpu: {{ .Values.server.resources.requests.cpu }}
+              ephemeral-storage: {{ .Values.server.resources.requests.ephemeralStorage }}
+              memory: {{ .Values.server.resources.requests.memory }}
+          ports:
+            - name: http
+              containerPort: {{ include "wandb.clickhouse.port" . }}
+            - name: tcp
+              containerPort: {{ .Values.server.tcpPort }}
+            - name: intrsrvhttp
+              containerPort: {{ .Values.server.intrsrvhttpPort }}
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+            tcpSocket:
+              port: http
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+            httpGet:
+              path: /ping
+              port: http
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ include "clickhouse.fullname" . }}-ch-server-config
+        - name: clickhouse-log
+          emptyDir: {}  # Or use a PVC if logs need persistence
+
+  volumeClaimTemplates:
+    - metadata:
+        name: clickhouse-data
+      spec:
+        {{- if .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass }}
+        {{- end }}
+        accessModes:
+          {{- range .Values.persistence.server.accessModes }}
+          - {{ . | quote }}
+          {{- end }}
+        resources:
+          requests:
+            storage: {{ if .Values.persistence.server.size }}{{ .Values.persistence.server.size }}{{ else }}{{ include "clickhouse.calculateStorageSize" . }}{{ end }}
+    - metadata:
+        name: clickhouse-cache
+      spec:
+        {{- if .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass }}
+        {{- end }}
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.cache.size }}
+{{- end }}
