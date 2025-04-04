@@ -22,39 +22,60 @@ Get ClickHouse password from either explicit value or secret
   {{- if .Values.global.clickhouse.password -}}
     {{- .Values.global.clickhouse.password -}}
   {{- else if .Values.global.clickhouse.passwordSecret.name -}}
-    {{- $secretName := .Values.global.clickhouse.passwordSecret.name -}}
-    {{- $secretKey := .Values.global.clickhouse.passwordSecret.passwordKey | default "CLICKHOUSE_PASSWORD" -}}
-    {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
-    {{- if and $secret $secret.data }}
-      {{- $value := index $secret.data $secretKey | b64dec -}}
-      {{- if $value }}
-        {{- $value -}}
+    {{- /* For template/lint we simply return a dummy value instead of trying to look up a secret */ -}}
+    {{- if .Release.IsUpgrade | or .Release.IsInstall -}}
+      {{- $secretName := .Values.global.clickhouse.passwordSecret.name -}}
+      {{- $secretKey := .Values.global.clickhouse.passwordSecret.passwordKey | default "CLICKHOUSE_PASSWORD" -}}
+      {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
+      {{- if and $secret $secret.data }}
+        {{- $value := index $secret.data $secretKey | b64dec -}}
+        {{- if $value }}
+          {{- $value -}}
+        {{- else }}
+          {{- fail (printf "Key %s not found in Secret %s" $secretKey $secretName) -}}
+        {{- end }}
       {{- else }}
-        {{- fail (printf "Key %s not found in Secret %s" $secretKey $secretName) -}}
+        {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
       {{- end }}
-    {{- else }}
-      {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
-    {{- end }}
+    {{- else -}}
+      {{- /* Return a dummy password for lint/template */ -}}
+      dummy-password-lint-only
+    {{- end -}}
   {{- else }}
-    {{- fail "When using external ClickHouse (clickhouse.install=false), either global.clickhouse.password or global.clickhouse.passwordSecret must be provided" -}}
+    {{- if .Release.IsUpgrade | or .Release.IsInstall -}}
+      {{- fail "When using external ClickHouse (clickhouse.install=false), either global.clickhouse.password or global.clickhouse.passwordSecret must be provided" -}}
+    {{- else -}}
+      {{- /* Return a dummy password for lint/template */ -}}
+      dummy-password-lint-only
+    {{- end -}}
   {{- end }}
 {{- else -}}
   {{- if .Values.clickhouse.password -}}
     {{- .Values.clickhouse.password -}}
-  {{- else if .Values.clickhouse.passwordSecret.name -}}
-    {{- $secretName := .Values.clickhouse.passwordSecret.name -}}
-    {{- $secretKey := .Values.clickhouse.passwordSecret.key | default "CLICKHOUSE_PASSWORD" -}}
-    {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
-    {{- if and $secret $secret.data }}
-      {{- $value := index $secret.data $secretKey | b64dec -}}
-      {{- if $value }}
-        {{- $value -}}
-      {{- else }}
-        {{- fail (printf "Key %s not found in Secret %s" $secretKey $secretName) -}}
-      {{- end }}
-    {{- else }}
-      {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
-    {{- end }}
+  {{- else if .Values.clickhouse.passwordSecret -}}
+    {{- if .Values.clickhouse.passwordSecret.name -}}
+      {{- /* For template/lint we simply return a dummy value instead of trying to look up a secret */ -}}
+      {{- if .Release.IsUpgrade | or .Release.IsInstall -}}
+        {{- $secretName := .Values.clickhouse.passwordSecret.name -}}
+        {{- $secretKey := .Values.clickhouse.passwordSecret.key | default "CLICKHOUSE_PASSWORD" -}}
+        {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
+        {{- if and $secret $secret.data }}
+          {{- $value := index $secret.data $secretKey | b64dec -}}
+          {{- if $value }}
+            {{- $value -}}
+          {{- else }}
+            {{- fail (printf "Key %s not found in Secret %s" $secretKey $secretName) -}}
+          {{- end }}
+        {{- else }}
+          {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
+        {{- end }}
+      {{- else -}}
+        {{- /* Return a dummy password for lint/template */ -}}
+        dummy-password-lint-only
+      {{- end -}}
+    {{- else -}}
+      {{- randAlphaNum 16 | quote -}}
+    {{- end -}}
   {{- else -}}
     {{- randAlphaNum 16 | quote -}}
   {{- end }}
@@ -72,8 +93,12 @@ Return name of secret where ClickHouse information is stored
     {{- fail "When using external ClickHouse (clickhouse.install=false), global.clickhouse.passwordSecret.name must be provided" -}}
   {{- end }}
 {{- else -}}
-  {{- if .Values.clickhouse.passwordSecret.name -}}
-    {{- .Values.clickhouse.passwordSecret.name -}}
+  {{- if .Values.clickhouse.passwordSecret -}}
+    {{- if .Values.clickhouse.passwordSecret.name -}}
+      {{- .Values.clickhouse.passwordSecret.name -}}
+    {{- else -}}
+      {{- printf "%s-clickhouse" .Release.Name -}}
+    {{- end -}}
   {{- else -}}
     {{- printf "%s-clickhouse" .Release.Name -}}
   {{- end -}}
@@ -91,8 +116,12 @@ Return key in secret where ClickHouse password is stored
     {{- fail "When using external ClickHouse (clickhouse.install=false), global.clickhouse.passwordSecret.name must be provided" -}}
   {{- end }}
 {{- else -}}
-  {{- if .Values.clickhouse.passwordSecret.name -}}
-    {{- .Values.clickhouse.passwordSecret.key | default "CLICKHOUSE_PASSWORD" -}}
+  {{- if .Values.clickhouse.passwordSecret -}}
+    {{- if .Values.clickhouse.passwordSecret.key -}}
+      {{- .Values.clickhouse.passwordSecret.key | default "CLICKHOUSE_PASSWORD" -}}
+    {{- else -}}
+      CLICKHOUSE_PASSWORD
+    {{- end -}}
   {{- else -}}
     CLICKHOUSE_PASSWORD
   {{- end -}}
@@ -103,7 +132,11 @@ Return key in secret where ClickHouse password is stored
 {{- if not .Values.clickhouse.install -}}
   {{- .Values.global.clickhouse.port | default 8123 -}}
 {{- else -}}
-  {{- .Values.clickhouse.server.httpPort | default 8123 -}}
+  {{- if .Values.clickhouse.server -}}
+    {{- .Values.clickhouse.server.httpPort | default 8123 -}}
+  {{- else -}}
+    {{- 8123 -}}
+  {{- end -}}
 {{- end -}}
 {{- end -}}
 

@@ -144,11 +144,7 @@ If you prefer to use an external ClickHouse instance, set `clickhouse.install: f
 Below is an example values.yaml for deploying the Weights & Biases Operator with weave-trace and the new ClickHouse chart using a simple configuration:
 
 ```yaml
-# Deploy weave-trace
-weave-trace:
-  install: true
-
-# Deploy and configure ClickHouse
+# Deploy ClickHouse
 clickhouse:
   install: true
   
@@ -191,6 +187,12 @@ clickhouse:
     # Keeper persistence (for ClickHouse Keeper nodes)
     keeper:
       size: "10Gi"
+      
+# Deploy weave-trace to use the installed ClickHouse
+weave-trace:
+  install: true
+  # No need to configure ClickHouse connection details
+  # These will be automatically derived from the ClickHouse installation
 
 ### Using an External ClickHouse
 
@@ -201,11 +203,7 @@ Alternatively, if you want to use an existing external ClickHouse instance:
 clickhouse:
   install: false
 
-# Deploy weave-trace
-weave-trace:
-  install: true
-
-# Configure external ClickHouse for weave-trace  
+# Configure external ClickHouse settings
 global:
   clickhouse:
     host: "your-external-clickhouse-host.example.com"
@@ -214,23 +212,25 @@ global:
     user: "wandb"
     password: "your-external-clickhouse-password"
     replicated: true  # Set to true if your external ClickHouse is replicated
+
+# Deploy weave-trace to use the external ClickHouse
+weave-trace:
+  install: true
+  # No need to configure ClickHouse connection details
+  # These will be automatically derived from the global.clickhouse settings
 ```
 
 This configuration will:
-1. Deploy only weave-trace without deploying ClickHouse
-2. Configure weave-trace to connect to your external ClickHouse instance
-3. Use the specified credentials and database for the external connection
+1. Skip deploying ClickHouse
+2. Configure connection details for your external ClickHouse instance
+3. Deploy weave-trace, which will automatically use the external ClickHouse settings
 
 ### Minimal Development Configuration
 
 For development or testing purposes, you can minimize resources by using a single ClickHouse replica:
 
 ```yaml
-# Deploy weave-trace
-weave-trace:
-  install: true
-
-# Deploy ClickHouse with minimal configuration
+# Deploy ClickHouse with minimal resources
 clickhouse:
   install: true
   
@@ -257,6 +257,10 @@ clickhouse:
   persistence:
     keeper:
       size: "5Gi"
+      
+# Deploy weave-trace to use the installed ClickHouse
+weave-trace:
+  install: true
 ```
 
 This minimal configuration still maintains the 3-node Keeper cluster for high availability (required for ClickHouse coordination) but reduces the number of ClickHouse server replicas to just one, which is sufficient for development and testing.

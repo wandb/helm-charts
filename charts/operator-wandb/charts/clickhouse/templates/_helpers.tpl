@@ -158,39 +158,60 @@ Validate required S3 configuration
 Get S3 access key from secret
 */}}
 {{- define "clickhouse.s3.accessKey" -}}
-  {{- $secretName := .Values.bucket.secret.secretName -}}
-  {{- $accessKey := .Values.bucket.secret.accessKeyName -}}
-  {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
-  {{- if and $secret $secret.data }}
-    {{- $value := index $secret.data $accessKey | b64dec -}}
-    {{- if $value }}
-      {{- $value -}}
-    {{- else }}
-      {{- fail (printf "Key %s not found in Secret %s" $accessKey $secretName) -}}
-    {{- end }}
-  {{- else }}
-    {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
-  {{- end }}
+  {{- if .Values.bucket.accessKeyId -}}
+    {{- .Values.bucket.accessKeyId -}}
+  {{- else if .Values.bucket.useInstanceMetadata -}}
+    instance-metadata
+  {{- else -}}
+    {{- if .Release.IsUpgrade | or .Release.IsInstall -}}
+      {{- $secretName := .Values.bucket.secret.secretName -}}
+      {{- $accessKey := .Values.bucket.secret.accessKeyName -}}
+      {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
+      {{- if and $secret $secret.data }}
+        {{- $value := index $secret.data $accessKey | b64dec -}}
+        {{- if $value }}
+          {{- $value -}}
+        {{- else }}
+          {{- fail (printf "Key %s not found in Secret %s" $accessKey $secretName) -}}
+        {{- end }}
+      {{- else }}
+        {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
+      {{- end }}
+    {{- else -}}
+      {{- /* Return a dummy value for lint/template */ -}}
+      dummy-access-key-lint-only
+    {{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/*
 Get S3 secret key from secret
 */}}
 {{- define "clickhouse.s3.secretKey" -}}
-  {{- include "clickhouse.validateS3Config" . -}}
-  {{- $secretName := .Values.bucket.secret.secretName -}}
-  {{- $secretKey := .Values.bucket.secret.secretKeyName -}}
-  {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
-  {{- if and $secret $secret.data }}
-    {{- $value := index $secret.data $secretKey | b64dec -}}
-    {{- if $value }}
-      {{- $value -}}
-    {{- else }}
-      {{- fail (printf "Key %s not found in Secret %s" $secretKey $secretName) -}}
-    {{- end }}
-  {{- else }}
-    {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
-  {{- end }}
+  {{- if .Values.bucket.secretAccessKey -}}
+    {{- .Values.bucket.secretAccessKey -}}
+  {{- else if .Values.bucket.useInstanceMetadata -}}
+    instance-metadata
+  {{- else -}}
+    {{- if .Release.IsUpgrade | or .Release.IsInstall -}}
+      {{- $secretName := .Values.bucket.secret.secretName -}}
+      {{- $secretKey := .Values.bucket.secret.secretKeyName -}}
+      {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
+      {{- if and $secret $secret.data }}
+        {{- $value := index $secret.data $secretKey | b64dec -}}
+        {{- if $value }}
+          {{- $value -}}
+        {{- else }}
+          {{- fail (printf "Key %s not found in Secret %s" $secretKey $secretName) -}}
+        {{- end }}
+      {{- else }}
+        {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
+      {{- end }}
+    {{- else -}}
+      {{- /* Return a dummy value for lint/template */ -}}
+      dummy-secret-key-lint-only
+    {{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/*
@@ -320,7 +341,7 @@ ClickHouse Keeper Instance Configuration
 Calculate the total storage size needed based on cache size + 10Gi
 */}}
 {{- define "clickhouse.calculateStorageSize" -}}
-{{- $cacheSize := .Values.clickhouse.cache.size | default "20Gi" -}}
+{{- $cacheSize := .Values.cache.size | default "20Gi" -}}
 {{- $numericSize := regexReplaceAll "([0-9]+)([A-Za-z]+)" $cacheSize "${1}" | int -}}
 {{- $unit := regexReplaceAll "([0-9]+)([A-Za-z]+)" $cacheSize "${2}" -}}
 {{- $totalSize := add $numericSize 10 -}}
@@ -335,9 +356,5 @@ Helper to determine if ClickHouse should be installed
 {{- end -}}
 
 {{/*
-Helper to determine if Weave Trace is using the installed ClickHouse
-*/}}
-{{- define "clickhouse.useInstalledClickhouse" -}}
-{{- $weavetrace_install := index .Values "weave-trace" "install" | default false -}}
-{{- if and (include "clickhouse.shouldInstall" .) $weavetrace_install -}}true{{- else -}}false{{- end -}}
-{{- end -}}
+Helper for ClickHouse installation */}}
+{{- define "clickhouse.useInstalledClickhouse" -}}false{{- end -}}
