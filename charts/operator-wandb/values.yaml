@@ -495,10 +495,29 @@ etcd:
 
 bufstream:
   install: false
-  metadata:
-    use: ""
   storage:
-    use: ""
+    use: '{{ (include "wandb.bucket" . | fromYaml).provider }}'
+    gcs:
+      bucket: '{{ include "wandb.bufstream.bucket.name" . }}'
+    s3:
+      bucket: '{{ include "wandb.bufstream.bucket.name" . }}'
+      accessKeyId: '{{ (include "wandb.bucket" . | fromYaml).accessKey }}'
+      secretName: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+      secretKeyName: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
+      region: '{{ (include "wandb.bucket" . | fromYaml).region }}'
+      endpoint: '{{ include "wandb.bufstream.bucket.endpoint" . }}'
+  metadata:
+    use: etcd
+    etcd:
+      addresses:
+        - host: '{{ .Release.Name }}-etcd.{{ .Release.Namespace }}.svc.cluster.local'
+          port: 2379
+  bufstream:
+    deployment:
+      resources:
+        requests:
+          cpu: '1'
+          memory: 4Gi
 
 glue:
   # install: false
@@ -928,8 +947,11 @@ settingsMigrationJob:
 
 reloader:
   install: false
-  watchGlobally: false
-  reloadOnCreate: true
-  reloadOnDelete: true
-  serviceAccount:
-    create: false
+  reloader:
+    # deployment:
+    #   image:
+    #     repository: ghcr.io/stakater/reloader
+    #     tag: v1.3.0
+    watchGlobally: false
+    reloadOnCreate: true
+    reloadOnDelete: true
