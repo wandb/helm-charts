@@ -94,18 +94,25 @@ global:
       # grpc, http
       proto: "grpc"
 
+  # Global configuration for external ClickHouse
+  # These settings are only used when clickhouse.install is false
   clickhouse:
-    install: false
+    # Host for external ClickHouse (required when not installing ClickHouse)
     host: ""
-    port: 8443
-    password: "fake"
-    passwordSecret:
-      name: ""
-      passwordKey: "CLICKHOUSE_PASSWORD"
+    # Default ClickHouse HTTP port
+    port: 8123
+    # Default database name
     database: "weave_trace_db"
-    user: "default"
-    # Required when using replicated services on self-managed ClickHouse (not ClickHouse Cloud).
-    # Flag will substitute MergeTree() with ReplicatedMergeTree() and use `ON CLUSTER` on table creation.
+    # Default user
+    user: "wandb"
+    # Password for external ClickHouse (required if not using passwordSecret)
+    password: ""
+    passwordSecret:
+      # Name of the secret containing the password
+      name: ""
+      # Key in the secret containing the password
+      passwordKey: "CLICKHOUSE_PASSWORD"
+    # Whether the external ClickHouse is replicated
     replicated: false
 
   email:
@@ -201,9 +208,6 @@ global:
   # Name of a ConfigMap containing additional .crt files for CA certificates.
   caCertsConfigMap: ""
 
-  weave-trace:
-    enabled: false
-
   api:
     enabled: false
   glue:
@@ -280,6 +284,106 @@ weave:
   image:
     repository: wandb/local
     tag: latest
+
+# Configuration for ClickHouse installation by the operator
+clickhouse:
+  # Enable or disable ClickHouse installation by the operator
+  install: true
+
+  # Number of ClickHouse server replicas (default: 3)
+  # ClickHouse Keeper will always have 3 replicas for high availability
+  replicas: 3
+
+  # Database name for ClickHouse
+  database: "weave_wandb_db"
+
+  # User for ClickHouse
+  user: "wandb"
+
+  # Password for ClickHouse (will be auto-generated if not provided)
+  password: ""
+
+  # Secret containing the password (alternative to password field)
+  passwordSecret:
+    # Name of the secret containing the password
+    name: ""
+    # Key in the secret containing the password
+    key: "CLICKHOUSE_PASSWORD"
+
+  # Server configuration
+  server:
+    httpPort: 8123
+    tcpPort: 9000
+
+  # ClickHouse server image configuration
+  server_image:
+    repository: "clickhouse/clickhouse-server"
+    # Use a specific version tag instead of 'latest' for stability
+    tag: "24.8.14"
+
+  # ClickHouse keeper image configuration
+  keeper_image:
+    repository: "clickhouse/clickhouse-keeper"
+    # Use a specific version tag instead of 'latest' for stability
+    tag: "24.8.14"
+
+  # Persistence configuration
+  persistence:
+    # Server persistence (for ClickHouse replicas)
+    server:
+      # Size will be automatically calculated based on cache size + 10Gi
+      size: ""
+      accessModes:
+        - ReadWriteOnce
+    # Keeper persistence (for ClickHouse Keeper nodes)
+    keeper:
+      size: "10Gi"
+      accessModes:
+        - ReadWriteOnce
+
+  # S3 bucket configuration for ClickHouse data
+  bucket:
+    # Flag to use the same bucket for all replicas
+    # If true, use common configuration with a different path for each replica
+    # If false, specify unique endpoints for each replica
+    useSingleBucket: false
+
+    # For single bucket mode: the path prefix within the bucket for each replica
+    # Will be automatically appended with replica number (e.g. path/replica-0)
+    path: "clickhouse"
+
+    # Access credentials can be provided directly or via secret
+    accessKeyId: ""
+    secretAccessKey: ""
+
+    # Use instance metadata instead of credentials (for cloud environments)
+    useInstanceMetadata: false
+
+    # Secret configuration for bucket credentials
+    secret:
+      secretName: "wandb-clickhouse"
+      accessKeyName: "ACCESS_KEY"
+      secretKeyName: "SECRET_KEY"
+
+    # Required: AWS region for S3 buckets (e.g., us-east-1, eu-central-1)
+    region: "us-east-1"
+
+    # Required only when useSingleBucket is false: List of S3 bucket endpoints for each replica
+    # Must match the number of replicas
+    endpoints:
+      - ""
+      - ""
+      - ""
+
+    # Required only when useSingleBucket is true: Single bucket endpoint for all replicas
+    endpoint: ""
+
+  # Local cache configuration for ClickHouse
+  cache:
+    # Cache size for ClickHouse (persistent volume will be 10GB larger)
+    size: 20Gi
+    # Cache path within the container
+    path: /var/lib/clickhouse/cache
 
 weave-trace:
   install: false
@@ -933,3 +1037,9 @@ reloader:
   reloadOnDelete: true
   serviceAccount:
     create: false
+
+# Subchart configuration - Values to be passed directly to the clickhouse subchart
+# This ensures parent chart values are passed down to the subchart
+subchart:
+  clickhouse:
+    install: true
