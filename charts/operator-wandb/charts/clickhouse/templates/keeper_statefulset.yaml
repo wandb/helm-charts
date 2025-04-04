@@ -1,4 +1,4 @@
-{{- if .Values.install }}
+{{- if eq (include "clickhouse.shouldInstall" .) "true" }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -63,10 +63,22 @@ spec:
               mountPath: /etc/clickhouse-keeper
             - name: keeper-data
               mountPath: /var/lib/clickhouse
+              readOnly: false
             - name: keeper-data
               mountPath: /var/lib/clickhouse-keeper
+              readOnly: false
             - name: keeper-data
               mountPath: /var/log/clickhouse-keeper
+              readOnly: false
+            # Ensure coordination paths are explicitly mounted to persist raft state
+            - name: keeper-data
+              mountPath: /var/lib/clickhouse/coordination/log
+              readOnly: false
+              subPath: coordination/log
+            - name: keeper-data
+              mountPath: /var/lib/clickhouse/coordination/snapshots
+              readOnly: false
+              subPath: coordination/snapshots
             - name: config-volume
               mountPath: /etc/clickhouse-keeper/keeper_config.xml
               subPathExpr: "$(POD_NAME).xml"
@@ -118,9 +130,14 @@ spec:
     - metadata:
         name: keeper-data
       spec:
+        {{- if .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass }}
+        {{- end }}
         accessModes:
-          - ReadWriteOnce
+          {{- range .Values.persistence.keeper.accessModes }}
+          - {{ . | quote }}
+          {{- end }}
         resources:
           requests:
-            storage: {{ .Values.persistence.size }}
+            storage: {{ .Values.persistence.keeper.size }}
 {{- end }}

@@ -1,4 +1,4 @@
-{{- if .Values.install }}
+{{- if eq (include "clickhouse.shouldInstall" .) "true" }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -17,7 +17,7 @@ metadata:
     {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
-  podManagementPolicy: "{{ .Values.common.podManagementPolicy }}"
+  podManagementPolicy: "{{ .Values.common.podManagementPolicy | default "Parallel" }}"
   selector:
     matchLabels:
       {{ include "wandb.selectorLabels" $ | nindent 6 }}
@@ -51,11 +51,56 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: REPLICA_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+                  {{- /* Extract the replica index from the pod name */}}
+              {{- /* Will extract the ordinal from pod name like clickhouse-ch-server-0 */}}
+            - name: CLICKHOUSE_USER
+              value: {{ include "wandb.clickhouse.user" . | quote }}
             - name: CLICKHOUSE_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.clickhouse.passwordSecret" . }}
                   key: {{ include "wandb.clickhouse.passwordSecret.passwordKey" . }}
+            - name: CLICKHOUSE_DATABASE
+              value: {{ include "wandb.clickhouse.database" . | quote }}
+            {{- /* S3 bucket configuration */}}
+            - name: S3_REGION
+              value: {{ .Values.bucket.region | quote }}
+            {{- if .Values.bucket.useSingleBucket }}
+            {{- /* For single bucket configuration */}}
+            - name: S3_ENDPOINT
+              value: {{ .Values.bucket.endpoint | quote }}
+            - name: S3_BUCKET_PATH
+              value: "{{ .Values.bucket.path }}/replica-$(echo $REPLICA_INDEX | sed 's/.*-//')"
+            {{- else }}
+            {{- /* For multiple bucket configuration */}}
+            - name: S3_ENDPOINT
+              value: "{{ .Values.bucket.endpoints }}"
+            {{- end }}
+            {{- /* Credentials configuration */}}
+            {{- if .Values.bucket.useInstanceMetadata }}
+            - name: USE_INSTANCE_METADATA
+              value: "true"
+            {{- else if and .Values.bucket.accessKeyId .Values.bucket.secretAccessKey }}
+            - name: AWS_ACCESS_KEY_ID
+              value: {{ .Values.bucket.accessKeyId | quote }}
+            - name: AWS_SECRET_ACCESS_KEY
+              value: {{ .Values.bucket.secretAccessKey | quote }}
+            {{- else if .Values.bucket.secret.secretName }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucket.secret.secretName }}
+                  key: {{ .Values.bucket.secret.accessKeyName }}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucket.secret.secretName }}
+                  key: {{ .Values.bucket.secret.secretKeyName }}
+            {{- end }}
           volumeMounts:
             - name: config-volume
               mountPath: /etc/clickhouse-server/config.xml
@@ -66,6 +111,9 @@ spec:
               readOnly: false
             - name: clickhouse-log
               mountPath: /var/log/clickhouse-server
+              readOnly: false
+            - name: clickhouse-cache
+              mountPath: {{ .Values.cache.path }}
               readOnly: false
           resources:
             limits:
@@ -104,9 +152,6 @@ spec:
         - name: config-volume
           configMap:
             name: {{ include "clickhouse.fullname" . }}-ch-server-config
-        - name: clickhouse-existing-data
-          persistentVolumeClaim:
-            claimName: clickhouse-pvc  # PVC for persistent data
         - name: clickhouse-log
           emptyDir: {}  # Or use a PVC if logs need persistence
 
@@ -114,9 +159,25 @@ spec:
     - metadata:
         name: clickhouse-data
       spec:
+        {{- if .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass }}
+        {{- end }}
+        accessModes:
+          {{- range .Values.persistence.server.accessModes }}
+          - {{ . | quote }}
+          {{- end }}
+        resources:
+          requests:
+            storage: {{ if .Values.persistence.server.size }}{{ .Values.persistence.server.size }}{{ else }}{{ include "clickhouse.calculateStorageSize" . }}{{ end }}
+    - metadata:
+        name: clickhouse-cache
+      spec:
+        {{- if .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass }}
+        {{- end }}
         accessModes:
           - ReadWriteOnce
         resources:
           requests:
-            storage: {{ .Values.persistence.size }}
+            storage: {{ .Values.cache.size }}
 {{- end }}

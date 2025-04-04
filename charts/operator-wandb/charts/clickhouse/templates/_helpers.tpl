@@ -12,17 +12,16 @@ If release name contains chart name it will be used as a full name.
 */}}
 {{- define "clickhouse.fullname" -}}
 {{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+  {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
 {{- $name := default .Chart.Name .Values.nameOverride }}
 {{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+  {{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+  {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end }}
 {{- end }}
-
 
 {{/*
 Create chart name and version as used by the chart label.
@@ -71,7 +70,6 @@ app.kubernetes.io/name: {{ include "clickhouse.name" . }}{{ .suffix }}
 app.kubernetes.io/instance: {{ .Release.Name }}{{ .suffix }}
 {{- end }}
 
-
 {{/*
 Clickhouse Server Service Port
 */}}
@@ -89,7 +87,6 @@ Clickhouse Server Service Port
   port: {{ .Values.server.intrsrvhttpPort }}
   protocol: TCP
 {{- end }}
-
 
 {{/*
 Clickhouse Keeper Service Port
@@ -175,7 +172,6 @@ Get S3 access key from secret
     {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
   {{- end }}
 {{- end -}}
-
 
 {{/*
 Get S3 secret key from secret
@@ -295,10 +291,6 @@ ClickHouse Keeper Instance Configuration
             <console>true</console>
             <log remove="remove"/>
             <errorlog remove="remove"/>
-            <!-- log>/var/log/clickhouse-keeper/clickhouse-keeper.log</log>
-            <errorlog>/var/log/clickhouse-keeper/clickhouse-keeper.err.log</errorlog>
-            <size>1000M</size>
-            <count>3</count -->
         </logger>
         <listen_host>0.0.0.0</listen_host>
         <keeper_server>
@@ -323,3 +315,28 @@ ClickHouse Keeper Instance Configuration
     </clickhouse>
 {{- end }}
 {{- end }}
+
+{{/*
+Calculate the total storage size needed based on cache size + 10Gi
+*/}}
+{{- define "clickhouse.calculateStorageSize" -}}
+{{- $cacheSize := .Values.clickhouse.cache.size | default "20Gi" -}}
+{{- $numericSize := regexReplaceAll "([0-9]+)([A-Za-z]+)" $cacheSize "${1}" | int -}}
+{{- $unit := regexReplaceAll "([0-9]+)([A-Za-z]+)" $cacheSize "${2}" -}}
+{{- $totalSize := add $numericSize 10 -}}
+{{- printf "%d%s" $totalSize $unit -}}
+{{- end -}}
+
+{{/*
+Helper to determine if ClickHouse should be installed
+*/}}
+{{- define "clickhouse.shouldInstall" -}}
+{{- if .Values.clickhouse.install -}}true{{- else -}}false{{- end -}}
+{{- end -}}
+
+{{/*
+Helper to determine if Weave Trace is using the installed ClickHouse
+*/}}
+{{- define "clickhouse.useInstalledClickhouse" -}}
+{{- if and (include "clickhouse.shouldInstall" .) .Values.weave-trace.install -}}true{{- else -}}false{{- end -}}
+{{- end -}}
