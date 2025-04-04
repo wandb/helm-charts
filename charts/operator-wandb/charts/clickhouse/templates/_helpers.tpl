@@ -338,5 +338,6 @@ Helper to determine if ClickHouse should be installed
 Helper to determine if Weave Trace is using the installed ClickHouse
 */}}
 {{- define "clickhouse.useInstalledClickhouse" -}}
-{{- if and (include "clickhouse.shouldInstall" .) .Values.weave-trace.install -}}true{{- else -}}false{{- end -}}
+{{- $weavetrace_install := index .Values "weave-trace" "install" | default false -}}
+{{- if and (include "clickhouse.shouldInstall" .) $weavetrace_install -}}true{{- else -}}false{{- end -}}
 {{- end -}}
