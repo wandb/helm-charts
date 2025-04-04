@@ -1,0 +1,136 @@
+nameOverride: ""
+fullnameOverride: ""
+
+# Number of ClickHouse server replicas
+# ClickHouse Keeper will always have 3 replicas for high availability
+replicas: 3
+
+server_image:
+  repository: "clickhouse/clickhouse-server"
+  tag: "24.8.14"
+
+keeper_image:
+  repository: "clickhouse/clickhouse-keeper"
+  tag: "24.8.14"
+
+# Note: database, user, and password are configured via top-level wandb.clickhouse helpers
+server:
+  tcpPort: 9000
+  intrsrvhttpPort: 9009
+  zookeeperPort: 9181
+  cluster: "weave_cluster"
+  resources:
+    limits:
+      cpu: 6
+      memory: 2048Mi
+    requests:
+      cpu: "1"
+      ephemeralStorage: 10Gi
+      memory: 2048Mi
+
+keeper:
+  tcpPort: 9181
+  httpPort: 9182
+  raftPort: 9234
+  resources:
+    limits:
+      cpu: "1.5"
+      ephemeralStorage: 20Gi
+      memory: 4096Mi
+    requests:
+      cpu: "0.5"
+      ephemeralStorage: 500Mi
+      memory: 1024Mi
+
+# Local cache configuration
+cache:
+  size: "20Gi"
+  path: "/var/lib/clickhouse/cache"
+
+service:
+  annotations: {}
+  labels: {}
+
+common:
+  annotations: {}
+  labels: {}
+  podManagementPolicy: "Parallel"
+
+deployment:
+  labels: {}
+  annotations: {}
+
+pod:
+  labels: {}
+  annotations: {}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 0
+    fsGroup: 999
+    fsGroupChangePolicy: "OnRootMismatch"
+    seccompProfile:
+      type: ""
+
+container:
+  securityContext:
+    capabilities:
+      add: []
+      drop: []
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    privileged: false
+
+logLevel: information
+
+# Node selector for the StatefulSet pods (for scheduling pods on specific nodes)
+nodeSelector: {}
+
+# Tolerations for the StatefulSet pods (for allowing pods to be scheduled on tainted nodes)
+tolerations: []
+
+# Affinity settings for the StatefulSet pods (for custom scheduling rules)
+affinity: {}
+
+# Persistent volume claim settings for the StatefulSet
+persistence:
+  enabled: true
+  # Server persistence (for ClickHouse replicas)
+  server:
+    accessModes:
+      - ReadWriteOnce
+    # Size will be automatically calculated based on cache size + 10Gi
+    size: "30Gi"
+  # Keeper persistence (for ClickHouse Keeper nodes)
+  keeper:
+    accessModes:
+      - ReadWriteOnce
+    size: "10Gi"
+
+serviceAccount:
+  name: "clickhouse"
+  automountServiceAccountToken: false
+  create: true
+  annotations: {}
+
+# S3 bucket configuration derived from global values
+bucket:
+  # Use single bucket or multiple buckets
+  useSingleBucket: false
+  # Path prefix for single bucket mode
+  path: "clickhouse"
+  # Credentials configuration
+  accessKeyId: ""
+  secretAccessKey: ""
+  useInstanceMetadata: false
+  # Secret configuration
+  secret:
+    secretName: ""
+    accessKeyName: "ACCESS_KEY"
+    secretKeyName: "SECRET_KEY"
+  # AWS region
+  region: ""
+  # Multiple bucket endpoints (used when useSingleBucket is false)
+  endpoints: []
+  # Single bucket endpoint (used when useSingleBucket is true)
+  endpoint: ""
