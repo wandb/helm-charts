@@ -8,259 +8,178 @@ The deployment consists of:
 - 3 ClickHouse Keeper nodes (always 3 for high availability)
 - Configurable number of ClickHouse server replicas (default: 3, can be set to 1 for development)
 
+## Integration with Weights & Biases
+
+This chart is part of the Weights & Biases Operator and is integrated with Weave Trace. It can be used in two ways:
+
+1. **Deployed by the Operator (`clickhouse.install: true`)**: 
+   - The chart deploys a complete ClickHouse installation
+   - All configuration is managed by this chart
+   - Weave Trace connects to this internal ClickHouse
+
+2. **External ClickHouse (`clickhouse.install: false`)**: 
+   - No ClickHouse components are deployed
+   - Weave Trace connects to an external ClickHouse using `global.clickhouse` settings
+   - S3 bucket configuration in this chart is ignored
+
 ## Configuration
 
-| Parameter                            | Description                                                      | Default                        |
-| ------------------------------------ | ---------------------------------------------------------------- | ------------------------------ |
-| `clickhouse.install`                 | Enable or disable ClickHouse installation                        | `true`                         |
-| `clickhouse.replicas`                | Number of ClickHouse server replicas (Keeper will always be 3)   | `3`                            |
-| `clickhouse.database`                | Database name for ClickHouse                                     | `weave_trace_db`               |
-| `clickhouse.user`                    | User for ClickHouse                                              | `wandb-user`                   |
-| `clickhouse.password`                | Password for ClickHouse (will be auto-generated if not provided) | `""`                           |
-| `clickhouse.passwordSecret.name`     | Name of existing secret containing the password                  | `""`                           |
-| `clickhouse.passwordSecret.key`      | Key in the secret containing the password                        | `CLICKHOUSE_PASSWORD`          |
-| `clickhouse.server.httpPort`         | HTTP port for ClickHouse                                         | `8123`                         |
-| `clickhouse.server.tcpPort`          | TCP port for ClickHouse                                          | `9000`                         |
-| `clickhouse.server_image.repository` | ClickHouse server image repository                               | `clickhouse/clickhouse-server` |
-| `clickhouse.server_image.tag`        | ClickHouse server image tag                                      | `24.8.14`                      |
-| `clickhouse.keeper_image.repository` | ClickHouse keeper image repository                               | `clickhouse/clickhouse-keeper` |
-| `clickhouse.keeper_image.tag`        | ClickHouse keeper image tag                                      | `24.8.14`                      |
+| Parameter                 | Description                          | Default                        |
+| ------------------------- | ------------------------------------ | ------------------------------ |
+| `replicas`                | Number of ClickHouse server replicas | `3`                            |
+| `server_image.repository` | ClickHouse server image repository   | `clickhouse/clickhouse-server` |
+| `server_image.tag`        | ClickHouse server image tag          | `24.8.14`                      |
+| `keeper_image.repository` | ClickHouse keeper image repository   | `clickhouse/clickhouse-keeper` |
+| `keeper_image.tag`        | ClickHouse keeper image tag          | `24.8.14`                      |
+| `server.tcpPort`          | TCP port for ClickHouse              | `9000`                         |
+| `server.intrsrvhttpPort`  | Interserver HTTP port                | `9009`                         |
+| `cache.size`              | Cache size for ClickHouse            | `20Gi`                         |
+| `cache.path`              | Cache path within container          | `/var/lib/clickhouse/cache`    |
 
 ### S3 Bucket Configuration
 
-This chart supports two modes for S3 bucket configuration:
+The S3 bucket configuration is only used when the chart deploys ClickHouse (`clickhouse.install: true`). It is ignored when using an external ClickHouse.
 
-#### Single Bucket Mode
+#### Path Style vs Virtual Hosted Style
 
-In single bucket mode, all ClickHouse replicas use the same S3 bucket with different paths:
+The chart supports both path-style and virtual hosted-style S3 URLs:
 
-| Parameter                           | Description                                     | Default      |
-| ----------------------------------- | ----------------------------------------------- | ------------ |
-| `clickhouse.bucket.useSingleBucket` | Use a single bucket for all replicas            | `false`      |
-| `clickhouse.bucket.endpoint`        | S3 bucket endpoint (required for single bucket) | `""`         |
-| `clickhouse.bucket.path`            | Base path prefix for all replicas               | `clickhouse` |
+| Parameter             | Description                                      | Default |
+| --------------------- | ------------------------------------------------ | ------- |
+| `bucket.usePathStyle` | Use path-style S3 URLs instead of virtual hosted | `true`  |
 
-When using single bucket mode, the paths inside your bucket will be structured as follows:
+Format endpoints according to the style you choose:
+- Path-style: `https://s3-endpoint.example.com/bucket-name`
+- Virtual hosted-style: `https://bucket-name.s3-endpoint.example.com`
 
+#### Single vs Multiple Bucket Modes
+
+You can configure ClickHouse to use a single bucket for all replicas or separate buckets for each replica:
+
+##### Single Bucket Mode
+
+In single bucket mode, all ClickHouse replicas use the same bucket with different paths:
+
+| Parameter                | Description                          | Default      |
+| ------------------------ | ------------------------------------ | ------------ |
+| `bucket.useSingleBucket` | Use a single bucket for all replicas | `false`      |
+| `bucket.endpoint`        | S3 bucket endpoint with bucket name  | `""`         |
+| `bucket.path`            | Base path prefix for replicas        | `clickhouse` |
+
+The resulting path structure will be:
 ```
-your-bucket-name/
-├── [path-prefix]/replica-0/
-├── [path-prefix]/replica-1/
-├── [path-prefix]/replica-2/
-```
-
-For example, with `path: "clickhouse-data"`, the actual paths would be:
-- ClickHouse Server 0: `s3://your-bucket-name/clickhouse-data/replica-0`
-- ClickHouse Server 1: `s3://your-bucket-name/clickhouse-data/replica-1`
-- ClickHouse Server 2: `s3://your-bucket-name/clickhouse-data/replica-2`
-
-#### Multiple Bucket Mode
-
-In multiple bucket mode, each ClickHouse replica uses a separate S3 bucket:
-
-| Parameter                           | Description                                   | Default |
-| ----------------------------------- | --------------------------------------------- | ------- |
-| `clickhouse.bucket.useSingleBucket` | Use a single bucket for all replicas          | `false` |
-| `clickhouse.bucket.endpoints`       | List of S3 bucket endpoints (one per replica) | `[]`    |
-
-When using multiple bucket mode, each replica uses its own dedicated bucket:
-
-```
-bucket-for-replica-0/  (for ClickHouse Server 0)
-bucket-for-replica-1/  (for ClickHouse Server 1)
-bucket-for-replica-2/  (for ClickHouse Server 2)
+bucket/
+├── clickhouse/
+    ├── replica-0/
+    ├── replica-1/
+    ├── replica-2/
 ```
 
-The number of endpoints provided must match the number of replicas specified in `clickhouse.replicas`.
+##### Multiple Bucket Mode
 
-### S3 Credentials Configuration
+In multiple bucket mode, each ClickHouse replica uses a separate bucket:
 
-The chart supports three ways to provide S3 credentials:
+| Parameter                | Description                          | Default |
+| ------------------------ | ------------------------------------ | ------- |
+| `bucket.useSingleBucket` | Use a single bucket for all replicas | `false` |
+| `bucket.endpoints`       | List of S3 bucket endpoints          | `[]`    |
 
-1. **Instance Metadata** (recommended for cloud environments):
+The number of endpoints must match the number of replicas. Each endpoint can use:
+- Simple string (uses global credentials): `"https://s3.example.com/bucket1"`
+- Object with custom credentials:
+  ```yaml
+  - url: "https://s3.example.com/bucket2"
+    accessKeyId: "key2"
+    secretAccessKey: "secret2"
+  ```
+  or
+  ```yaml
+  - url: "https://s3.example.com/bucket3"
+    secretName: "bucket3-secret"
+    accessKeyName: "ACCESS_KEY"
+    secretKeyName: "SECRET_KEY"
+  ```
 
-| Parameter                               | Description                           | Default |
-| --------------------------------------- | ------------------------------------- | ------- |
-| `clickhouse.bucket.useInstanceMetadata` | Use instance metadata for credentials | `false` |
+### S3 Credentials
 
-2. **Secret Reference**:
+| Parameter                     | Description                           | Default      |
+| ----------------------------- | ------------------------------------- | ------------ |
+| `bucket.useInstanceMetadata`  | Use instance metadata for credentials | `false`      |
+| `bucket.accessKeyId`          | S3 access key ID                      | `""`         |
+| `bucket.secretAccessKey`      | S3 secret access key                  | `""`         |
+| `bucket.secret.secretName`    | Name of the secret for credentials    | `""`         |
+| `bucket.secret.accessKeyName` | Key in the secret for access key      | `ACCESS_KEY` |
+| `bucket.secret.secretKeyName` | Key in the secret for secret key      | `SECRET_KEY` |
 
-| Parameter                                | Description                               | Default            |
-| ---------------------------------------- | ----------------------------------------- | ------------------ |
-| `clickhouse.bucket.secret.secretName`    | Name of the secret containing credentials | `wandb-clickhouse` |
-| `clickhouse.bucket.secret.accessKeyName` | Key in the secret for access key          | `ACCESS_KEY`       |
-| `clickhouse.bucket.secret.secretKeyName` | Key in the secret for secret key          | `SECRET_KEY`       |
-
-3. **Plain Text Credentials** (not recommended for production):
-
-| Parameter                           | Description          | Default |
-| ----------------------------------- | -------------------- | ------- |
-| `clickhouse.bucket.accessKeyId`     | S3 access key ID     | `""`    |
-| `clickhouse.bucket.secretAccessKey` | S3 secret access key | `""`    |
-
-### Cache Configuration
-
-ClickHouse uses local cache to improve performance. The persistent volume will be 10GB larger than the cache size:
-
-| Parameter               | Description                 | Default                     |
-| ----------------------- | --------------------------- | --------------------------- |
-| `clickhouse.cache.size` | Cache size for ClickHouse   | `20Gi`                      |
-| `clickhouse.cache.path` | Cache path in the container | `/var/lib/clickhouse/cache` |
+The chart will try credentials in this order:
+1. Instance metadata (if `useInstanceMetadata: true`)
+2. Explicitly provided credentials
+3. Secret reference
 
 ### Persistence Configuration
 
 The chart uses persistent volumes for both ClickHouse server replicas and Keeper nodes:
 
-| Parameter                                   | Description                                                              | Default                         |
-| ------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------- |
-| `clickhouse.persistence.server.size`        | Size for each ClickHouse server PVC                                      | Auto-calculated from cache size |
-| `clickhouse.persistence.server.accessModes` | Access modes for server PVCs                                             | `["ReadWriteOnce"]`             |
-| `clickhouse.persistence.keeper.size`        | Size for each ClickHouse Keeper PVC (important for raft quorum recovery) | `10Gi`                          |
-| `clickhouse.persistence.keeper.accessModes` | Access modes for Keeper PVCs                                             | `["ReadWriteOnce"]`             |
+| Parameter                        | Description                  | Default                         |
+| -------------------------------- | ---------------------------- | ------------------------------- |
+| `persistence.server.size`        | Size for each server PVC     | Auto-calculated from cache size |
+| `persistence.server.accessModes` | Access modes for server PVCs | `["ReadWriteOnce"]`             |
+| `persistence.keeper.size`        | Size for each Keeper PVC     | `10Gi`                          |
+| `persistence.keeper.accessModes` | Access modes for Keeper PVCs | `["ReadWriteOnce"]`             |
 
-The Keeper persistence is critical for maintaining the raft quorum and ensuring high availability. It specifically persists:
-- Coordination logs: `/var/lib/clickhouse/coordination/log`
-- Coordination snapshots: `/var/lib/clickhouse/coordination/snapshots`
+## Example Configurations
 
-These paths are critical for the raft quorum recovery when pods are restarted or rescheduled.
-
-## External ClickHouse Configuration
-
-If you prefer to use an external ClickHouse instance, set `clickhouse.install: false` and configure the external ClickHouse using the `global.clickhouse` settings:
-
-| Parameter                                      | Description                                   | Default               |
-| ---------------------------------------------- | --------------------------------------------- | --------------------- |
-| `global.clickhouse.host`                       | External ClickHouse host                      | `""`                  |
-| `global.clickhouse.port`                       | External ClickHouse port                      | `8123`                |
-| `global.clickhouse.database`                   | External ClickHouse database                  | `weave_trace_db`      |
-| `global.clickhouse.user`                       | External ClickHouse user                      | `default`             |
-| `global.clickhouse.password`                   | External ClickHouse password                  | `""`                  |
-| `global.clickhouse.passwordSecret.name`        | Name of the secret containing the password    | `""`                  |
-| `global.clickhouse.passwordSecret.passwordKey` | Key in the secret containing the password     | `CLICKHOUSE_PASSWORD` |
-| `global.clickhouse.replicated`                 | Whether the external ClickHouse is replicated | `false`               |
-
-## Example Configuration
-
-Below is an example values.yaml for deploying the Weights & Biases Operator with weave-trace and the new ClickHouse chart using a simple configuration:
+### Basic Configuration
 
 ```yaml
-# Deploy ClickHouse
 clickhouse:
   install: true
-  
-  # Number of ClickHouse server replicas
-  replicas: 3  # Can be set to 1 for development environments
-  
-  # User and password in clear text (for simplicity)
-  user: "wandb"
-  password: "your-secure-password"  # In production, consider using passwordSecret
-  
-  # Database name for weave-trace
-  database: "weave_trace_db"
-  
-  # S3 bucket configuration - single bucket with paths per replica
+  replicas: 3
   bucket:
     useSingleBucket: true
-    endpoint: "s3.amazonaws.com/your-bucket-name"
-    path: "clickhouse-data"  # Will automatically append /replica-[0-N] to this path
+    usePathStyle: true
+    endpoint: "https://s3.amazonaws.com/your-bucket-name"
+    path: "clickhouse-data"
     region: "us-east-1"
-    
-    # Explicit S3 credentials (for simplicity)
-    accessKeyId: "your-access-key"
-    secretAccessKey: "your-secret-key"
-    # In production, consider using the secret reference:
-    # secret:
-    #   secretName: "your-s3-credentials-secret"
-    #   accessKeyName: "ACCESS_KEY"
-    #   secretKeyName: "SECRET_KEY"
-    
-  # Cache configuration
-  cache:
-    size: "20Gi"  # PV size will be 30Gi (20Gi + 10Gi)
-    
-  # Persistence configuration
-  persistence:
-    # Server persistence (for ClickHouse replicas)
-    server:
-      accessModes:
-        - ReadWriteOnce
-    # Keeper persistence (for ClickHouse Keeper nodes)
-    keeper:
-      size: "10Gi"
-      
-# Deploy weave-trace to use the installed ClickHouse
-weave-trace:
-  install: true
-  # No need to configure ClickHouse connection details
-  # These will be automatically derived from the ClickHouse installation
-
-### Using an External ClickHouse
-
-Alternatively, if you want to use an existing external ClickHouse instance:
-
-```yaml
-# Don't deploy ClickHouse, use external instance
-clickhouse:
-  install: false
-
-# Configure external ClickHouse settings
-global:
-  clickhouse:
-    host: "your-external-clickhouse-host.example.com"
-    port: 8123
-    database: "weave_trace_db"
-    user: "wandb"
-    password: "your-external-clickhouse-password"
-    replicated: true  # Set to true if your external ClickHouse is replicated
-
-# Deploy weave-trace to use the external ClickHouse
-weave-trace:
-  install: true
-  # No need to configure ClickHouse connection details
-  # These will be automatically derived from the global.clickhouse settings
+    useInstanceMetadata: true
 ```
 
-This configuration will:
-1. Skip deploying ClickHouse
-2. Configure connection details for your external ClickHouse instance
-3. Deploy weave-trace, which will automatically use the external ClickHouse settings
-
-### Minimal Development Configuration
-
-For development or testing purposes, you can minimize resources by using a single ClickHouse replica:
+### Multi-Bucket with Different Credentials
 
 ```yaml
-# Deploy ClickHouse with minimal resources
 clickhouse:
   install: true
-  
-  # Use a single ClickHouse server replica for development
-  replicas: 1
-  
-  # Simple user and password
-  user: "wandb"
-  password: "dev-password"
-  
-  # S3 bucket configuration - instance metadata (for cloud environments)
+  replicas: 3
+  bucket:
+    useSingleBucket: false
+    usePathStyle: true
+    region: "us-east-1"
+    endpoints:
+      - url: "https://s3.example.com/dept1-bucket"
+        accessKeyId: "dept1-access-key"
+        secretAccessKey: "dept1-secret-key"
+      - url: "https://s3.example.com/dept2-bucket"
+        secretName: "dept2-credentials"
+      - url: "https://s3.example.com/dept3-bucket"
+        useInstanceMetadata: true
+```
+
+### Development Configuration
+
+```yaml
+clickhouse:
+  install: true
+  replicas: 1  # Single replica for development
   bucket:
     useSingleBucket: true
-    endpoint: "s3.amazonaws.com/dev-bucket"
+    endpoint: "https://minio.example.com/dev-bucket"
     path: "clickhouse-dev"
     region: "us-east-1"
-    useInstanceMetadata: true  # Use IAM role instead of explicit credentials
-    
-  # Smaller cache for development
+    accessKeyId: "dev-key"
+    secretAccessKey: "dev-secret"
   cache:
-    size: "5Gi"  # PV size will be 15Gi (5Gi + 10Gi)
-    
-  # Smaller keeper persistence for development
+    size: "5Gi"
   persistence:
     keeper:
       size: "5Gi"
-      
-# Deploy weave-trace to use the installed ClickHouse
-weave-trace:
-  install: true
 ```
-
-This minimal configuration still maintains the 3-node Keeper cluster for high availability (required for ClickHouse coordination) but reduces the number of ClickHouse server replicas to just one, which is sufficient for development and testing.

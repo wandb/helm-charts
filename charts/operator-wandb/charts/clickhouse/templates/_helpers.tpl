@@ -215,6 +215,13 @@ Get S3 secret key from secret
 {{- end -}}
 
 {{/*
+Get ClickHouse password for S3 configuration
+*/}}
+{{- define "clickhouse.s3.password" -}}
+{{- include "wandb.clickhouse.password" . -}}
+{{- end -}}
+
+{{/*
 ClickHouse Server Configuration
 */}}
 {{- define "clickhouse.serverConfig" -}}
@@ -279,10 +286,71 @@ ClickHouse Server Configuration
             <disks>
                 <s3_express>
                     <type>s3</type>
-                    <endpoint>{{ index $.Values.bucket.endpoints $i }}</endpoint>
+                    {{- if $.Values.bucket.useSingleBucket }}
+                    {{- /* Single bucket mode */}}
+                    <endpoint>{{ $.Values.bucket.endpoint }}</endpoint>
+                    {{- if $.Values.bucket.usePathStyle }}
+                    <use_path_style_endpoint>true</use_path_style_endpoint>
+                    {{- end }}
                     <region>{{ $.Values.bucket.region }}</region>
+                    {{- if $.Values.bucket.useInstanceMetadata }}
+                    <use_instance_metadata>true</use_instance_metadata>
+                    {{- else }}
                     <access_key_id>{{ include "clickhouse.s3.accessKey" $ }}</access_key_id>
                     <secret_access_key>{{ include "clickhouse.s3.secretKey" $ }}</secret_access_key>
+                    {{- end }}
+                    <path_prefix>{{ $.Values.bucket.path }}/replica-{{ $i }}</path_prefix>
+                    {{- else }}
+                    {{- /* Multiple bucket mode */}}
+                    {{- $endpoint := index $.Values.bucket.endpoints $i }}
+                    {{- if kindIs "string" $endpoint }}
+                    {{- /* Simple string endpoint */}}
+                    <endpoint>{{ $endpoint }}</endpoint>
+                    {{- if $.Values.bucket.usePathStyle }}
+                    <use_path_style_endpoint>true</use_path_style_endpoint>
+                    {{- end }}
+                    <region>{{ $.Values.bucket.region }}</region>
+                    {{- if $.Values.bucket.useInstanceMetadata }}
+                    <use_instance_metadata>true</use_instance_metadata>
+                    {{- else }}
+                    <access_key_id>{{ include "clickhouse.s3.accessKey" $ }}</access_key_id>
+                    <secret_access_key>{{ include "clickhouse.s3.secretKey" $ }}</secret_access_key>
+                    {{- end }}
+                    {{- else }}
+                    {{- /* Object with custom credentials */}}
+                    <endpoint>{{ $endpoint.url }}</endpoint>
+                    {{- if $.Values.bucket.usePathStyle }}
+                    <use_path_style_endpoint>true</use_path_style_endpoint>
+                    {{- end }}
+                    <region>{{ $.Values.bucket.region }}</region>
+                    {{- if $endpoint.useInstanceMetadata }}
+                    <use_instance_metadata>true</use_instance_metadata>
+                    {{- else if and $endpoint.accessKeyId $endpoint.secretAccessKey }}
+                    <access_key_id>{{ $endpoint.accessKeyId }}</access_key_id>
+                    <secret_access_key>{{ $endpoint.secretAccessKey }}</secret_access_key>
+                    {{- else if $endpoint.secretName }}
+                    {{- $secretName := $endpoint.secretName }}
+                    {{- $accessKeyName := default "ACCESS_KEY" $endpoint.accessKeyName }}
+                    {{- $secretKeyName := default "SECRET_KEY" $endpoint.secretKeyName }}
+                    {{- $secret := (lookup "v1" "Secret" $.Release.Namespace $secretName) }}
+                    {{- if and $secret $secret.data }}
+                    <access_key_id>{{ index $secret.data $accessKeyName | b64dec }}</access_key_id>
+                    <secret_access_key>{{ index $secret.data $secretKeyName | b64dec }}</secret_access_key>
+                    {{- else }}
+                    <access_key_id>{{ include "clickhouse.s3.accessKey" $ }}</access_key_id>
+                    <secret_access_key>{{ include "clickhouse.s3.secretKey" $ }}</secret_access_key>
+                    {{- end }}
+                    {{- else }}
+                    {{- /* Fall back to global credentials */}}
+                    {{- if $.Values.bucket.useInstanceMetadata }}
+                    <use_instance_metadata>true</use_instance_metadata>
+                    {{- else }}
+                    <access_key_id>{{ include "clickhouse.s3.accessKey" $ }}</access_key_id>
+                    <secret_access_key>{{ include "clickhouse.s3.secretKey" $ }}</secret_access_key>
+                    {{- end }}
+                    {{- end }}
+                    {{- end }}
+                    {{- end }}
                 </s3_express>
             </disks>
             <policies>
