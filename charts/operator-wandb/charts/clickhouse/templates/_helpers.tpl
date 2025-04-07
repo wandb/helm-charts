@@ -228,16 +228,16 @@ ClickHouse Server Configuration
 {{- range $i, $e := until (.Values.replicas | int) }}
 {{ include "clickhouse.fullname" $ }}-ch-server-{{ $i }}.xml: |
     <clickhouse replace="true">
-        <default_database>{{ include "wandb.clickhouse.database" $ }}</default_database>
+        <default_database>{{ include "clickhouse.local.database" $ }}</default_database>
         <max_partition_size_to_drop>0</max_partition_size_to_drop>
         <profiles>
             <default></default>
         </profiles>
         <users>
             <default>
-                <password>{{ include "wandb.clickhouse.password" $ }}</password>
+                <password>{{ include "clickhouse.local.password" $ }}</password>
                 <access_management>1</access_management>
-                <profile>{{ include "wandb.clickhouse.user" $ }}</profile>
+                <profile>{{ include "clickhouse.local.user" $ }}</profile>
             </default>
         </users>
         <user_directories>
@@ -257,7 +257,7 @@ ClickHouse Server Configuration
         </logger>
         <display_name>wandb_weave node_{{ $i }}</display_name>
         <listen_host>0.0.0.0</listen_host>
-        <http_port>{{ include "wandb.clickhouse.port" $ }}</http_port>
+        <http_port>{{ include "clickhouse.local.port" $ }}</http_port>
         <tcp_port>{{ $.Values.server.tcpPort }}</tcp_port>
         <interserver_http_port>{{ $.Values.server.intrsrvhttpPort }}</interserver_http_port>
         <distributed_ddl>
@@ -426,3 +426,51 @@ Helper to determine if ClickHouse should be installed
 {{/*
 Helper for ClickHouse installation */}}
 {{- define "clickhouse.useInstalledClickhouse" -}}false{{- end -}}
+
+{{/*
+Helper functions to provide fallbacks when parent chart functions aren't available
+*/}}
+
+{{/*
+Get ClickHouse password secret name with fallback
+*/}}
+{{- define "clickhouse.local.passwordSecret" -}}
+{{- printf "%s-clickhouse" .Release.Name -}}
+{{- end -}}
+
+{{/*
+Get ClickHouse password with fallback
+*/}}
+{{- define "clickhouse.local.password" -}}
+{{- randAlphaNum 16 -}}
+{{- end -}}
+
+{{/*
+Get ClickHouse database with fallback
+*/}}
+{{- define "clickhouse.local.database" -}}
+{{- .Values.clickhouse.database | default "weave_trace_db" -}}
+{{- end -}}
+
+{{/*
+Get ClickHouse user with fallback
+*/}}
+{{- define "clickhouse.local.user" -}}
+{{- .Values.clickhouse.user | default "wandb-user" -}}
+{{- end -}}
+
+{{/*
+Get ClickHouse port with fallback
+*/}}
+{{- define "clickhouse.local.port" -}}
+{{- .Values.clickhouse.server.httpPort | default 8123 -}}
+{{- end -}}
+
+{{/*
+Helper for common labels with fallback
+*/}}
+{{- define "clickhouse.local.commonLabels" -}}
+helm.sh/chart: {{ include "clickhouse.chart" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/part-of: wandb
+{{- end -}}

@@ -2,37 +2,64 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "clickhouse.fullname" . }}-ch-server-headless
+  name: {{ include "clickhouse.fullname" . }}-ch-server
   labels:
-    {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "clickhouse.labels" . | nindent 4 }}
-    {{- include "clickhouse.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     {{- if .Values.service.labels }}
-      {{- toYaml .Values.service.labels | nindent 4 }}
+    {{- toYaml .Values.service.labels | nindent 4 }}
     {{- end }}
+  {{- if .Values.service.annotations }}
+  annotations:
+    {{- toYaml .Values.service.annotations | nindent 4 }}
+  {{- end }}
 spec:
-  clusterIP: None
-  publishNotReadyAddresses: true
+  type: ClusterIP
   ports:
-    {{- include "clickhouse.servicePorts" . | nindent 4 }}
+    - port: 8123
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: {{ .Values.server.tcpPort }}
+      targetPort: tcp
+      protocol: TCP
+      name: tcp
+    - port: {{ .Values.server.intrsrvhttpPort }}
+      targetPort: intrsrvhttp
+      protocol: TCP
+      name: intrsrvhttp
   selector:
-    {{- include "clickhouse.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "clickhouse.fullname" . }}-ch-server
+  name: {{ include "clickhouse.fullname" . }}-ch-server-headless
   labels:
-    {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "clickhouse.labels" . | nindent 4 }}
-    {{- include "clickhouse.commonLabels" . | nindent 4 }}
-    {{- if .Values.service.labels }}
-      {{- toYaml .Values.service.labels | nindent 4 }}
-    {{- end }}
+    app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
 spec:
   clusterIP: None
   ports:
-    {{- include "clickhouse.servicePorts" . | nindent 4 }}
+    - port: 8123
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: {{ .Values.server.tcpPort }}
+      targetPort: tcp
+      protocol: TCP
+      name: tcp
+    - port: {{ .Values.server.intrsrvhttpPort }}
+      targetPort: intrsrvhttp
+      protocol: TCP
+      name: intrsrvhttp
   selector:
-    {{- include "clickhouse.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  publishNotReadyAddresses: true
 {{- end }}

@@ -4,48 +4,49 @@ kind: StatefulSet
 metadata:
   name: {{ include "clickhouse.fullname" . }}-ch-server
   labels:
-    {{- include "wandb.commonLabels" . | nindent 4 }}
-    {{- include "clickhouse.commonLabels" . | nindent 4 }}
-    {{- include "clickhouse.labels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
     {{- if .Values.deployment.labels }}
     {{-   toYaml .Values.deployment.labels | nindent 4 }}
     {{- end }}
+  {{- if .Values.deployment.annotations }}
   annotations:
-    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
-    {{- if .Values.deployment.annotations -}}
-    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
-    {{- end }}
+    {{- toYaml .Values.deployment.annotations | nindent 4 }}
+  {{- end }}
 spec:
   replicas: {{ .Values.replicas }}
   podManagementPolicy: "{{ .Values.common.podManagementPolicy | default "Parallel" }}"
   selector:
     matchLabels:
-      {{ include "wandb.selectorLabels" $ | nindent 6 }}
-      {{ include "clickhouse.labels" . | nindent 6 }}
+      app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
   serviceName: {{ include "clickhouse.fullname" . }}-ch-server-headless
   template:
     metadata:
       labels:
-        {{ include "wandb.podLabels" . | nindent 8 }}
-        {{ include "clickhouse.commonLabels" . | nindent 8 }}
-        {{ include "clickhouse.podLabels" . | nindent 8 }}
-        {{ include "clickhouse.labels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- if .Values.pod.annotations }}
       annotations:
-        {{- if .Values.pod.annotations -}}
         {{-   toYaml .Values.pod.annotations | nindent 8 }}
-        {{- end }}
+      {{- end }}
     spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.pod.securityContext | nindent 8 }}
+      {{- if .Values.global }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ .Values.serviceAccount.name }}
-      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
-      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      {{- end }}
       containers:
         - name: clickhouse
           image: "{{ .Values.server_image.repository }}:{{ .Values.server_image.tag }}"
-          {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
+          securityContext:
+            {{- toYaml .Values.container.securityContext | nindent 12 }}
           env:
             - name: POD_NAME
               valueFrom:
@@ -55,52 +56,6 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-                  {{- /* Extract the replica index from the pod name */}}
-              {{- /* Will extract the ordinal from pod name like clickhouse-ch-server-0 */}}
-            - name: CLICKHOUSE_USER
-              value: {{ include "wandb.clickhouse.user" . | quote }}
-            - name: CLICKHOUSE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "wandb.clickhouse.passwordSecret" . }}
-                  key: {{ include "wandb.clickhouse.passwordSecret.passwordKey" . }}
-            - name: CLICKHOUSE_DATABASE
-              value: {{ include "wandb.clickhouse.database" . | quote }}
-            {{- /* S3 bucket configuration */}}
-            - name: S3_REGION
-              value: {{ .Values.bucket.region | quote }}
-            {{- if .Values.bucket.useSingleBucket }}
-            {{- /* For single bucket configuration */}}
-            - name: S3_ENDPOINT
-              value: {{ .Values.bucket.endpoint | quote }}
-            - name: S3_BUCKET_PATH
-              value: "{{ .Values.bucket.path }}/replica-$(echo $REPLICA_INDEX | sed 's/.*-//')"
-            {{- else }}
-            {{- /* For multiple bucket configuration */}}
-            - name: S3_ENDPOINT
-              value: "{{ .Values.bucket.endpoints }}"
-            {{- end }}
-            {{- /* Credentials configuration */}}
-            {{- if .Values.bucket.useInstanceMetadata }}
-            - name: USE_INSTANCE_METADATA
-              value: "true"
-            {{- else if and .Values.bucket.accessKeyId .Values.bucket.secretAccessKey }}
-            - name: AWS_ACCESS_KEY_ID
-              value: {{ .Values.bucket.accessKeyId | quote }}
-            - name: AWS_SECRET_ACCESS_KEY
-              value: {{ .Values.bucket.secretAccessKey | quote }}
-            {{- else if .Values.bucket.secret.secretName }}
-            - name: AWS_ACCESS_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.bucket.secret.secretName }}
-                  key: {{ .Values.bucket.secret.accessKeyName }}
-            - name: AWS_SECRET_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.bucket.secret.secretName }}
-                  key: {{ .Values.bucket.secret.secretKeyName }}
-            {{- end }}
           volumeMounts:
             - name: config-volume
               mountPath: /etc/clickhouse-server/config.xml
@@ -126,7 +81,7 @@ spec:
               memory: {{ .Values.server.resources.requests.memory | default "2048Mi" }}
           ports:
             - name: http
-              containerPort: {{ include "wandb.clickhouse.port" . }}
+              containerPort: 8123
             - name: tcp
               containerPort: {{ .Values.server.tcpPort | default 9000 }}
             - name: intrsrvhttp
@@ -159,7 +114,7 @@ spec:
     - metadata:
         name: clickhouse-data
       spec:
-        {{- if .Values.global.storageClass }}
+        {{- if and .Values.global .Values.global.storageClass }}
         storageClassName: {{ .Values.global.storageClass }}
         {{- end }}
         accessModes:
@@ -172,7 +127,7 @@ spec:
     - metadata:
         name: clickhouse-cache
       spec:
-        {{- if .Values.global.storageClass }}
+        {{- if and .Values.global .Values.global.storageClass }}
         storageClassName: {{ .Values.global.storageClass }}
         {{- end }}
         accessModes:
