@@ -1,0 +1,143 @@
+{{- if eq (include "clickhouse.shouldInstall" .) "true" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "clickhouse.fullname" . }}-ch-server
+  labels:
+    app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    {{- if .Values.deployment.labels }}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  {{- if .Values.deployment.annotations }}
+  annotations:
+    {{- toYaml .Values.deployment.annotations | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.replicas }}
+  podManagementPolicy: "{{ .Values.common.podManagementPolicy | default "Parallel" }}"
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  serviceName: {{ include "clickhouse.fullname" . }}-ch-server-headless
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- if .Values.pod.annotations }}
+      annotations:
+        {{-   toYaml .Values.pod.annotations | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.pod.securityContext | nindent 8 }}
+      {{- if .Values.global }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: clickhouse
+          image: "{{ .Values.server_image.repository }}:{{ .Values.server_image.tag }}"
+          securityContext:
+            {{- toYaml .Values.container.securityContext | nindent 12 }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: REPLICA_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "clickhouse.local.passwordSecret" . }}
+                  key: CLICKHOUSE_PASSWORD
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/clickhouse-server/config.xml
+              subPathExpr: "$(POD_NAME).xml"
+              readOnly: true
+            - name: clickhouse-data
+              mountPath: /var/lib/clickhouse
+              readOnly: false
+            - name: clickhouse-log
+              mountPath: /var/log/clickhouse-server
+              readOnly: false
+            - name: clickhouse-cache
+              mountPath: {{ .Values.cache.path }}
+              readOnly: false
+          resources:
+            limits:
+              cpu: {{ .Values.server.resources.limits.cpu | default "6" }}
+              ephemeral-storage: {{ .Values.server.resources.limits.ephemeralStorage | default "20Gi" }}
+              memory: {{ .Values.server.resources.limits.memory | default "2048Mi" }}
+            requests:
+              cpu: {{ .Values.server.resources.requests.cpu | default "1" }}
+              ephemeral-storage: {{ .Values.server.resources.requests.ephemeralStorage | default "10Gi" }}
+              memory: {{ .Values.server.resources.requests.memory | default "2048Mi" }}
+          ports:
+            - name: http
+              containerPort: 8123
+            - name: tcp
+              containerPort: {{ .Values.server.tcpPort | default 9000 }}
+            - name: intrsrvhttp
+              containerPort: {{ .Values.server.intrsrvhttpPort | default 9009 }}
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+            tcpSocket:
+              port: http
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+            httpGet:
+              path: /ping
+              port: http
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ include "clickhouse.fullname" . }}-ch-server-config
+        - name: clickhouse-log
+          emptyDir: {}  # Or use a PVC if logs need persistence
+
+  volumeClaimTemplates:
+    - metadata:
+        name: clickhouse-data
+      spec:
+        {{- if and .Values.global .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass }}
+        {{- end }}
+        accessModes:
+          {{- range .Values.persistence.server.accessModes }}
+          - {{ . | quote }}
+          {{- end }}
+        resources:
+          requests:
+            storage: {{ if .Values.persistence.server.size }}{{ .Values.persistence.server.size }}{{ else }}{{ include "clickhouse.calculateStorageSize" . }}{{ end }}
+    - metadata:
+        name: clickhouse-cache
+      spec:
+        {{- if and .Values.global .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass }}
+        {{- end }}
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.cache.size }}
+{{- end }}

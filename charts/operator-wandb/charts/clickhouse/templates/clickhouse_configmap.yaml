@@ -1,0 +1,46 @@
+{{- if eq (include "clickhouse.shouldInstall" .) "true" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "clickhouse.fullname" . }}-ch-server-config
+  labels:
+    app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  {{- range $i, $e := until (.Values.replicas | int) }}
+  {{ include "clickhouse.fullname" $ }}-ch-server-{{ $i }}.xml: |
+    <clickhouse replace="true">
+      <logger>
+        <level>{{ $.Values.logLevel }}</level>
+        <console>true</console>
+      </logger>
+      <listen_host>0.0.0.0</listen_host>
+      <http_port>8123</http_port>
+      <tcp_port>{{ $.Values.server.tcpPort }}</tcp_port>
+      <interserver_http_port>{{ $.Values.server.intrsrvhttpPort }}</interserver_http_port>
+      
+      <!-- Basic configuration for deployment testing -->
+      <path>/var/lib/clickhouse/</path>
+      <tmp_path>/var/lib/clickhouse/tmp/</tmp_path>
+      <user_files_path>/var/lib/clickhouse/user_files/</user_files_path>
+      
+      <storage_configuration>
+        <disks>
+          <default>
+            <path>/var/lib/clickhouse/</path>
+          </default>
+        </disks>
+        <policies>
+          <default>
+            <volumes>
+              <default>
+                <disk>default</disk>
+              </default>
+            </volumes>
+          </default>
+        </policies>
+      </storage_configuration>
+    </clickhouse>
+  {{- end }}
+{{- end }}

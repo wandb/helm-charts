@@ -1,0 +1,163 @@
+nameOverride: ""
+fullnameOverride: ""
+
+# Flag to enable or disable ClickHouse installation
+# This will be overridden by parent chart's value (Values.clickhouse.install)
+clickhouse:
+  install: true
+  cache:
+    size: "20Gi"
+    path: "/var/lib/clickhouse/cache"
+  database: "weave_trace_db"
+  user: "wandb-user"
+
+# Support for weave-trace
+weave-trace:
+  install: false
+
+# Number of ClickHouse server replicas
+# ClickHouse Keeper will always have 3 replicas for high availability
+replicas: 3
+
+server_image:
+  repository: "clickhouse/clickhouse-server"
+  tag: "24.8.14"
+
+keeper_image:
+  repository: "clickhouse/clickhouse-keeper"
+  tag: "24.8.14"
+
+# Note: database, user, and password are configured via top-level wandb.clickhouse helpers
+server:
+  tcpPort: 9000
+  intrsrvhttpPort: 9009
+  zookeeperPort: 9181
+  cluster: "wandb_weave"
+  resources:
+    limits:
+      cpu: 6
+      memory: 2048Mi
+    requests:
+      cpu: "1"
+      ephemeralStorage: 10Gi
+      memory: 2048Mi
+
+keeper:
+  tcpPort: 9181
+  httpPort: 8123
+  raftPort: 9234
+  resources:
+    limits:
+      cpu: "1.5"
+      ephemeralStorage: 20Gi
+      memory: 4096Mi
+    requests:
+      cpu: "0.5"
+      ephemeralStorage: 500Mi
+      memory: 1024Mi
+
+# Local cache configuration
+cache:
+  size: "20Gi"
+  path: "/var/lib/clickhouse/cache"
+
+service:
+  annotations: {}
+  labels: {}
+
+common:
+  annotations: {}
+  labels: {}
+  podManagementPolicy: "Parallel"
+
+deployment:
+  labels: {}
+  annotations: {}
+
+pod:
+  labels: {}
+  annotations: {}
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 0
+    fsGroup: 999
+    fsGroupChangePolicy: "OnRootMismatch"
+    seccompProfile:
+      type: ""
+
+container:
+  securityContext:
+    capabilities:
+      add: []
+      drop: []
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    privileged: false
+
+logLevel: information
+
+# Node selector for the StatefulSet pods (for scheduling pods on specific nodes)
+nodeSelector: {}
+
+# Tolerations for the StatefulSet pods (for allowing pods to be scheduled on tainted nodes)
+tolerations: []
+
+# Affinity settings for the StatefulSet pods (for custom scheduling rules)
+affinity: {}
+
+# Persistent volume claim settings for the StatefulSet
+persistence:
+  enabled: true
+  # Server persistence (for ClickHouse replicas)
+  server:
+    accessModes:
+      - ReadWriteOnce
+    # Size will be automatically calculated based on cache size + 10Gi
+    size: "30Gi"
+  # Keeper persistence (for ClickHouse Keeper nodes)
+  keeper:
+    accessModes:
+      - ReadWriteOnce
+    size: "10Gi"
+
+serviceAccount:
+  name: "clickhouse"
+  automountServiceAccountToken: false
+  create: true
+  annotations: {}
+
+# S3 bucket configuration derived from global values
+bucket:
+  # Whether to use path-style URLs (true) or virtual hosted-style URLs (false)
+  usePathStyle: true
+  # Use single bucket or multiple buckets
+  useSingleBucket: false
+  # Path prefix for single bucket mode
+  path: "clickhouse"
+  # Credentials configuration (used for single bucket mode)
+  accessKeyId: ""
+  secretAccessKey: ""
+  useInstanceMetadata: false
+  # Secret configuration (used for single bucket mode)
+  secret:
+    # Default name will be based on the release name
+    secretName: ""
+    accessKeyName: "ACCESS_KEY"
+    secretKeyName: "SECRET_KEY"
+  # AWS region
+  region: ""
+  # Multiple bucket endpoints (used when useSingleBucket is false)
+  # Can be simple strings or objects with credentials
+  # Examples:
+  # - "https://s3.example.com/bucket1"  # Uses default credentials
+  # - url: "https://s3.example.com/bucket2"
+  #   accessKeyId: "key2"
+  #   secretAccessKey: "secret2"
+  # - url: "https://s3.example.com/bucket3"
+  #   secretName: "bucket3-secret"
+  #   accessKeyName: "ACCESS_KEY"
+  #   secretKeyName: "SECRET_KEY"
+  endpoints: []
+  # Single bucket endpoint (used when useSingleBucket is true)
+  endpoint: ""
