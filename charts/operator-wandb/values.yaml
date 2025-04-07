@@ -94,16 +94,15 @@ global:
       # grpc, http
       proto: "grpc"
 
+  # clickhouse configuration for the wandb weave-trace service
   clickhouse:
-    install: false
     host: ""
     port: 8443
-    password: "fake"
     passwordSecret:
       name: ""
       passwordKey: "CLICKHOUSE_PASSWORD"
-    database: "weave_trace_db"
-    user: "default"
+    database: ""
+    user: ""
     # Required when using replicated services on self-managed ClickHouse (not ClickHouse Cloud).
     # Flag will substitute MergeTree() with ReplicatedMergeTree() and use `ON CLUSTER` on table creation.
     replicated: false
@@ -274,6 +273,40 @@ app:
 
 nginx:
   install: false
+
+# configuration passed to install clickhouse with the operator
+clickhouse:
+  # Enable or disable ClickHouse installation by the operator
+  install: true
+
+  # ClickHouse server image configuration
+  server_image:
+    repository: "clickhouse/clickhouse-server"
+    # Use a specific version tag instead of 'latest' for stability
+    tag: "24.8.14"
+
+  # ClickHouse keeper image configuration
+  keeper_image:
+    repository: "clickhouse/clickhouse-keeper"
+    # Use a specific version tag instead of 'latest' for stability
+    tag: "24.8.14"
+
+  # S3 bucket configuration for ClickHouse data
+  bucket:
+    # Access credentials should be provided via secret in production
+    # Example: kubectl create secret generic clickhouse-s3-credentials --from-literal=access_key_id=your-key --from-literal=secret_access_key=your-secret
+    secret:
+      secretName: "wandb-clickhouse"
+      accessKeyName: "ACCESS_KEY"
+      secretKeyName: "SECRET_KEY"
+    region: "us-east-1"  # Required: AWS region for S3 buckets (e.g., us-east-1, eu-central-1)
+    endpoints:  # Required: List of S3 bucket endpoints for each replica
+      - ""
+      - ""
+      - ""
+  cache:
+    size: 20Gi
+    path: /var/lib/clickhouse/cache
 
 weave:
   install: true

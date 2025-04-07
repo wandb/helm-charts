@@ -59,6 +59,18 @@ jobs:
         run: kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} -n minio wait --for=condition=Ready pod/minio --timeout=300s
         if: env.ACT || steps.list-changed.outputs.changed == 'true'
 
+      - name: Generate Random Namespace
+        run: echo "TEST_NAMESPACE=operator-wandb-$(openssl rand -hex 6)" >> $GITHUB_ENV
+
+      - name: Create a test secret
+        run: |
+          kubectl create namespace $TEST_NAMESPACE || true
+
+          kubectl create secret generic wandb-clickhouse \
+            --from-literal=ACCESS_KEY=test-access-key \
+            --from-literal=SECRET_KEY=test-secret-key \
+            --namespace $TEST_NAMESPACE
+
       - name: Run chart-testing (install)
         env:
           LICENSE: ${{ secrets.LICENSE }}
@@ -67,5 +79,6 @@ jobs:
           ct install \
           --charts ./charts/operator-wandb \
           --config ct.yaml \
+          --namespace $TEST_NAMESPACE \
           --helm-extra-args '--kube-context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} --timeout 600s' \
           --helm-extra-set-args '--values test-configs/operator-wandb/${{ matrix.configuration }}.yaml --set=license=$LICENSE'
