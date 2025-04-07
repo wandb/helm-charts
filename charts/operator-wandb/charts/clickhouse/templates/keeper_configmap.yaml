@@ -1,0 +1,38 @@
+{{- if eq (include "clickhouse.shouldInstall" .) "true" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "clickhouse.fullname" . }}-ch-keeper-config
+  labels:
+    app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  {{- range $i, $e := until 3 }}
+  {{ include "clickhouse.fullname" $ }}-ch-keeper-{{ $i }}.xml: |
+    <clickhouse replace="true">
+      <path>/var/lib/clickhouse/coordination/keeper</path>
+      <logger>
+        <level>information</level>
+        <console>true</console>
+      </logger>
+      <listen_host>0.0.0.0</listen_host>
+      <keeper_server>
+        <tcp_port>{{ $.Values.keeper.tcpPort }}</tcp_port>
+        <http_control>
+          <port>{{ $.Values.keeper.httpPort }}</port>
+          <readiness><endpoint>/ready</endpoint></readiness>
+          <liveness><endpoint>/health</endpoint></liveness>
+        </http_control>
+        <server_id>{{ $i }}</server_id>
+        <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
+        <coordination_settings>
+          <operation_timeout_ms>10000</operation_timeout_ms>
+          <session_timeout_ms>30000</session_timeout_ms>
+          <raft_logs_level>information</raft_logs_level>
+        </coordination_settings>
+      </keeper_server>
+    </clickhouse>
+  {{- end }}
+{{- end }}

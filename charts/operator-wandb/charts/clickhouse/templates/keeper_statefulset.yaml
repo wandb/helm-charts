@@ -1,0 +1,137 @@
+{{- if eq (include "clickhouse.shouldInstall" .) "true" }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "clickhouse.fullname" . }}-ch-keeper
+  labels:
+    app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    {{- if .Values.deployment.labels }}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  {{- if .Values.deployment.annotations }}
+  annotations:
+    {{- toYaml .Values.deployment.annotations | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: 3
+  podManagementPolicy: "{{ .Values.common.podManagementPolicy }}"
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  serviceName: {{ include "clickhouse.fullname" . }}-ch-keeper-headless
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "clickhouse.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- if .Values.pod.annotations }}
+      annotations:
+        {{-   toYaml .Values.pod.annotations | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.pod.securityContext | nindent 8 }}
+      {{- if .Values.global }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: keeper
+          image: "{{ .Values.keeper_image.repository }}:{{ .Values.keeper_image.tag }}"
+          securityContext:
+            {{- toYaml .Values.container.securityContext | nindent 12 }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: processed-config
+              mountPath: /etc/clickhouse-keeper
+            - name: keeper-data
+              mountPath: /var/lib/clickhouse
+              readOnly: false
+            - name: keeper-data
+              mountPath: /var/lib/clickhouse-keeper
+              readOnly: false
+            - name: keeper-data
+              mountPath: /var/log/clickhouse-keeper
+              readOnly: false
+            # Ensure coordination paths are explicitly mounted to persist raft state
+            - name: keeper-data
+              mountPath: /var/lib/clickhouse/coordination/log
+              readOnly: false
+              subPath: coordination/log
+            - name: keeper-data
+              mountPath: /var/lib/clickhouse/coordination/snapshots
+              readOnly: false
+              subPath: coordination/snapshots
+            - name: config-volume
+              mountPath: /etc/clickhouse-keeper/keeper_config.xml
+              subPathExpr: "$(POD_NAME).xml"
+              readOnly: true
+          resources:
+            limits:
+              cpu: {{ .Values.keeper.resources.limits.cpu }}
+              ephemeral-storage: {{ .Values.keeper.resources.limits.ephemeralStorage }}
+              memory: {{ .Values.keeper.resources.limits.memory }}
+            requests:
+              cpu: {{ .Values.keeper.resources.requests.cpu }}
+              ephemeral-storage: {{ .Values.keeper.resources.requests.ephemeralStorage }}
+              memory: {{ .Values.keeper.resources.requests.memory }}
+          ports:
+            - name: tcp
+              containerPort: {{ .Values.keeper.tcpPort }}
+            - name: raft
+              containerPort: {{ .Values.keeper.raftPort }}
+            - name: http
+              containerPort: {{ .Values.keeper.httpPort }}
+          livenessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+            httpGet:
+              path: /ready
+              port: http
+          readinessProbe:
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+            httpGet:
+              path: /ready
+              port: http
+      volumes:
+        - name: config-volume
+          configMap:
+            name: {{ include "clickhouse.fullname" . }}-ch-keeper-config
+        - name: processed-config
+          emptyDir: {}
+        - name: keeper-logs
+          emptyDir: {} 
+
+  volumeClaimTemplates:
+    - metadata:
+        name: keeper-data
+      spec:
+        {{- if and .Values.global .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass }}
+        {{- end }}
+        accessModes:
+          {{- range .Values.persistence.keeper.accessModes }}
+          - {{ . | quote }}
+          {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.keeper.size }}
+{{- end }}
