@@ -6,8 +6,16 @@ settings = {
         "kind-kind",
     ],
     "installMinio": True,
-    "values": "./test-configs/operator-wandb/default.yaml",
+    "values": "default",
 }
+
+settings["operator-wandb-values"] = "./test-configs/operator-wandb/" + settings['values'] + ".yaml"
+settings["additional-resource-directory"] = "./test-configs/additional-resources/" + settings['values'] + ""
+
+if os.path.exists(settings["additional-resource-directory"]):
+    for file in listdir(settings["additional-resource-directory"]):
+        if file.endswith(".yaml") or file.endswith(".yml"):
+            k8s_yaml(os.path.join(settings["additional-resource-directory"], file))
 
 # global settings
 settings.update(read_json(
@@ -33,10 +41,10 @@ if settings.get("installMinio"):
         ]
     )
 
-k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("values")]))
+k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")]))
 k8s_resource('wandb-app', port_forwards=8080, objects=['wandb-app:ServiceAccount:default', 'wandb-app-config:secret:default'])
 k8s_resource('wandb-console', port_forwards=8082, objects=['wandb-console:ServiceAccount:default', 'wandb-console:clusterrole:default', 'wandb-console:clusterrolebinding:default'])
-k8s_resource('wandb-executor',objects=['wandb-executor:ServiceAccount:default'])
+# k8s_resource('wandb-executor',objects=['wandb-executor:ServiceAccount:default'])
 k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)
 k8s_resource('wandb-otel-daemonset',objects=['wandb-otel-daemonset:ServiceAccount:default', 'wandb-otel-daemonset:clusterrole:default', 'wandb-otel-daemonset:clusterrolebinding:default'])
 k8s_resource('wandb-parquet',objects=['wandb-parquet:ServiceAccount:default'])
