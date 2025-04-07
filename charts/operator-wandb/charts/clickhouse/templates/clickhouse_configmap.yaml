@@ -6,5 +6,20 @@ metadata:
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
-{{- include "clickhouse.serverConfig" . | trim | nindent 2 }}
+  {{- if and .Release.IsUpgrade .Release.IsInstall -}}
+  {{- include "clickhouse.serverConfig" . | trim | nindent 2 }}
+  {{- else -}}
+  # During template rendering/linting, include a minimal configuration
+  # to avoid lookup errors
+  {{ include "clickhouse.fullname" . }}-ch-server-0.xml: |
+    <clickhouse replace="true">
+      <logger>
+        <level>debug</level>
+        <console>true</console>
+      </logger>
+      <listen_host>0.0.0.0</listen_host>
+      <http_port>8123</http_port>
+      <tcp_port>9000</tcp_port>
+    </clickhouse>
+  {{- end -}}
 {{- end }}

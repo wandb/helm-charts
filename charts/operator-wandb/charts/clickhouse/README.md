@@ -116,6 +116,10 @@ The chart will try credentials in this order:
 2. Explicitly provided credentials
 3. Secret reference
 
+> **Important**: If no credentials are provided and `bucket.secret.secretName` is empty, 
+> the chart will automatically create a secret with name format `<release-name>-clickhouse` 
+> containing placeholder credentials. You should replace these with actual credentials.
+
 ### Persistence Configuration
 
 The chart uses persistent volumes for both ClickHouse server replicas and Keeper nodes:

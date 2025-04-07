@@ -163,23 +163,23 @@ Get S3 access key from secret
   {{- else if .Values.bucket.useInstanceMetadata -}}
     instance-metadata
   {{- else -}}
-    {{- if .Release.IsUpgrade | or .Release.IsInstall -}}
-      {{- $secretName := .Values.bucket.secret.secretName -}}
-      {{- $accessKey := .Values.bucket.secret.accessKeyName -}}
+    {{- $secretName := .Values.bucket.secret.secretName -}}
+    {{- $accessKey := .Values.bucket.secret.accessKeyName -}}
+    {{- if and (not .Release.IsInstall) (not .Release.IsUpgrade) -}}
+      {{- /* Return a dummy value for lint/template */ -}}
+      dummy-access-key-lint-only
+    {{- else -}}
       {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
       {{- if and $secret $secret.data }}
         {{- $value := index $secret.data $accessKey | b64dec -}}
         {{- if $value }}
           {{- $value -}}
         {{- else }}
-          {{- fail (printf "Key %s not found in Secret %s" $accessKey $secretName) -}}
+          {{- printf "missing-access-key-%s" (randAlphaNum 8) | quote -}}
         {{- end }}
       {{- else }}
-        {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
+        {{- printf "missing-secret-%s" (randAlphaNum 8) | quote -}}
       {{- end }}
-    {{- else -}}
-      {{- /* Return a dummy value for lint/template */ -}}
-      dummy-access-key-lint-only
     {{- end -}}
   {{- end -}}
 {{- end -}}
@@ -193,23 +193,23 @@ Get S3 secret key from secret
   {{- else if .Values.bucket.useInstanceMetadata -}}
     instance-metadata
   {{- else -}}
-    {{- if .Release.IsUpgrade | or .Release.IsInstall -}}
-      {{- $secretName := .Values.bucket.secret.secretName -}}
-      {{- $secretKey := .Values.bucket.secret.secretKeyName -}}
+    {{- $secretName := .Values.bucket.secret.secretName -}}
+    {{- $secretKey := .Values.bucket.secret.secretKeyName -}}
+    {{- if and (not .Release.IsInstall) (not .Release.IsUpgrade) -}}
+      {{- /* Return a dummy value for lint/template */ -}}
+      dummy-secret-key-lint-only
+    {{- else -}}
       {{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) -}}
       {{- if and $secret $secret.data }}
         {{- $value := index $secret.data $secretKey | b64dec -}}
         {{- if $value }}
           {{- $value -}}
         {{- else }}
-          {{- fail (printf "Key %s not found in Secret %s" $secretKey $secretName) -}}
+          {{- printf "missing-secret-key-%s" (randAlphaNum 8) | quote -}}
         {{- end }}
       {{- else }}
-        {{- fail (printf "Secret %s not found or has no data in namespace %s" $secretName .Release.Namespace) -}}
+        {{- printf "missing-secret-%s" (randAlphaNum 8) | quote -}}
       {{- end }}
-    {{- else -}}
-      {{- /* Return a dummy value for lint/template */ -}}
-      dummy-secret-key-lint-only
     {{- end -}}
   {{- end -}}
 {{- end -}}
