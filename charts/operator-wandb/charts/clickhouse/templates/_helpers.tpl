@@ -435,7 +435,7 @@ Helper functions to provide fallbacks when parent chart functions aren't availab
 Get ClickHouse password secret name with fallback
 */}}
 {{- define "clickhouse.local.passwordSecret" -}}
-{{- printf "%s-clickhouse" .Release.Name -}}
+wandb-clickhouse
 {{- end -}}
 
 {{/*
