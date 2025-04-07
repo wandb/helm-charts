@@ -171,3 +171,18 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
 {{ end }}
 {{- end }}
 
+{{/*
+Check if weave-trace is enabled globally
+*/}}
+{{- define "app.weaveTraceEnabled" -}}
+{{- if hasKey .Values.global "weave-trace" -}}
+  {{- if (index .Values.global "weave-trace" "enabled") -}}
+    {{- true -}}
+  {{- else -}}
+    {{- false -}}
+  {{- end -}}
+{{- else -}}
+  {{- false -}}
+{{- end -}}
+{{- end -}}
+
