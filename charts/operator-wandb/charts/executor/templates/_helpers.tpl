@@ -106,7 +106,7 @@ Create the name of the service account to use
   {{- else }}
     {{- $cs = printf "%s?" $cs -}}
   {{- end }}
-  {{- $cs = printf "%sworkerConcurrency=%s" $cs ($concur | toString) -}}
+  {{- $cs = printf "%sconcurrency=%s" $cs ($concur | toString) -}}
 {{- end }}
 {{- print $cs }}
 {{- end }}

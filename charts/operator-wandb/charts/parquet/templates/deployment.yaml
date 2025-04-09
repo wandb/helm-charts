@@ -133,12 +133,12 @@ spec:
                   key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
               value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
-            - name: REDIS_PASSWORD
+            - name: A_REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.redis.passwordSecret" . }}
                   optional: true
-                  key: REDIS_PASSWORD
+                  key: {{ .Values.global.redis.secret.secretKey }}
             - name: REDIS_PORT
               value: "{{ include "wandb.redis.port" . }}"
             - name: REDIS_HOST
@@ -178,6 +178,20 @@ spec:
                   optional: true
                   {{- end }}
 
+            - name: BUCKET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}"
+                  optional: true
+
+            - name: BUCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ (include "wandb.bucket" . | fromYaml).secretName }}"
+                  key: "{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}"
+                  optional: true
+
             - name: G_HOST_IP
               valueFrom:
                 fieldRef:
@@ -201,11 +215,11 @@ spec:
 
           livenessProbe:
             httpGet:
-              path: /ready 
+              path: /healthz
               port: 8087
             initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 30
             failureThreshold: 3
             successThreshold: 1
 
@@ -214,8 +228,8 @@ spec:
               path: /ready
               port: 8087
             initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
+            periodSeconds: 30
+            timeoutSeconds: 30
             failureThreshold: 3
             successThreshold: 1
 
@@ -231,9 +245,10 @@ spec:
             readOnly: true
             volumeAttributes:
               bucketName: {{ (include "wandb.bucket" . | fromYaml).name }}
-              mountOptions: "implicit-dirs"
-              fileCacheCapacity: "-1"
+              mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,metadata-cache:stat-cache-max-size-mb:-1,metadata-cache:type-cache-max-size-mb:-1,file-system:kernel-list-cache-ttl-secs:-1,metadata-cache:ttl-secs:-1"
+              fileCacheCapacity: "{{ .Values.fuse.fileCacheCapacity }}"
               fileCacheForRangeRead: "true"
+              gcsfuseMetadataPrefetchOnMount: "true"
           {{- else }}
           emptyDir: {}
           {{- end }}

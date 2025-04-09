@@ -3,7 +3,7 @@
 {{- if $commonLabels }}
 {{-   range $key, $value := $commonLabels }}
 {{- if $key }}
-{{ $key }}: {{ $value | quote }}
+{{ $key }}: {{ $value | trunc 63 | quote }}
 {{- end }}
 {{-   end }}
 {{- end -}}
@@ -24,7 +24,7 @@ Handles merging a set of non-selector labels
 {{- $allLabels := merge (default (dict) .Values.podLabels) .Values.global.pod.labels -}}
 {{- if $allLabels -}}
 {{-   range $key, $value := $allLabels }}
-{{ $key }}: {{ $value | quote }}
+{{ $key }}: {{ $value | trunc 63 | quote }}
 {{-   end }}
 {{- end -}}
 {{- end -}}
@@ -36,7 +36,7 @@ Handles merging a set of labels for services
 {{- $allLabels := merge (default (dict) .Values.serviceLabels) .Values.global.service.labels -}}
 {{- if $allLabels -}}
 {{-   range $key, $value := $allLabels }}
-{{ $key }}: {{ $value | quote }}
+{{ $key }}: {{ $value | trunc 63 | quote }}
 {{-   end }}
 {{- end -}}
 {{- end -}}
