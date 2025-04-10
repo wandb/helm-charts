@@ -1,5 +1,3 @@
-{{/* vim: set filetype=mustache: */}}
-
 {{/*
 Expand the name of the chart.
 */}}
@@ -152,3 +150,24 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
     name: {{ $key }}
 {{ end }}
 {{- end }}
+
+{{- define "parquet.export.parallelism" -}}
+{{- if .Values.cronJob.exportHistoryToParquet.parallism }}
+  {{- print .Values.cronJob.exportHistoryToParquet.parallism }}
+{{- else }}
+    {{- if eq .Values.global.size "xxlarge" }}
+      {{- print "250" }}
+    {{- else if eq .Values.global.size "xlarge" }}
+      {{- print "80" }}
+    {{- else if eq .Values.global.size "large" }}
+      {{- print "40" }}
+    {{- else if eq .Values.global.size "medium" }}
+      {{- print "20" }}
+    {{- else if eq .Values.global.size "small" }}
+      {{- print "10" }}
+    {{- else }}
+      {{- print "10" | quote }}
+    {{- end }}
+{{- end -}}
+{{- end -}}
+
