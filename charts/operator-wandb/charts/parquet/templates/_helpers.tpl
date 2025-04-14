@@ -166,7 +166,7 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
     {{- else if eq .Values.global.size "small" }}
       {{- print "10" }}
     {{- else }}
-      {{- print "10" | quote }}
+      {{- print "10" }}
     {{- end }}
 {{- end -}}
 {{- end -}}
