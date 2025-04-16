@@ -119,6 +119,6 @@ kafka://$(KAFKA_CLIENT_USER):$(A_KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):909
 {{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
 {{- else -}}
-mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
 {{- end -}}
 {{- end -}}
