@@ -309,18 +309,8 @@ console:
     # ex: AWS("arn:aws:iam::{acc_number}:role/{customer_namespace}-node")
     BUCKET_ACCESS_IDENTITY: unknown
 
-# flat-run-fields-updater:
-#   install: true
-#   image:
-#     repository: wandb/local
-#     tag: latest
-#   pubSub:
-#     subscription: ""
-#   envFrom:
-#     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-
 flat-run-fields-updater:
-  install: false
+  install: true
   deploymentPostfix: "bc"
   service:
     enabled: false
@@ -333,6 +323,35 @@ flat-run-fields-updater:
       # targetMemoryUtilizationPercentage: 80
   terminationGracePeriodSeconds: 60
   env:
+    A_REDIS_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.redis.passwordSecret" . }}'
+          key: "{{ .Values.global.redis.secret.secretKey }}"
+          optional: true
+    AZURE_STORAGE_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_ACCESS_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_SECRET_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
+          optional: true
+    A_MYSQL_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.mysql.passwordSecret" . }}'
+          key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
     POD_NAME:
       valueFrom:
         fieldRef:
@@ -365,18 +384,11 @@ flat-run-fields-updater:
       value: '{{ (include "wandb.bucket" . | fromYaml).url | quote }}'
     GORILLA_TRACER:
       value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
-    AZURE_STORAGE_KEY:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
-          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
-          optional: true
   envFrom:
     "{{ .Release.Name }}-mysql": "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    '{{ include "wandb.redis.passwordSecret" . }}': "secretRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-gorilla-secret": "secretRef"
