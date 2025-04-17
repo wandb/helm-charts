@@ -25,6 +25,10 @@ global:
 
   cloudProvider: ""
 
+  # Rough size of the deployment, in our terms this value comes from terraform, expected values:
+  # small, medium, large, xlarge, xxlarge
+  size: ""
+
   storageClass: ""
 
   banners:
@@ -525,6 +529,35 @@ glue:
   service:
     enabled: false
   env:
+    A_REDIS_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.redis.passwordSecret" . }}'
+          key: "{{ .Values.global.redis.secret.secretKey }}"
+          optional: true
+    AZURE_STORAGE_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_ACCESS_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_SECRET_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
+          optional: true
+    A_MYSQL_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.mysql.passwordSecret" . }}'
+          key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
     GORILLA_FRONTEND_HOST:
       value: "{{ .Values.global.host }}"
     GORILLA_LICENSE_CERT_PATH:
@@ -571,17 +604,9 @@ glue:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     GORILLA_STORAGE_BUCKET:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
-    AZURE_STORAGE_KEY:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
-          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
-          optional: true
   envFrom:
-    "{{ .Release.Name }}-mysql": "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    '{{ include "wandb.redis.passwordSecret" . }}': "secretRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-gorilla-secret": "secretRef"
@@ -701,6 +726,41 @@ api:
         protocol: TCP
         name: http
   env:
+    A_REDIS_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.redis.passwordSecret" . }}'
+          key: "{{ .Values.global.redis.secret.secretKey }}"
+          optional: true
+    AZURE_STORAGE_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_ACCESS_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_SECRET_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
+          optional: true
+    A_MYSQL_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.mysql.passwordSecret" . }}'
+          key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+    A_KAFKA_CLIENT_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.kafka.passwordSecret" . }}'
+          key: '{{ include "wandb.kafka.passwordSecret.passwordKey" . }}'
+          optional: true
     GORILLA_FRONTEND_HOST:
       value: "{{ .Values.global.host }}"
     GORILLA_LICENSE_CERT_PATH:
@@ -747,12 +807,10 @@ api:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     GORILLA_STORAGE_BUCKET:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
-    A_KAFKA_CLIENT_PASSWORD:
+    GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE:
       valueFrom:
-        secretKeyRef:
-          name: '{{ include "wandb.kafka.passwordSecret" . }}'
-          key: '{{ include "wandb.kafka.passwordSecret.passwordKey" . }}'
-          optional: true
+        fieldRef:
+          fieldPath: metadata.namespace
     GORILLA_RUN_UPDATE_SHADOW_QUEUE:
       value: >
         {
@@ -765,17 +823,9 @@ api:
         }
     GORILLA_PORT:
       value: "8081"
-    AZURE_STORAGE_KEY:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
-          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
-          optional: true
   envFrom:
-    "{{ .Release.Name }}-mysql": "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    '{{ include "wandb.redis.passwordSecret" . }}': "secretRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
@@ -902,14 +952,6 @@ settingsMigrationJob:
           - update
           - patch
   env:
-    SMJ_FILE_STORE:
-      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
-    SMJ_K8S_ACTIVE_SPEC_SECRET_NAME:
-      value: "wandb-spec-active"
-    SMJ_K8S_USER_SPEC_SECRET_NAME:
-      value: "wandb-spec-user"
-    SMJ_K8S_NAMESPACE:
-      value: "default"
     AZURE_STORAGE_KEY:
       valueFrom:
         secretKeyRef:
@@ -928,9 +970,16 @@ settingsMigrationJob:
           name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
           key: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
           optional: true
+    SMJ_FILE_STORE:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    SMJ_K8S_ACTIVE_SPEC_SECRET_NAME:
+      value: "wandb-spec-active"
+    SMJ_K8S_USER_SPEC_SECRET_NAME:
+      value: "wandb-spec-user"
+    SMJ_K8S_NAMESPACE:
+      value: "default"
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-    "{{ .Release.Name }}-bucket": "secretRef"
   kind: Job
   jobs:
     smj:
