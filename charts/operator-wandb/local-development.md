@@ -104,6 +104,26 @@ After completing your development work:
    kubectl scale --replicas=1 deployment -n wandb wandb-controller-manager
    ```
 
+# Local Pipeline Development and Troubleshooting
+
+To test the pipeline locally, comment out all but the test you want to run in
+the `.github/workflows/test-operator-wandb.yaml` testing matrix, and run
+
+```bash
+act pull_request -s LICENSE="test" -W '.github/workflows/test-operator-wandb.yaml' --container-architecture linux/amd64
+```
+
+To test the `ct install` that gets run in the pipeline.
+
+You can then exec into the `chart-testing-***-control-plane` docker container, run `bash` and `kubectl` to 
+diagnose any issues the tests are facing
+
+`act` is a tool that allows you to run GitHub Actions workflows locally. It
+simulates the GitHub Actions environment on your local machine.
+
+`ct` (chart-testing), which is a tool that helps validate Helm charts by 
+running a series of checks and tests including linting and installation tests.
+
 ## Contributing
 
 After testing your changes locally, submit a pull request with your modifications. Ensure your commits are well-documented, and your PR includes a summary of the changes and any testing performed.
