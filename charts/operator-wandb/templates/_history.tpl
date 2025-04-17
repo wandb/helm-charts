@@ -11,7 +11,7 @@
     {{- end -}}
 
     {{- if not (or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled) -}}
-        {{- $stores = append $stores "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" -}}
+        {{- $stores = append $stores (include "wandb.mysql" .) -}}
     {{- end -}}
 
     {{- join "," $stores -}}
