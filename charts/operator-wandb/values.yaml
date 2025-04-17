@@ -364,6 +364,38 @@ flat-run-fields-updater:
       valueFrom:
         fieldRef:
           fieldPath: metadata.namespace
+    GORILLA_RUN_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_METADATA_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_PARQUET_LIVE_HISTORY_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_ANALYTICS_SINK:
+      value: '{{ include "wandb.mysql" . | trim }}' 
+    GORILLA_HISTORY_STORE:
+      value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
+    GORILLA_METADATA_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    REDIS:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_AUDITOR_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_SETTINGS_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_LOCKER:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_ACTIVITY_STORE_CACHE_ADDRESS:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_FILE_METADATA_SOURCE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_TASK_QUEUE:
+      value: '{{ include "wandb.redis.taskQueue" . | trim }}'
+    GORILLA_FILE_HOST:
+      value: "{{ .Values.global.host }}"
+    GORILLA_STATIC_HOST:
+      value: "{{ .Values.global.host }}"
     OPERATOR_ENABLED:
       value: "true"
     LOGGING_ENABLED:
@@ -376,7 +408,9 @@ flat-run-fields-updater:
             "name": "wandb",
             "prefix": "wandb-overflow"
           },
-          "addr": {{ include "wandb.runUpdateShadowTopicProducer" . | quote }}
+          "subscriptions": {
+            "flatRunFieldsUpdater": {{ include "wandb.runUpdateShadowQueue" . | quote }}
+          }
         }
     GORILLA_FILE_STORE:
       value: '{{ (include "wandb.bucket" . | fromYaml).url | quote }}'
@@ -392,6 +426,7 @@ flat-run-fields-updater:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-gorilla-secret": "secretRef"
     "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-session-key": "secretRef"
   containers:
     flat-run-fields-updater:
       args: ["flat-run-fields-updater"]
