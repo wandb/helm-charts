@@ -49,7 +49,7 @@ It expects a dictionary with two entries:
       name: {{ $.Release.Name }}-console
       port:
         number: 8082
-      {{- else if eq $.Values.frontend.install }}
+      {{- else if $.Values.frontend.install }}
       name: {{ $.Release.Name }}-frontend
       port:
         number: 80
