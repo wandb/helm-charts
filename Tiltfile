@@ -6,8 +6,16 @@ settings = {
         "kind-kind",
     ],
     "installMinio": True,
+    "installIngress": False,
     "values": "default",
+    "additionalValues": {},
 }
+
+# global settings
+settings.update(read_json(
+    "tilt-settings.json",
+    default={},
+))
 
 settings["operator-wandb-values"] = "./test-configs/operator-wandb/" + settings['values'] + ".yaml"
 settings["additional-resource-directory"] = "./test-configs/additional-resources/" + settings['values'] + ""
@@ -17,12 +25,6 @@ if os.path.exists(settings["additional-resource-directory"]):
         if file.endswith(".yaml") or file.endswith(".yml"):
             k8s_yaml(os.path.join(settings["additional-resource-directory"], file))
 
-# global settings
-settings.update(read_json(
-    "tilt-settings.json",
-    default={},
-))
-
 if k8s_context() in settings.get("allowedContexts"):
     print("Context is allowed")
 else:
@@ -30,7 +32,7 @@ else:
 
 allow_k8s_contexts(settings.get("allowed_k8s_contexts"))
 
-current_values = read_yaml(settings.get("values"))
+current_values = read_yaml(settings["operator-wandb-values"])
 
 if settings.get("installMinio"):
     k8s_yaml('./test-configs/minio/default.yaml')
@@ -43,7 +45,53 @@ if settings.get("installMinio"):
         ]
     )
 
-k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")]))
+if settings.get("installIngress"):
+    k8s_yaml('./test-configs/ingress/default.yaml')
+    k8s_resource(
+        new_name='ingress-nginx',
+        objects=[
+            'ingress-nginx:namespace',
+            'ingress-nginx:serviceaccount',
+            'ingress-nginx:role',
+            'ingress-nginx-admission:role',
+            'ingress-nginx:clusterrole',
+            'ingress-nginx-admission:clusterrole',
+            'ingress-nginx:rolebinding',
+            'ingress-nginx-admission:rolebinding',
+            'ingress-nginx:clusterrolebinding',
+            'ingress-nginx-admission:clusterrolebinding',
+            'ingress-nginx-admission:serviceaccount',
+            'ingress-nginx-controller:configmap',
+        ]
+    )
+    k8s_resource(
+        'ingress-nginx-admission-create',
+        resource_deps=[
+            'ingress-nginx'
+        ]
+    )
+    k8s_resource(
+        'ingress-nginx-admission-patch',
+        resource_deps=[
+            'ingress-nginx'
+        ]
+    )
+    k8s_resource(
+        'ingress-nginx-controller',
+        objects=[
+            'nginx:ingressclass',
+            'ingress-nginx-admission:validatingwebhookconfiguration'
+        ],
+        resource_deps=[
+            'ingress-nginx', 'ingress-nginx-admission-create'
+        ]
+    )
+
+helmSetValues = []
+for key, value in settings["additionalValues"].items():
+    helmSetValues.append(key + '=' + value)
+
+k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")], set=helmSetValues))
 k8s_resource('wandb-app', port_forwards=8080, objects=['wandb-app:ServiceAccount:default', 'wandb-app-config:secret:default'])
 k8s_resource('wandb-console', port_forwards=8082, objects=['wandb-console:ServiceAccount:default', 'wandb-console:clusterrole:default', 'wandb-console:clusterrolebinding:default'])
 if current_values.get('executor', {}).get('install', False):
@@ -56,6 +104,8 @@ k8s_resource('wandb-redis-master',objects=['wandb-redis-master:ServiceAccount:de
 if current_values.get('reloader', {}).get('install', False):
     k8s_resource('wandb-reloader',objects=['wandb-reloader:ServiceAccount:default'])
 k8s_resource('wandb-weave',objects=['wandb-weave:ServiceAccount:default'])
+if current_values.get('weave-trace', {}).get('install', False):
+    k8s_resource('wandb-weave-trace', port_forwards=8722)
 k8s_resource(
     new_name='wandb-configs',
     objects=[
