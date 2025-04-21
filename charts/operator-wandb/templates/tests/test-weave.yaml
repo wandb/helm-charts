@@ -1,0 +1,107 @@
+{{- if (get .Values "weave-trace").install }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "wandb.fullname" . }}-test-weave"
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wandb-verify
+      image: python:3.10
+      env:
+        - name: WANDB_BASE_URL
+          value: "http://{{ .Release.Name }}-app:8080"
+        - name: WF_TRACE_SERVER_URL
+          value: "http://{{ .Release.Name }}-weave-trace:8722/traces"
+        - name: WANDB_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+      command:
+        - sh
+        - -c
+        - "pip install weave && (timeout=240; start_time=$(date +%s); until python /tmp/test.py || [ $(($(date +%s) - start_time)) -gt $timeout ]; do echo 'weave verify failed, retrying...' && cat /tmp/debug-cli.root.log; sleep 10; done)"
+      volumeMounts:
+        - name: test-script
+          mountPath: /tmp/test.py
+          subPath: test.py
+  volumes:
+    - name: test-script
+      configMap:
+        name: "{{ include "wandb.fullname" . }}-test-weave"
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ include "wandb.fullname" . }}-test-weave"
+  annotations:
+    "helm.sh/hook": test
+data:
+  test.py: |
+    import weave
+    import json
+    from datetime import datetime
+
+    # Initialize weave
+    weave.init('mock-trace-example')
+
+    # Define a mock LLM call function
+    @weave.op()
+    def mock_llm_call(prompt: str) -> str:
+      # Instead of making an actual LLM call, we'll just return a mock response
+      mock_response = {
+        "id": "mock-llm-call-123",
+        "model": "gpt-4",
+        "created": datetime.now().isoformat(),
+        "choices": [{
+          "message": {
+            "role": "assistant",
+            "content": "This is a mock response to: " + prompt
+          }
+        }]
+      }
+
+      return json.dumps(mock_response)
+
+    # Create a mock trace
+    @weave.op()
+    def create_mock_trace():
+      # Call the mock LLM function
+      response = mock_llm_call("What is the capital of France?")
+
+      # Return the response
+      return {
+      "prompt": "What is the capital of France?",
+      "response": response,
+      "metadata": {
+        "model": "gpt-4",
+        "temperature": 0.7,
+        "max_tokens": 100
+      }
+    }
+
+    if __name__ == "__main__":
+      # Create and log the mock trace
+      result, call = create_mock_trace.call()
+
+      # Set a custom display name for the call
+      call.set_display_name("Mock LLM Call - Capital of France")
+
+      # Add feedback to the call using the correct method
+      call.feedback.add("rating", {"value": 5, "comment": "Great response! Very informative."})
+
+      # Get call information and convert datetime objects to ISO format strings
+      call_info = {
+      "id": call.id,
+      "trace_id": call.trace_id,
+      "started_at": call.started_at.isoformat() if call.started_at else None,
+      "ended_at": call.ended_at.isoformat() if call.ended_at else None,
+      "inputs": call.inputs,
+      "output": call.output
+    }
+
+    print("Mock trace created and logged successfully!")
+    print("Call information:", json.dumps(call_info, indent=2))
+{{- end }}
