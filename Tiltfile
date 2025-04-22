@@ -112,7 +112,7 @@ k8s_resource(
         'wandb-bucket-configmap:configmap:default',
         'wandb-bucket:secret:default',
         'wandb-ca-certs:configmap:default',
-        'wandb-clickhouse:secret:default',
+        'wandb-clickhouse-configmap:configmap:default',
         'wandb-global-secret:secret:default',
         'wandb-glue-configmap:configmap:default',
         'wandb-glue-secret:secret:default',
@@ -125,5 +125,5 @@ k8s_resource(
         'wandb-redis-secret:secret:default',
     ]
 )
-k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:default', 'wandb-gorilla-session-key:secret:default'], trigger_mode=TRIGGER_MODE_MANUAL)
+k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:default', 'wandb-gorilla-session-key:secret:default', 'wandb-clickhouse:secret:default'], trigger_mode=TRIGGER_MODE_MANUAL)
 k8s_resource(new_name='PVCs', objects=['wandb-mysql-data:PersistentVolumeClaim:default', 'wandb-prometheus-server:PersistentVolumeClaim:default'], trigger_mode=TRIGGER_MODE_MANUAL)

@@ -1,11 +1,4 @@
 {{/*
-Return the kafka client password
-*/}}
-{{- define "wandb.clickhouse.password" -}}
-{{ .Values.global.clickhouse.password }}
-{{- end -}}
-
-{{/*
 Return name of secret where clickhouse information is stored
 */}}
 {{- define "wandb.clickhouse.passwordSecret" -}}
@@ -16,23 +9,18 @@ Return name of secret where clickhouse information is stored
 {{- end -}}
 {{- end }}
 
-{{/*
-Return name of secret where clickhouse information is stored
-*/}}
-{{- define "wandb.clickhouse.passwordSecret.passwordKey" -}}
-{{- if .Values.global.clickhouse.passwordSecret.name }}
-  {{- .Values.global.clickhouse.passwordSecret.passwordKey -}}
-{{- else -}}
-  CLICKHOUSE_PASSWORD
-{{- end -}}
+{{- define "wandb.clickhouse.host" -}}
+  {{- tpl .Values.global.clickhouse.host . -}}
 {{- end }}
 
-{{/*
-Return the redis host
-*/}}
-{{- define "wandb.clickhouse.host" -}}
-{{- if eq .Values.global.clickhouse.host "" -}}
+{{- define "wandb.clickhouse.port" -}}
+{{- if .Values.global.clickhouse.port }}
+  {{- .Values.global.clickhouse.port -}}
 {{- else -}}
-{{ tpl .Values.global.clickhouse.host . }}
+  {{- if .Values.clickhouse.install }}
+    {{- print "8123" -}}
+  {{- else -}}
+    {{- print "8443" -}}
+  {{- end -}}
 {{- end -}}
-{{- end -}}
+{{- end }}
