@@ -99,10 +99,9 @@ global:
       proto: "grpc"
 
   clickhouse:
-    install: false
-    host: ""
-    port: 8443
-    password: "fake"
+    host: "{{ .Release.Name }}-clickhouse-headless"
+    port: ""
+    password: ""
     passwordSecret:
       name: ""
       passwordKey: "CLICKHOUSE_PASSWORD"
@@ -1008,3 +1007,31 @@ reloader:
     watchGlobally: false
     reloadOnCreate: true
     reloadOnDelete: true
+
+clickhouse:
+  install: false
+  auth:
+    existingSecret: '{{ include "wandb.clickhouse.passwordSecret" . }}'
+    existingSecretKey: '{{- .Values.global.clickhouse.passwordSecret.passwordKey -}}'
+
+  shards: 1
+  replicaCount: 1
+
+  persistentVolumeClaimRetentionPolicy:
+    enabled: true
+    whenScaled: Retain
+    whenDeleted: Retain
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+
+  keeper:
+    persistentVolumeClaimRetentionPolicy:
+      enabled: true
+      whenScaled: Retain
+      whenDeleted: Retain
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: ""
