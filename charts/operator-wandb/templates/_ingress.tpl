@@ -52,7 +52,7 @@ It expects a dictionary with two entries:
       {{- else if $.Values.frontend.install }}
       name: {{ $.Release.Name }}-frontend
       port:
-        number: 80
+        number: 8080
       {{- else }}
       name: {{ $.Release.Name }}-app
       port: 
