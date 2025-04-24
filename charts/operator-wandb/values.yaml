@@ -933,6 +933,52 @@ api:
             path: redis_ca.pem
         optional: true
 
+frontend:
+  install: false
+  podSecurityContext:
+    runAsUser: 101
+  autoscaling:
+    horizontal:
+      enabled: true
+      maxReplicas: 3
+      minReplicas: 2
+  imagePullSecrets: *imagePullSecrets
+  image:
+    repository: wandb/frontend-nginx
+    tag: latest
+  service:
+    enabled: true
+    loadBalancerHealthCheckPath: "/ready"
+    type: ClusterIP
+    ports:
+      - port: 8080
+        targetPort: frontend
+        protocol: TCP
+        name: http
+  env:
+    FRONTEND_APP_BACKEND:
+      value: "wandb-app"
+    PUBLIC_URL:
+      value: '{{ .Values.global.host }}'
+    REACT_APP_GIT_TAG:
+      value: "HEAD"
+  envFrom: {}
+  containers:
+    frontend:
+      env: {}
+      envFrom: {}
+      ports:
+        - name: frontend
+          containerPort: 8080
+          protocol: TCP
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+        requests:
+          cpu: 100m
+          memory: 512Mi
+
 settingsMigrationJob:
   install: false
   imagePullSecrets: *imagePullSecrets
