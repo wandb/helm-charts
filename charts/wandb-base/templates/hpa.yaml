@@ -1,4 +1,6 @@
-{{- if .Values.autoscaling.horizontal.enabled }}
+{{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
+{{- $hpaSizing := merge .Values.autoscaling.horizontal $sizingInfo.autoscaling.horizontal }}
+{{- if $hpaSizing.enabled }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -10,23 +12,23 @@ spec:
     apiVersion: apps/v1
     kind: {{ .Values.kind }}
     name: {{ include "wandb-base.fullname" . }}
-  minReplicas: {{ .Values.autoscaling.horizontal.minReplicas }}
-  maxReplicas: {{ .Values.autoscaling.horizontal.maxReplicas }}
+  minReplicas: {{ $hpaSizing.minReplicas }}
+  maxReplicas: {{ $hpaSizing.maxReplicas }}
   metrics:
-    {{- if .Values.autoscaling.horizontal.targetCPUUtilizationPercentage }}
+    {{- if $hpaSizing.targetCPUUtilizationPercentage }}
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: {{ .Values.autoscaling.horizontal.targetCPUUtilizationPercentage }}
+          averageUtilization: {{ $hpaSizing.targetCPUUtilizationPercentage }}
     {{- end }}
-    {{- if .Values.autoscaling.horizontal.targetMemoryUtilizationPercentage }}
+    {{- if $hpaSizing.targetMemoryUtilizationPercentage }}
     - type: Resource
       resource:
         name: memory
         target:
           type: Utilization
-          averageUtilization: {{ .Values.autoscaling.horizontal.targetMemoryUtilizationPercentage }}
+          averageUtilization: {{ $hpaSizing.targetMemoryUtilizationPercentage }}
     {{- end }}
 {{- end }}

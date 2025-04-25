@@ -92,3 +92,12 @@ secret.reloader.stakater.com/reload: {{ $secrets | trimSuffix "," }}
 {{- end }}
 reloader.stakater.com/auto: "true"
 {{- end }}
+
+{{- define "wandb-base.sizingInfo" }}
+{{- $size := default "" (coalesce .Values.size .Values.global.size) }}
+{{- $sizingInfo := default (dict) (get .Values.sizing $size) }}
+{{- $defaultSize := default (dict) (get .Values.sizing "default") }}
+{{- $mergedSize := merge $sizingInfo $defaultSize }}
+
+{{- toYaml $mergedSize }}
+{{- end }}
