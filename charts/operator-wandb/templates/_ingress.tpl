@@ -73,6 +73,13 @@ It expects a dictionary with two entries:
       name: {{ $.Release.Name }}-api
       port: 
         number: 8081
+- pathType: Prefix
+  path: /files
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port: 
+        number: 8081
 {{- end }}
 - pathType: Prefix
   path: /console
