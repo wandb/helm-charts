@@ -73,6 +73,87 @@ It expects a dictionary with two entries:
       name: {{ $.Release.Name }}-api
       port: 
         number: 8081
+{{- if .Values.global.api.additionalPaths.analytics }}
+- pathType: Prefix
+  path: /analytics
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+{{- end }}
+{{- if .Values.global.api.additionalPaths.oidc }}
+- pathType: Prefix
+  path: /oidc
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+{{- end }}
+{{- if .Values.global.api.additionalPaths.proxy }}
+- pathType: Prefix
+  path: /proxy
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+{{- end }}
+{{- if .Values.global.api.additionalPaths.files }}
+- pathType: Prefix
+  path: /files
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+{{- end }}
+{{- if .Values.global.api.additionalPaths.debug }}
+- pathType: Prefix
+  path: /debug
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+{{- end }}
+{{- if .Values.global.api.additionalPaths.service_redirect }}
+- pathType: Prefix
+  path: /service-redirect
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+{{- end }}
+{{- if .Values.global.api.additionalPaths.service_dangerzone }}
+- pathType: Prefix
+  path: /service-dangerzone
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+{{- end }}
+{{- if .Values.global.api.additionalPaths.scim }}
+- pathType: Prefix
+  path: /scim
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+{{- end }}
+{{- if .Values.global.api.additionalPaths.admin }}
+- pathType: Prefix
+  path: /admin/audit_logs
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+{{- end }}
 {{- end }}
 - pathType: Prefix
   path: /console
