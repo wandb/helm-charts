@@ -154,6 +154,15 @@ It expects a dictionary with two entries:
       port:
         number: 8081
 {{- end }}
+{{- if .Values.global.api.additionalPaths.artifacts }}
+- pathType: Prefix
+  path: /artifacts
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+{{- end }}
 {{- end }}
 - pathType: Prefix
   path: /console
