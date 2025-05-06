@@ -58,7 +58,7 @@ It expects a dictionary with two entries:
       port: 
         number: 8080
       {{- end }}
-{{- if .Values.global.api.enabled }}
+{{- if $.Values.global.api.enabled }}
 - pathType: Prefix
   path: /api
   backend:
@@ -73,7 +73,7 @@ It expects a dictionary with two entries:
       name: {{ $.Release.Name }}-api
       port: 
         number: 8081
-{{- if .Values.global.api.additionalPaths.analytics }}
+{{- if $.Values.global.api.additionalPaths.analytics }}
 - pathType: Prefix
   path: /analytics
   backend:
@@ -82,7 +82,7 @@ It expects a dictionary with two entries:
       port:
         number: 8081
 {{- end }}
-{{- if .Values.global.api.additionalPaths.oidc }}
+{{- if $.Values.global.api.additionalPaths.oidc }}
 - pathType: Prefix
   path: /oidc
   backend:
@@ -91,7 +91,7 @@ It expects a dictionary with two entries:
       port:
         number: 8081
 {{- end }}
-{{- if .Values.global.api.additionalPaths.proxy }}
+{{- if $.Values.global.api.additionalPaths.proxy }}
 - pathType: Prefix
   path: /proxy
   backend:
@@ -100,7 +100,7 @@ It expects a dictionary with two entries:
       port:
         number: 8081
 {{- end }}
-{{- if .Values.global.api.additionalPaths.files }}
+{{- if $.Values.global.api.additionalPaths.files }}
 - pathType: Prefix
   path: /files
   backend:
@@ -109,7 +109,7 @@ It expects a dictionary with two entries:
       port:
         number: 8081
 {{- end }}
-{{- if .Values.global.api.additionalPaths.debug }}
+{{- if $.Values.global.api.additionalPaths.debug }}
 - pathType: Prefix
   path: /debug
   backend:
@@ -118,7 +118,7 @@ It expects a dictionary with two entries:
       port:
         number: 8081
 {{- end }}
-{{- if .Values.global.api.additionalPaths.service_redirect }}
+{{- if $.Values.global.api.additionalPaths.service_redirect }}
 - pathType: Prefix
   path: /service-redirect
   backend:
@@ -127,7 +127,7 @@ It expects a dictionary with two entries:
       port:
         number: 8081
 {{- end }}
-{{- if .Values.global.api.additionalPaths.service_dangerzone }}
+{{- if $.Values.global.api.additionalPaths.service_dangerzone }}
 - pathType: Prefix
   path: /service-dangerzone
   backend:
@@ -136,7 +136,7 @@ It expects a dictionary with two entries:
       port:
         number: 8081
 {{- end }}
-{{- if .Values.global.api.additionalPaths.scim }}
+{{- if $.Values.global.api.additionalPaths.scim }}
 - pathType: Prefix
   path: /scim
   backend:
@@ -145,7 +145,7 @@ It expects a dictionary with two entries:
       port:
         number: 8081
 {{- end }}
-{{- if .Values.global.api.additionalPaths.admin }}
+{{- if $.Values.global.api.additionalPaths.admin }}
 - pathType: Prefix
   path: /admin/audit_logs
   backend:
@@ -154,7 +154,7 @@ It expects a dictionary with two entries:
       port:
         number: 8081
 {{- end }}
-{{- if .Values.global.api.additionalPaths.artifacts }}
+{{- if $.Values.global.api.additionalPaths.artifacts }}
 - pathType: Prefix
   path: /artifacts
   backend:
