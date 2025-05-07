@@ -25,10 +25,6 @@ global:
 
   cloudProvider: ""
 
-  # Rough size of the deployment, in our terms this value comes from terraform, expected values:
-  # small, medium, large, xlarge, xxlarge
-  size: ""
-
   storageClass: ""
 
   banners:
@@ -209,6 +205,18 @@ global:
 
   api:
     enabled: false
+    additionalPaths:
+      proxy: false
+      files: false
+      debug: false
+      service_redirect: false
+      service_dangerzone: false
+      artifacts: false
+      oidc: false
+      analytics: false
+      scim: false
+      admin: false
+
   glue:
     enabled: false
 
@@ -335,6 +343,7 @@ executor:
     tag: latest
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
 
 mysql:
   install: false
@@ -935,6 +944,58 @@ api:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
         optional: true
+
+frontend:
+  install: false
+  podSecurityContext:
+    runAsUser: 101
+  autoscaling:
+    horizontal:
+      enabled: true
+      maxReplicas: 3
+      minReplicas: 2
+  imagePullSecrets: *imagePullSecrets
+  image:
+    repository: wandb/frontend-nginx
+    tag: latest
+  service:
+    enabled: true
+    loadBalancerHealthCheckPath: "/ready"
+    type: ClusterIP
+    ports:
+      - port: 8080
+        targetPort: frontend
+        protocol: TCP
+        name: http
+  env:
+    PUBLIC_URL:
+      value: '{{ .Values.global.host }}'
+    REACT_APP_GIT_TAG:
+      value: "HEAD"
+    REACT_APP_HOST:
+      value: '{{ .Values.global.host }}'
+    REACT_APP_ENVIRONMENT_NAME:
+      value: "local"
+    REACT_APP_ENVIRONMENT_IS_PRIVATE:
+      value: "true"
+    REACT_APP_ANALYTICS_DISABLED:
+      value: "true"
+  envFrom: {}
+  containers:
+    frontend:
+      env: {}
+      envFrom: {}
+      ports:
+        - name: frontend
+          containerPort: 8080
+          protocol: TCP
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+        requests:
+          cpu: 100m
+          memory: 512Mi
 
 settingsMigrationJob:
   install: false
