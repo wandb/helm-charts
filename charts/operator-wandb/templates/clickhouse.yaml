@@ -1,12 +1,31 @@
----
 {{- if not .Values.global.clickhouse.passwordSecret.name }}
 {{- $secretName := (include "wandb.clickhouse.passwordSecret" .)  }}
+{{- $secret := (lookup "v1" "Secret" .Release.Namespace $secretName) }}
 apiVersion: v1
 kind: Secret
 metadata:
   name: {{ $secretName }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
-  CLICKHOUSE_PASSWORD: {{ include "wandb.clickhouse.password" . | b64enc }}
+{{- if $secret }}
+  CLICKHOUSE_PASSWORD: {{ default ($secret.data.CLICKHOUSE_PASSWORD) .Values.global.clickhouse.password | b64enc }}
+{{- else }}
+  CLICKHOUSE_PASSWORD: {{ default (randAlphaNum 64) .Values.global.clickhouse.password | b64enc }}
 {{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-clickhouse-configmap
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  WF_CLICKHOUSE_PORT: "{{ include "wandb.clickhouse.port" . }}"
+  WF_CLICKHOUSE_HOST: "{{ include "wandb.clickhouse.host" . }}"
+  WF_CLICKHOUSE_DATABASE: "{{ .Values.global.clickhouse.database }}"
+  WF_CLICKHOUSE_USER: "{{ .Values.global.clickhouse.user }}"
+  WF_CLICKHOUSE_REPLICATED: "{{ .Values.global.clickhouse.replicated }}"
