@@ -1,0 +1,93 @@
+{{- if .Values.weaveWorker.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "weaveWorker.fullname" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "weaveTrace.commonLabels" . | nindent 4 }}
+    {{- include "weaveTrace.labels" . | nindent 4 }}
+    {{- if .Values.deployment.labels -}}
+    {{-   toYaml .Values.deployment.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
+    {{- if .Values.deployment.annotations -}}
+    {{-   toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "wandb.selectorLabels" $ | nindent 6 }}
+      {{- include "weaveTrace.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wandb.podLabels" . | nindent 8 }}
+        {{- include "weaveTrace.commonLabels" . | nindent 8 }}
+        {{- include "weaveTrace.podLabels" . | nindent 8 }}
+        {{- include "weaveTrace.labels" . | nindent 8 }}
+      annotations:
+        {{- if .Values.pod.annotations -}}
+        {{-   toYaml .Values.pod.annotations | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- end }}
+      {{- include "wandb.nodeSelector" . | nindent 6 }}
+      {{- include "wandb.priorityClassName" . | nindent 6 }}
+      {{- include "wandb.podSecurityContext" .Values.pod.securityContext | nindent 6 }}
+      containers:
+        - name: {{ include "weaveWorker.fullname" .  }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-clickhouse-configmap
+          env:
+            - name: WF_CLICKHOUSE_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.clickhouse.passwordSecret" . }}
+                  key: {{ .Values.global.clickhouse.passwordSecret.passwordKey }}
+            - name: WF_KAFKA_BROKER_HOST
+              value: "bufstream.default.svc.cluster.local"
+            - name: WF_KAFKA_BROKER_PORT
+              value: "9092"
+            {{- include "weaveTrace.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
+            {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+          command:
+            - python
+          args:
+            - "-m"
+            - "weave.workers.weave_scorer"
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - ps aux | grep 'weave_scorer'
+            timeoutSeconds: 2
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - ps aux | grep 'weave_scorer'
+            timeoutSeconds: 2
+            failureThreshold: 5
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - ps aux | grep 'weave_scorer'
+            timeoutSeconds: 2
+            failureThreshold: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}
