@@ -54,20 +54,15 @@ spec:
           command:
             - "python"
             - "migrator.py"
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-clickhouse-configmap
           env:
-            - name: WF_CLICKHOUSE_HOST
-              value: "{{ .Values.global.clickhouse.host }}"
-            - name: WF_CLICKHOUSE_PORT
-              value: "{{ .Values.global.clickhouse.port }}"
-            - name: WF_CLICKHOUSE_DATABASE
-              value: "{{ .Values.global.clickhouse.database }}"
-            - name: WF_CLICKHOUSE_USER
-              value: "{{ .Values.global.clickhouse.user }}"
             - name: WF_CLICKHOUSE_PASS
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.clickhouse.passwordSecret" . }}
-                  key: {{ include "wandb.clickhouse.passwordSecret.passwordKey" . }}
+                  key: {{ .Values.global.clickhouse.passwordSecret.passwordKey }}
             {{- include "weaveTrace.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
       {{- end }}
@@ -79,6 +74,9 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-clickhouse-configmap
           env:
             - name: PORT
               value: "8080"
@@ -94,21 +92,11 @@ spec:
               value: "{{ .Values.global.host }}/traces"
             - name: WF_ENFORCE_PASSWORD_LENGTH
               value: "false"
-            - name: WF_CLICKHOUSE_HOST
-              value: "{{ .Values.global.clickhouse.host }}"
-            - name: WF_CLICKHOUSE_PORT
-              value: "{{ .Values.global.clickhouse.port }}"
-            - name: WF_CLICKHOUSE_DATABASE
-              value: "{{ .Values.global.clickhouse.database }}"
-            - name: WF_CLICKHOUSE_USER
-              value: "{{ .Values.global.clickhouse.user }}"
-            - name: WF_CLICKHOUSE_REPLICATED
-              value: "{{ .Values.global.clickhouse.replicated }}"
             - name: WF_CLICKHOUSE_PASS
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.clickhouse.passwordSecret" . }}
-                  key: {{ include "wandb.clickhouse.passwordSecret.passwordKey" . }}
+                  key: {{ .Values.global.clickhouse.passwordSecret.passwordKey }}
             {{- include "weaveTrace.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           {{- if not .Values.datadog.enabled }}

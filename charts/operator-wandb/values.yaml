@@ -95,10 +95,9 @@ global:
       proto: "grpc"
 
   clickhouse:
-    install: false
-    host: ""
-    port: 8443
-    password: "fake"
+    host: "{{ .Release.Name }}-clickhouse-headless"
+    port: ""
+    password: ""
     passwordSecret:
       name: ""
       passwordKey: "CLICKHOUSE_PASSWORD"
@@ -790,6 +789,8 @@ api:
       value: '{{ include "wandb.redis.connectionString" . | trim }}'
     GORILLA_FILE_METADATA_SOURCE:
       value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL:
+      value: "true"
     GORILLA_TASK_QUEUE:
       value: '{{ include "wandb.redis.taskQueue" . | trim }}'
     GORILLA_GLUE_TASK_STRATEGY_STORE:
@@ -1069,3 +1070,31 @@ reloader:
     watchGlobally: false
     reloadOnCreate: true
     reloadOnDelete: true
+
+clickhouse:
+  install: false
+  auth:
+    existingSecret: '{{ include "wandb.clickhouse.passwordSecret" . }}'
+    existingSecretKey: '{{- .Values.global.clickhouse.passwordSecret.passwordKey -}}'
+
+  shards: 1
+  replicaCount: 1
+
+  persistentVolumeClaimRetentionPolicy:
+    enabled: true
+    whenScaled: Retain
+    whenDeleted: Retain
+  persistence:
+    enabled: true
+    size: 30Gi
+    storageClass: ""
+
+  keeper:
+    persistentVolumeClaimRetentionPolicy:
+      enabled: true
+      whenScaled: Retain
+      whenDeleted: Retain
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: ""
