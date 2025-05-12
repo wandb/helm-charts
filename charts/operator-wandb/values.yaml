@@ -522,17 +522,18 @@ bufstream:
     use: etcd
     etcd:
       addresses:
-        - host: '{{ .Release.Name }}-etcd.{{ .Release.Namespace }}.svc.cluster.local'
+        - host: "{{ .Release.Name }}-etcd.{{ .Release.Namespace }}.svc.cluster.local"
           port: 2379
   bufstream:
     deployment:
       resources:
         requests:
-          cpu: '1'
+          cpu: "1"
           memory: 4Gi
 
 glue:
   # install: false
+  useConfigMap: false
   imagePullSecrets: *imagePullSecrets
   service:
     enabled: false
@@ -613,7 +614,7 @@ glue:
     GORILLA_STORAGE_BUCKET:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     GORILLA_TSHIRT_SIZE:
-      value: '{{ .Values.global.size }}'
+      value: "{{ .Values.global.size }}"
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
@@ -699,6 +700,9 @@ glue:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
+        - name: glue-config
+          subPath: gorilla_glue_tasks_local.yaml
+          mountPath: /
   image:
     repository: wandb/megabinary
     tag: latest
@@ -709,6 +713,10 @@ glue:
     - name: wandb-ca-certs-user
       configMap:
         name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
+        optional: true
+    - name: glue-config
+      configMap:
+        name: "{{ .Release.Name }}-glue-configmap"
         optional: true
     - name: redis-ca
       secret:
@@ -798,7 +806,7 @@ api:
     GORILLA_GLUE_TASK_METADATA_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_TSHIRT_SIZE:
-      value: '{{ .Values.global.size }}'
+      value: "{{ .Values.global.size }}"
     GORILLA_USAGE_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_METADATA_STORE:
@@ -971,11 +979,11 @@ frontend:
         name: http
   env:
     PUBLIC_URL:
-      value: '{{ .Values.global.host }}'
+      value: "{{ .Values.global.host }}"
     REACT_APP_GIT_TAG:
       value: "HEAD"
     REACT_APP_HOST:
-      value: '{{ .Values.global.host }}'
+      value: "{{ .Values.global.host }}"
     REACT_APP_ENVIRONMENT_NAME:
       value: "local"
     REACT_APP_ENVIRONMENT_IS_PRIVATE:
@@ -1075,7 +1083,7 @@ clickhouse:
   install: false
   auth:
     existingSecret: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-    existingSecretKey: '{{- .Values.global.clickhouse.passwordSecret.passwordKey -}}'
+    existingSecretKey: "{{- .Values.global.clickhouse.passwordSecret.passwordKey -}}"
 
   shards: 1
   replicaCount: 1
