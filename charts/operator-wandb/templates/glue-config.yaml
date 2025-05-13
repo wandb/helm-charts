@@ -1,0 +1,395 @@
+{{- /*
+Create a ConfigMap for the glue component.
+This ConfigMap is intended to be mounted as a configuration file.
+The file created within this ConfigMap is named "gorilla_glue_tasks_local.yaml".
+The ConfigMap is only created if glue.useConfigMap is true.
+The ConfigMap contains task definitions for background jobs like cleaning stale runs,
+early stopping sweeps, backfilling storage stats, etc.
+*/}}
+{{- if and .Values.glue.useConfigMap .Values.executor.install }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "wandb.fullname" . }}-glue-configfile
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: glue
+data:
+  gorilla_glue_tasks_local.yaml: |-
+    - name: "Flapping Sweeps"
+      glueTaskType: "FLAPPINGSWEEPS"
+      arguments:
+        flappingArguments:
+          maxFailures: 3
+          maxSweepsToCheck: 100
+      checkpoint:
+        totalSweepsChecked: 0
+      status: "DISABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "*/1 * * * *"
+    - name: "Stale Runs Cleaner"
+      glueTaskType: "STALERUNSCLEANER"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 */5 * * * * *" # 5 minutes
+    - name: "Early Stop Sweeps"
+      glueTaskType: "EARLYSTOPSWEEPS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: Backfill Run Storage Stats
+      glueTaskType: "BACKFILLRUNSTORAGE"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: Clean Run Storage Stats
+      glueTaskType: "CLEANRUNSTORAGESTATS"
+      arguments:
+        cleanRunStorageStatsArgs:
+          cutoff: 300000000000
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: RecalculateArtifactCollectionStorageStats
+      glueTaskType: "CLEANARTIFACTCOLLECTIONSTORAGESTATS"
+      arguments:
+        cleanArtifactCollectionStorageStatsArguments:
+          cutoff: 300000000000
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: GarbageCollectArtifactCollections
+      glueTaskType: "DELETEARTIFACTCOLLECTIONS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: DeleteArtifacts
+      glueTaskType: "ARTIFACTDEADLISTS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: GarbageCollectArtifacts
+      glueTaskType: "GARBAGECOLLECTARTIFACTS"
+      arguments:
+        garbageCollectArtifactsArguments:
+          batchSize: 100000
+          numWorkers: 64
+          deleteFilesNumWorkers: 64
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: telemetry
+      glueTaskType: "TELEMETRY"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 * * * * *" # 1 hour
+    - name: logrotate
+      glueTaskType: "LOGROTATE"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: check_local_latest
+      glueTaskType: "CHECKLOCALLATEST"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 0 * * * *" # 1 day
+    - name: backfill_run_compute_hours
+      glueTaskType: "BACKFILLRUNCOMPUTEHOURS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: ensure_analytics_partition
+      glueTaskType: "ENSUREANALYTICSPARTITION"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 * * * * *" # 1 hour
+    - name: upload_analytics_events
+      glueTaskType: "UPLOADANALYTICSEVENTS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 * * * * *" # 1 hour
+    - name: upsert_daily_audit_logs
+      glueTaskType: "UPSERTDAILYAUDITLOGS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 */10 * * * * *" # 10 minutes
+    - name: send_analytics_events
+      glueTaskType: "SENDANALYTICSEVENTS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 * * * * *" # 1 hour
+    - name: prune_sessions
+      glueTaskType: "PRUNESESSIONS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 10 * * * * *" # At 10 minutes past the hour
+    - name: stale_launch_agents
+      glueTaskType: "STALELAUNCHAGENTS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 */5 * * * * *" # 5 minutes
+    - name: crashed_launch_agents
+      glueTaskType: "CRASHEDLAUNCHAGENTS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 */5 * * * * *" # 5 minutes
+    - name: email_reminders
+      glueTaskType: "EMAILREMINDERS"
+      status: "DISABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 12 * * * *" # daily, 12PM PST
+    - name: ldap_group_sync
+      glueTaskType: "LDAPGROUPSYNC"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 * * * * *" # 1 hour
+    - name: garbage_collect_runs
+      glueTaskType: "GARBAGECOLLECTRUNS"
+      arguments:
+        garbageCollectRunsArguments:
+          numRunsToProcess: 75
+          windowSize: 100
+          numConcurrent: 5
+          batchSize: 500
+      checkpoint:
+        garbageCollectRunsCheckpoint:
+          lastProjectIDProcessed: 0
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+      status: "ENABLED"
+    - name: garbage_collect_runs_v2
+      glueTaskType: "GARBAGECOLLECTRUNSV2"
+      arguments:
+        garbageCollectRunsArguments:
+          numRunsToProcess: 75
+          windowSize: 100
+          numConcurrent: 5
+          batchSize: 500
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+      status: "ENABLED"
+    - name: garbage_collect_files
+      glueTaskType: "GARBAGECOLLECTFILES"
+      arguments:
+        garbageCollectFilesArguments:
+          numFilesToProcess: 100
+          windowSize: 100
+          numConcurrent: 10
+      checkpoint:
+        garbageCollectFilesCheckpoint:
+          lastIDProcessed: 0
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: user_activity_daily
+      glueTaskType: "USERACTIVITYDAILY"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 0 * * * *" # daily, 12AM
+      status: "ENABLED"
+    - name: user_activity_backfill
+      glueTaskType: "USERACTIVITYBACKFILL"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0,15,30,45 * * * * *" # 15 minutes
+      status: "ENABLED"
+    - name: ArtifactTTLDeletion
+      glueTaskType: "ARTIFACT_TTL_DELETION"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+      status: "ENABLED"
+    - name: "Stale Run Queue Item Cleaner"
+      glueTaskType: "STALERUNQUEUEITEMSCLEANER"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 * * * * *" # 1 hour
+    - name: "FixMovedKeySets"
+      glueTaskType: "FIXMOVEDKEYSETS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 hour
+    - name: "artifact entity TTL expansion"
+      glueTaskType: "ARTIFACT_ENTITY_TTL_EXPANSION"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+      status: "ENABLED"
+    - name: ExportHistoryToParquet
+      glueTaskType: "EXPORTHISTORYTOPARQUET"
+      status: "ENABLED"
+      arguments:
+        exportHistoryToParquetArguments:
+          max_concurrent_tasks: 10
+          stale_task_threshold_seconds: -3600000000000
+      checkpoint:
+        exportHistoryToParquetCheckpoint:
+          created_at_cursor: "2000-01-01T00:00:00Z"
+          project_id_cursor: 0
+          run_name_cursor: ""
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0,15,30,45 * * * * *" # 15 minutes
+    - name: FlatRunsMigrator
+      glueTaskType: "FLATRUNSMIGRATOR"
+      status: "ENABLED"
+      arguments:
+        flatRunsMigratorArguments:
+          entityName: ""
+          batchSize: 1000
+          parallelism: 5
+      checkpoint:
+        flatRunsMigratorCheckpoint:
+          projectIDCursor: 0
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: ClearTaskDedupeKey
+      glueTaskType: "CLEARTASKDEDUPEKEY"
+      status: "ENABLED"
+      arguments:
+        clearTaskDedupeKeyArguments:
+          batchSize: 1000
+          stale_task_threshold_seconds: -3600000000000
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 * * * * *" # 1 hour
+    - name: entity_type_backfill
+      glueTaskType: "BACKFILLENTITYTYPE"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+      status: "ENABLED"
+    - name: "delete projects"
+      glueTaskType: "DELETEPROJECTS"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+      status: "ENABLED"
+    - name: "Backfill Files Storage Fields"
+      glueTaskType: "BACKFILLFILESSTORAGEFIELDS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+      arguments:
+        filesStorageFieldsBackfillArguments:
+          batchSizePerTaskExecution: 10000
+          batchSizePerGoRoutine: 500
+          numberOfGoRoutines: 20
+    - name: "Record Weave Usage Stats"
+      glueTaskType: "RECORD_WEAVE_USAGE_STATS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 */5 * * * * *" # 5 minutes
+    - name: "Report Usage Stats"
+      glueTaskType: "REPORT_USAGE_STATS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 */5 * * * * *" # 5 minutes
+      arguments:
+        reportUsageStatsArguments:
+          entityBatchSize: 10000
+    - name: "Record Storage Usage Stats"
+      glueTaskType: "RECORD_STORAGE_USAGE_STATS"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+      arguments:
+        recordStorageUsageStatsArguments:
+          entityBatchSize: 1000
+          projectBatchSize: 1000
+    - name: BackfillProjectLastActiveAt
+      glueTaskType: "BACKFILLPROJECTLASTACTIVEAT"
+      status: "ENABLED"
+      arguments:
+        backfillProjectLastActiveAtArguments:
+          batchSize: 1000
+          parallelism: 5
+      checkpoint:
+        backfillProjectLastActiveAtCheckpoint:
+          projectIDCursor: 0
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 * * * * * *" # 1 minute
+    - name: "Backfill Service Account Org Membership"
+      glueTaskType: "BACKFILL_SERVICE_ACCOUNT_ORG_MEMBERSHIP"
+      status: "ENABLED"
+      strategyType: "CronStrategy"
+      strategyMetadata:
+        cronScheduleStrategy:
+          cronexpr: "0 0 0 * * * *"  # daily, 12 AM
+    # Please refer to https://crontab.cronhub.io/ for cron expressions
+    # SECONDS MINUTES HOURS DAY-OF-MONTH MONTH DAY-OF-WEEK YEAR
+{{- end }} 
