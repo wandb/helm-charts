@@ -318,13 +318,166 @@ console:
 
 flat-run-fields-updater:
   install: false
-  image:
-    repository: wandb/local
-    tag: latest
-  pubSub:
-    subscription: ""
+  deploymentPostfix: "bc"
+  service:
+    enabled: false
+  autoscaling:
+    horizontal:
+      enabled: true
+      maxReplicas: 10
+      minReplicas: 1
+      targetCPUUtilizationPercentage: 80
+      # targetMemoryUtilizationPercentage: 80
+  terminationGracePeriodSeconds: 60
+  env:
+    A_KAFKA_CLIENT_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.kafka.passwordSecret" . }}'
+          key: '{{ include "wandb.kafka.passwordSecret.passwordKey" . }}'
+          optional: true
+    A_REDIS_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.redis.passwordSecret" . }}'
+          key: "{{ .Values.global.redis.secret.secretKey }}"
+          optional: true
+    AZURE_STORAGE_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_ACCESS_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_SECRET_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
+          optional: true
+    A_MYSQL_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.mysql.passwordSecret" . }}'
+          key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+    POD_NAME:
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    G_HOST_IP:
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
+    GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE:
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    GORILLA_RUN_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_METADATA_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_PARQUET_LIVE_HISTORY_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_ANALYTICS_SINK:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_HISTORY_STORE:
+      value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
+    GORILLA_METADATA_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    REDIS:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_AUDITOR_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_SETTINGS_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_LOCKER:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_ACTIVITY_STORE_CACHE_ADDRESS:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_FILE_METADATA_SOURCE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_FRONTEND_HOST:
+      value: "{{ .Values.global.host }}"
+    GORILLA_FILE_HOST:
+      value: "{{ .Values.global.host }}"
+    GORILLA_STATIC_HOST:
+      value: "{{ .Values.global.host }}"
+    GORILLA_TSHIRT_SIZE:
+      value: "{{ .Values.global.size }}"
+    OPERATOR_ENABLED:
+      value: "true"
+    LOGGING_ENABLED:
+      value: "true"
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
+      value: >
+        {
+          "overflow-bucket": {
+            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+            "name": "wandb",
+            "prefix": "wandb-overflow"
+          },
+          "subscriptions": {
+            "flatRunFieldsUpdater": {{ include "wandb.runUpdateShadowQueue" . | quote }}
+          }
+        }
+    GORILLA_FILE_STORE:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_STORAGE_BUCKET:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_TRACER:
+      value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-session-key": "secretRef"
+  containers:
+    flat-run-fields-updater:
+      args: ["flat-run-fields-updater"]
+      volumeMounts:
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  resources:
+    limits:
+      cpu: "2"
+      memory: 4Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+  volumes:
+    - name: wandb-ca-certs
+      configMap:
+        name: "{{ .Release.Name }}-ca-certs"
+    - name: wandb-ca-certs-user
+      configMap:
+        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
+        optional: true
+    - name: redis-ca
+      secret:
+        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
+        items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+        optional: true
 
 filestream:
   install: false
@@ -522,13 +675,13 @@ bufstream:
     use: etcd
     etcd:
       addresses:
-        - host: '{{ .Release.Name }}-etcd.{{ .Release.Namespace }}.svc.cluster.local'
+        - host: "{{ .Release.Name }}-etcd.{{ .Release.Namespace }}.svc.cluster.local"
           port: 2379
   bufstream:
     deployment:
       resources:
         requests:
-          cpu: '1'
+          cpu: "1"
           memory: 4Gi
 
 glue:
@@ -613,7 +766,7 @@ glue:
     GORILLA_STORAGE_BUCKET:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     GORILLA_TSHIRT_SIZE:
-      value: '{{ .Values.global.size }}'
+      value: "{{ .Values.global.size }}"
     GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE:
       valueFrom:
         fieldRef:
@@ -811,7 +964,7 @@ api:
     GORILLA_GLUE_TASK_METADATA_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_TSHIRT_SIZE:
-      value: '{{ .Values.global.size }}'
+      value: "{{ .Values.global.size }}"
     GORILLA_USAGE_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_METADATA_STORE:
@@ -993,11 +1146,11 @@ frontend:
         name: http
   env:
     PUBLIC_URL:
-      value: '{{ .Values.global.host }}'
+      value: "{{ .Values.global.host }}"
     REACT_APP_GIT_TAG:
       value: "HEAD"
     REACT_APP_HOST:
-      value: '{{ .Values.global.host }}'
+      value: "{{ .Values.global.host }}"
     REACT_APP_ENVIRONMENT_NAME:
       value: "local"
     REACT_APP_ENVIRONMENT_IS_PRIVATE:
@@ -1097,7 +1250,7 @@ clickhouse:
   install: false
   auth:
     existingSecret: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-    existingSecretKey: '{{- .Values.global.clickhouse.passwordSecret.passwordKey -}}'
+    existingSecretKey: "{{- .Values.global.clickhouse.passwordSecret.passwordKey -}}"
 
   shards: 1
   replicaCount: 1
