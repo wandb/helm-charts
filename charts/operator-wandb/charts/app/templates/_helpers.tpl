@@ -171,3 +171,6 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
 {{ end }}
 {{- end }}
 
+{{- define "wandb.podHostNetwork" }}
+hostNetwork: {{ .Values.podHostNetwork }}
+{{- end }}
