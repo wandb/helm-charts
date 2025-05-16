@@ -87,7 +87,3 @@ securityContext:
   {{- toYaml .Values.init.containerSecurityContext | nindent 2 }}
 {{- end }}
 {{- end }}
-
-{{- define "wandb.podHostNetwork" }}
-hostNetwork: {{ .Values.podHostNetwork }}
-{{- end }}
