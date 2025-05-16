@@ -88,3 +88,6 @@ securityContext:
 {{- end }}
 {{- end }}
 
+{{- define "wandb.podHostNetwork" }}
+hostNetwork: {{ .Values.podHostNetwork }}
+{{- end }}
