@@ -87,4 +87,3 @@ securityContext:
   {{- toYaml .Values.init.containerSecurityContext | nindent 2 }}
 {{- end }}
 {{- end }}
-
