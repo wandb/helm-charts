@@ -98,7 +98,14 @@ spec:
         - name: {{ include "weave.fullname" . }}-cache-clear
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
-          command: ["python", "-m", "weave.clear_cache"]
+          command:
+            - /bin/bash
+            - -c
+            - |
+              if [ -f /var/app/weave-python/venv/bin/activate ]; then
+                source /var/app/weave-python/venv/bin/activate
+              fi
+              python -m weave.clear_cache
           env:
             - name: WEAVE_LOCAL_ARTIFACT_DIR
               value: /vol/weave/cache
