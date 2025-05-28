@@ -1135,6 +1135,11 @@ frontend:
   image:
     repository: wandb/frontend-nginx
     tag: latest
+  volumes:
+    - name: wandb-setup-scripts
+      configMap:
+        name: "{{ .Release.Name }}-frontend-configmap"
+        defaultMode: 0755
   service:
     enabled: true
     loadBalancerHealthCheckPath: "/ready"
@@ -1169,6 +1174,10 @@ frontend:
         - name: frontend
           containerPort: 8080
           protocol: TCP
+      volumeMounts:
+        - name: wandb-setup-scripts
+          mountPath: /docker-entrypoint.d/02_setup_script.sh
+          subPath: 02_setup_script.sh
       resources:
         limits:
           cpu: 1000m
