@@ -1135,6 +1135,14 @@ frontend:
   image:
     repository: wandb/frontend-nginx
     tag: latest
+  volumes:
+    - name: wandb-setup-scripts
+      configMap:
+        name: "{{ .Release.Name }}-frontend-configmap"
+        items:
+          - key: 02_setup_script.sh
+            path: 02_setup_script.sh
+        defaultMode: 0755
   service:
     enabled: true
     loadBalancerHealthCheckPath: "/ready"
@@ -1145,6 +1153,8 @@ frontend:
         protocol: TCP
         name: http
   env:
+    OPERATOR_ENABLED:
+      value: "true"
     PUBLIC_URL:
       value: "{{ .Values.global.host }}"
     REACT_APP_GIT_TAG:
@@ -1157,7 +1167,8 @@ frontend:
       value: "true"
     REACT_APP_ANALYTICS_DISABLED:
       value: "true"
-  envFrom: {}
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
   containers:
     frontend:
       env: {}
@@ -1166,6 +1177,10 @@ frontend:
         - name: frontend
           containerPort: 8080
           protocol: TCP
+      volumeMounts:
+        - name: wandb-setup-scripts
+          mountPath: /docker-entrypoint.d/02_setup_script.sh
+          subPath: 02_setup_script.sh
       resources:
         limits:
           cpu: 1000m
