@@ -73,7 +73,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           volumeMounts:
-            {{- if .Values.gcsConfigMap }}
+            {{- if .Values.gcsCredConfigMap }}
             - name: gcs-credentials
               mountPath: /var/run/secrets/google/credentials_config.json
               subPath: credentials_config.json
@@ -117,7 +117,7 @@ spec:
                 name: {{ .Release.Name }}-kafka-configmap
           {{- end }}
           env:
-            {{- if .Values.gcsConfigMap }}
+            {{- if .Values.gcsCredConfigMap }}
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /var/run/secrets/google/credentials_config.json
             {{- end }}
@@ -396,10 +396,10 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
-        {{- if .Values.gcsConfigMap }}
+        {{- if .Values.gcsCredConfigMap }}
         - name: gcs-credentials
           configMap:
-            name: {{ .Values.gcsConfigMap }}
+            name: {{ .Values.gcsCredConfigMap }}
         {{- end }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "app.fullname" . }}-redis-ca
