@@ -92,20 +92,20 @@ for key, value in settings["additionalValues"].items():
     helmSetValues.append(key + '=' + value)
 
 k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")], set=helmSetValues))
-k8s_resource('wandb-app', port_forwards=8080, objects=['wandb-app:ServiceAccount:default', 'wandb-app-config:secret:default'])
-k8s_resource('wandb-console', port_forwards=8082, objects=['wandb-console:ServiceAccount:default', 'wandb-console:clusterrole:default', 'wandb-console:clusterrolebinding:default'])
-if current_values.get('executor', {}).get('install', False):
-    k8s_resource('wandb-executor',objects=['wandb-executor:ServiceAccount:default'])
+k8s_resource('wandb-app', port_forwards=8080)
+k8s_resource('wandb-console', port_forwards=8082, objects=['wandb-console:ServiceAccount:default'])
+# if current_values.get('executor', {}).get('install', False):
+#     k8s_resource('wandb-executor',objects=['wandb-executor:ServiceAccount:default'])
 k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)
 k8s_resource('wandb-otel-daemonset',objects=['wandb-otel-daemonset:ServiceAccount:default', 'wandb-otel-daemonset:clusterrole:default', 'wandb-otel-daemonset:clusterrolebinding:default'])
-k8s_resource('wandb-parquet',objects=['wandb-parquet:ServiceAccount:default'])
+# k8s_resource('wandb-parquet',objects=['wandb-parquet:ServiceAccount:default'])
 k8s_resource('wandb-prometheus-server',objects=['wandb-prometheus-server:ServiceAccount:default', 'wandb-prometheus-server:clusterrole:default', 'wandb-prometheus-server:clusterrolebinding:default'])
 k8s_resource('wandb-redis-master',objects=['wandb-redis-master:ServiceAccount:default'])
 if current_values.get('reloader', {}).get('install', False):
     k8s_resource('wandb-reloader',objects=['wandb-reloader:ServiceAccount:default'])
 k8s_resource('wandb-weave',objects=['wandb-weave:ServiceAccount:default'])
-if current_values.get('weave-trace', {}).get('install', False):
-    k8s_resource('wandb-weave-trace', port_forwards=8722)
+# if current_values.get('weave-trace', {}).get('install', False):
+#     k8s_resource('wandb-weave-trace', port_forwards=8722)
 
 configObjects = [
     'wandb-bucket-configmap:configmap:default',
@@ -123,8 +123,8 @@ configObjects = [
     'wandb-redis-secret:secret:default',
 ]
 
-if current_values.get('weave-trace', {}).get('install', False):
-    configObjects.append('wandb-clickhouse-configmap:configmap:default')
+# if current_values.get('weave-trace', {}).get('install', False):
+#     configObjects.append('wandb-clickhouse-configmap:configmap:default')
 
 k8s_resource(
     new_name='wandb-configs',
