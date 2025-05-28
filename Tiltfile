@@ -92,7 +92,7 @@ for key, value in settings["additionalValues"].items():
     helmSetValues.append(key + '=' + value)
 
 k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")], set=helmSetValues))
-k8s_resource('wandb-app', port_forwards=8080)
+k8s_resource('wandb-app', port_forwards=8080, objects=['wandb-app:ServiceAccount:default'])
 k8s_resource('wandb-console', port_forwards=8082, objects=['wandb-console:ServiceAccount:default'])
 # if current_values.get('executor', {}).get('install', False):
 #     k8s_resource('wandb-executor',objects=['wandb-executor:ServiceAccount:default'])

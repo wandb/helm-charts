@@ -14,6 +14,77 @@ metadata:
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
+  # Basic service configuration
+  GORILLA_GLUE_CONTAINER_PORT: "8083"
+  
+  # Database configurations using existing mysql template
+  GORILLA_GLUE_METADATA_STORE: "{{ include "wandb.mysql" . }}"
+  GORILLA_GLUE_FILE_METADATA_STORE: "{{ include "wandb.mysql" . }}"
+  GORILLA_GLUE_RUN_STORE: "{{ include "wandb.mysql" . }}"
+  GORILLA_GLUE_USAGE_STORE: "{{ include "wandb.mysql" . }}"
+  GORILLA_GLUE_HISTORY_STORE: "{{ include "wandb.mysql" . }}"
+
+  # Cache and Redis configurations using existing redis templates  
+  GORILLA_GLUE_SETTINGS_CACHE: "{{ include "wandb.redis.connectionString" . }}"
+  GORILLA_GLUE_METADATA_CACHE: "{{ include "wandb.redis.connectionString" . }}"
+  GORILLA_GLUE_CACHE: "{{ include "wandb.redis.connectionString" . }}"
+  GORILLA_GLUE_NOTIFICATIONS_QUEUE: "{{ include "wandb.redis.connectionString" . }}"
+  GORILLA_GLUE_TASK_QUEUE: "{{ include "wandb.redis.taskQueue" . }}"
+
+  # File storage using existing bucket template
+  {{- with include "wandb.bucket" . | fromYaml }}
+  GORILLA_GLUE_FILE_STORE: "{{ .url }}"
+  {{- end }}
+  GORILLA_GLUE_STORAGE_BUCKET: "$(BUCKET_NAME)"
+
+  # Values that correspond to existing configurations from gorilla.yaml
+  GORILLA_GLUE_SWEEP_PROVIDER: "{{ .Values.global.sweepProvider | default (printf "http://%s-app:8082" .Release.Name) }}"
+  GORILLA_GLUE_SESSION_LENGTH: "{{ .Values.global.auth.sessionLengthHours }}h"
+  GORILLA_GLUE_DEV: "false"
+  GORILLA_GLUE_ONPREM: "true"
+  GORILLA_GLUE_USE_PARQUET_HISTORY_STORE: "true"
+  GORILLA_GLUE_COLLECT_AUDIT_LOGS: "true"
+  GORILLA_GLUE_TASK_QUEUE_WORKER_ENABLED: "false"
+  GORILLA_GLUE_ARTIFACT_GC_ENABLED: "false"
+  GORILLA_GLUE_VIEW_SPEC_UPDATER_PROVIDER: "/usr/local/bin/view-spec-updater-linux"
+  GORILLA_GLUE_DEFAULT_REGION: "minio-local"
+  GORILLA_GLUE_DISABLE_TELEMETRY: "true"
+  GORILLA_GLUE_FILE_STORE_IS_PROXIED: "false"
+
+  # Task configuration (existing values)
   GORILLA_GLUE_TASK_PROVIDER: "memory://"
   GORILLA_GLUE_TASK_CONFIG_PATH: "/gorilla_glue_tasks_local.yaml"
   GORILLA_GLUE_TASK_STORE: "memory://"
+
+  # ClickHouse configuration using existing clickhouse variables
+  {{- if .Values.global.clickhouse.host }}
+  GORILLA_GLUE_CLICKHOUSE_ADDRESS: "http://$(WF_CLICKHOUSE_HOST):$(WF_CLICKHOUSE_PORT)"
+  {{- end }}
+
+  # Activity store configuration
+  GORILLA_GLUE_ACTIVITY_STORE_ENABLE: "true"
+  GORILLA_GLUE_ACTIVITY_STORE_SERVE: "true"
+  GORILLA_GLUE_ACTIVITY_STORE_BACKFILL_ENABLE: "true"
+
+  # Monitoring configurations
+  {{- if and .Values.global .Values.global.observability }}
+    {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
+  GORILLA_GLUE_STATSD_HOST: "0.0.0.0"
+  GORILLA_GLUE_STATSD_PORT: "8125"
+    {{- end }}
+  {{- end }}
+
+  # T-shirt size for deployment
+  GORILLA_GLUE_TSHIRT_SIZE: "small"
+
+
+  # Artifacts GC configuration
+  GORILLA_GLUE_ARTIFACTS_GC_BATCH_SIZE: "100"
+  GORILLA_GLUE_ARTIFACTS_GC_NUM_WORKERS: "4"
+  GORILLA_GLUE_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS: "2"
+
+  # Clear task dedupe key configuration
+  GORILLA_GLUE_CLEAR_TASK_DEDUPE_KEY_ENABLED: "true"
+
+  # Parquet configuration
+  GORILLA_GLUE_SUPPRESS_ON_DEMAND_PARQUET_EXPORT: "false"

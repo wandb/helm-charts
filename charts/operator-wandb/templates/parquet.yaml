@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-parquet-configmap
+  labels:
+    {{- include "wandb-base.labels" . | nindent 4 }}
+data:
+  # Port configuration
+  GORILLA_PARQUET_PORT: "8087"
+  
+  # RPC path configuration
+  GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
+  
+  # MySQL configuration (from mysql configmap)
+  MYSQL_HOST: "{{ include "wandb.mysql.host" . }}"
+  MYSQL_PORT: "{{ include "wandb.mysql.port" . }}"
+  MYSQL_DATABASE: "{{ include "wandb.mysql.database" . }}"
+  MYSQL_USER: "{{ include "wandb.mysql.user" . }}"
+  
+  # Task queue configuration
+  GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
+  
+  # Storage bucket configuration (from bucket configmap)
+  {{- with include "wandb.bucket" . | fromYaml }}
+  BUCKET_NAME: "{{ .name }}"
+  BUCKET_PATH: "{{ .path }}"
+  AWS_REGION: "{{ .region }}"
+  AWS_S3_KMS_ID: "{{ .kmsKey }}"
+  {{- end }}
+  GORILLA_DEFAULT_REGION: "minio-local"
+  
+  # Parquet-specific configuration
+  GORILLA_USE_PARQUET_HISTORY_STORE: "true"
+  GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648" # 2GB
+  
+  # General application configuration
+  GORILLA_FILE_STORE_IS_PROXIED: "false"
+  GORILLA_ONPREM: "true"
+  GORILLA_COLLECT_AUDIT_LOGS: "true"
+  
+  # Monitoring and observability
+  {{- if and .Values.global .Values.global.observability }}
+    {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
+  GORILLA_STATSD_PORT: "8125"
+  GORILLA_STATSD_HOST: "0.0.0.0"
+    {{- else }}
+  GORILLA_STATSD_PORT: "8125"
+    {{- end }}
+  {{- else }}
+  GORILLA_STATSD_PORT: "8125"
+  {{- end }}
+  
+  # T-shirt size configuration
+  GORILLA_TSHIRT_SIZE: {{ .Values.global.size | quote }}

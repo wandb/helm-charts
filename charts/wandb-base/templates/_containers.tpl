@@ -44,6 +44,11 @@
   {{- if .env }}
     {{- tpl (include "wandb-base.env" . | nindent 4) $.root }}
   {{- end }}
+  {{- if .envTpls }}
+    {{- range .envTpls }}
+    {{- tpl (include "wandb-base.env" . | nindent 4) $.root }}
+    {{- end }}
+  {{- end }}
   {{- if .securityContext }}
   securityContext:
     {{- toYaml .securityContext | nindent 4 }}
@@ -74,9 +79,14 @@
   resources:
     {{- toYaml .resources | nindent 4 }}
   {{- end }}
-  {{- with .volumeMounts }}
+  {{- if or .volumeMounts .volumeMountsTpls }}
   volumeMounts:
-    {{- toYaml . | nindent 4 }}
+    {{- range .volumeMountsTpls }}
+    {{- tpl (toYaml . | nindent 4) $.root }}
+    {{- end }}
+    {{- if .volumeMounts }}
+    {{- tpl (toYaml .volumeMounts | nindent 4) $.root }}
+    {{- end }}
   {{- end }}
 {{- end }}
 

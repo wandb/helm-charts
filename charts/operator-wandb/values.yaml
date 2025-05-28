@@ -269,10 +269,67 @@ ingress:
 parquet:
   install: true
   image:
-    repository: wandb/local
+    repository: wandb/megabinary
     tag: latest
+  fuse:
+    enabled: false
+    resources:
+      requests:
+        cpu: 1
+        memory: 1Gi
+      limits:
+        cpu: 2
+        memory: 2Gi
+        ephemeral-storage: 10Gi
+    fileCacheCapacity: 9.5Gi
   envFrom:
+    "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-secret": "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+  env:
+    A_REDIS_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.redis.passwordSecret" . }}'
+          key: "{{ .Values.global.redis.secret.secretKey }}"
+          optional: true
+    AZURE_STORAGE_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    A_BUCKET_ACCESS_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    A_BUCKET_SECRET_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
+          optional: true
+    A_MYSQL_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+        name: '{{ include "wandb.mysql.passwordSecret" . }}'
+        key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+    BUCKET: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    MYSQL: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_METADATA_CACHE: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_HISTORY_STORE: '{{ include "parquet.historyStore" . | quote }}'
+    GORILLA_PARQUET_LIVE_HISTORY_STORE: '{{ include "parquet.liveHistoryStore" . | quote }}'
+    GORILLA_FILE_STREAM_STORE_ADDRESS: '{{ include "parquet.fileStreamStore" . | quote }}'
+    GORILLA_SETTINGS_CACHE: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_TASK_QUEUE: '{{ include "wandb.redis.taskQueue" . | trim }}'
+    REDIS: '{{ include "wandb.redis.connectionString" . | trim }}'
+  podAnnotationsTpl:
+   - '{{ include "wandb.gksFuseAnnotations" . }}'
+  containers:
+    parquet:
+      args: ["parquet"]
 
 app:
   install: true
@@ -449,14 +506,8 @@ app:
         preStop:
           exec:
             command: [ "sleep", "25" ]
-      volumeMounts:
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
+      volumeMountsTpl:
+       - '{{ include "wandb.caCertsVolumeMounts" . }}'
   role:
     create: true
     rules:
@@ -466,21 +517,9 @@ app:
       - apiGroups: [ "" ]
         resources: [ "namespaces" ]
         verbs: [ "get" ]
-  volumes:
-    - name: wandb-ca-certs
-      configMap:
-        name: "{{ .Release.Name }}-ca-certs"
-    - name: wandb-ca-certs-user
-      configMap:
-        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
-        optional: true
-    - name: redis-ca
-      secret:
-        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
-        items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-        optional: true
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+
 nginx:
   install: false
 
@@ -713,32 +752,13 @@ flat-run-fields-updater:
         requests:
           cpu: "1"
           memory: 1Gi
-      volumeMounts:
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
+      volumeMountsTpl:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
-  volumes:
-    - name: wandb-ca-certs
-      configMap:
-        name: "{{ .Release.Name }}-ca-certs"
-    - name: wandb-ca-certs-user
-      configMap:
-        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
-        optional: true
-    - name: redis-ca
-      secret:
-        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
-        items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-        optional: true
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
 
 filestream:
   install: false
@@ -1109,14 +1129,8 @@ glue:
         requests:
           cpu: "1"
           memory: 1Gi
-      volumeMounts:
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
+      volumeMountsTpl:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1129,21 +1143,8 @@ glue:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
-  volumes:
-    - name: wandb-ca-certs
-      configMap:
-        name: "{{ .Release.Name }}-ca-certs"
-    - name: wandb-ca-certs-user
-      configMap:
-        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
-        optional: true
-    - name: redis-ca
-      secret:
-        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
-        items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-        optional: true
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
 
 api:
   install: false
@@ -1335,14 +1336,8 @@ api:
         periodSeconds: 5
         successThreshold: 1
         failureThreshold: 5
-      volumeMounts:
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
+      volumeMountsTpl:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1355,21 +1350,8 @@ api:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
-  volumes:
-    - name: wandb-ca-certs
-      configMap:
-        name: "{{ .Release.Name }}-ca-certs"
-    - name: wandb-ca-certs-user
-      configMap:
-        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
-        optional: true
-    - name: redis-ca
-      secret:
-        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
-        items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-        optional: true
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""
   sizing:
     default:
