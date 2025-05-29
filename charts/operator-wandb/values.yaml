@@ -235,6 +235,9 @@ global:
   # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#cloud_armor
   gcpSecurityPolicy: ""
 
+  statsig:
+    apiKey: ""
+
 ingress:
   install: true
   create: true
@@ -273,6 +276,7 @@ parquet:
     tag: latest
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
 
 app:
   install: true
@@ -282,6 +286,7 @@ app:
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-gorilla-session-key": "secretRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
 
 nginx:
   install: false
@@ -291,6 +296,8 @@ weave:
   image:
     repository: wandb/local
     tag: latest
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
 
 weave-trace:
   install: false
@@ -299,6 +306,9 @@ weave-trace:
     tag: latest
   datadog:
     enabled: false
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
 
 console:
   install: true
@@ -488,6 +498,7 @@ filestream:
     subscription: ""
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
 
 executor:
   install: false
@@ -497,6 +508,7 @@ executor:
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
 
 mysql:
   install: false
@@ -1135,6 +1147,14 @@ frontend:
   image:
     repository: wandb/frontend-nginx
     tag: latest
+  volumes:
+    - name: wandb-setup-scripts
+      configMap:
+        name: "{{ .Release.Name }}-frontend-configmap"
+        items:
+          - key: 02_patch_env_js.sh
+            path: 02_patch_env_js.sh
+        defaultMode: 0755
   service:
     enabled: true
     loadBalancerHealthCheckPath: "/ready"
@@ -1145,6 +1165,8 @@ frontend:
         protocol: TCP
         name: http
   env:
+    OPERATOR_ENABLED:
+      value: "true"
     PUBLIC_URL:
       value: "{{ .Values.global.host }}"
     REACT_APP_GIT_TAG:
@@ -1157,7 +1179,8 @@ frontend:
       value: "true"
     REACT_APP_ANALYTICS_DISABLED:
       value: "true"
-  envFrom: {}
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
   containers:
     frontend:
       env: {}
@@ -1166,6 +1189,10 @@ frontend:
         - name: frontend
           containerPort: 8080
           protocol: TCP
+      volumeMounts:
+        - name: wandb-setup-scripts
+          mountPath: /docker-entrypoint.d/02_patch_env_js.sh
+          subPath: 02_patch_env_js.sh
       resources:
         limits:
           cpu: 1000m

@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-frontend-configmap
+  labels:
+      {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  02_patch_env_js.sh: |
+    #!/bin/bash
+    function append_env_js() {
+      local key=$1
+      local value=$2
+      local env_js_path="$BUILD_DIR/env.js"
+      if [ -w "$env_js_path" ]; then
+        printf "Object.assign(window.CONFIG, {%s: %s});\n" "$key" "$value" >> "$env_js_path"
+      fi
+    }
+    function extract_server_flags() {
+      # This function builds a javascript string that gets appended to env.js
+      # it defines a SERVER_FLAGS object maping env vars which start with "SERVER_FLAG_"
+      # where each key is the rest of that env var name and the value is that as a string.
+      local env_js_path="$BUILD_DIR/env.js"
+      local new_js=""
+      # define the object and open it with '{ '
+      # pad with a <space> incase no server flags are set
+      printf -v new_js "const SERVER_FLAGS = { "
+      for name in "${!SERVER_FLAG_@}"; do
+        # append the to the new_js bash variable the key/value pair
+        printf -v new_js '%s"%s": "%s",' "${new_js}" "${name:12}" "${!name}"
+      done
+      # remove the trailing comma and close the object
+      local length="${#new_js}"-1
+      printf "${new_js:0:length}};\n" >> "$env_js_path"
+      append_env_js "SERVER_FLAGS" "SERVER_FLAGS"
+     }
+
+    function known_additional_flags() {
+      if [ "$CI" == "1" ]; then
+        append_env_js "CI" "true"
+        echo "WARN: use REACT_APP_CI instead"
+      fi
+      if [ "$(echo "$DISABLE_TELEMETRY" | tr '[:lower:]')" == "true" ]; then
+        append_env_js "DISABLE_TELEMETRY" "true"
+        echo "WARN: use REACT_APP_DISABLE_TELEMETRY instead"
+      fi
+      if [ "$WEAVE_ENABLED" == "true" ]; then
+        echo "WARN: use REACT_APP_WEAVE_BACKEND_HOST instead"
+        append_env_js "WEAVE_BACKEND_HOST" \"/__weave\"
+      fi
+      if [ "$WEAVE_TRACES_ENABLED" == "true" ]; then
+        append_env_js "TRACE_BACKEND_BASE_URL" \"/traces\"
+      fi
+      if [ "$ENABLE_RBAC_UI" == "true" ]; then
+        append_env_js "ENABLE_RBAC_UI" "true"
+      fi
+      if [ "$OPERATOR_ENABLED" = "true" ]; then
+        append_env_js "OPERATOR_ENABLED" "true"
+      fi
+      # GORILLA_CUSTOMER_SECRET_STORE_SOURCE is populated by terraform in the global secrets map
+      # which determines ENABLE_SECRET_STORE
+      if [[ -n "$GORILLA_CUSTOMER_SECRET_STORE_SOURCE" && "$GORILLA_CUSTOMER_SECRET_STORE_SOURCE" != "noop://" ]]; then
+        append_env_js "ENABLE_SECRET_STORE" "true"
+      fi
+      if [ -n "$BANNERS" ]; then
+        append_env_js "BANNERS" "$BANNERS"
+      else
+        append_env_js "BANNERS" "{}"
+      fi
+      if [ "$ENABLE_REGISTRY_UI" == "true" ]; then
+        append_env_js "ENABLE_REGISTRY_UI" "true"
+      fi
+    }
+
+    function main() {
+      # Server flag templating
+      if ! grep -q 'const SERVER_FLAGS =' "$BUILD_DIR/env.js"; then
+        extract_server_flags
+        known_additional_flags
+      else
+        echo "WARN: Server Flag already completed."
+      fi
+    }
+    main "$@"
