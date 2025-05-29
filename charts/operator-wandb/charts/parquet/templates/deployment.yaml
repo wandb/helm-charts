@@ -83,6 +83,11 @@ spec:
             - name: fuse
               mountPath: "/{{ (include "wandb.bucket" . | fromYaml).name }}"
             {{- end }}
+            {{- if .Values.gcsCredConfigMap }}
+            - name: gcs-credentials
+              mountPath: /var/run/secrets/google/credentials_config.json
+              subPath: credentials_config.json
+            {{- end }}
           ports:
             - name: parquet
               containerPort: 8087
@@ -92,6 +97,10 @@ spec:
             {{- tpl (include "parquet.envFrom" . ) . | nindent 12 }}
           {{- end }}
           env:
+            {{- if .Values.gcsCredConfigMap }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/run/secrets/google/credentials_config.json
+            {{- end }}
             - name: GOMEMLIMIT
               valueFrom:
                 resourceFieldRef:
@@ -242,6 +251,11 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
       serviceAccountName: {{ include "parquet.serviceAccountName" . }}
       volumes:
+        {{- if .Values.gcsCredConfigMap }}
+        - name: gcs-credentials
+          configMap:
+            name: {{ .Values.gcsCredConfigMap }}
+        {{- end }}
         {{- if .Values.fuse.enabled }}
         - name: fuse
           {{- if and (eq $bucketProvider "gcs") (eq .Values.global.cloudProvider "gcp") }}
