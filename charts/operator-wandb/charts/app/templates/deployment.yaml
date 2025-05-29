@@ -73,10 +73,10 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           volumeMounts:
-            {{- if .Values.gcsCredConfigMap }}
+            {{- if and .Values.gcsCredConfigMap .Values.gcsCredSubPath}}
             - name: gcs-credentials
-              mountPath: /var/run/secrets/google/credentials_config.json
-              subPath: credentials_config.json
+              mountPath: /var/run/secrets/google/{{ .Values.gcsCredSubPath  }}
+              subPath: {{ .Values.gcsCredSubPath  }}
             {{- end }}
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "app.fullname" . }}-redis-ca
@@ -117,9 +117,9 @@ spec:
                 name: {{ .Release.Name }}-kafka-configmap
           {{- end }}
           env:
-            {{- if .Values.gcsCredConfigMap }}
+            {{- if and .Values.gcsCredConfigMap .Values.gcsCredSubPath }}
             - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /var/run/secrets/google/credentials_config.json
+              value: /var/run/secrets/google/{{ .Values.gcsCredSubPath }}
             {{- end }}
             - name: GOMEMLIMIT
               valueFrom:
@@ -396,10 +396,13 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
-        {{- if .Values.gcsCredConfigMap }}
+        {{- if and .Values.gcsCredConfigMap .Values.gcsCredSubPath }}
         - name: gcs-credentials
           configMap:
             name: {{ .Values.gcsCredConfigMap }}
+            items:
+              - key: {{ .Values.gcsCredSubPath }}
+                path: {{ .Values.gcsCredSubPath }}
         {{- end }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "app.fullname" . }}-redis-ca
