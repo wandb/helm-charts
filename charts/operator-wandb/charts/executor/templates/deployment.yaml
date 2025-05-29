@@ -57,11 +57,20 @@ spec:
               mountPath: /etc/ssl/certs/redis_ca.pem
               subPath: redis_ca.pem
             {{- end }}
+            {{- if and .Values.gcsCredConfigMap .Values.gcsCredSubPath}}
+            - name: gcs-credentials
+              mountPath: /var/run/secrets/google/{{ .Values.gcsCredSubPath  }}
+              subPath: {{ .Values.gcsCredSubPath  }}
+            {{- end }}
           envFrom:
           {{- if .Values.envFrom }}
             {{- tpl (include "executor.envFrom" . ) . | nindent 12 }}
           {{- end }}
           env:
+            {{- if and .Values.gcsCredConfigMap .Values.gcsCredSubPath }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/run/secrets/google/{{ .Values.gcsCredSubPath }}
+            {{- end }}
             - name: GOMEMLIMIT
               valueFrom:
                 resourceFieldRef:
@@ -197,6 +206,14 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
+        {{- if and .Values.gcsCredConfigMap .Values.gcsCredSubPath }}
+        - name: gcs-credentials
+          configMap:
+            name: {{ .Values.gcsCredConfigMap }}
+            items:
+              - key: {{ .Values.gcsCredSubPath }}
+                path: {{ .Values.gcsCredSubPath }}
+        {{- end }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "executor.fullname" . }}-redis-ca
           secret:
