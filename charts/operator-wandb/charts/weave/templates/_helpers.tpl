@@ -99,3 +99,10 @@ app deployments.
 {{ $key }}: {{ $value | quote }}
 {{- end }}
 {{- end -}}
+
+{{- define "weave.envFrom" -}}
+{{- range $key, $value := .Values.envFrom -}}
+- {{ $value }}:
+    name: {{ $key }}
+{{ end }}
+{{- end }}
