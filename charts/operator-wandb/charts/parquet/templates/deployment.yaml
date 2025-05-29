@@ -83,10 +83,10 @@ spec:
             - name: fuse
               mountPath: "/{{ (include "wandb.bucket" . | fromYaml).name }}"
             {{- end }}
-            {{- if .Values.gcsCredConfigMap }}
+            {{- if and .Values.gcsCredConfigMap .Values.gcsCredSubPath}}
             - name: gcs-credentials
-              mountPath: /var/run/secrets/google/credentials_config.json
-              subPath: credentials_config.json
+              mountPath: /var/run/secrets/google/{{ .Values.gcsCredSubPath  }}
+              subPath: {{ .Values.gcsCredSubPath  }}
             {{- end }}
           ports:
             - name: parquet
@@ -97,9 +97,9 @@ spec:
             {{- tpl (include "parquet.envFrom" . ) . | nindent 12 }}
           {{- end }}
           env:
-            {{- if .Values.gcsCredConfigMap }}
+            {{- if and .Values.gcsCredConfigMap .Values.gcsCredSubPath }}
             - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /var/run/secrets/google/credentials_config.json
+              value: /var/run/secrets/google/{{ .Values.gcsCredSubPath }}
             {{- end }}
             - name: GOMEMLIMIT
               valueFrom:
@@ -251,10 +251,13 @@ spec:
             {{- toYaml .Values.resources | nindent 12 }}
       serviceAccountName: {{ include "parquet.serviceAccountName" . }}
       volumes:
-        {{- if .Values.gcsCredConfigMap }}
+        {{- if and .Values.gcsCredConfigMap .Values.gcsCredSubPath }}
         - name: gcs-credentials
           configMap:
             name: {{ .Values.gcsCredConfigMap }}
+            items:
+              - key: {{ .Values.gcsCredSubPath }}
+                path: {{ .Values.gcsCredSubPath }}
         {{- end }}
         {{- if .Values.fuse.enabled }}
         - name: fuse
