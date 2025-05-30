@@ -276,6 +276,7 @@ artifactsGc:
 
 parquet:
   install: true
+  deploymentPostfix: "bc"
   image:
     repository: wandb/megabinary
     tag: latest
@@ -306,13 +307,14 @@ parquet:
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
   podAnnotationsTpl:
-   - '{{ include "wandb.gksFuseAnnotations" . }}'
+    - '{{ include "wandb.gksFuseAnnotations" . }}'
   containers:
     parquet:
       args: ["parquet"]
 
 app:
   install: true
+  deploymentPostfix: "bc"
   image:
     repository: wandb/local
     tag: latest
@@ -371,7 +373,7 @@ app:
         name: local
   initContainers:
     init-db:
-      command: [ 'bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done" ]
+      command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
   containers:
     app:
       ports:
@@ -410,18 +412,18 @@ app:
       lifecycle:
         preStop:
           exec:
-            command: [ "sleep", "25" ]
+            command: ["sleep", "25"]
       volumeMountsTpl:
        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   role:
     create: true
     rules:
-      - apiGroups: [ "" ]
-        resources: [ "secrets" ]
-        verbs: [ "get", "create", "update", "delete" ]
-      - apiGroups: [ "" ]
-        resources: [ "namespaces" ]
-        verbs: [ "get" ]
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get", "create", "update", "delete"]
+      - apiGroups: [""]
+        resources: ["namespaces"]
+        verbs: ["get"]
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
 
@@ -430,6 +432,7 @@ nginx:
 
 weave:
   install: true
+  deploymentPostfix: "bc"
   cache:
     intervalInHours: 24
     size: 20Gi
@@ -493,6 +496,7 @@ weave:
 
 weave-trace:
   install: false
+  deploymentPostfix: "bc"
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -516,6 +520,7 @@ weave-trace:
 
 console:
   install: true
+  deploymentPostfix: "bc"
   image:
     repository: wandb/console
     tag: latest
@@ -655,7 +660,7 @@ executor:
     - '{{ include "wandb.historyStoreEnvs" . }}'
   containers:
     executor:
-      args: [ "executor" ]
+      args: ["executor"]
       requests:
         cpu: 1
         memory: 2Gi
