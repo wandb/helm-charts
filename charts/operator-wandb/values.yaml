@@ -235,6 +235,9 @@ global:
   # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#cloud_armor
   gcpSecurityPolicy: ""
 
+  statsig:
+    apiKey: ""
+
 ingress:
   install: true
   create: true
@@ -496,6 +499,7 @@ weave-trace:
   datadog:
     enabled: false
   envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
     "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
   env:
@@ -547,7 +551,6 @@ flat-run-fields-updater:
             "name": "wandb",
             "prefix": "wandb-overflow"
           },
-          "addr": {{ include "wandb.runUpdateShadowTopicProducer" . | quote }},
           "subscriptions": {
             "flatRunFieldsUpdater": {{ include "wandb.runUpdateShadowQueue" . | quote }}
           }
@@ -1163,6 +1166,14 @@ frontend:
   image:
     repository: wandb/frontend-nginx
     tag: latest
+  volumes:
+    - name: wandb-setup-scripts
+      configMap:
+        name: "{{ .Release.Name }}-frontend-patch-env-js"
+        items:
+          - key: 02_patch_env_js.sh
+            path: 02_patch_env_js.sh
+        defaultMode: 0755
   service:
     enabled: true
     loadBalancerHealthCheckPath: "/ready"
@@ -1174,6 +1185,7 @@ frontend:
         name: http
   env: {}
   envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-frontend-configmap": "configMapRef"
     "{{ .Release.Name }}-frontend-secret": "secretRef"
   containers:
@@ -1184,6 +1196,10 @@ frontend:
         - name: frontend
           containerPort: 8080
           protocol: TCP
+      volumeMounts:
+        - name: wandb-setup-scripts
+          mountPath: /docker-entrypoint.d/02_patch_env_js.sh
+          subPath: 02_patch_env_js.sh
       resources:
         limits:
           cpu: 1000m
