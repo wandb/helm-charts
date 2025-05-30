@@ -9,6 +9,7 @@
     {{- $_ = set $container "name" $containerName }}
     {{- $_ = set $container "securityContext" (coalesce $container.securityContext $.root.Values.securityContext) }}
     {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
+    {{- $_ = set $container "envTpls" $.root.Values.envTpls }}
     {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
     {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env))) }}
     {{- $_ = set $container "root" $.root }}
@@ -46,7 +47,7 @@
   {{- end }}
   {{- if .envTpls }}
     {{- range .envTpls }}
-    {{- tpl (include "wandb-base.env" . | nindent 4) $.root }}
+    {{- tpl . $.root | nindent 4 }}
     {{- end }}
   {{- end }}
   {{- if .securityContext }}
