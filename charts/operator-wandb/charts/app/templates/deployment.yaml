@@ -73,6 +73,11 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           volumeMounts:
+            {{- if and .Values.gcsCredConfigMap }}
+            - name: gcs-credentials
+              mountPath: /var/run/secrets/google/credentials_config.json
+              subPath: credentials_config.json
+            {{- end }}
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "app.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
@@ -112,6 +117,10 @@ spec:
                 name: {{ .Release.Name }}-kafka-configmap
           {{- end }}
           env:
+            {{- if and .Values.gcsCredConfigMap }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/run/secrets/google/credentials_config.json
+            {{- end }}
             - name: GOMEMLIMIT
               valueFrom:
                 resourceFieldRef:
@@ -387,6 +396,11 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
+        {{- if and .Values.gcsCredConfigMap }}
+        - name: gcs-credentials
+          configMap:
+            name: {{ .Values.gcsCredConfigMap }}
+        {{- end }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "app.fullname" . }}-redis-ca
           secret:
