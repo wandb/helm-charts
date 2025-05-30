@@ -18,47 +18,55 @@ spec:
       {{- include "wandb-base.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
+      {{- if or .Values.podAnnotations .Values.podAnnotationsTpls }}
       annotations:
-        {{- toYaml . | nindent 8 }}
+        {{- range .Values.podAnnotationsTpls }}
+        {{- tpl . $ | nindent 8 }}
+        {{- end }}
+        {{- tpl (toYaml .Values.podAnnotations | nindent 8) . }}
       {{- end }}
       labels:
-        {{- include "wandb-base.labels" . | nindent 8 }}
+        {{- tpl (include "wandb-base.labels" . | nindent 8) . }}
         {{- with .Values.podLabels }}
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml . | nindent 8) $ }}
         {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml . | nindent 8) $ }}
       {{- end }}
       serviceAccountName: {{ include "wandb-base.serviceAccountName" . }}
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+       {{- tpl (toYaml .Values.podSecurityContext | nindent 8) . }}
       {{- with .Values.terminationGracePeriodSeconds }}
       terminationGracePeriodSeconds: {{ . }}
       {{- end }}
       {{- if .Values.initContainers }}
       initContainers:
-        {{- include "wandb-base.containers" (dict "containers" .Values.initContainers "root" .) | nindent 8 }}
+        {{- include "wandb-base.containers" (dict "containers" .Values.initContainers "root" . "source" "initContainers") | nindent 8 }}
       {{- end }}
       containers:
-        {{- include "wandb-base.containers" (dict "containers" .Values.containers "root" .) | nindent 8 }}
-      {{- with .Values.volumes }}
+        {{- include "wandb-base.containers" (dict "containers" .Values.containers "root" . "source" "containers") | nindent 8 }}
+      {{- if or .Values.volumes .Values.volumesTpls  }}
       volumes:
-        {{- tpl (toYaml . | nindent 8) $ }}
+        {{- range .Values.volumesTpls }}
+        {{- tpl . $ | nindent 8 }}
+        {{- end }}
+        {{- if .Values.volumes }}
+        {{- tpl (toYaml .Values.volumes | nindent 8) . }}
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml . | nindent 8) $ }}
       {{- end }}
       {{- with .Values.affinity }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml . | nindent 8) $ }}
       {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml . | nindent 8) $ }}
       {{- end }}
       {{- with .Values.topologySpreadConstraints }}
       topologySpreadConstraints:

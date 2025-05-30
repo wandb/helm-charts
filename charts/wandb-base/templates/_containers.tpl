@@ -3,17 +3,28 @@
   containing the . from the calling context
  */}}
 {{- define "wandb-base.containers" -}}
-{{- range $containerName, $containerSource := .containers -}}
-{{- $container := dict }}
-{{- $_ := deepCopy $containerSource | merge $container }}
-{{- $_ = set $container "name" $containerName }}
-{{- $_ = set $container "securityContext" (coalesce $container.securityContext $.root.Values.securityContext) }}
-{{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
-{{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
-{{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env))) }}
-{{- $_ = set $container "root" $.root }}
-{{- include "wandb-base.container" $container -}}
-{{- end }}
+  {{- range $containerName, $containerSource := .containers -}}
+    {{- $container := dict }}
+    {{- $_ := deepCopy $containerSource | merge $container }}
+    {{- $_ = set $container "name" $containerName }}
+    {{- $_ = set $container "securityContext" (coalesce $container.securityContext $.root.Values.securityContext) }}
+    {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
+    {{- $_ = set $container "envTpls" $.root.Values.envTpls }}
+    {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
+    {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env))) }}
+    {{- $_ = set $container "root" $.root }}
+    {{- if eq $.source "containers" }}
+      {{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" $.root) }}
+      {{- if $sizingInfo  }}
+        {{- $_ = set $container "resources" (merge (default (dict) ($container.resources)) (default (dict) ($sizingInfo.resources))) }}
+      {{- end }}
+
+      {{- if $sizingInfo.env }}
+        {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($sizingInfo.env))) }}
+      {{- end }}
+    {{- end }}
+    {{ include "wandb-base.container" $container }}
+  {{- end }}
 {{- end }}
 
 {{- define "wandb-base.container" }}
@@ -31,6 +42,11 @@
     {{- tpl (include "wandb-base.envFrom" . | nindent 4) $.root }}
   {{- end }}
   env:
+  {{- if .envTpls }}
+    {{- range .envTpls }}
+    {{- tpl . $.root | nindent 4 }}
+    {{- end }}
+  {{- end }}
   {{- if .env }}
     {{- tpl (include "wandb-base.env" . | nindent 4) $.root }}
   {{- end }}
@@ -64,9 +80,14 @@
   resources:
     {{- toYaml .resources | nindent 4 }}
   {{- end }}
-  {{- with .volumeMounts }}
+  {{- if or .volumeMounts .volumeMountsTpls }}
   volumeMounts:
-    {{- toYaml . | nindent 4 }}
+    {{- range .volumeMountsTpls }}
+    {{- tpl (toYaml . | nindent 4) $.root }}
+    {{- end }}
+    {{- if .volumeMounts }}
+    {{- tpl (toYaml .volumeMounts | nindent 4) $.root }}
+    {{- end }}
   {{- end }}
 {{- end }}
 
@@ -87,4 +108,8 @@
 - {{ $value }}:
     name: {{ $key }}
 {{- end }}
+{{- end }}
+
+{{- define "wandb-base.resources" -}}
+
 {{- end }}

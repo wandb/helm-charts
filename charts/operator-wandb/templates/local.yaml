@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-local-configmap
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+data:
+  GLUE_ENABLED: "{{ not .Values.global.glue.enabled }}"
+  GORILLA_GLUE_CONTAINER_PORT: "9173"
+  HOST: "{{ .Values.global.host }}"
+  {{/* {{- if .Values.global.api.enabled }} */}}
+  # GORILLA_ENABLED
+  #   value: "{{ not .Values.global.api.enabled }}"
+  # PROXY_PASS_BACKEND_HOST
+  #   value: "$({{.Release.Name | upper | replace "-" "_" }}_API_SERVICE_HOST):$({{.Release.Name | upper | replace "-" "_" }}_API_SERVICE_PORT)"
+  {{/* {{- end }} */}}
+
+  {{- if ne .Values.global.auth.oidc.clientId ""  }}
+  OIDC_CLIENT_ID: {{ .Values.global.auth.oidc.clientId }}
+  OIDC_AUTH_METHOD: {{ .Values.global.auth.oidc.authMethod }}
+  OIDC_ISSUER: {{ .Values.global.auth.oidc.issuer }}
+  OIDC_CLIENT_SECRET: {{ .Values.global.auth.oidc.secret }}
+  {{- end }}

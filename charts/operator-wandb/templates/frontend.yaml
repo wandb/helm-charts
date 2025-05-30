@@ -3,7 +3,22 @@ kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-frontend-configmap
   labels:
-      {{- include "wandb.commonLabels" . | nindent 4 }}
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  PUBLIC_URL: "{{ .Values.global.host }}"
+  REACT_APP_GIT_TAG: "HEAD"
+  REACT_APP_HOST: "{{ .Values.global.host }}"
+  REACT_APP_ENVIRONMENT_NAME: "local"
+  REACT_APP_ENVIRONMENT_IS_PRIVATE: "true"
+  REACT_APP_ANALYTICS_DISABLED: "true"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-frontend-patch-env-js
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
   02_patch_env_js.sh: |
     #!/bin/bash
@@ -33,7 +48,6 @@ data:
       printf "${new_js:0:length}};\n" >> "$env_js_path"
       append_env_js "SERVER_FLAGS" "SERVER_FLAGS"
      }
-
     function known_additional_flags() {
       if [ "$CI" == "1" ]; then
         append_env_js "CI" "true"
@@ -81,3 +95,12 @@ data:
       fi
     }
     main "$@"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-frontend-secret
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+stringData: {}

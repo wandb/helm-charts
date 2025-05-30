@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-console-configmap
+  labels:
+      {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  BUCKET_ACCESS_IDENTITY: "unknown"
+  AUTH_SERVICE: "{{ .Release.Name }}-app:8080"
+  OPERATOR_NAMESPACE: "{{ .Values.global.operator.namespace }}"
+  RELEASE_NAME: "{{ $.Release.Name }}"
+  RELEASE_NAMESPACE: "{{ $.Release.Namespace }}"
+  PROMETHEUS_SERVER: "http://{{ $.Release.Name }}-prometheus-server"
+  BANNERS: {{ toJson .Values.global.banners | quote }}
+  {{- if .Values.console.proxy }}
+    {{- if .Values.console.proxy.httpProxy }}
+  HTTP_PROXY: {{ .Values.console.proxy.httpProxy | quote }}
+    {{- end }}
+    {{- if .Values.console.proxy.httpsProxy }}
+  HTTPS_PROXY: {{ .Values.console.proxy.httpsProxy | quote }}
+    {{- end }}
+    {{- if .Values.console.proxy.noProxy }}
+  NO_PROXY: {{ .Values.console.proxy.noProxy | quote }}
+    {{- end }}
+    {{- if .Values.console.proxy.debug }}
+  PROXY_DEBUG: {{ .Values.console.proxy.debug | quote }}
+    {{- end }}
+  {{- end }}
