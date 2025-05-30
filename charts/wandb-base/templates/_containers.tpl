@@ -42,13 +42,13 @@
     {{- tpl (include "wandb-base.envFrom" . | nindent 4) $.root }}
   {{- end }}
   env:
-  {{- if .env }}
-    {{- tpl (include "wandb-base.env" . | nindent 4) $.root }}
-  {{- end }}
   {{- if .envTpls }}
     {{- range .envTpls }}
     {{- tpl . $.root | nindent 4 }}
     {{- end }}
+  {{- end }}
+  {{- if .env }}
+    {{- tpl (include "wandb-base.env" . | nindent 4) $.root }}
   {{- end }}
   {{- if .securityContext }}
   securityContext:

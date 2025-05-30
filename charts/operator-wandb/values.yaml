@@ -266,6 +266,11 @@ ingress:
       server: https://acme-v02.api.letsencrypt.org/directory
       email: support@wandb.com
 
+artifactsGc:
+  BatchSize: 0
+  NumWorkers: 0
+  DeleteFilesNumWorkers: 0
+
 parquet:
   install: true
   image:
@@ -282,13 +287,6 @@ parquet:
         memory: 2Gi
         ephemeral-storage: 10Gi
     fileCacheCapacity: 9.5Gi
-  envTpls:
-    - '{{ include "wandb.downwardEnvs" . }}'
-    - '{{ include "wandb.bucketEnvs" . }}'
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
-    - '{{ include "wandb.queueEnvs" . }}'
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
@@ -297,6 +295,13 @@ parquet:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-parquet-configmap": "configMapRef"
     "{{ .Release.Name }}-parquet-secret": "secretRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
   podAnnotationsTpl:
    - '{{ include "wandb.gksFuseAnnotations" . }}'
   containers:
@@ -308,13 +313,6 @@ app:
   image:
     repository: wandb/local
     tag: latest
-  envTpls:
-    - '{{ include "wandb.downwardEnvs" . }}'
-    - '{{ include "wandb.bucketEnvs" . }}'
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
-    - '{{ include "wandb.queueEnvs" . }}'
   env:
     GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
     GORILLA_TASK_CONFIG_PATH: "/etc/service/gorilla-glue/glue_tasks_local.yaml"
@@ -322,6 +320,17 @@ app:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_GLUE_TASK_METADATA_STORE:
       value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE: "/usr/local/bin/view-spec-updater-linux"
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
+      value: >
+        {
+          "overflow-bucket": {
+            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+            "name": "wandb",
+            "prefix": "wandb-overflow"
+          },
+          "addr": {{ include "wandb.runUpdateShadowTopicProducer" . | quote }}
+        }
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
@@ -336,6 +345,13 @@ app:
     "{{ .Release.Name }}-local-configmap": "configMapRef"
     "{{ .Release.Name }}-app-configmap": "configMapRef"
     "{{ .Release.Name }}-app-secret": "secretRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
   service:
     ports:
       - port: 8080
@@ -352,7 +368,7 @@ app:
         name: local
   initContainers:
     init-db:
-      command: [ 'bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$A_MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done" ]
+      command: [ 'bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done" ]
   containers:
     app:
       ports:
@@ -522,13 +538,20 @@ flat-run-fields-updater:
       targetCPUUtilizationPercentage: 80
       # targetMemoryUtilizationPercentage: 80
   terminationGracePeriodSeconds: 60
-  envTpls:
-    - '{{ include "wandb.downwardEnvs" . }}'
-    - '{{ include "wandb.bucketEnvs" . }}'
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
-    - '{{ include "wandb.queueEnvs" . }}'
+  env:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
+      value: >
+        {
+          "overflow-bucket": {
+            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+            "name": "wandb",
+            "prefix": "wandb-overflow"
+          },
+          "addr": {{ include "wandb.runUpdateShadowTopicProducer" . | quote }},
+          "subscriptions": {
+            "flatRunFieldsUpdater": {{ include "wandb.runUpdateShadowQueue" . | quote }}
+          }
+        }
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -537,6 +560,13 @@ flat-run-fields-updater:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-flat-run-fields-updater-secret": "secretRef"
     "{{ .Release.Name }}-flat-run-fields-updater-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
   containers:
     flat-run-fields-updater:
       args: ["flat-run-fields-updater"]
@@ -557,22 +587,85 @@ flat-run-fields-updater:
 
 filestream:
   install: false
-  image:
-    repository: wandb/local
-    tag: latest
-  pubSub:
-    subscription: ""
-  envFrom:
-    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-
-executor:
-  install: false
-  image:
-    repository: wandb/local
-    tag: latest
+  deploymentPostfix: "bc"
+  service:
+    enabled: false
+  autoscaling:
+    horizontal:
+      enabled: false
+  terminationGracePeriodSeconds: 60
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-filestream-secret": "secretRef"
+    "{{ .Release.Name }}-filestream-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+  containers:
+    filestream:
+      args: ["filestream"]
+      requests:
+        cpu: 500m
+        memory: 4Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+      volumeMountsTpl:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+
+executor:
+  install: false
+  deploymentPostfix: "bc"
+  service:
+    enabled: false
+  autoscaling:
+    horizontal:
+      enabled: false
+  terminationGracePeriodSeconds: 60
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-executor-secret": "secretRef"
+    "{{ .Release.Name }}-executor-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+  containers:
+    executor:
+      args: [ "executor" ]
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 8
+        memory: 16Gi
+      volumeMountsTpl:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
 
 mysql:
   install: false
@@ -769,9 +862,17 @@ glue:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-mysql-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-glue-secret": "secretRef"
     "{{ .Release.Name }}-glue-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
   initContainers:
     init-db:
       image:
@@ -883,8 +984,8 @@ api:
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
   initContainers:
     init-db:
       image:
@@ -1116,13 +1217,13 @@ settingsMigrationJob:
           name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
           key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
           optional: true
-    A_BUCKET_ACCESS_KEY:
+    BUCKET_ACCESS_KEY:
       valueFrom:
         secretKeyRef:
           name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
           key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
           optional: true
-    A_BUCKET_SECRET_KEY:
+    BUCKET_SECRET_KEY:
       valueFrom:
         secretKeyRef:
           name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'

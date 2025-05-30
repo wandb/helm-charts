@@ -24,7 +24,7 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.redisEnvs" -}}
-- name: A_REDIS_PASSWORD
+- name: REDIS_PASSWORD
   valueFrom:
     secretKeyRef:
       name: "{{ include "wandb.redis.passwordSecret" . }}"
@@ -46,8 +46,10 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.redis.connectionString" . | trim | quote }}
 - name: GORILLA_SETTINGS_CACHE
   value: {{ include "wandb.redis.connectionString" . | trim | quote }}
+{{- if .Values.global.executor.enabled }}
 - name: GORILLA_TASK_QUEUE
   value: {{ include "wandb.redis.taskQueue" . | trim | quote }}
+{{- end -}}
 {{- end -}}
 
 {{- define "wandb.bucketEnvs" -}}
@@ -57,13 +59,13 @@ Global values will override any chart-specific values.
       name: {{ (include "wandb.bucket" . | fromYaml).secretName | quote }}
       key: {{ (include "wandb.bucket" . | fromYaml).accessKeyName | quote }}
       optional: true
-- name: A_BUCKET_ACCESS_KEY
+- name: BUCKET_ACCESS_KEY
   valueFrom:
     secretKeyRef:
       name: {{ (include "wandb.bucket" . | fromYaml).secretName | quote }}
       key: {{ (include "wandb.bucket" . | fromYaml).accessKeyName | quote }}
       optional: true
-- name: A_BUCKET_SECRET_KEY
+- name: BUCKET_SECRET_KEY
   valueFrom:
     secretKeyRef:
       name: {{ (include "wandb.bucket" . | fromYaml).secretName | quote }}
@@ -78,7 +80,7 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.mysqlEnvs" -}}
-- name: A_MYSQL_PASSWORD
+- name: MYSQL_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.mysql.passwordSecret" . | quote}}
@@ -105,7 +107,7 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.queueEnvs" -}}
-- name: A_KAFKA_CLIENT_PASSWORD
+- name: KAFKA_CLIENT_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.kafka.passwordSecret" . | quote }}
@@ -113,19 +115,6 @@ Global values will override any chart-specific values.
       optional: true
 - name: GORILLA_FILE_STREAM_STORE_ADDRESS
   value: {{ include "wandb.fileStreamStoreProducer" . | quote }}
-- name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
-  value: >
-    {
-      "overflow-bucket": {
-        "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
-        "name": "wandb",
-        "prefix": "wandb-overflow"
-      },
-      "addr": {{ include "wandb.runUpdateShadowTopicProducer" . | quote }},
-      "subscriptions": {
-        "flatRunFieldsUpdater": {{ include "wandb.runUpdateShadowQueue" . | quote }}
-      }
-    }
 {{- end -}}
 
 {{- define "wandb.downwardEnvs" -}}
@@ -133,6 +122,10 @@ Global values will override any chart-specific values.
   valueFrom:
     fieldRef:
       fieldPath: status.hostIP
+- name: GOMEMLIMIT
+  valueFrom:
+    resourceFieldRef:
+      resource: limits.memory
 - name: POD_NAME
   valueFrom:
     fieldRef:
