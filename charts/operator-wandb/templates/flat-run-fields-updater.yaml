@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-flat-run-fields-updater-configmap
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  # File store configuration (matches existing GORILLA_FILE_STORE_IS_PROXIED from gorilla.yaml)
+  GORILLA_FILE_STORE_IS_PROXIED: "false"
+  GORILLA_FILE_HOST: "{{ .Values.global.host }}"
+  OPERATOR_ENABLED: "true"
+  # Onprem configuration (matches existing GORILLA_ONPREM from gorilla.yaml)
+  GORILLA_ONPREM: "true"
+
+  # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
+  {{- if and .Values.global .Values.global.observability }}
+    {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
+  GORILLA_STATSD_PORT: "8125"
+  GORILLA_STATSD_HOST: "0.0.0.0"
+    {{- else }}
+  GORILLA_STATSD_PORT: "8125"
+    {{- end }}
+  {{- else }}
+  GORILLA_STATSD_PORT: "8125"
+  {{- end }}
+
+  # Run update queue configuration (matches existing GORILLA_RUN_UPDATE_QUEUE_ADDR from gorilla.yaml)
+  GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
+
+  # Tracer configuration (matches existing GORILLA_TRACER from api.yaml)
+  GORILLA_TRACER: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-flat-run-fields-updater-secret
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+stringData: {}
+

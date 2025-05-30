@@ -114,8 +114,6 @@ configObjects = [
     'wandb-global-secret:secret:default',
     'wandb-glue-configmap:configmap:default',
     'wandb-glue-secret:secret:default',
-    'wandb-gorilla-configmap:configmap:default',
-    'wandb-gorilla-secret:secret:default',
     'wandb-kafka-configmap:configmap:default',
     'wandb-kafka:secret:default',
     'wandb-mysql-configmap:configmap:default',

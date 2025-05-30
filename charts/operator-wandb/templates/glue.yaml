@@ -5,6 +5,19 @@ metadata:
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 stringData:
+  {{- if ne .Values.global.email.smtp.host "" }}
+  GORILLA_EMAIL_SINK: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
+  {{- else }}
+  GORILLA_EMAIL_SINK: "https://api.wandb.ai/email/dispatch"
+  {{- end }}
+  SLACK_SECRET: {{ default "" .Values.global.slack.secret }}
+  {{- if and (not .Values.global.licenseSecret.name) (not .Values.global.licenseSecret.key) .Values.global.license }}
+  LICENSE: {{ .Values.global.license }}
+  GORILLA_LICENSE: {{ .Values.global.license }}
+  {{- end }}
+  {{- if ne .Values.global.auth.oidc.clientId ""  }}
+  GORILLA_OIDC_CLIENT_SECRET: {{ .Values.global.auth.oidc.secret }}
+  {{- end }}
 
 ---
 apiVersion: v1
@@ -16,26 +29,9 @@ metadata:
 data:
   # Basic service configuration
   GORILLA_GLUE_CONTAINER_PORT: "8083"
-  
-  # Database configurations using existing mysql template
-  GORILLA_GLUE_METADATA_STORE: "{{ include "wandb.mysql" . }}"
-  GORILLA_GLUE_FILE_METADATA_STORE: "{{ include "wandb.mysql" . }}"
-  GORILLA_GLUE_RUN_STORE: "{{ include "wandb.mysql" . }}"
-  GORILLA_GLUE_USAGE_STORE: "{{ include "wandb.mysql" . }}"
-  GORILLA_GLUE_HISTORY_STORE: "{{ include "wandb.mysql" . }}"
 
-  # Cache and Redis configurations using existing redis templates  
-  GORILLA_GLUE_SETTINGS_CACHE: "{{ include "wandb.redis.connectionString" . }}"
-  GORILLA_GLUE_METADATA_CACHE: "{{ include "wandb.redis.connectionString" . }}"
-  GORILLA_GLUE_CACHE: "{{ include "wandb.redis.connectionString" . }}"
-  GORILLA_GLUE_NOTIFICATIONS_QUEUE: "{{ include "wandb.redis.connectionString" . }}"
-  GORILLA_GLUE_TASK_QUEUE: "{{ include "wandb.redis.taskQueue" . }}"
-
-  # File storage using existing bucket template
-  {{- with include "wandb.bucket" . | fromYaml }}
-  GORILLA_GLUE_FILE_STORE: "{{ .url }}"
-  {{- end }}
-  GORILLA_GLUE_STORAGE_BUCKET: "$(BUCKET_NAME)"
+  GORILLA_GLUE_FRONTEND_HOST: "{{ .Values.global.host }}"
+  GORILLA_GLUE_LICENSE_CERT_PATH: "/jwks.json"
 
   # Values that correspond to existing configurations from gorilla.yaml
   GORILLA_GLUE_SWEEP_PROVIDER: "{{ .Values.global.sweepProvider | default (printf "http://%s-app:8082" .Release.Name) }}"
@@ -74,17 +70,5 @@ data:
     {{- end }}
   {{- end }}
 
-  # T-shirt size for deployment
-  GORILLA_GLUE_TSHIRT_SIZE: "small"
-
-
-  # Artifacts GC configuration
-  GORILLA_GLUE_ARTIFACTS_GC_BATCH_SIZE: "100"
-  GORILLA_GLUE_ARTIFACTS_GC_NUM_WORKERS: "4"
-  GORILLA_GLUE_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS: "2"
-
   # Clear task dedupe key configuration
-  GORILLA_GLUE_CLEAR_TASK_DEDUPE_KEY_ENABLED: "true"
-
-  # Parquet configuration
-  GORILLA_GLUE_SUPPRESS_ON_DEMAND_PARQUET_EXPORT: "false"
+  GORILLA_GLUE_CLEAR_TASK_DEDUPE_KEY_ENABLED: "false"
