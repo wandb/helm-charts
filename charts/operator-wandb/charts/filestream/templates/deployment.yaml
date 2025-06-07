@@ -53,6 +53,11 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
+            {{- if and .Values.gcsCredConfigMap }}
+            - name: gcs-credentials
+              mountPath: /var/run/secrets/google/credentials_config.json
+              subPath: credentials_config.json
+            {{- end }}
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "filestream.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
@@ -63,6 +68,10 @@ spec:
             {{- tpl (include "filestream.envFrom" . ) . | nindent 12 }}
           {{- end }}
           env:
+            {{- if and .Values.gcsCredConfigMap }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/run/secrets/google/credentials_config.json
+            {{- end }}
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -181,6 +190,11 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
+        {{- if and .Values.gcsCredConfigMap }}
+        - name: gcs-credentials
+          configMap:
+            name: {{ .Values.gcsCredConfigMap }}
+        {{- end }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "filestream.fullname" . }}-redis-ca
           secret:
