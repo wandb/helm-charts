@@ -1188,7 +1188,10 @@ frontend:
         targetPort: frontend
         protocol: TCP
         name: http
-  env: {}
+  env:
+    WEAVE_TRACES_ENABLED:
+      # use index function because '-' is an illegal char in tpl function
+      value: '{{ index .Values.global "weave-trace" "enabled" }}'
   envFrom:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-frontend-configmap": "configMapRef"
@@ -1257,7 +1260,9 @@ settingsMigrationJob:
     SMJ_K8S_USER_SPEC_SECRET_NAME:
       value: "wandb-spec-user"
     SMJ_K8S_NAMESPACE:
-      value: "default"
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
   kind: Job
