@@ -46,10 +46,8 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.redis.connectionString" . | trim | quote }}
 - name: GORILLA_SETTINGS_CACHE
   value: {{ include "wandb.redis.connectionString" . | trim | quote }}
-{{- if .Values.global.executor.enabled }}
 - name: GORILLA_TASK_QUEUE
   value: {{ include "wandb.redis.taskQueue" . | trim | quote }}
-{{- end -}}
 {{- end -}}
 
 {{- define "wandb.bucketEnvs" -}}
