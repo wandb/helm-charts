@@ -87,8 +87,6 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.mysql" . | trim | quote }}
 - name: GORILLA_ANALYTICS_SINK
   value: {{ include "wandb.mysql" . | trim | quote }}
-- name: GORILLA_CASBIN_ADDRESS
-  value: {{ include "wandb.mysql" . | trim | quote }}
 - name: GORILLA_METADATA_STORE
   value: {{ include "wandb.mysql" . | trim | quote }}
 - name: GORILLA_RUN_STORE
