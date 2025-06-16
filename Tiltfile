@@ -5,6 +5,11 @@ settings = {
         "minikube",
         "kind-kind",
     ],
+    "forwardedPorts": {
+        "app": 8080,
+        "console": 8082,
+        "weave-trace": 8722,
+    },
     "installMinio": True,
     "installIngress": False,
     "values": "default",
@@ -105,8 +110,8 @@ for app in ['app', 'console', 'executor', 'parquet', 'weave', 'weave-trace']:
     postfix = current_values.get(app, {}).get('deploymentPostfix', "")
     if postfix != "":
         app_names[app] += '-' + postfix
-k8s_resource(app_names['app'], port_forwards=8080, objects=['wandb-app:ServiceAccount:default'])
-k8s_resource(app_names['console'], port_forwards=8082, objects=['wandb-console:ServiceAccount:default'])
+k8s_resource(app_names['app'], port_forwards=settings["forwardedPorts"]["app"], objects=['wandb-app:ServiceAccount:default'])
+k8s_resource(app_names['console'], port_forwards=settings["forwardedPorts"]["console"], objects=['wandb-console:ServiceAccount:default'])
 if current_values.get('executor', {}).get('install', False):
     k8s_resource(app_names['executor'],objects=['wandb-executor:ServiceAccount:default'])
 k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)
@@ -118,12 +123,31 @@ if current_values.get('reloader', {}).get('install', False):
     k8s_resource('wandb-reloader',objects=['wandb-reloader:ServiceAccount:default'])
 k8s_resource(app_names['weave'],objects=['wandb-weave:ServiceAccount:default'])
 if current_values.get('weave-trace', {}).get('install', False):
-    k8s_resource(app_names['weave-trace'], port_forwards=8722)
+    k8s_resource(app_names['weave-trace'], port_forwards=settings["forwardedPorts"]["weave-trace"])
 
 configObjects = [
+    'wandb-api-configmap:configmap:default',
+    'wandb-app-configmap:configmap:default',
     'wandb-bucket-configmap:configmap:default',
     'wandb-bucket:secret:default',
     'wandb-ca-certs:configmap:default',
+    'wandb-clickhouse-configmap:configmap:default',
+    'wandb-console-configmap:configmap:default',
+    'wandb-executor-configmap:configmap:default',
+    'wandb-flat-run-fields-updater-configmap:configmap:default',
+    'wandb-frontend-configmap:configmap:default',
+    'wandb-local-configmap:configmap:default',
+    'wandb-parquet-configmap:configmap:default',
+    'wandb-weave-trace-configmap:configmap:default',
+    'wandb-weave-configmap:configmap:default',
+    'wandb-filestream-configmap:configmap:default',
+    'wandb-api-secret:secret:default',
+    'wandb-app-secret:secret:default',
+    'wandb-executor-secret:secret:default',
+    'wandb-filestream-secret:secret:default',
+    'wandb-flat-run-fields-updater-secret:secret:default',
+    'wandb-frontend-secret:secret:default',
+    'wandb-parquet-secret:secret:default',
     'wandb-global-secret:secret:default',
     'wandb-glue-configmap:configmap:default',
     'wandb-glue-secret:secret:default',
@@ -132,6 +156,7 @@ configObjects = [
     'wandb-mysql-configmap:configmap:default',
     'wandb-redis-configmap:configmap:default',
     'wandb-redis-secret:secret:default',
+    'wandb-gorilla-session-key:secret:default',
 ]
 
 # if current_values.get('weave-trace', {}).get('install', False):
@@ -141,5 +166,5 @@ k8s_resource(
     new_name='wandb-configs',
     objects=configObjects
 )
-k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:default', 'wandb-gorilla-session-key:secret:default', 'wandb-clickhouse:secret:default'], trigger_mode=TRIGGER_MODE_MANUAL)
+k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:default', 'wandb-clickhouse:secret:default'], trigger_mode=TRIGGER_MODE_MANUAL)
 k8s_resource(new_name='PVCs', objects=['wandb-mysql-data:PersistentVolumeClaim:default', 'wandb-prometheus-server:PersistentVolumeClaim:default'], trigger_mode=TRIGGER_MODE_MANUAL)
