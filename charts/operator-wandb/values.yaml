@@ -322,17 +322,16 @@ app:
     GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
     GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE: "/usr/local/bin/view-spec-updater-linux"
     BUCKET_QUEUE: internal://
-#    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
-#      value: >
-#        {
-#          "overflow-bucket": {
-#            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
-#            "name": "wandb",
-#            "prefix": "wandb-overflow"
-#          },
-#          "addr": {{ include "wandb.runUpdateShadowTopicProducer" . | quote }}
-#        }
-#    GORILLA_SWEEP_PROVIDER: "http://localhost:8082"
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
+      value: >
+        {
+          "overflow-bucket": {
+            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+            "name": "wandb",
+            "prefix": "wandb-overflow"
+          },
+          "addr": {{ include "wandb.runUpdateShadowTopicProducer" . | quote }}
+        }
     GORILLA_TASK_CONFIG_PATH: "/etc/service/gorilla-glue/glue_tasks_local.yaml"
     GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/usr/local/bin/view-spec-updater-linux"
   envFrom:
@@ -346,7 +345,7 @@ app:
     "{{ .Release.Name }}-glue-secret": "secretRef"
     "{{ .Release.Name }}-glue-configmap": "configMapRef"
     "{{ .Release.Name }}-gorilla-session-key": "secretRef"
-    "{{ .Release.Name }}-local-configmap": "configMapRef"
+    "{{ .Release.Name }}-frontend-configmap": "configMapRef"
     "{{ .Release.Name }}-app-configmap": "configMapRef"
     "{{ .Release.Name }}-app-secret": "secretRef"
   envTpls:
@@ -413,7 +412,7 @@ app:
           exec:
             command: ["sleep", "25"]
       volumeMountsTpl:
-       - '{{ include "wandb.caCertsVolumeMounts" . }}'
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   role:
     create: true
     rules:
@@ -515,7 +514,16 @@ weave-trace:
     weave-trace-migrate:
       command: ["python", "migrator.py"]
   containers:
-    weave-trace: {}
+    weave-trace:
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+  service:
+    ports:
+      - name: http
+        port: 8722
+        protocol: TCP
 
 console:
   install: true
@@ -1187,10 +1195,7 @@ frontend:
         targetPort: frontend
         protocol: TCP
         name: http
-  env:
-    WEAVE_TRACES_ENABLED:
-      # use index function because '-' is an illegal char in tpl function
-      value: '{{ index .Values.global "weave-trace" "enabled" }}'
+  env: {}
   envFrom:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-frontend-configmap": "configMapRef"
