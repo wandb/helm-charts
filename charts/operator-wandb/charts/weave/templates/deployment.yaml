@@ -73,6 +73,10 @@ spec:
 
             {{- include "weave.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+          envFrom:
+          {{- if .Values.envFrom }}
+            {{- tpl (include "weave.envFrom" . ) . | nindent 12 }}
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /__weave/hello
@@ -98,7 +102,14 @@ spec:
         - name: {{ include "weave.fullname" . }}-cache-clear
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
-          command: ["python", "-m", "weave.clear_cache"]
+          command:
+            - /bin/bash
+            - -c
+            - |
+              if [ -f /var/app/weave-python/venv/bin/activate ]; then
+                source /var/app/weave-python/venv/bin/activate
+              fi
+              python -m weave.clear_cache
           env:
             - name: WEAVE_LOCAL_ARTIFACT_DIR
               value: /vol/weave/cache
@@ -120,7 +131,10 @@ spec:
           emptyDir: 
             sizeLimit: {{ .Values.cache.size }}
             medium: {{ .Values.cache.medium }}
-  
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 {{- end }}
 ---
 apiVersion: autoscaling/v2

@@ -52,8 +52,9 @@ spec:
             - "python"
             - "migrator.py"
           envFrom:
-            - configMapRef:
-                name: {{ .Release.Name }}-clickhouse-configmap
+            {{- if .Values.envFrom }}
+              {{- tpl (include "weaveTrace.envFrom" . ) . | nindent 12 }}
+            {{- end }}
           env:
             - name: WF_CLICKHOUSE_PASS
               valueFrom:
@@ -72,6 +73,9 @@ spec:
               containerPort: 8080
               protocol: TCP
           envFrom:
+            {{- if .Values.envFrom }}
+              {{- tpl (include "weaveTrace.envFrom" . ) . | nindent 12 }}
+            {{- end }}
             - configMapRef:
                 name: {{ .Release.Name }}-clickhouse-configmap
           env:
@@ -142,6 +146,10 @@ spec:
                   audience: internal-service
                   path: token
                   expirationSeconds: 600
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
