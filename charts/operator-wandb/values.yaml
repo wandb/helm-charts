@@ -1165,6 +1165,84 @@ api:
           maxReplicas: 10
           minReplicas: 3
 
+filemeta:
+  install: false
+  imagePullSecrets: *imagePullSecrets
+  autoscaling:
+    horizontal:
+      enabled: true
+      maxReplicas: 3
+      minReplicas: 2
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  env:
+    A_REDIS_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.redis.passwordSecret" . }}'
+          key: "{{ .Values.global.redis.secret.secretKey }}"
+          optional: true
+    A_MYSQL_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.mysql.passwordSecret" . }}'
+          key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+    AZURE_STORAGE_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_ACCESS_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_SECRET_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
+          optional: true
+    GORILLA_ONPREM:
+      value: "true"
+    GORILLA_SETTINGS_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_FILE_METADATA_SOURCE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL:
+      value: "true"
+    GORILLA_TASK_QUEUE:
+      value: '{{ include "wandb.redis.taskQueue" . | trim }}'
+    GORILLA_METADATA_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_TRACER:
+      value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
+    GORILLA_FILE_STORE:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_STORAGE_BUCKET:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+  containers:
+    filemeta:
+      args: ["filemeta"]
+      env: {}
+      envFrom: {}
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+        requests:
+          cpu: 250m
+          memory: 256Mi
+
+
 frontend:
   install: false
   podSecurityContext:
