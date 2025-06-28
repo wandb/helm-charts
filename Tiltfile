@@ -106,24 +106,29 @@ if current_values.get('reloader', {}).get('install', False):
 k8s_resource('wandb-weave',objects=['wandb-weave:ServiceAccount:default'])
 if current_values.get('weave-trace', {}).get('install', False):
     k8s_resource('wandb-weave-trace', port_forwards=8722)
+
+configObjects = [
+    'wandb-bucket-configmap:configmap:default',
+    'wandb-bucket:secret:default',
+    'wandb-ca-certs:configmap:default',
+    'wandb-global-secret:secret:default',
+    'wandb-glue-configmap:configmap:default',
+    'wandb-glue-secret:secret:default',
+    'wandb-gorilla-configmap:configmap:default',
+    'wandb-gorilla-secret:secret:default',
+    'wandb-kafka-configmap:configmap:default',
+    'wandb-kafka:secret:default',
+    'wandb-mysql-configmap:configmap:default',
+    'wandb-redis-configmap:configmap:default',
+    'wandb-redis-secret:secret:default',
+]
+
+if current_values.get('weave-trace', {}).get('install', False):
+    configObjects.append('wandb-clickhouse-configmap:configmap:default')
+
 k8s_resource(
     new_name='wandb-configs',
-    objects=[
-        'wandb-bucket-configmap:configmap:default',
-        'wandb-bucket:secret:default',
-        'wandb-ca-certs:configmap:default',
-        'wandb-clickhouse-configmap:configmap:default',
-        'wandb-global-secret:secret:default',
-        'wandb-glue-configmap:configmap:default',
-        'wandb-glue-secret:secret:default',
-        'wandb-gorilla-configmap:configmap:default',
-        'wandb-gorilla-secret:secret:default',
-        'wandb-kafka-configmap:configmap:default',
-        'wandb-kafka:secret:default',
-        'wandb-mysql-configmap:configmap:default',
-        'wandb-redis-configmap:configmap:default',
-        'wandb-redis-secret:secret:default',
-    ]
+    objects=configObjects
 )
 k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:default', 'wandb-gorilla-session-key:secret:default', 'wandb-clickhouse:secret:default'], trigger_mode=TRIGGER_MODE_MANUAL)
 k8s_resource(new_name='PVCs', objects=['wandb-mysql-data:PersistentVolumeClaim:default', 'wandb-prometheus-server:PersistentVolumeClaim:default'], trigger_mode=TRIGGER_MODE_MANUAL)
