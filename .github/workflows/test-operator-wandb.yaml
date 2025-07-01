@@ -25,7 +25,8 @@ jobs:
             "separate-pods",
             "runs-v2-bufstream",
             "weave-trace",
-            "separate-pods-filemeta"
+            "separate-pods-filemeta",
+            "fmb",
           ]
     runs-on: ubuntu-latest
     environment: Helm Charts
@@ -73,6 +74,10 @@ jobs:
       - name: Wait for Minio to be Ready
         run: kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} -n minio wait --for=condition=Ready pod/minio --timeout=300s
         if: env.ACT || steps.list-changed.outputs.changed == 'true'
+
+      - name: Install pubsub emulator
+        run: helm --kube-context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} install charts/wandb-test --values test-configs/pubsub/values.yaml
+        if: (env.ACT || steps.list-changed.outputs.changed == 'true') && matrix.configuration == 'fmb'
 
       - name: Apply user defined secrets
         run: |
