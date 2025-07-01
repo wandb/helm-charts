@@ -11,6 +11,7 @@ settings = {
     "defaultValues": {
         "global.mysql.password": "password",
         "global.extraEnv.GLOBAL_ADMIN_API_KEY": "",
+        "reloader.install": "true",
     },
     "additionalValues": {},
 }
