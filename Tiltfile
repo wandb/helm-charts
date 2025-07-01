@@ -13,6 +13,10 @@ settings = {
     "installMinio": True,
     "installIngress": False,
     "values": "default",
+    "defaultValues": {
+        "global.mysql.password": "password",
+        "global.extraEnv.GLOBAL_ADMIN_API_KEY": "",
+    },
     "additionalValues": {},
 }
 
@@ -99,7 +103,12 @@ if settings.get("installIngress"):
         ]
     )
 
+if current_values.get('global', {}).get('pubSub', {}).get('enabled', False):
+    k8s_yaml(helm('./charts/wandb-base', 'pubsub', values=['./test-configs/pubsub/values.yaml']))
+
 helmSetValues = []
+for key, value in settings["defaultValues"].items():
+    helmSetValues.append(key + '=' + value)
 for key, value in settings["additionalValues"].items():
     helmSetValues.append(key + '=' + value)
 
