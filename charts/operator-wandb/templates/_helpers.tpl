@@ -71,3 +71,13 @@ otlp+{{ .Values.global.otel.traces.proto }}://{{ .Values.global.otel.traces.host
 otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset:{{ .Values.global.otel.traces.port }}?trace_ratio={{ default 0.0 .Values.traceRatio }}
 {{- end -}}
 {{- end -}}
+
+{{- define "wandb.internalJWTMap" -}}
+'{
+{{- range $value := .Values.internalJWTMap -}}
+{{- if and (not (empty $value.subject)) (not (empty $value.issuer)) }}
+{{- printf "%q: %q" $value.subject $value.issuer }},
+{{- end -}}
+{{- end -}}
+}'
+{{- end -}}

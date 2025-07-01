@@ -13,22 +13,33 @@ global:
     enabled: true
   api:
     enabled: true
-    additionalPaths:
-      files:
-        enabled: true
+  pubSub:
+    enabled: true
+    host: "pubsub-wandb-base:8085"
+    project: "playground-111"
+    filestreamTopic: "filestream"
+    runUpdateShadowTopic: "run-updates-shadow"
+
   extraEnv:
+    GORILLA_PUBSUB_INSECURE: "true"
+    GORILLA_DEV: "true"
+    PUBSUB_EMULATOR_HOST: "pubsub-wandb-base:8085"
+    PUBSUB_PROJECT_ID: "playground-111"
     GLOBAL_ADMIN_API_KEY: "local-123456789-123456789-123456789-1234"
     GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS: "true"
+    GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES: "true"
+    GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE: "true"
+    GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES: "true"
+    GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS: "false"
+    GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR: "true"
 
 app:
   env:
     GORILLA_STORAGE_BUCKET: "s3://local-files"
-  containers:
-    app:
-      resources:
-        requests:
-          cpu: "100m"
-          memory: "128Mi"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
 
 api:
   containers:
@@ -37,6 +48,24 @@ api:
         requests:
           cpu: "100m"
           memory: "128Mi"
+
+flat-run-fields-updater:
+  install: true
+  pubSub:
+    subscription: "flat-run-fields-updater"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+filestream:
+  install: true
+  pubSub:
+    subscription: "filestream-gorilla"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
 
 glue:
   containers:
@@ -81,3 +110,6 @@ redis:
     requests:
       cpu: "100m"
       memory: "128Mi"
+
+reloader:
+  install: true
