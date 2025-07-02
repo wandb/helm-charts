@@ -73,6 +73,8 @@ Global values will override any chart-specific values.
   value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
 - name: GORILLA_FILE_STORE
   value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
+- name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+  value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
 - name: GORILLA_STORAGE_BUCKET
   value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
 {{- end -}}
@@ -100,6 +102,8 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.historyStore" . | quote }}
 - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
   value: {{ include "wandb.liveHistoryStore" . | quote }}
+- name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
+  value: {{ include "wandb.fileStreamWorkerStore" . | quote }}
 {{- end -}}
 
 {{- define "wandb.queueEnvs" -}}
@@ -111,6 +115,8 @@ Global values will override any chart-specific values.
       optional: true
 - name: GORILLA_FILE_STREAM_STORE_ADDRESS
   value: {{ include "wandb.fileStreamStoreProducer" . | quote }}
+- name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
+  value: {{ include "wandb.runUpdateShadowTopicProducer" . | quote }}
 {{- end -}}
 
 {{- define "wandb.downwardEnvs" -}}

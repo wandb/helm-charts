@@ -326,16 +326,6 @@ app:
     GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
     GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE: "/usr/local/bin/view-spec-updater-linux"
     BUCKET_QUEUE: internal://
-    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
-      value: >
-        {
-          "overflow-bucket": {
-            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
-            "name": "wandb",
-            "prefix": "wandb-overflow"
-          },
-          "addr": {{ include "wandb.runUpdateShadowTopicProducer" . | quote }}
-        }
     GORILLA_TASK_CONFIG_PATH: "/etc/service/gorilla-glue/glue_tasks_local.yaml"
     GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/usr/local/bin/view-spec-updater-linux"
   envFrom:
@@ -561,18 +551,8 @@ flat-run-fields-updater:
       # targetMemoryUtilizationPercentage: 80
   terminationGracePeriodSeconds: 60
   env:
-    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
-      value: >
-        {
-          "overflow-bucket": {
-            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
-            "name": "wandb",
-            "prefix": "wandb-overflow"
-          },
-          "subscriptions": {
-            "flatRunFieldsUpdater": {{ include "wandb.runUpdateShadowQueue" . | quote }}
-          }
-        }
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -630,6 +610,9 @@ filestream:
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
+  env:
+    GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
+      value: '{{ include "wandb.fileStreamStoreConsumer" . }}'
   containers:
     filestream:
       args: ["filestream"]

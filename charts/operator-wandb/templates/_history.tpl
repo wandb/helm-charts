@@ -34,3 +34,17 @@
 {{- end -}}
 {{- $historyStore -}}
 {{- end -}}
+
+{{- define "wandb.fileStreamWorkerStore" -}}
+    {{- $stores := list -}}
+
+    {{- if .Values.global.bigtable.v2.enabled -}}
+        {{- $stores = append $stores (printf "bigtablev2://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
+    {{- end -}}
+
+    {{- if .Values.global.bigtable.v3.enabled -}}
+        {{- $stores = append $stores (printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
+    {{- end -}}
+
+    {{- join "," $stores -}}
+{{- end -}}
