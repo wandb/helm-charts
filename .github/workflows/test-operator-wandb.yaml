@@ -75,8 +75,10 @@ jobs:
         run: kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} -n minio wait --for=condition=Ready pod/minio --timeout=300s
         if: env.ACT || steps.list-changed.outputs.changed == 'true'
 
-      - name: Install pubsub emulator
-        run: helm --kube-context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} install pubsub-wandb-base ./charts/wandb-base --values test-configs/pubsub/values.yaml
+      - name: Install pubsub and bigtable emulators
+        run: |
+          helm --kube-context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} install pubsub-wandb-base ./charts/wandb-base --values test-configs/pubsub/values.yaml
+          helm --kube-context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} install bigtable-wandb-base ./charts/wandb-base --values test-configs/bigtable/values.yaml
         if: (env.ACT || steps.list-changed.outputs.changed == 'true') && matrix.configuration == 'fmb'
 
       - name: Apply user defined secrets
