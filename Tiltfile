@@ -16,6 +16,7 @@ settings = {
     "defaultValues": {
         "global.mysql.password": "password",
         "global.extraEnv.GLOBAL_ADMIN_API_KEY": "",
+        "reloader.install": "true",
     },
     "additionalValues": {},
 }
@@ -105,6 +106,9 @@ if settings.get("installIngress"):
 
 if current_values.get('global', {}).get('pubSub', {}).get('enabled', False):
     k8s_yaml(helm('./charts/wandb-base', 'pubsub', values=['./test-configs/pubsub/values.yaml']))
+
+if current_values.get('global', {}).get('bigtable', {}).get('v2', {}).get('enabled', False):
+    k8s_yaml(helm('./charts/wandb-base', 'bigtable', values=['./test-configs/bigtable/values.yaml']))
 
 helmSetValues = []
 for key, value in settings["defaultValues"].items():
