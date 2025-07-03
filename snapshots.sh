@@ -19,6 +19,7 @@ function main() {
       echo "Checking snapshot tests"
       for value_file in ./$values_dir/$chart/*; do
         if [[ -f "$value_file" ]]; then
+          sleep 1
           helm chartsnap -c "./charts/$chart" -f "$value_file"
         fi
       done
