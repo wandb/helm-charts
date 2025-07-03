@@ -9,19 +9,11 @@ function main() {
   case "$func" in
     update)
       echo "Updating operator-wandb snapshots"
-      for value_file in ./$values_dir/$chart/*; do
-        if [[ -f "$value_file" ]]; then
-          helm chartsnap -c "./charts/$chart" -u -f "$value_file"
-        fi
-      done
+      helm chartsnap -c "./charts/$chart" -u -f "./$values_dir/$chart"
       ;;
     run)
       echo "Checking snapshot tests"
-      for value_file in ./$values_dir/$chart/*; do
-        if [[ -f "$value_file" ]]; then
-          helm chartsnap -c "./charts/$chart" -f "$value_file"
-        fi
-      done
+      helm chartsnap -c "./charts/$chart" -f "./$values_dir/$chart"
       ;;
     *)
       cat <<EOF
