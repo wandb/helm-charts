@@ -86,10 +86,10 @@
   {{- if or .volumeMounts .volumeMountsTpls }}
   volumeMounts:
     {{- range .volumeMountsTpls }}
-    {{- tpl (toYaml . | nindent 4) $.root }}
+{{ tpl . $.root | indent 4 }}
     {{- end }}
     {{- if .volumeMounts }}
-    {{- tpl (toYaml .volumeMounts | nindent 4) $.root }}
+{{ tpl (toYaml .volumeMounts | nindent 4) $.root }}
     {{- end }}
   {{- end }}
 {{- end }}
