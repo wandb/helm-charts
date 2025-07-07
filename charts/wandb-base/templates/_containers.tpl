@@ -7,7 +7,7 @@
     {{- $container := dict }}
     {{- $_ := deepCopy $containerSource | merge $container }}
     {{- $_ = set $container "name" $containerName }}
-    {{- $_ = set $container "securityContext" (coalesce $container.securityContext $.root.Values.securityContext) }}
+    {{- $_ = set $container "securityContext" (coalesce $container.securityContext (merge $.root.Values.securityContext $.root.Values.container.securityContext)) }}
     {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
     {{- $_ = set $container "envTpls" $.root.Values.envTpls }}
     {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
