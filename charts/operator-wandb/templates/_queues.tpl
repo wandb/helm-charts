@@ -92,6 +92,9 @@ Return the number of partitions for run-updates-shadow
 
 {{- define "wandb.runUpdateShadowTopicProducer" -}}
 {{- if .Values.global.pubSub.enabled -}}
+  {{- if .Values.global.pubSub.host -}}
+pubsub://{{ .Values.global.pubSub.host }}/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}
+  {{- else -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}
 {{- else if .Values.global.bufstream.enabled -}}
 kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
