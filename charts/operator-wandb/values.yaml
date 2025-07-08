@@ -1369,6 +1369,18 @@ metric-observer:
       value: "{{ .Values.global.size }}"
 
     ##### The following are unique/extra critical to metric-observer
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
+      value: >
+        {
+          "overflow-bucket": {
+            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+            "name": "wandb",
+            "prefix": "wandb-overflow"
+          },
+          "subscriptions": {
+            "metricObserver": {{ include "wandb.runUpdateShadowQueue" . | quote }}
+          }
+        }
     GORILLA_METRIC_OBSERVER_STORE:
       value: '{{ include "wandb.redis.connectionString" . | trim }}' 
     GOMAXPROCS:
@@ -1390,6 +1402,12 @@ metric-observer:
           name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
           key: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
           optional: true
+    AZURE_STORAGE_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
     
     # I'm pretty sure it's safe to skip these - we use these during
     # setup of the slack integration, but by the time MO runs the slack integration,
@@ -1399,13 +1417,7 @@ metric-observer:
     # GORILLA_SLACK_SECRET:
     #    value: "{{ required "slack secret required" .Values.secretRefs.slack.alertsApp.secret }}"
 
-    # TODO - unclear if/how AZURE_STORAGE_KEY one is used
-    # AZURE_STORAGE_KEY:
-    #   valueFrom:
-    #     secretKeyRef:
-    #       name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
-    #       key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
-    #       optional: true
+
     # don't believe this is used
     # GORILLA_STATIC_HOST:
     #   value: "{{ .Values.global.host }}"
