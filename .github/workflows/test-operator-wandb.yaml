@@ -7,6 +7,36 @@ on:
       - test-configs/operator-wandb/**
 
 jobs:
+  snapshots:
+    name: Snapshot testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.2.0
+        with:
+          version: v3.17.0
+      - name: Helm snapshot build and test
+        run: |
+          pushd ./charts/operator-wandb/
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add stakater https://stakater.github.io/stakater-charts
+          helm repo add prometheus https://prometheus-community.github.io/helm-charts
+          popd
+          helm plugin install https://github.com/origranot/helm-cascade
+          helm cascade build ./charts/operator-wandb/
+          helm plugin install https://github.com/jlandowner/helm-chartsnap
+          ./snapshots.sh run
+      # currently this action always tries to install helm, so dont use it for now
+      - name: Chart Snapshots
+        if: ${{ !always() }}
+        uses: jlandowner/helm-chartsnap-action@v1
+        id: chartsnap
+        with:
+          chart:  charts/operator-wandb/
+          values: test-configs/operator-wandb/
+
   test:
     name: Test Chart
     strategy:
@@ -27,6 +57,8 @@ jobs:
             "separate-pods-filemeta",
             "user-defined-secrets",
             "weave-trace",
+            "separate-pods-filemeta",
+            "fmb",
           ]
     runs-on: ubuntu-latest
     environment: Helm Charts
@@ -74,6 +106,12 @@ jobs:
       - name: Wait for Minio to be Ready
         run: kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} -n minio wait --for=condition=Ready pod/minio --timeout=300s
         if: env.ACT || steps.list-changed.outputs.changed == 'true'
+
+      - name: Install pubsub and bigtable emulators
+        run: |
+          helm --kube-context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} install pubsub-wandb-base ./charts/wandb-base --values test-configs/pubsub/values.yaml
+          helm --kube-context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} install bigtable-wandb-base ./charts/wandb-base --values test-configs/bigtable/values.yaml
+        if: (env.ACT || steps.list-changed.outputs.changed == 'true') && matrix.configuration == 'fmb'
 
       - name: Apply user defined secrets
         run: |
