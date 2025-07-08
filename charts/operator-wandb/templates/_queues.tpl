@@ -122,6 +122,9 @@ kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):9092/
 {{/* TODO(dpanzella) - Probably need to make this support kafka as well*/}}
 {{- define "wandb.fileStreamStoreProducer" -}}
 {{- if .Values.global.pubSub.enabled -}}
+  {{- if .Values.global.pubSub.host -}}
+pubsub://{{ .Values.global.pubSub.host }}/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
+  {{- else -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
 {{- else -}}
 {{ include "wandb.mysql" . }}
