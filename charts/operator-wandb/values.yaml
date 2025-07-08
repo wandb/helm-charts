@@ -1218,6 +1218,75 @@ filemeta:
           cpu: 250m
           memory: 256Mi
 
+anaconda2:
+  install: false
+  autoscaling:
+    horizontal:
+      enabled: true
+      maxReplicas: 3
+      minReplicas: 2
+  imagePullSecrets: *imagePullSecrets
+  service:
+    enabled: true
+    loadBalancerHealthCheckPath: "/ping"
+    type: ClusterIP
+    ports:
+      - port: 8082
+        targetPort: http
+        protocol: TCP
+        name: http
+  env:
+    PORT:
+      value: "80"
+    # PROJECT_ID:
+    #   value: "{{ required "projectID required" .Values.env.projectID }}"
+    DD_ENV:
+      value: "{{ .Values.env.ddEnv }}"
+    DD_SERVICE:
+      value: "anaconda2"
+    ANACONDA2_DISABLE_FILE_LOGGING:
+      value: "true"
+    DD_TRACE_AGENT_HOSTNAME:
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
+    DD_AGENT_HOST:
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
+  containers:
+    anaconda2:
+      env: {}
+      envFrom: {}
+      ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /ping
+          port: http
+        timeoutSeconds: 2
+        failureThreshold: 5
+      readinessProbe:
+        httpGet:
+          path: /ping
+          port: http
+        timeoutSeconds: 2
+        failureThreshold: 5
+      resources:
+        limits:
+          cpu: "1"
+          memory: 1Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+  image:
+    repository: wandb/anaconda2
+    tag: 0.70.0-anaconda2.3
+  role:
+    enabled: false
+
 frontend:
   install: false
   podSecurityContext:
