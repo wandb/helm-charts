@@ -36,29 +36,109 @@ global:
     GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES: "true"
     GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS: "false"
     GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR: "true"
-  size: "testing"
+    GORILLA_ENABLE_RUN_AUTOMATIONS: "true"
 
 app:
   env:
     GORILLA_STORAGE_BUCKET: "s3://local-files"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  image: # TODO: DO NOT SUBMIT - remove this and all image overrides
+    tag: 0.70.0-metric-observer-available.0
+    repository: wandb/local-dev
 
 console:
   containers:
     console:
       resources:
         requests:
-          cpu: 100m
-          memory: 100Mi
+          cpu: "100m"
+          memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
 
 flat-run-fields-updater:
   install: true
   pubSub:
     subscription: "flat-run-fields-updater"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
+
+metric-observer:
+  install: true
+  pubSub:
+    subscription: "metric-observer"
+  env: 
+    # TODO: I assume SHADOW_QUEUE needs to be updated on a per-env basis?
+    # TODO: DO NOT SUBMIT - SHADOW_QUEUE needs to be updated to use a different queue that FRFU
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
+      value: >
+        {
+          "overflow-bucket": {
+            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+            "name": "wandb",
+            "prefix": "wandb-overflow"
+          },
+          "subscriptions": {
+            "metricObserver": {{ include "wandb.runUpdateShadowQueue" . | quote }}
+          }
+        }
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
 
 filestream:
   install: true
   pubSub:
     subscription: "filestream-gorilla"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
+    repository: wandb/local-dev
+
+glue:
+  containers:
+    glue:
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
+    repository: wandb/local-dev
+
+parquet:
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
+    repository: wandb/local-dev
+
+weave:
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+
+console:
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
 
 ingress:
   install: false
