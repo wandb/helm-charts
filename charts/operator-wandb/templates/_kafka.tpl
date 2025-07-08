@@ -126,7 +126,7 @@ kafka://$(KAFKA_CLIENT_USER):$(A_KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):909
 {{- if .Values.global.pubSub.enabled -}}
   {{- if .Values.global.pubSub.host -}}
 pubsub://{{ .Values.global.pubSub.host }}/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
-  {{- else }}
+  {{- else -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
   {{- end -}}
 {{- else -}}
