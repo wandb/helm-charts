@@ -111,7 +111,7 @@ TODO(Zachary B) - Check with dpanzella to see if this is correct.
 {{- if .Values.global.pubSub.enabled -}}
   {{- if .Values.global.pubSub.host -}}
 pubsub://{{ .Values.global.pubSub.host }}/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}/{{ .Values.pubSub.subscription }}
-  {{- else }}
+  {{- else -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}/{{ .Values.pubSub.subscription }}
   {{- end -}}
 {{- else if .Values.global.beta.bufstream.enabled -}}
