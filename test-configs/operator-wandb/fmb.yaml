@@ -41,6 +41,7 @@ global:
     GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES: "true"
     GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS: "false"
     GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR: "true"
+    GORILLA_ENABLE_RUN_AUTOMATIONS: "true"
 
 app:
   env:
@@ -49,6 +50,9 @@ app:
     requests:
       cpu: "100m"
       memory: "128Mi"
+  image: # TODO: DO NOT SUBMIT - remove this and all image overrides
+    tag: 0.70.0-metric-observer-available.0
+    repository: wandb/local-dev
 
 api:
   containers:
@@ -57,6 +61,8 @@ api:
         requests:
           cpu: "100m"
           memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
 
 flat-run-fields-updater:
   install: true
@@ -66,6 +72,34 @@ flat-run-fields-updater:
     requests:
       cpu: "100m"
       memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
+
+metric-observer:
+  install: true
+  pubSub:
+    subscription: "metric-observer"
+  env: 
+    # TODO: I assume SHADOW_QUEUE needs to be updated on a per-env basis?
+    # TODO: DO NOT SUBMIT - SHADOW_QUEUE needs to be updated to use a different queue that FRFU
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
+      value: >
+        {
+          "overflow-bucket": {
+            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+            "name": "wandb",
+            "prefix": "wandb-overflow"
+          },
+          "subscriptions": {
+            "metricObserver": {{ include "wandb.runUpdateShadowQueue" . | quote }}
+          }
+        }
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
 
 filestream:
   install: true
@@ -75,6 +109,9 @@ filestream:
     requests:
       cpu: "100m"
       memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
+    repository: wandb/local-dev
 
 glue:
   containers:
@@ -83,12 +120,18 @@ glue:
         requests:
           cpu: "100m"
           memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
+    repository: wandb/local-dev
 
 parquet:
   resources:
     requests:
       cpu: "100m"
       memory: "128Mi"
+  image:
+    tag: 0.70.0-metric-observer-available.0
+    repository: wandb/local-dev
 
 weave:
   resources:
