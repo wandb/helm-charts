@@ -94,7 +94,7 @@ Return the number of partitions for run-updates-shadow
 {{- if .Values.global.pubSub.enabled -}}
   {{- if .Values.global.pubSub.host -}}
 pubsub://{{ .Values.global.pubSub.host }}/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}
-  {{- else }}
+  {{- else -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}
   {{- end -}}
 {{- else if .Values.global.beta.bufstream.enabled -}}
