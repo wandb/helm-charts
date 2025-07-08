@@ -4,7 +4,21 @@
 
 kind: Deployment
 
-global: {}
+global:
+  pod:
+    labels: {}
+    annotations: {}
+  deployment:
+    annotations:
+      reloader.stakater.com/auto: "true"
+    labels: {}
+  statefulset:
+    annotations:
+      reloader.stakater.com/auto: "true"
+    labels: {}
+  service:
+    labels: {}
+    annotations: {}
 
 replicaCount: 1
 
@@ -22,6 +36,7 @@ fullnameOverride: ""
 deploymentPostfix: ""
 
 env: {}
+envTpls: []
 envFrom: {}
 
 addReloaderAnnotations: true
@@ -34,9 +49,11 @@ serviceAccount:
 
 role:
   create: false
+  type: "Role"  # Role or ClusterRole
   rules: []
 
 podAnnotations: {}
+podAnnotationsTpls: []
 podLabels: {}
 
 podSecurityContext:
@@ -48,6 +65,7 @@ podSecurityContext:
   seccompProfile:
     type: "RuntimeDefault"
 
+# if no securityContext is defined at the container level, this will be used
 securityContext:
   capabilities:
     add: []
@@ -94,6 +112,7 @@ containers: {}
 #        cpu: 100m
 #        memory: 128Mi
 #    volumeMounts: []
+#    volumeMountsTpls: []
 
 jobs: {}
 #  example:
@@ -131,7 +150,8 @@ jobs: {}
 #          requests:
 #            cpu: 100m
 #            memory: 128Mi
-#        volumeMounts: [ ]
+#        volumeMounts: []
+#        volumeMountsTpls: []
 
 cronJobs: {}
 #  example:
@@ -168,11 +188,14 @@ cronJobs: {}
 #          requests:
 #            cpu: 100m
 #            memory: 128Mi
-#        volumeMounts: [ ]
+#        volumeMounts: []
+#        volumeMountsTpls: []
 
 # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
 service:
   enabled: true
+  labels: {}
+  annotations: {}
   # This path is currently only used for AWS ALB health checks
   loadBalancerHealthCheckPath: ""
   # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
@@ -202,21 +225,22 @@ ingress:
   #      - chart-example.local
 
 # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
+# Values defined here will override the values defined in the sizing section.
 autoscaling:
-  horizontal:
-    enabled: false
-    minReplicas: 1
-    maxReplicas: 5
-    targetCPUUtilizationPercentage: 80
-    targetMemoryUtilizationPercentage: 80
-  vertical:
-    enabled: false
-    updateMode: "Auto"
-    containerPolicies:
-      - containerName: "*"
-        controlledResources:
-          - memory
-          - cpu
+  horizontal: {}
+#    enabled: false
+#    minReplicas: 1
+#    maxReplicas: 5
+#    targetCPUUtilizationPercentage: 80
+#    targetMemoryUtilizationPercentage: 80
+  vertical: {}
+#    enabled: false
+#    updateMode: "Auto"
+#    containerPolicies:
+#      - containerName: "*"
+#        controlledResources:
+#          - memory
+#          - cpu
 
 # Additional volumes on the output Deployment definition.
 volumes: []
@@ -224,6 +248,8 @@ volumes: []
 #   secret:
 #     secretName: mysecret
 #     optional: false
+
+volumesTpls: []
 
 nodeSelector: {}
 
@@ -233,3 +259,66 @@ affinity: {}
 
 test:
   enabled: false
+
+size: ""
+
+# Configure scale dependant variables.  This enables configuring "t-shirt" sizes for different deployments.
+# This is useful for setting up different resource requests and limits for different environments.
+# Resources - https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+# Env - Follows the same format rules for `env` and `containers.env` values
+# autoscaling - https://kubernetes.io/docs/concepts/workloads/autoscaling/
+sizing:
+  default:
+    resources: {}
+    env: {}
+    autoscaling:
+      horizontal:
+        enabled: false
+        minReplicas: 1
+        maxReplicas: 5
+        targetCPUUtilizationPercentage: 80
+        targetMemoryUtilizationPercentage: 80
+      vertical:
+        enabled: false
+        updateMode: "Auto"
+        containerPolicies:
+          - containerName: "*"
+            controlledResources:
+              - memory
+              - cpu
+#  small:
+#    resources:
+#      requests:
+#        cpu: 100m
+#        memory: 128Mi
+#        ephemeral-storage: "2Gi"
+#      limits:
+#        cpu: 100m
+#        memory: 128Mi
+#        ephemeral-storage: "2Gi"
+#    env:
+#      - name: GORILLA_TSHIRT_SIZE
+#        value: small
+#    autoscaling:
+#      horizontal:
+#        minReplicas: 1
+#        maxReplicas: 5
+#        targetCPUUtilizationPercentage: 80
+#        targetMemoryUtilizationPercentage: 80
+
+# DEPRECATED - Added for backwards compatibility with previous charts
+pod:
+  labels: {}
+  annotations: {}
+  securityContext: {}
+
+container:
+  securityContext: {}
+
+deployment:
+  labels: {}
+  annotations: {}
+
+statefulset:
+  labels: {}
+  annotations: {}
