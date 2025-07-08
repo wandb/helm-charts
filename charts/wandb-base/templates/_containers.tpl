@@ -11,7 +11,7 @@
     {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
     {{- $_ = set $container "envTpls" $.root.Values.envTpls }}
     {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
-    {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env))) }}
+    {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $.root.Values.global.env $.root.Values.global.extraEnv) }}
     {{- $_ = set $container "root" $.root }}
     {{- if eq $.source "containers" }}
       {{/* Merge in resources from .Values.resources to support legacy chart values */}}
