@@ -96,9 +96,9 @@
 
 {{- define "wandb-base.env" -}}
 {{- range $key, $value := .env -}}
-{{- if kindIs "string" $value }}
+{{- if or (kindIs "string" $value) (kindIs "bool" $value) }}
 - name: {{ $key }}
-  value: {{ $value | quote }}
+  value: {{ toString $value | quote }}
 {{- else }}
 - name: {{ $key }}
 {{- toYaml $value | nindent 2 }}
