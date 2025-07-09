@@ -104,9 +104,16 @@ for key, value in settings["defaultValues"].items():
 for key, value in settings["additionalValues"].items():
     helmSetValues.append(key + '=' + value)
 
+# Disable anaconda in app if separate anaconda2 service is enabled
+if current_values.get('anaconda2', {}).get('install', False):
+    helmSetValues.append('app.extraEnv.ANACONDA_ENABLED=false')
+    helmSetValues.append('global.anaconda2.enabled=true')
+
 k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")], set=helmSetValues))
 k8s_resource('wandb-app', port_forwards=8080, objects=['wandb-app:ServiceAccount:default', 'wandb-app-config:secret:default'])
 k8s_resource('wandb-console', port_forwards=8082, objects=['wandb-console:ServiceAccount:default', 'wandb-console:clusterrole:default', 'wandb-console:clusterrolebinding:default'])
+if current_values.get('anaconda2', {}).get('install', False):
+    k8s_resource('wandb-anaconda2', port_forwards=8084, objects=['wandb-anaconda2:ServiceAccount:default'])
 if current_values.get('executor', {}).get('install', False):
     k8s_resource('wandb-executor',objects=['wandb-executor:ServiceAccount:default'])
 k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)
