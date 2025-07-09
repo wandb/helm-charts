@@ -1,6 +1,14 @@
 #!/usr/bin/env bash 
 set -euo pipefail
 
+# Check if helm chartsnap plugin is installed
+if ! helm plugin list | grep -q "chartsnap"; then
+  echo "❌ helm chartsnap plugin is not installed"
+  echo "Please install it by running:"
+  echo "  helm plugin install https://github.com/jlandowner/helm-chartsnap"
+  exit 1
+fi
+
 function main() {
   local chart="operator-wandb"
   local values_dir="test-configs"
