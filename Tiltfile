@@ -106,7 +106,8 @@ for key, value in settings["additionalValues"].items():
 
 # Disable anaconda in app if separate anaconda2 service is enabled
 if current_values.get('anaconda2', {}).get('install', False):
-    helmSetValues.append('app.extraEnv.ANACONDA_ENABLED=true')
+    helmSetValues.append('app.extraEnv.ANACONDA_ENABLED=false')
+    helmSetValues.append('global.anaconda2.enabled=true')
 
 k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")], set=helmSetValues))
 k8s_resource('wandb-app', port_forwards=8080, objects=['wandb-app:ServiceAccount:default', 'wandb-app-config:secret:default'])
