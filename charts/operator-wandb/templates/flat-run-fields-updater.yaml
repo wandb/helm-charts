@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-flat-run-fields-updater-configmap
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  GORILLA_FILE_HOST: "{{ .Values.global.host }}"
+
+  # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
+  {{- if and .Values.global .Values.global.observability }}
+    {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
+  GORILLA_STATSD_PORT: "8125"
+  GORILLA_STATSD_HOST: "0.0.0.0"
+    {{- else }}
+  GORILLA_STATSD_PORT: "8125"
+    {{- end }}
+  {{- else }}
+  GORILLA_STATSD_PORT: "8125"
+  {{- end }}
+
+  GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
+  GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
+  GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
+
+  {{- if and .Values.traceRatio (ne .Values.traceRatio 0.0) }}
+  GORILLA_TRACER: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
+  {{- end }}
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-flat-run-fields-updater-secret
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+stringData: {}
+
