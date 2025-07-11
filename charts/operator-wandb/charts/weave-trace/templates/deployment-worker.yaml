@@ -54,22 +54,35 @@ spec:
                   name: {{ include "wandb.clickhouse.passwordSecret" . }}
                   key: {{ .Values.global.clickhouse.passwordSecret.passwordKey }}
             - name: WF_KAFKA_BROKER_HOST
-              value: "bufstream.default.svc.cluster.local"
+              value: "{{ .Values.bufstream.host }}"
             - name: WF_KAFKA_BROKER_PORT
-              value: "9092"
+              value: "{{ .Values.bufstream.port }}"
             {{- include "weaveTrace.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
+            - name: WANDB_INTERNAL_SERVICE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: weave-worker-auth
+                  key: key
+            - name: WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME
+              value: weave-worker-auth
+            - name: WANDB_BASE_URL
+              value: http://{{ .Release.Name }}-app:8080/
+            - name: WEAVE_ENABLE_ONLINE_EVAL
+              value: "true"
+            - name: WEAVE_TRACE_SERVER_BASE_URL
+              value: "{{ .Values.global.host }}/traces"
           command:
             - python
           args:
             - "-m"
-            - "weave.workers.weave_scorer"
+            - "src.workers.scoring_worker"
           livenessProbe:
             exec:
               command:
                 - /bin/sh
                 - -c
-                - ps aux | grep 'weave_scorer'
+                - ps aux | grep 'scoring_worker' | grep -v 'grep'
             timeoutSeconds: 2
             failureThreshold: 5
           readinessProbe:
@@ -77,7 +90,7 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - ps aux | grep 'weave_scorer'
+                - ps aux | grep 'scoring_worker' | grep -v 'grep'
             timeoutSeconds: 2
             failureThreshold: 5
           startupProbe:
@@ -85,7 +98,7 @@ spec:
               command:
                 - /bin/sh
                 - -c
-                - ps aux | grep 'weave_scorer'
+                - ps aux | grep 'scoring_worker' | grep -v 'grep'
             timeoutSeconds: 2
             failureThreshold: 5
           resources:
