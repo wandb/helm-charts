@@ -1,4 +1,4 @@
-{{- if eq .Values.kind "Statefulset" }}
+{{- if eq .Values.kind "StatefulSet" }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -10,6 +10,9 @@ metadata:
     {{- tpl (include "wandb-base.reloaderannotations" . | nindent 4) . }}
   {{- end }}
 spec:
+  {{- if .Values.service.headless }}
+  serviceName: {{ include "wandb-base.fullname" . }}
+  {{- end }}
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
@@ -41,9 +44,13 @@ spec:
       {{- end }}
       containers:
         {{- include "wandb-base.containers" (dict "containers" .Values.containers "root" .) | nindent 8 }}
+      {{- with .Values.volumeClaimTemplates }}
+      volumeClaimTemplates:
+        {{- tpl (toYaml . | nindent 8) $ }}
+      {{- end }}
       {{- with .Values.volumes }}
       volumes:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml . | nindent 8) $ }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
