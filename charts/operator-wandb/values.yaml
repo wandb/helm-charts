@@ -591,7 +591,7 @@ history:
             "prefix": "wandb-overflow"
           },
           "subscriptions": {
-            "history": {{ include "wandb.runUpdateShadowQueue" . | quote }}
+            "historyIngester": {{ include "wandb.runUpdateShadowQueue" . | quote }}
           }
         }
     GORILLA_FILE_STORE:
@@ -620,6 +620,8 @@ history:
           cpu: "1"
           memory: 1Gi
       volumeMounts:
+        - name: history-data-volume
+          mountPath: /storage
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
         - name: wandb-ca-certs-user
@@ -630,6 +632,15 @@ history:
   image:
     repository: wandb/megabinary
     tag: latest
+  volumeClaimTemplates:
+    - metadata:
+        name: history-data-volume
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
   volumes:
     - name: wandb-ca-certs
       configMap:
