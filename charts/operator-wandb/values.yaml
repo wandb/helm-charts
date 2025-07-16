@@ -334,8 +334,10 @@ console:
 flat-run-fields-updater:
   install: false
   deploymentPostfix: "bc"
-  pubsub:
-    subscriptions: ""
+  pubSub:
+    subscription: "flat-run-fields-updater"
+  kafka:
+    consumerGroup: "flat-run-fields-updater"
   service:
     enabled: false
   autoscaling:
@@ -499,8 +501,19 @@ flat-run-fields-updater:
 history:
   install: false
   kind: StatefulSet
+  pubSub:
+    subscription: "history"
+  kafka:
+    consumerGroup: "history"
   service:
-    enabled: false
+    enabled: true
+    headless: true
+    type: ClusterIP
+    ports:
+      - name: http
+        port: 8080
+        targetPort: 8080
+        protocol: TCP
   env:
     A_KAFKA_CLIENT_PASSWORD:
       valueFrom:
@@ -578,7 +591,7 @@ history:
             "prefix": "wandb-overflow"
           },
           "subscriptions": {
-            "flatRunFieldsUpdater": {{ include "wandb.runUpdateShadowQueue" . | quote }}
+            "history": {{ include "wandb.runUpdateShadowQueue" . | quote }}
           }
         }
     GORILLA_FILE_STORE:
