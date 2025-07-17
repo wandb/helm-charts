@@ -111,7 +111,6 @@ kafka:
   group_consumer_session_timeout: {{ .Values.kafka.groupConsumerSessionTimeout }}
   group_consumer_session_timeout_max: {{ .Values.kafka.groupConsumerSessionTimeoutMax }}
   group_consumer_session_timeout_min: {{ .Values.kafka.groupConsumerSessionTimeoutMin }}
-  message_max_bytes: {{ .Values.kafka.messageMaxBytes }}
 
 connect_address:
   host: 0.0.0.0
