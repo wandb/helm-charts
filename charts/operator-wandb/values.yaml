@@ -334,8 +334,10 @@ console:
 flat-run-fields-updater:
   install: false
   deploymentPostfix: "bc"
-  pubsub:
-    subscriptions: ""
+  pubSub:
+    subscription: "flat-run-fields-updater"
+  kafka:
+    consumerGroup: "flat-run-fields-updater"
   service:
     enabled: false
   autoscaling:
@@ -402,8 +404,6 @@ flat-run-fields-updater:
       value: '{{ include "wandb.mysql" . | trim }}'
     GORILLA_ANALYTICS_SINK:
       value: '{{ include "wandb.mysql" . | trim }}'
-    GORILLA_HISTORY_STORE:
-      value: 'http://{{ .Release.Name }}-parquet:8087/_goRPC_,{{ include "wandb.mysql" . | trim }}'
     GORILLA_METADATA_CACHE:
       value: '{{ include "wandb.redis.connectionString" . | trim }}'
     REDIS:
@@ -480,6 +480,183 @@ flat-run-fields-updater:
   image:
     repository: wandb/megabinary
     tag: latest
+  volumes:
+    - name: wandb-ca-certs
+      configMap:
+        name: "{{ .Release.Name }}-ca-certs"
+    - name: wandb-ca-certs-user
+      configMap:
+        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
+        optional: true
+    - name: redis-ca
+      secret:
+        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
+        items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+        optional: true
+
+history:
+  install: false
+  kind: StatefulSet
+  pubSub:
+    subscription: "history"
+  kafka:
+    consumerGroup: "history"
+  service:
+    enabled: true
+    headless: true
+    type: ClusterIP
+    ports:
+      - name: http
+        port: 8080
+        targetPort: 8080
+        protocol: TCP
+  env:
+    A_KAFKA_CLIENT_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.kafka.passwordSecret" . }}'
+          key: '{{ include "wandb.kafka.passwordSecret.passwordKey" . }}'
+          optional: true
+    A_REDIS_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.redis.passwordSecret" . }}'
+          key: "{{ .Values.global.redis.secret.secretKey }}"
+          optional: true
+    AZURE_STORAGE_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_ACCESS_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
+          optional: true
+    BUCKET_SECRET_KEY:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+          key: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
+          optional: true
+    A_MYSQL_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.mysql.passwordSecret" . }}'
+          key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+    POD_NAME:
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    G_HOST_IP:
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
+    GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE:
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    GORILLA_RUN_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_METADATA_STORE:
+      value: '{{ include "wandb.mysql" . | trim }}'
+    GORILLA_METADATA_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    REDIS:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_SETTINGS_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_FILE_HOST:
+      value: "{{ .Values.global.host }}"
+    GORILLA_TSHIRT_SIZE:
+      value: "{{ .Values.global.size }}"
+    OPERATOR_ENABLED:
+      value: "true"
+    LOGGING_ENABLED:
+      value: "true"
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE:
+      value: >
+        {
+          "overflow-bucket": {
+            "store": {{ (include "wandb.bucket" . | fromYaml).url | quote}},
+            "name": "wandb",
+            "prefix": "wandb-overflow"
+          },
+          "subscriptions": {
+            "historyIngester": {{ include "wandb.runUpdateShadowQueue" . | quote }}
+          }
+        }
+    GORILLA_FILE_STORE:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_STORAGE_BUCKET:
+      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
+    GORILLA_TRACER:
+      value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-secret": "secretRef"
+    "{{ .Release.Name }}-gorilla-configmap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-session-key": "secretRef"
+  containers:
+    history:
+      args: ["history"]
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        initialDelaySeconds: 30
+        periodSeconds: 5
+        timeoutSeconds: 1
+        successThreshold: 1
+        failureThreshold: 3
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: api
+        periodSeconds: 5
+        successThreshold: 1
+        failureThreshold: 5
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      volumeMounts:
+        - name: history-data-volume
+          mountPath: /storage
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  volumeClaimTemplates:
+    - metadata:
+        name: history-data-volume
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
   volumes:
     - name: wandb-ca-certs
       configMap:
