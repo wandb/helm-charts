@@ -54,7 +54,7 @@ Return the db connection string with TLS support
 {{- define "wandb.mysql" -}}
   {{- $tlsConfig := .Values.global.mysql.tls -}}
   {{- $baseUrl := "mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?" -}}
-  {{- if and $tlsConfig.enabled $tlsConfig.secret.name -}}
+  {{- if $tlsConfig.secret.name -}}
     {{- $mode := $tlsConfig.mode | default "required" -}}
     {{- if and $tlsConfig.secret.keys.cert $tlsConfig.secret.keys.key -}}
       {{- print $baseUrl "tls=custom" -}}
@@ -81,7 +81,7 @@ Return the MySQL wait command with TLS support
 {{- define "wandb.waitForMySQL" -}}
   {{- $tlsConfig := .Values.global.mysql.tls -}}
   {{- $baseCmd := "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT" -}}
-  {{- if and $tlsConfig.enabled $tlsConfig.secret.name -}}
+  {{- if $tlsConfig.secret.name -}}
     {{- if and $tlsConfig.secret.keys.cert $tlsConfig.secret.keys.key -}}
       {{- print $baseCmd " --ssl-cert=/etc/ssl/certs/mysql/" $tlsConfig.secret.keys.cert -}}
       {{- print " --ssl-key=/etc/ssl/certs/mysql/" $tlsConfig.secret.keys.key -}}
@@ -104,7 +104,7 @@ Return the MySQL TLS volume mount configuration
 */}}
 {{- define "wandb.mysql.volumeMount" -}}
   {{- $tlsConfig := .Values.global.mysql.tls -}}
-  {{- if and $tlsConfig.enabled $tlsConfig.secret.name -}}
+  {{- if $tlsConfig.secret.name -}}
     {{- if or (and $tlsConfig.secret.keys.cert $tlsConfig.secret.keys.key) $tlsConfig.secret.keys.ca -}}
 - name: mysql-certs
   mountPath: /etc/ssl/certs/mysql/
@@ -118,7 +118,7 @@ Return the MySQL TLS volume configuration
 */}}
 {{- define "wandb.mysql.volume" -}}
   {{- $tlsConfig := .Values.global.mysql.tls -}}
-  {{- if and $tlsConfig.enabled $tlsConfig.secret.name -}}
+  {{- if $tlsConfig.secret.name -}}
     {{- if or (and $tlsConfig.secret.keys.cert $tlsConfig.secret.keys.key) $tlsConfig.secret.keys.ca -}}
 - name: mysql-certs
   secret:
