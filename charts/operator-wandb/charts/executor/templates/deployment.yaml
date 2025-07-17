@@ -52,6 +52,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           volumeMounts:
+            {{- include "wandb.mysql.volumeMount" . | nindent 12 }}
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "executor.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
@@ -101,8 +102,13 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
+            - name: A_MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . }}
+                  key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
-              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+              value: "{{ include "wandb.mysql" . }}"
             - name: A_REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -197,6 +203,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
+        {{- include "wandb.mysql.volume" . | nindent 8 }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "executor.fullname" . }}-redis-ca
           secret:

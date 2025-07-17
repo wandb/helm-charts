@@ -130,6 +130,6 @@ pubsub://{{ .Values.global.pubSub.host }}/{{ .Values.global.pubSub.project }}/{{
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
   {{- end -}}
 {{- else -}}
-mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+{{ include "wandb.mysql" . }}
 {{- end -}}
 {{- end -}}

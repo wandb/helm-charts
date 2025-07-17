@@ -131,14 +131,14 @@ kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAF
     {{- end -}}
 
     {{- if not (or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled) -}}
-        {{- $stores = append $stores "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" -}}
+        {{- $stores = append $stores (include "wandb.mysql" $) -}}
     {{- end -}}
 
     {{- join "," $stores -}}
 {{- end -}}
 
 {{- define "app.liveHistoryStore" -}}
-{{- $historyStore := printf "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred" -}}
+{{- $historyStore := include "wandb.mysql" . -}}
 {{- if or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled -}}
   {{- $stores := list -}}
 
@@ -160,7 +160,7 @@ kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAF
 {{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
 {{- else -}}
-mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+{{ include "wandb.mysql" . }}
 {{- end -}}
 {{- end -}}
 

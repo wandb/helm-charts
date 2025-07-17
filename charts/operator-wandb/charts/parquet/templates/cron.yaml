@@ -56,6 +56,7 @@ spec:
                 "glue",
               ]
               volumeMounts:
+                {{- include "wandb.mysql.volumeMount" . | nindent 16 }}
                 {{- if ne (include "wandb.redis.caCert" .) "" }}
                 - name: {{ include "parquet.fullname" . }}-redis-ca
                   mountPath: /etc/ssl/certs/redis_ca.pem
@@ -103,8 +104,13 @@ spec:
                     secretKeyRef:
                       name: {{ include "wandb.mysql.passwordSecret" . }}
                       key:  {{ .Values.global.mysql.passwordSecret.passwordKey }}
+                - name: A_MYSQL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "wandb.mysql.passwordSecret" . }}
+                      key:  {{ .Values.global.mysql.passwordSecret.passwordKey }}
                 - name: MYSQL
-                  value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+                  value: "{{ include "wandb.mysql" . }}"
 
                 - name: A_REDIS_PASSWORD
                   valueFrom:
@@ -174,6 +180,7 @@ spec:
                 {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 16 }}
           serviceAccountName: {{ include "parquet.serviceAccountName" . }}
           volumes:
+            {{- include "wandb.mysql.volume" . | nindent 12 }}
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "parquet.fullname" . }}-redis-ca
               secret:

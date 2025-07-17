@@ -67,12 +67,23 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key:  {{ .Values.global.mysql.passwordSecret.passwordKey }}
-          command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
+            - name: A_MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . }}
+                  key:  {{ .Values.global.mysql.passwordSecret.passwordKey }}
+          volumeMounts:
+            {{- include "wandb.mysql.volumeMount" . | nindent 12 }}
+          command: 
+            - bash
+            - -c
+            - {{ include "wandb.waitForMySQL" . | quote }}
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           {{- include "wandb.containerSecurityContext" .Values.container.securityContext | nindent 10 }}
           volumeMounts:
+            {{- include "wandb.mysql.volumeMount" . | nindent 12 }}
             {{- if ne (include "wandb.redis.caCert" .) "" }}
             - name: {{ include "app.fullname" . }}-redis-ca
               mountPath: /etc/ssl/certs/redis_ca.pem
@@ -160,8 +171,13 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key:  {{ .Values.global.mysql.passwordSecret.passwordKey }}
+            - name: A_MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . }}
+                  key:  {{ .Values.global.mysql.passwordSecret.passwordKey }}
             - name: MYSQL
-              value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
+              value: "{{ include "wandb.mysql" . }}"
             - name: WEAVE_SERVICE
               value: "{{ .Release.Name }}-weave:9994"
             - name: PARQUET_HOST
@@ -397,6 +413,7 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
+        {{- include "wandb.mysql.volume" . | nindent 8 }}
         {{- if ne (include "wandb.redis.caCert" .) "" }}
         - name: {{ include "app.fullname" . }}-redis-ca
           secret:

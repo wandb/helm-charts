@@ -1,0 +1,113 @@
+# Test configuration for custom TLS MySQL connection
+# This configuration tests the ability to connect to MySQL with custom TLS certificates
+# including custom CA, client certificate, and client key
+
+global:
+  host: "https://wandb-test.local"
+  
+  # MySQL configuration with custom TLS
+  mysql:
+    host: "mysql-tls.example.com"
+    port: 3306
+    database: "wandb_local"
+    user: "wandb_user"
+    passwordSecret:
+      name: "mysql-credentials"
+      passwordKey: "password"
+    
+    # Custom TLS configuration
+    tls:
+      enabled: true
+      mode: "required"
+      secret:
+        name: "mysql-tls-certs"
+        keys:
+          ca: "ca.pem"
+          cert: "client.pem"
+          key: "client-key.pem"
+
+# Enable essential services for testing
+app:
+  install: true
+  
+console:
+  install: true
+  
+weave:
+  install: true
+  
+parquet:
+  install: true
+
+# Enable API service to test TLS connections
+api:
+  install: true
+  enabled: true
+
+# Enable glue service for additional MySQL testing
+glue:
+  enabled: true
+
+# Enable MySQL with TLS support
+mysql:
+  install: true
+  auth:
+    rootPassword: "root-password"
+    password: "mysql-password"
+    database: "wandb_local"
+    username: "wandb_user"
+  
+  # MySQL TLS configuration
+  tls:
+    enabled: true
+    certificatesSecret: "mysql-server-certs"
+    certFilename: "tls.crt"
+    certKeyFilename: "tls.key"
+    certCAFilename: "ca.crt"
+  
+  # Additional MySQL configuration for TLS
+  primary:
+    configuration: |-
+      [mysqld]
+      ssl-ca=/opt/bitnami/mysql/certs/ca.crt
+      ssl-cert=/opt/bitnami/mysql/certs/tls.crt
+      ssl-key=/opt/bitnami/mysql/certs/tls.key
+      require_secure_transport=ON
+      bind-address=0.0.0.0
+      default-authentication-plugin=mysql_native_password
+      skip-name-resolve
+      explicit_defaults_for_timestamp
+      basedir=/opt/bitnami/mysql
+      plugin_dir=/opt/bitnami/mysql/plugin
+      port=3306
+      socket=/opt/bitnami/mysql/tmp/mysql.sock
+      datadir=/bitnami/mysql/data
+      tmpdir=/opt/bitnami/mysql/tmp
+      max_allowed_packet=16M
+      bind-address=0.0.0.0
+      pid-file=/opt/bitnami/mysql/tmp/mysqld.pid
+      log-error=/opt/bitnami/mysql/logs/mysqld.log
+      character-set-server=UTF8
+      collation-server=utf8_general_ci
+      slow_query_log=0
+      long_query_time=10.0
+
+# Redis configuration (required for W&B)
+redis:
+  install: true
+  auth:
+    enabled: true
+    password: "redis-password"
+
+# Disable services not needed for TLS testing
+kafka:
+  install: false
+
+prometheus:
+  install: false
+
+otel:
+  install: false
+
+clickhouse:
+  install: false

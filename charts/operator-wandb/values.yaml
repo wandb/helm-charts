@@ -80,6 +80,25 @@ global:
       name: ""
       rootPasswordKey: "MYSQL_ROOT_PASSWORD"
       passwordKey: "MYSQL_PASSWORD"
+    # TLS configuration for MySQL connections
+    # Supports custom CA certificates and full client certificate authentication
+    tls:
+      # Enable TLS (default: false, uses 'preferred' mode)
+      enabled: false
+      # TLS mode: 'required', 'preferred', 'disabled', 'verify-ca', 'verify-identity'
+      mode: "preferred"
+      # Custom TLS secret containing certificates
+      secret:
+        # Name of the secret containing TLS certificates
+        name: ""
+        # Key names in the secret (customize based on your secret structure)
+        keys:
+          # Custom CA certificate key name
+          ca: "ca.crt"
+          # Client certificate key name (optional)
+          cert: "tls.crt"
+          # Client private key name (optional)
+          key: "tls.key"
 
   slack:
     secret: ""
@@ -818,11 +837,9 @@ glue:
               name: '{{ include "wandb.mysql.passwordSecret" . }}'
               key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
       command:
-        [
-          "bash",
-          "-c",
-          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
-        ]
+        - "bash"
+        - "-c"
+        - '{{ include "wandb.waitForMySQL" . }}'
     migrate-db:
       env:
         MYSQL_HOST:
@@ -1049,11 +1066,9 @@ api:
               name: '{{ include "wandb.mysql.passwordSecret" . }}'
               key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
       command:
-        [
-          "bash",
-          "-c",
-          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
-        ]
+        - "bash"
+        - "-c"
+        - '{{ include "wandb.waitForMySQL" . }}'
     migrate-db:
       env:
         MYSQL_HOST:
