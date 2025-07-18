@@ -78,6 +78,19 @@ spec:
       app.kubernetes.io/name: etcd
       app.kubernetes.io/component: etcd
 ---
+# Source: operator-wandb/charts/anaconda2/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-anaconda2
+  labels:
+    helm.sh/chart: anaconda2-0.7.2
+    app.kubernetes.io/name: anaconda2
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.71.0-anaconda2.0"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
 # Source: operator-wandb/charts/api/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -1230,7 +1243,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-ca-certs
   labels:
-    helm.sh/chart: operator-wandb-0.32.4
+    helm.sh/chart: operator-wandb-0.32.5
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1760,6 +1773,28 @@ subjects:
 - kind: ServiceAccount
   name: chartsnap-reloader
   namespace: default
+---
+# Source: operator-wandb/charts/anaconda2/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-anaconda2
+  labels:
+    helm.sh/chart: anaconda2-0.7.2
+    app.kubernetes.io/name: anaconda2
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.71.0-anaconda2.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8082
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/name: anaconda2
+    app.kubernetes.io/instance: chartsnap
 ---
 # Source: operator-wandb/charts/api/templates/service.yaml
 apiVersion: v1
@@ -2355,6 +2390,94 @@ spec:
         hostPath:
           path: /var/lib/docker/containers
       hostNetwork: false
+---
+# Source: operator-wandb/charts/anaconda2/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-anaconda2
+  labels:
+    helm.sh/chart: anaconda2-0.7.2
+    app.kubernetes.io/name: anaconda2
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.71.0-anaconda2.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anaconda2
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: anaconda2-0.7.2
+        app.kubernetes.io/name: anaconda2
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "0.71.0-anaconda2.0"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      serviceAccountName: chartsnap-anaconda2
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: anaconda2
+        envFrom:
+        env:
+        - name: ANACONDA2_DISABLE_FILE_LOGGING
+          value: "true"
+        - name: DD_AGENT_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: DD_SERVICE
+          value: anaconda2
+        - name: DD_TRACE_AGENT_HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: PORT
+          value: "80"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "wandb/anaconda2:0.71.0-anaconda2.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /ping
+            port: http
+          timeoutSeconds: 2
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /ping
+            port: http
+          timeoutSeconds: 2
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 128Mi
 ---
 # Source: operator-wandb/charts/api/templates/deployment.yaml
 apiVersion: apps/v1
@@ -3105,7 +3228,7 @@ spec:
         - name: GORILLA_SETTINGS_CACHE
           value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
         - name: GORILLA_SWEEP_PROVIDER
-          value: 'http://chartsnap-app:8082'
+          value: "http://chartsnap-app:8082"
         - name: GORILLA_METADATA_CACHE
           value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
         - name: GORILLA_AUDITOR_CACHE
@@ -3493,8 +3616,8 @@ spec:
             cpu: "2"
             memory: 4Gi
           requests:
-            cpu: "1"
-            memory: 1Gi
+            cpu: 100m
+            memory: 128Mi
         volumeMounts:
         - mountPath: /usr/local/share/ca-certificates/inline
           name: wandb-ca-certs
@@ -5201,7 +5324,7 @@ kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-connection"
   labels:
-    helm.sh/chart: operator-wandb-0.32.4
+    helm.sh/chart: operator-wandb-0.32.5
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
