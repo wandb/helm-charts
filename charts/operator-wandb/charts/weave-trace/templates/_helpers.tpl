@@ -34,7 +34,7 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 {{- end }}
 
 {{/*
-Create a default fully qualified name for the weave-trace migration. (Should be something like wandb-weave-trace-migrate)
+Create a default fully qualified name for the weave-worker deployment. (Should be something like wandb-weave-trace-worker)
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 */}}
 {{- define "weaveWorker.fullname" -}}
