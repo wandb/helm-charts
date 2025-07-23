@@ -32,6 +32,9 @@ spec:
   nodeSelector:
     {{- tpl (toYaml . | nindent 4) $.root }}
   {{- end }}
+  {{- if .podData.restartPolicy }}
+  restartPolicy: {{ .podData.restartPolicy }}
+  {{- end }}
   serviceAccountName: {{ include "wandb-base.serviceAccountName" $.root }}
   securityContext:
    {{- tpl (toYaml .podData.podSecurityContext | nindent 4) $.root }}
