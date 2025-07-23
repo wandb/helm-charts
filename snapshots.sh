@@ -1,6 +1,10 @@
 #!/usr/bin/env bash 
 set -euo pipefail
 
+# helm plugin install https://github.com/origranot/helm-cascade
+# helm plugin install https://github.com/jlandowner/helm-chartsnap
+# helm cascade build ./charts/operator-wandb/
+
 function main() {
   local chart="operator-wandb"
   local values_dir="test-configs"
