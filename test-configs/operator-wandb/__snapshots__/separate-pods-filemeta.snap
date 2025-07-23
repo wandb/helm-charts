@@ -3556,57 +3556,91 @@ spec:
         - configMapRef:
             name: chartsnap-redis-configmap
         env:
+        - name: G_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: 'ACCESS_KEY'
-              name: 'chartsnap-bucket'
+              name: "chartsnap-bucket"
+              key: "ACCESS_KEY"
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: 'ACCESS_KEY'
-              name: 'chartsnap-bucket'
+              name: "chartsnap-bucket"
+              key: "ACCESS_KEY"
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: 'SECRET_KEY'
-              name: 'chartsnap-bucket'
+              name: "chartsnap-bucket"
+              key: "SECRET_KEY"
               optional: true
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_FILE_METADATA_SOURCE
-          value: 'redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL
-          value: "true"
+        - name: BUCKET
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
         - name: GORILLA_FILE_STORE
-          value: 's3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)'
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_METADATA_STORE
-          value: 'mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
-        - name: GORILLA_ONPREM
-          value: "true"
-        - name: GORILLA_SETTINGS_CACHE
-          value: 'redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
         - name: GORILLA_STORAGE_BUCKET
-          value: 's3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)'
-        - name: GORILLA_TASK_QUEUE
-          value: 'noop://'
-        - name: GORILLA_TRACER
-          value: 'otlp+grpc://chartsnap-otel-daemonset:4317?trace_ratio=0'
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: 'MYSQL_PASSWORD'
-              name: 'chartsnap-mysql'
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
+        - name: MYSQL
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_ANALYTICS_SINK
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_METADATA_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_RUN_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_USAGE_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: 'REDIS_PASSWORD'
-              name: 'chartsnap-redis-secret'
+              name: "chartsnap-redis-secret"
+              key: "REDIS_PASSWORD"
               optional: true
+        - name: REDIS
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_AUDITOR_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_FILE_METADATA_SOURCE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_LOCKER
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_METADATA_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_SETTINGS_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_TASK_QUEUE
+          value: "noop://"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
