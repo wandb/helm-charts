@@ -2741,302 +2741,6 @@ spec:
         app.kubernetes.io/version: "latest"
         app.kubernetes.io/managed-by: Helm
     spec:
-      serviceAccountName: chartsnap-api
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      initContainers:
-      - name: init-db
-        command:
-        - bash
-        - -c
-        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
-        envFrom:
-        - configMapRef:
-            name: chartsnap-api-configmap
-        - secretRef:
-            name: chartsnap-api-secret
-        - configMapRef:
-            name: chartsnap-bucket-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - secretRef:
-            name: chartsnap-gorilla-session-key
-        - configMapRef:
-            name: chartsnap-kafka-configmap
-        - configMapRef:
-            name: chartsnap-mysql-configmap
-        - configMapRef:
-            name: chartsnap-redis-configmap
-        env:
-        - name: G_HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        - name: GOMEMLIMIT
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.memory
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: AZURE_STORAGE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "SECRET_KEY"
-              optional: true
-        - name: BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_FILE_STORE
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_STORAGE_BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-mysql"
-              key: "MYSQL_PASSWORD"
-        - name: MYSQL
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_ANALYTICS_SINK
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_METADATA_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_USAGE_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-redis-secret"
-              key: "REDIS_PASSWORD"
-              optional: true
-        - name: REDIS
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_AUDITOR_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_FILE_METADATA_SOURCE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_LOCKER
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_METADATA_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_SETTINGS_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_TASK_QUEUE
-          value: "noop://"
-        - name: KAFKA_CLIENT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-kafka"
-              key: "KAFKA_CLIENT_PASSWORD"
-              optional: true
-        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
-          value: "kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
-        - name: GORILLA_HISTORY_STORE
-          value: "http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
-          value: ""
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
-        imagePullPolicy:
-      - name: migrate-db
-        command:
-        - bash
-        - -c
-        - ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true
-        envFrom:
-        - configMapRef:
-            name: chartsnap-api-configmap
-        - secretRef:
-            name: chartsnap-api-secret
-        - configMapRef:
-            name: chartsnap-bucket-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - secretRef:
-            name: chartsnap-gorilla-session-key
-        - configMapRef:
-            name: chartsnap-kafka-configmap
-        - configMapRef:
-            name: chartsnap-mysql-configmap
-        - configMapRef:
-            name: chartsnap-redis-configmap
-        env:
-        - name: G_HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        - name: GOMEMLIMIT
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.memory
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: AZURE_STORAGE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "SECRET_KEY"
-              optional: true
-        - name: BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_FILE_STORE
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_STORAGE_BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-mysql"
-              key: "MYSQL_PASSWORD"
-        - name: MYSQL
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_ANALYTICS_SINK
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_METADATA_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_USAGE_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-redis-secret"
-              key: "REDIS_PASSWORD"
-              optional: true
-        - name: REDIS
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_AUDITOR_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_FILE_METADATA_SOURCE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_LOCKER
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_METADATA_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_SETTINGS_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_TASK_QUEUE
-          value: "noop://"
-        - name: KAFKA_CLIENT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-kafka"
-              key: "KAFKA_CLIENT_PASSWORD"
-              optional: true
-        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
-          value: "kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
-        - name: GORILLA_HISTORY_STORE
-          value: "http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
-          value: ""
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
-        imagePullPolicy: IfNotPresent
       containers:
       - name: api
         args:
@@ -3211,21 +2915,302 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
-      volumes:
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
+      initContainers:
+      - name: init-db
+        command:
+        - bash
+        - -c
+        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
+        envFrom:
+        - configMapRef:
+            name: chartsnap-api-configmap
+        - secretRef:
+            name: chartsnap-api-secret
+        - configMapRef:
+            name: chartsnap-bucket-configmap
+        - secretRef:
+            name: chartsnap-global-secret
+        - secretRef:
+            name: chartsnap-gorilla-session-key
+        - configMapRef:
+            name: chartsnap-kafka-configmap
+        - configMapRef:
+            name: chartsnap-mysql-configmap
+        - configMapRef:
+            name: chartsnap-redis-configmap
+        env:
+        - name: G_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: AZURE_STORAGE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "ACCESS_KEY"
+              optional: true
+        - name: BUCKET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "ACCESS_KEY"
+              optional: true
+        - name: BUCKET_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "SECRET_KEY"
+              optional: true
+        - name: BUCKET
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_FILE_STORE
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_STORAGE_BUCKET
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
+        - name: MYSQL
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_ANALYTICS_SINK
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_METADATA_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_RUN_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_USAGE_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-redis-secret"
+              key: "REDIS_PASSWORD"
+              optional: true
+        - name: REDIS
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_AUDITOR_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_FILE_METADATA_SOURCE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_LOCKER
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_METADATA_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_SETTINGS_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_TASK_QUEUE
+          value: "noop://"
+        - name: KAFKA_CLIENT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-kafka"
+              key: "KAFKA_CLIENT_PASSWORD"
+              optional: true
+        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
+          value: "kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+        - name: GORILLA_HISTORY_STORE
+          value: "http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
+          value: ""
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
+          value: "false"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "wandb/local:latest"
+        imagePullPolicy:
+      - name: migrate-db
+        command:
+        - bash
+        - -c
+        - ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true
+        envFrom:
+        - configMapRef:
+            name: chartsnap-api-configmap
+        - secretRef:
+            name: chartsnap-api-secret
+        - configMapRef:
+            name: chartsnap-bucket-configmap
+        - secretRef:
+            name: chartsnap-global-secret
+        - secretRef:
+            name: chartsnap-gorilla-session-key
+        - configMapRef:
+            name: chartsnap-kafka-configmap
+        - configMapRef:
+            name: chartsnap-mysql-configmap
+        - configMapRef:
+            name: chartsnap-redis-configmap
+        env:
+        - name: G_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: AZURE_STORAGE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "ACCESS_KEY"
+              optional: true
+        - name: BUCKET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "ACCESS_KEY"
+              optional: true
+        - name: BUCKET_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "SECRET_KEY"
+              optional: true
+        - name: BUCKET
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_FILE_STORE
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_STORAGE_BUCKET
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
+        - name: MYSQL
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_ANALYTICS_SINK
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_METADATA_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_RUN_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_USAGE_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-redis-secret"
+              key: "REDIS_PASSWORD"
+              optional: true
+        - name: REDIS
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_AUDITOR_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_FILE_METADATA_SOURCE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_LOCKER
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_METADATA_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_SETTINGS_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_TASK_QUEUE
+          value: "noop://"
+        - name: KAFKA_CLIENT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-kafka"
+              key: "KAFKA_CLIENT_PASSWORD"
+              optional: true
+        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
+          value: "kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+        - name: GORILLA_HISTORY_STORE
+          value: "http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
+          value: ""
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
+          value: "false"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "wandb/megabinary:latest"
+        imagePullPolicy: IfNotPresent
+      serviceAccountName: chartsnap-api
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -3241,6 +3226,21 @@ spec:
         maxSkew: 1
         topologyKey: hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/app/templates/deployment.yaml
 apiVersion: apps/v1
@@ -3272,346 +3272,6 @@ spec:
         app.kubernetes.io/version: "latest"
         app.kubernetes.io/managed-by: Helm
     spec:
-      serviceAccountName: chartsnap-app
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      initContainers:
-      - name: init-db
-        command:
-        - bash
-        - -c
-        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
-        envFrom:
-        - configMapRef:
-            name: chartsnap-api-configmap
-        - secretRef:
-            name: chartsnap-api-secret
-        - configMapRef:
-            name: chartsnap-app-configmap
-        - secretRef:
-            name: chartsnap-app-secret
-        - configMapRef:
-            name: chartsnap-bucket-configmap
-        - configMapRef:
-            name: chartsnap-frontend-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-glue-configmap
-        - secretRef:
-            name: chartsnap-glue-secret
-        - secretRef:
-            name: chartsnap-gorilla-session-key
-        - configMapRef:
-            name: chartsnap-kafka-configmap
-        - configMapRef:
-            name: chartsnap-mysql-configmap
-        - configMapRef:
-            name: chartsnap-redis-configmap
-        env:
-        - name: G_HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        - name: GOMEMLIMIT
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.memory
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: AZURE_STORAGE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "SECRET_KEY"
-              optional: true
-        - name: BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_FILE_STORE
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_STORAGE_BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-mysql"
-              key: "MYSQL_PASSWORD"
-        - name: MYSQL
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_ANALYTICS_SINK
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_METADATA_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_USAGE_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-redis-secret"
-              key: "REDIS_PASSWORD"
-              optional: true
-        - name: REDIS
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_AUDITOR_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_FILE_METADATA_SOURCE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_LOCKER
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_METADATA_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_SETTINGS_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_TASK_QUEUE
-          value: "noop://"
-        - name: KAFKA_CLIENT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-kafka"
-              key: "KAFKA_CLIENT_PASSWORD"
-              optional: true
-        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
-          value: "kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
-        - name: GORILLA_HISTORY_STORE
-          value: "http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
-          value: ""
-        - name: BUCKET_QUEUE
-          value: "internal://"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE
-          value: "/usr/local/bin/view-spec-updater-linux"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_LICENSE_CERT_PATH
-          value: "/var/app/jwks.json"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: GORILLA_STORAGE_BUCKET
-          value: "s3://local-files"
-        - name: GORILLA_TASK_CONFIG_PATH
-          value: "/etc/service/gorilla-glue/glue_tasks_local.yaml"
-        - name: GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE
-          value: "/usr/local/bin/view-spec-updater-linux"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
-        imagePullPolicy:
-      - name: migrate-db
-        command:
-        - bash
-        - -c
-        - ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true
-        envFrom:
-        - configMapRef:
-            name: chartsnap-api-configmap
-        - secretRef:
-            name: chartsnap-api-secret
-        - configMapRef:
-            name: chartsnap-app-configmap
-        - secretRef:
-            name: chartsnap-app-secret
-        - configMapRef:
-            name: chartsnap-bucket-configmap
-        - configMapRef:
-            name: chartsnap-frontend-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-glue-configmap
-        - secretRef:
-            name: chartsnap-glue-secret
-        - secretRef:
-            name: chartsnap-gorilla-session-key
-        - configMapRef:
-            name: chartsnap-kafka-configmap
-        - configMapRef:
-            name: chartsnap-mysql-configmap
-        - configMapRef:
-            name: chartsnap-redis-configmap
-        env:
-        - name: G_HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        - name: GOMEMLIMIT
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.memory
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: AZURE_STORAGE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "SECRET_KEY"
-              optional: true
-        - name: BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_FILE_STORE
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_STORAGE_BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-mysql"
-              key: "MYSQL_PASSWORD"
-        - name: MYSQL
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_ANALYTICS_SINK
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_METADATA_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_USAGE_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-redis-secret"
-              key: "REDIS_PASSWORD"
-              optional: true
-        - name: REDIS
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_AUDITOR_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_FILE_METADATA_SOURCE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_LOCKER
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_METADATA_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_SETTINGS_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_TASK_QUEUE
-          value: "noop://"
-        - name: KAFKA_CLIENT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-kafka"
-              key: "KAFKA_CLIENT_PASSWORD"
-              optional: true
-        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
-          value: "kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
-        - name: GORILLA_HISTORY_STORE
-          value: "http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
-          value: ""
-        - name: BUCKET_QUEUE
-          value: "internal://"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE
-          value: "/usr/local/bin/view-spec-updater-linux"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_LICENSE_CERT_PATH
-          value: "/var/app/jwks.json"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: GORILLA_STORAGE_BUCKET
-          value: "s3://local-files"
-        - name: GORILLA_TASK_CONFIG_PATH
-          value: "/etc/service/gorilla-glue/glue_tasks_local.yaml"
-        - name: GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE
-          value: "/usr/local/bin/view-spec-updater-linux"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
-        imagePullPolicy: IfNotPresent
       containers:
       - name: app
         envFrom:
@@ -3825,21 +3485,181 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
-      volumes:
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
+      initContainers:
+      - name: init-db
+        command:
+        - bash
+        - -c
+        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
+        envFrom:
+        - configMapRef:
+            name: chartsnap-api-configmap
+        - secretRef:
+            name: chartsnap-api-secret
+        - configMapRef:
+            name: chartsnap-app-configmap
+        - secretRef:
+            name: chartsnap-app-secret
+        - configMapRef:
+            name: chartsnap-bucket-configmap
+        - configMapRef:
+            name: chartsnap-frontend-configmap
+        - secretRef:
+            name: chartsnap-global-secret
+        - configMapRef:
+            name: chartsnap-glue-configmap
+        - secretRef:
+            name: chartsnap-glue-secret
+        - secretRef:
+            name: chartsnap-gorilla-session-key
+        - configMapRef:
+            name: chartsnap-kafka-configmap
+        - configMapRef:
+            name: chartsnap-mysql-configmap
+        - configMapRef:
+            name: chartsnap-redis-configmap
+        env:
+        - name: G_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: AZURE_STORAGE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "ACCESS_KEY"
+              optional: true
+        - name: BUCKET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "ACCESS_KEY"
+              optional: true
+        - name: BUCKET_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "SECRET_KEY"
+              optional: true
+        - name: BUCKET
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_FILE_STORE
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_STORAGE_BUCKET
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
+        - name: MYSQL
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_ANALYTICS_SINK
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_METADATA_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_RUN_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_USAGE_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-redis-secret"
+              key: "REDIS_PASSWORD"
+              optional: true
+        - name: REDIS
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_AUDITOR_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_FILE_METADATA_SOURCE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_LOCKER
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_METADATA_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_SETTINGS_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_TASK_QUEUE
+          value: "noop://"
+        - name: KAFKA_CLIENT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-kafka"
+              key: "KAFKA_CLIENT_PASSWORD"
+              optional: true
+        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
+          value: "kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+        - name: GORILLA_HISTORY_STORE
+          value: "http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
+          value: ""
+        - name: BUCKET_QUEUE
+          value: "internal://"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE
+          value: "/usr/local/bin/view-spec-updater-linux"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        - name: GORILLA_LICENSE_CERT_PATH
+          value: "/var/app/jwks.json"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
+          value: "false"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
+          value: "true"
+        - name: GORILLA_STORAGE_BUCKET
+          value: "s3://local-files"
+        - name: GORILLA_TASK_CONFIG_PATH
+          value: "/etc/service/gorilla-glue/glue_tasks_local.yaml"
+        - name: GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE
+          value: "/usr/local/bin/view-spec-updater-linux"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "wandb/local:latest"
+        imagePullPolicy:
+      serviceAccountName: chartsnap-app
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -3855,6 +3675,21 @@ spec:
         maxSkew: 1
         topologyKey: hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/console/templates/deployment.yaml
 apiVersion: apps/v1
@@ -3885,15 +3720,6 @@ spec:
         app.kubernetes.io/version: "latest"
         app.kubernetes.io/managed-by: Helm
     spec:
-      serviceAccountName: chartsnap-console
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - name: console
         envFrom:
@@ -3948,6 +3774,15 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
+      serviceAccountName: chartsnap-console
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -3994,16 +3829,6 @@ spec:
         app.kubernetes.io/version: "latest"
         app.kubernetes.io/managed-by: Helm
     spec:
-      serviceAccountName: chartsnap-flat-run-fields-updater
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
       containers:
       - name: flat-run-fields-updater
         args:
@@ -4161,21 +3986,16 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
-      volumes:
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
+      serviceAccountName: chartsnap-flat-run-fields-updater
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -4191,6 +4011,21 @@ spec:
         maxSkew: 1
         topologyKey: hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/glue/templates/deployment.yaml
 apiVersion: apps/v1
@@ -4222,15 +4057,171 @@ spec:
         app.kubernetes.io/version: "latest"
         app.kubernetes.io/managed-by: Helm
     spec:
-      serviceAccountName: chartsnap-glue
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
+      containers:
+      - name: glue
+        args:
+        - glue
+        envFrom:
+        - configMapRef:
+            name: chartsnap-bucket-configmap
+        - secretRef:
+            name: chartsnap-global-secret
+        - configMapRef:
+            name: chartsnap-glue-configmap
+        - secretRef:
+            name: chartsnap-glue-secret
+        - configMapRef:
+            name: chartsnap-kafka-configmap
+        - configMapRef:
+            name: chartsnap-mysql-configmap
+        - configMapRef:
+            name: chartsnap-redis-configmap
+        env:
+        - name: G_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: AZURE_STORAGE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "ACCESS_KEY"
+              optional: true
+        - name: BUCKET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "ACCESS_KEY"
+              optional: true
+        - name: BUCKET_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-bucket"
+              key: "SECRET_KEY"
+              optional: true
+        - name: BUCKET
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_FILE_STORE
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: GORILLA_STORAGE_BUCKET
+          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
+        - name: MYSQL
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_ANALYTICS_SINK
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_METADATA_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_RUN_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_USAGE_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-redis-secret"
+              key: "REDIS_PASSWORD"
+              optional: true
+        - name: REDIS
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_AUDITOR_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_FILE_METADATA_SOURCE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_LOCKER
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_METADATA_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_SETTINGS_CACHE
+          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_TASK_QUEUE
+          value: "noop://"
+        - name: KAFKA_CLIENT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-kafka"
+              key: "KAFKA_CLIENT_PASSWORD"
+              optional: true
+        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
+          value: "kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+        - name: GORILLA_HISTORY_STORE
+          value: "http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
+        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
+          value: ""
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
+          value: "false"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "wandb/megabinary:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 1
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       initContainers:
       - name: init-db
         command:
@@ -4514,186 +4505,15 @@ spec:
           readOnlyRootFilesystem: false
         image: "wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
-      containers:
-      - name: glue
-        args:
-        - glue
-        envFrom:
-        - configMapRef:
-            name: chartsnap-bucket-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-glue-configmap
-        - secretRef:
-            name: chartsnap-glue-secret
-        - configMapRef:
-            name: chartsnap-kafka-configmap
-        - configMapRef:
-            name: chartsnap-mysql-configmap
-        - configMapRef:
-            name: chartsnap-redis-configmap
-        env:
-        - name: G_HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        - name: GOMEMLIMIT
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.memory
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: AZURE_STORAGE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "SECRET_KEY"
-              optional: true
-        - name: BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_FILE_STORE
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: GORILLA_STORAGE_BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-mysql"
-              key: "MYSQL_PASSWORD"
-        - name: MYSQL
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_ANALYTICS_SINK
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_METADATA_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_USAGE_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-redis-secret"
-              key: "REDIS_PASSWORD"
-              optional: true
-        - name: REDIS
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_AUDITOR_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_FILE_METADATA_SOURCE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_LOCKER
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_METADATA_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_SETTINGS_CACHE
-          value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: GORILLA_TASK_QUEUE
-          value: "noop://"
-        - name: KAFKA_CLIENT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-kafka"
-              key: "KAFKA_CLIENT_PASSWORD"
-              optional: true
-        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
-          value: "kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
-        - name: GORILLA_HISTORY_STORE
-          value: "http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
-          value: ""
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8080
-          name: http
-          protocol: TCP
-        livenessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /healthz
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 1
-          successThreshold: 1
-          timeoutSeconds: 1
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-        volumeMounts:
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
-      volumes:
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
+      serviceAccountName: chartsnap-glue
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -4709,6 +4529,21 @@ spec:
         maxSkew: 1
         topologyKey: hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/parquet/templates/deployment.yaml
 apiVersion: apps/v1
@@ -4740,15 +4575,6 @@ spec:
         app.kubernetes.io/version: "latest"
         app.kubernetes.io/managed-by: Helm
     spec:
-      serviceAccountName: chartsnap-parquet
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - name: parquet
         args:
@@ -4901,21 +4727,15 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
-      volumes:
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
+      serviceAccountName: chartsnap-parquet
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -4931,6 +4751,21 @@ spec:
         maxSkew: 1
         topologyKey: hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/prometheus/charts/instance/templates/deploy.yaml
 apiVersion: apps/v1
@@ -5154,15 +4989,6 @@ spec:
         app.kubernetes.io/version: "latest"
         app.kubernetes.io/managed-by: Helm
     spec:
-      serviceAccountName: chartsnap-weave
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - name: weave
         envFrom:
@@ -5264,11 +5090,15 @@ spec:
         volumeMounts:
         - mountPath: /vol/weave/cache
           name: cache
-      volumes:
-      - emptyDir:
-          medium: ''
-          sizeLimit: '20Gi'
-        name: cache
+      serviceAccountName: chartsnap-weave
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -5284,6 +5114,11 @@ spec:
         maxSkew: 1
         topologyKey: hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - emptyDir:
+          medium: ''
+          sizeLimit: '20Gi'
+        name: cache
 ---
 # Source: operator-wandb/charts/flat-run-fields-updater/templates/hpa.yaml
 apiVersion: autoscaling/v2

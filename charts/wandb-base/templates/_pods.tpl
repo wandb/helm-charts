@@ -49,8 +49,8 @@ spec:
     {{- range .podData.volumesTpls }}
     {{- tpl . $.root | nindent 4 }}
     {{- end }}
-    {{- if .root.Values.volumes }}
-    {{- tpl (toYaml .root.Values.volumes | nindent 4) . }}
+    {{- if $.root.Values.volumes }}
+    {{- tpl (toYaml $.root.Values.volumes | nindent 4) $.root }}
     {{- end }}
   {{- end }}
 {{ end }}
