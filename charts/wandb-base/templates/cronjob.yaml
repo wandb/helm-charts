@@ -10,47 +10,6 @@ spec:
   jobTemplate:
     spec:
       template:
-        metadata:
-          {{- with $cronJob.podAnnotations }}
-          annotations:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          labels:
-            {{- include "wandb-base.labels" $ | nindent 12 }}
-            {{- with $cronJob.podLabels }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
-        spec:
-          {{- with uniq (compact (concat $.Values.imagePullSecrets $.Values.global.imagePullSecrets)) }}
-          imagePullSecrets:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          serviceAccountName: {{ include "wandb-base.serviceAccountName" $ }}
-          securityContext:
-            {{- toYaml $.Values.podSecurityContext | nindent 12 }}
-          {{- if $cronJob.initContainers }}
-          initContainers:
-            {{- include "wandb-base.containers" (dict "containers" $cronJob.initContainers "root" $) | nindent 12 }}
-          {{- end }}
-          containers:
-            {{- include "wandb-base.containers" (dict "containers" $cronJob.containers "root" $) | nindent 12 }}
-          restartPolicy: Never
-    {{/*  TODO: enable this as needed
-          volumes:
-            {{- tpl (toYaml . | nindent 12) $ }}
-          {{- end }}
-          {{- with .Values.nodeSelector }}
-          nodeSelector:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .Values.affinity }}
-          affinity:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- with .Values.tolerations }}
-          tolerations:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-    */}}
+        {{- include "wandb-base.pod" (dict "podData" $cronJob "root" $) | nindent 4 }}
 ---
 {{- end }}

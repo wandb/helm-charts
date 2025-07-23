@@ -17,47 +17,6 @@ spec:
   backoffLimit: {{ . }}
   {{- end }}
   template:
-    metadata:
-      {{- with $job.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      labels:
-        {{- include "wandb-base.labels" $ | nindent 8 }}
-        {{- with $job.podLabels }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
-    spec:
-      {{- with uniq (compact (concat $.Values.imagePullSecrets $.Values.global.imagePullSecrets)) }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "wandb-base.serviceAccountName" $ }}
-      securityContext:
-        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
-      {{- if $job.initContainers }}
-      initContainers:
-        {{- include "wandb-base.containers" (dict "containers" $job.initContainers "root" $) | nindent 8 }}
-      {{- end }}
-      containers:
-        {{- include "wandb-base.containers" (dict "containers" $job.containers "root" $) | nindent 8 }}
-      restartPolicy: Never
-{{/*  TODO: enable this as needed
-      volumes:
-        {{- tpl (toYaml . | nindent 8) $ }}
-      {{- end }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-*/}}
+    {{- include "wandb-base.pod" (dict "podData" $job "root" $) | nindent 4 }}
 ---
 {{- end }}

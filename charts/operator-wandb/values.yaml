@@ -21,7 +21,7 @@ global:
   # Example:
   # imagePullSecrets: &imagePullSecrets
   #   - my-registry-secret
-  imagePullSecrets: &imagePullSecrets []
+  imagePullSecrets: &imagePullSecrets
 
   cloudProvider: ""
 
@@ -435,7 +435,15 @@ app:
         name: local
   initContainers:
     init-db:
-      command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
+      image:
+        repository: wandb/local
+        tag: latest
+      command:
+        [
+          "bash",
+          "-c",
+          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+        ]
   containers:
     app:
       ports:
@@ -1304,18 +1312,6 @@ glue:
       image:
         repository: wandb/local
         tag: latest
-      env:
-        MYSQL_HOST:
-          value: '{{ include "wandb.mysql.host" . }}'
-        MYSQL_DATABASE:
-          value: '{{ include "wandb.mysql.database" . }}'
-        MYSQL_USER:
-          value: '{{ include "wandb.mysql.user" . }}'
-        MYSQL_PASSWORD:
-          valueFrom:
-            secretKeyRef:
-              name: '{{ include "wandb.mysql.passwordSecret" . }}'
-              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
       command:
         [
           "bash",
@@ -1323,18 +1319,6 @@ glue:
           'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
         ]
     migrate-db:
-      env:
-        MYSQL_HOST:
-          value: '{{ include "wandb.mysql.host" . }}'
-        MYSQL_DATABASE:
-          value: '{{ include "wandb.mysql.database" . }}'
-        MYSQL_USER:
-          value: '{{ include "wandb.mysql.user" . }}'
-        MYSQL_PASSWORD:
-          valueFrom:
-            secretKeyRef:
-              name: '{{ include "wandb.mysql.passwordSecret" . }}'
-              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
       command:
         [
           "bash",
@@ -1452,18 +1436,6 @@ api:
       image:
         repository: wandb/local
         tag: latest
-      env:
-        MYSQL_HOST:
-          value: '{{ include "wandb.mysql.host" . }}'
-        MYSQL_DATABASE:
-          value: '{{ include "wandb.mysql.database" . }}'
-        MYSQL_USER:
-          value: '{{ include "wandb.mysql.user" . }}'
-        MYSQL_PASSWORD:
-          valueFrom:
-            secretKeyRef:
-              name: '{{ include "wandb.mysql.passwordSecret" . }}'
-              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
       command:
         [
           "bash",
@@ -1471,18 +1443,6 @@ api:
           'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
         ]
     migrate-db:
-      env:
-        MYSQL_HOST:
-          value: '{{ include "wandb.mysql.host" . }}'
-        MYSQL_DATABASE:
-          value: '{{ include "wandb.mysql.database" . }}'
-        MYSQL_USER:
-          value: '{{ include "wandb.mysql.user" . }}'
-        MYSQL_PASSWORD:
-          valueFrom:
-            secretKeyRef:
-              name: '{{ include "wandb.mysql.passwordSecret" . }}'
-              key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
       command:
         [
           "bash",

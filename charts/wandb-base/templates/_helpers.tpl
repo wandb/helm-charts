@@ -107,3 +107,11 @@ reloader.stakater.com/auto: "true"
 
 {{- toYaml $mergedSize }}
 {{- end }}
+
+{{- define "wandb-base.topologySpreadConstraints" }}
+{{- $topologyConstraints := default (deepCopy .Values.topologySpreadConstraints) list }}
+  {{- range $constraint := $topologyConstraints }}
+  {{- $_ := set $constraint "labelSelector" (dict "matchLabels" (include "wandb-base.selectorLabels" $ | fromYaml)) }}
+  {{- end }}
+{{- toYaml $topologyConstraints }}
+{{- end }}
