@@ -94,114 +94,155 @@ topologySpreadConstraints:
 initContainers: {}
 
 containers: {}
+# Example container configuration:
 #  nginx:
-#    command: []
-#    args: []
-#    env: {}
-#    envFrom: {}
-#    securityContext: {}
-#    image: {}
+#    command: ["nginx"]
+#    args: ["-g", "daemon off;"]
+#    env:
+#      NGINX_HOST: "example.com"
+#      NGINX_PORT: "80"
+#    envFrom:
+#      nginx-config: "configMapRef"
+#      nginx-secrets: "secretRef"
+#    securityContext:
+#      allowPrivilegeEscalation: false
+#      readOnlyRootFilesystem: true
+#    image:
+#      repository: nginx
+#      tag: "1.21.6"
+#      pullPolicy: IfNotPresent
 #    ports:
 #      - containerPort: 80
 #        name: http
+#      - containerPort: 443
+#        name: https
 #    livenessProbe:
 #      httpGet:
-#        path: /
+#        path: /healthz
 #        port: http
+#      initialDelaySeconds: 30
+#      periodSeconds: 10
+#      timeoutSeconds: 5
+#      successThreshold: 1
+#      failureThreshold: 3
 #    readinessProbe:
 #      httpGet:
-#        path: /
+#        path: /ready
 #        port: http
+#      initialDelaySeconds: 5
+#      periodSeconds: 10
+#      timeoutSeconds: 5
+#      successThreshold: 1
+#      failureThreshold: 3
 #    startupProbe:
 #      httpGet:
-#        path: /
+#        path: /startup
 #        port: http
-#    lifecycle: {}
+#      initialDelaySeconds: 10
+#      periodSeconds: 5
+#      timeoutSeconds: 5
+#      successThreshold: 1
+#      failureThreshold: 30
+#    lifecycle:
+#      preStop:
+#        exec:
+#          command: ["/usr/sbin/nginx", "-s", "quit"]
 #    resources:
 #      limits:
-#        cpu: 100m
-#        memory: 128Mi
+#        cpu: 200m
+#        memory: 256Mi
 #      requests:
 #        cpu: 100m
 #        memory: 128Mi
-#    volumeMounts: []
+#    volumeMounts:
+#      - name: nginx-config
+#        mountPath: /etc/nginx/conf.d
+#      - name: nginx-cache
+#        mountPath: /var/cache/nginx
 #    volumeMountsTpls: []
 
 jobs: {}
-#  example:
-#    ttlSecondsAfterFinished: 100
+# Example job configuration:
+#  database-migration:
+#    ttlSecondsAfterFinished: 3600
 #    annotations:
-#      "helm.sh/hook": post-install
+#      "helm.sh/hook": post-install,post-upgrade
+#      "helm.sh/hook-weight": "0"
+#      "helm.sh/hook-delete-policy": hook-succeeded
 #    containers:
-#      nginx:
-#        command: [ ]
-#        args: [ ]
-#        env: { }
-#        envFrom: { }
-#        securityContext: { }
-#        image: { }
-#        ports:
-#          - containerPort: 80
-#            name: http
-#        livenessProbe:
-#          httpGet:
-#            path: /
-#            port: http
-#        readinessProbe:
-#          httpGet:
-#            path: /
-#            port: http
-#        startupProbe:
-#          httpGet:
-#            path: /
-#            port: http
-#        lifecycle: { }
+#      migration:
+#        command: ["./migrate.sh"]
+#        args: ["--database", "$(DATABASE_NAME)", "--user", "$(DATABASE_USER)"]
+#        env:
+#          DATABASE_NAME: "example_db"
+#          DATABASE_USER: "db_user"
+#          LOG_LEVEL: "info"
+#        envFrom:
+#          db-credentials: "secretRef"
+#          app-config: "configMapRef"
+#        securityContext:
+#          allowPrivilegeEscalation: false
+#          readOnlyRootFilesystem: true
+#        image:
+#          repository: example/migration
+#          tag: "v1.2.3"
+#          pullPolicy: IfNotPresent
 #        resources:
 #          limits:
-#            cpu: 100m
-#            memory: 128Mi
+#            cpu: 500m
+#            memory: 512Mi
 #          requests:
-#            cpu: 100m
-#            memory: 128Mi
-#        volumeMounts: []
+#            cpu: 200m
+#            memory: 256Mi
+#        volumeMounts:
+#          - name: migration-scripts
+#            mountPath: /app/migrations
+#          - name: temp-data
+#            mountPath: /tmp
 #        volumeMountsTpls: []
 
 cronJobs: {}
-#  example:
-#    schedule: "*/5 * * * *"
-#    annotations: { }
+# Example cronjob configuration:
+#  cleanup-data:
+#    schedule: "0 2 * * *"  # Run at 2 AM every day
+#    concurrencyPolicy: "Forbid"
+#    failedJobsHistoryLimit: 3
+#    successfulJobsHistoryLimit: 5
+#    startingDeadlineSeconds: 300
+#    annotations:
+#      "app.kubernetes.io/part-of": "data-management"
+#      "monitoring.example.com/alert": "true"
 #    containers:
-#      nginx:
-#        command: [ ]
-#        args: [ ]
-#        env: { }
-#        envFrom: { }
-#        securityContext: { }
-#        image: { }
-#        ports:
-#          - containerPort: 80
-#            name: http
-#        livenessProbe:
-#          httpGet:
-#            path: /
-#            port: http
-#        readinessProbe:
-#          httpGet:
-#            path: /
-#            port: http
-#        startupProbe:
-#          httpGet:
-#            path: /
-#            port: http
-#        lifecycle: { }
+#      cleaner:
+#        command: ["/bin/sh"]
+#        args: ["-c", "/app/cleanup.sh --older-than 30d --dry-run=false"]
+#        env:
+#          MAX_DELETION_BATCH: "1000"
+#          BACKUP_ENABLED: "true"
+#          LOG_LEVEL: "info"
+#        envFrom:
+#          storage-credentials: "secretRef"
+#          app-config: "configMapRef"
+#        securityContext:
+#          allowPrivilegeEscalation: false
+#          readOnlyRootFilesystem: true
+#        image:
+#          repository: example/data-cleaner
+#          tag: "v2.1.0"
+#          pullPolicy: IfNotPresent
 #        resources:
 #          limits:
-#            cpu: 100m
-#            memory: 128Mi
+#            cpu: 500m
+#            memory: 512Mi
 #          requests:
-#            cpu: 100m
-#            memory: 128Mi
-#        volumeMounts: []
+#            cpu: 200m
+#            memory: 256Mi
+#        volumeMounts:
+#          - name: cleanup-scripts
+#            mountPath: /app
+#            readOnly: true
+#          - name: backup-data
+#            mountPath: /backups
 #        volumeMountsTpls: []
 
 # This is for setting up a service more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/
@@ -265,10 +306,30 @@ podDisruptionBudget:
 
 # Additional volumes on the output Deployment definition.
 volumes: []
-# - name: foo
-#   secret:
-#     secretName: mysecret
+# Example volume configurations:
+# - name: config-volume
+#   configMap:
+#     name: app-config
 #     optional: false
+#     items:
+#       - key: config.json
+#         path: config/config.json
+# - name: secret-volume
+#   secret:
+#     secretName: app-secrets
+#     optional: false
+#     defaultMode: 0400
+# - name: data-volume
+#   persistentVolumeClaim:
+#     claimName: app-data-pvc
+# - name: temp-volume
+#   emptyDir:
+#     medium: Memory
+#     sizeLimit: 256Mi
+# - name: shared-volume
+#   hostPath:
+#     path: /var/shared
+#     type: DirectoryOrCreate
 
 volumesTpls: []
 
@@ -283,7 +344,7 @@ test:
 
 size: ""
 
-# Configure scale dependant variables.  This enables configuring "t-shirt" sizes for different deployments.
+# Configure scale-dependent variables.  This enables configuring "t-shirt" sizes for different deployments.
 # This is useful for setting up different resource requests and limits for different environments.
 # Resources - https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 # Env - Follows the same format rules for `env` and `containers.env` values
@@ -326,14 +387,25 @@ sizing:
 #        memory: 128Mi
 #        ephemeral-storage: "2Gi"
 #    env:
-#      - name: GORILLA_TSHIRT_SIZE
-#        value: small
+#      GORILLA_TSHIRT_SIZE: "small"
+#      MAX_CONNECTIONS: "100"
+#      CACHE_SIZE: "64Mi"
+#      LOG_LEVEL: "info"
 #    autoscaling:
 #      horizontal:
+#        enabled: true
 #        minReplicas: 1
 #        maxReplicas: 5
 #        targetCPUUtilizationPercentage: 80
 #        targetMemoryUtilizationPercentage: 80
+#      vertical:
+#        enabled: false
+#        updateMode: "Auto"
+#        containerPolicies:
+#          - containerName: "*"
+#            controlledResources:
+#              - memory
+#              - cpu
 
 # DEPRECATED - All below values added for backwards compatibility with previous charts
 pod:
@@ -353,9 +425,12 @@ statefulset:
   annotations: {}
 
 resources: {}
+# Example resources configuration:
 #  requests:
 #    cpu: 500m
 #    memory: 1Gi
+#    ephemeral-storage: "5Gi"
 #  limits:
 #    cpu: 4000m
 #    memory: 8Gi
+#    ephemeral-storage: "10Gi"
