@@ -11,9 +11,11 @@ stringData:
   GORILLA_EMAIL_SINK: "https://api.wandb.ai/email/dispatch"
   {{- end }}
   SLACK_SECRET: {{ default "" .Values.global.slack.secret }}
-  {{- if and (not .Values.global.licenseSecret.name) (not .Values.global.licenseSecret.key) .Values.global.license }}
-  LICENSE: {{ .Values.global.license }}
-  GORILLA_LICENSE: {{ .Values.global.license }}
+  {{- $licenseObj := (lookup "v1" "Secret" .Release.Namespace .Values.global.licenseSecret.name) }}
+  {{- $license := default .Values.global.license (get $licenseObj.data .Values.global.licenseSecret.key) }}
+  {{- if $license }}
+  LICENSE: {{ $license }}
+  GORILLA_LICENSE: {{ $license }}
   {{- end }}
   {{- if ne .Values.global.auth.oidc.clientId ""  }}
   GORILLA_OIDC_CLIENT_SECRET: {{ .Values.global.auth.oidc.secret }}
