@@ -1,5 +1,5 @@
 {{- define "wandb.license.name" -}}
-{{- default (print "%s-license" .Release.Name) .Values.global.licenseSecret.name }}
+{{- default (printf "%s-license" .Release.Name) .Values.global.licenseSecret.name }}
 {{- end }}
 
 {{- define "wandb.license.key" -}}
