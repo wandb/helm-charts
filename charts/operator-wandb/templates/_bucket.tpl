@@ -45,6 +45,10 @@ secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}
 {{- if eq $path "" -}}
 
+{{- if eq $provider "cw" -}}
+{{- $url = "cw://$(BUCKET_NAME)" -}}
+{{- end -}}
+
 {{- if eq $provider "az" -}}
 {{- $url = "az://$(BUCKET_NAME)" -}}
 {{- end -}}
@@ -62,6 +66,10 @@ secretName: {{ include "wandb.bucket.secret" . }}
 {{- end -}}
 
 {{- else -}}
+
+{{- if eq $provider "cw" -}}
+{{- $url = "cw://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
+{{- end -}}
 
 {{- if eq $provider "az" -}}
 {{- $url = "az://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
