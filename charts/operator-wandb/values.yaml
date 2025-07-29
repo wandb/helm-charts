@@ -314,6 +314,21 @@ parquet:
       args: ["parquet"]
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  cronJobs:
+    parquet-backfill:
+      containers:
+        backfill-job:
+          args: ["glue"]
+          env:
+            GORILLA_GLUE_EXECUTE: "true"
+            GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
+          envFrom:
+            "{{ .Release.Name }}-glue-configmap": "configMapRef"
+      concurrencyPolicy: Forbid
+      schedule: "* * * * *"
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""

@@ -1,5 +1,5 @@
 {{- range $cronJobName, $cronJob := .Values.cronJobs }}
-  {{- $_ := set $cronJob "restartPolicy" (default $cronJob.restartPolicy "Never") }}
+  {{- $_ := set $cronJob "restartPolicy" (default "Never" $cronJob.restartPolicy) }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -7,10 +7,11 @@ metadata:
   labels:
     {{- include "wandb-base.labels" $ | nindent 4 }}
 spec:
+  concurrencyPolicy: "{{ $cronJob.concurrencyPolicy }}"
   schedule: "{{ $cronJob.schedule }}"
   jobTemplate:
     spec:
       template:
-        {{- include "wandb-base.pod" (dict "podData" $cronJob "root" $) | nindent 4 }}
+        {{- include "wandb-base.pod" (dict "podData" $cronJob "root" $) | nindent 8 }}
 ---
 {{- end }}
