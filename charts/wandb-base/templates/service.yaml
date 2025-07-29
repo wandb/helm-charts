@@ -21,11 +21,15 @@ metadata:
   name: {{ include "wandb-base.fullname" . }}
   labels:
     {{- include "wandb-base.labels" . | nindent 4 }}
+    {{- if .Values.service.labels -}}
+    {{-   toYaml .Values.service.labels | nindent 4 }}
+    {{- end }}
   annotations:
+    {{- tpl (include "wandb-base.serviceAnnotations" . | nindent 4) . }}
     {{- if and ( eq .Values.global.cloudProvider "aws" ) .Values.service.loadBalancerHealthCheckPath }}
     alb.ingress.kubernetes.io/healthcheck-path: {{ .Values.service.loadBalancerHealthCheckPath }}
     {{- end }}
-    {{- if and .Values.global.createGCPLoadBalancerBackend (eq .Values.global.cloudProvider "gcp") }}
+    {{- if eq .Values.global.cloudProvider "gcp" }}
     cloud.google.com/neg: '{"ingress": true}'
     cloud.google.com/backend-config: '{"default": "{{ include "wandb-base.fullname" . }}-backend-config"}'
     {{- end }}
