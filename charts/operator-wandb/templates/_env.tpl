@@ -141,6 +141,6 @@ Global values will override any chart-specific values.
 {{- define "wandb.observabilityEnvs" -}}
 {{- if and .Values.traceRatio (ne .Values.traceRatio 0.0) }}
 - name: GORILLA_TRACER:
-  values: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
+  value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
 {{- end }}
 {{- end -}}
