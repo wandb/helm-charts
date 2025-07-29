@@ -67,7 +67,7 @@ spec:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key:  {{ .Values.global.mysql.passwordSecret.passwordKey }}
-          command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
+          command: ['bash', '-c', 'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done']
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -112,6 +112,7 @@ spec:
                 name: {{ .Release.Name }}-kafka-configmap
           {{- end }}
           env:
+            {{ include "wandb.license" . | nindent 12 }}
             - name: GOMEMLIMIT
               valueFrom:
                 resourceFieldRef:
@@ -197,33 +198,6 @@ spec:
             {{- if ne .Values.global.email.smtp.host "" }}
             - name: GORILLA_EMAIL_SINK
               value: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
-            {{- end }}
-            {{- if and .Values.global.licenseSecret.name .Values.global.licenseSecret.key }}
-            - name: LICENSE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.licenseSecret.name }}
-                  key: {{ .Values.global.licenseSecret.key }}
-                  optional: true
-            - name: GORILLA_LICENSE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.licenseSecret.name }}
-                  key: {{ .Values.global.licenseSecret.key }}
-                  optional: true
-            {{- else }}
-            - name: LICENSE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "app.fullname" . }}-config
-                  key: LICENSE
-                  optional: true
-            - name: GORILLA_LICENSE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "app.fullname" . }}-config
-                  key: LICENSE
-                  optional: true
             {{- end }}
             {{- if ne .Values.global.auth.oidc.clientId ""  }}
             - name: OIDC_CLIENT_ID

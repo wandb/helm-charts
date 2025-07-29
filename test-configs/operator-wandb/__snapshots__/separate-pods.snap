@@ -151,7 +151,7 @@ metadata:
   labels:
 data:
   ACCESS_KEY: bWluaW8=
-  SECRET_KEY: bWluaW8xMjM=
+  SECRET_KEY: dGVzdCU0MCUzQyUzRSUyNSU3QiU3RCU3QyU1RSUyMiUyMCU1QyUyQnBhc3N3b3Jk
 ---
 # Source: operator-wandb/templates/clickhouse.yaml
 apiVersion: v1
@@ -201,6 +201,17 @@ metadata:
   labels:
 data:
   KAFKA_CLIENT_PASSWORD:
+---
+# Source: operator-wandb/templates/license.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chartsnap-license
+  annotations:
+    "helm.sh/resource-policy": "keep"
+  labels:
+data:
+  license: ""
 ---
 # Source: operator-wandb/templates/mysql.yaml
 apiVersion: v1
@@ -701,7 +712,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-ca-certs
   labels:
-    helm.sh/chart: operator-wandb-0.32.4
+    helm.sh/chart: operator-wandb-0.32.9
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -866,7 +877,7 @@ data:
   KAFKA_BROKER_PORT: "9092"
   KAFKA_CLIENT_USER: ""
   KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE: "chartsnap-run-updates-shadow"
-  KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS: "12"
+  KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS: "100"
 ---
 # Source: operator-wandb/templates/mysql.yaml
 apiVersion: v1
@@ -1569,7 +1580,7 @@ spec:
         command:
         - bash
         - -c
-        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
+        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
         envFrom:
         - configMapRef:
             name: chartsnap-bucket-configmap
@@ -1653,6 +1664,11 @@ spec:
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
         - name: GORILLA_HISTORY_STORE
           value: 'http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: GORILLA_LICENSE_CERT_PATH
           value: /jwks.json
         - name: GORILLA_LOCKER
@@ -1673,7 +1689,7 @@ spec:
                 "name": "wandb",
                 "prefix": "wandb-overflow"
               },
-              "addr": "kafka://$(KAFKA_CLIENT_USER):$(A_KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+              "addr": "kafka://$(KAFKA_CLIENT_USER):$(A_KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)"
             }
         - name: GORILLA_SETTINGS_CACHE
           value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
@@ -1687,6 +1703,11 @@ spec:
           value: ''
         - name: GORILLA_USAGE_STORE
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: MYSQL_DATABASE
           value: 'wandb_local'
         - name: MYSQL_HOST
@@ -1797,6 +1818,11 @@ spec:
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
         - name: GORILLA_HISTORY_STORE
           value: 'http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: GORILLA_LICENSE_CERT_PATH
           value: /jwks.json
         - name: GORILLA_LOCKER
@@ -1817,7 +1843,7 @@ spec:
                 "name": "wandb",
                 "prefix": "wandb-overflow"
               },
-              "addr": "kafka://$(KAFKA_CLIENT_USER):$(A_KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+              "addr": "kafka://$(KAFKA_CLIENT_USER):$(A_KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)"
             }
         - name: GORILLA_SETTINGS_CACHE
           value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
@@ -1831,6 +1857,11 @@ spec:
           value: ''
         - name: GORILLA_USAGE_STORE
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: MYSQL_DATABASE
           value: 'wandb_local'
         - name: MYSQL_HOST
@@ -1940,6 +1971,11 @@ spec:
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
         - name: GORILLA_HISTORY_STORE
           value: 'http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: GORILLA_LICENSE_CERT_PATH
           value: /jwks.json
         - name: GORILLA_LOCKER
@@ -1960,7 +1996,7 @@ spec:
                 "name": "wandb",
                 "prefix": "wandb-overflow"
               },
-              "addr": "kafka://$(KAFKA_CLIENT_USER):$(A_KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+              "addr": "kafka://$(KAFKA_CLIENT_USER):$(A_KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)"
             }
         - name: GORILLA_SETTINGS_CACHE
           value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
@@ -1974,6 +2010,11 @@ spec:
           value: ''
         - name: GORILLA_USAGE_STORE
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: REDIS
           value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
         securityContext:
@@ -2101,7 +2142,7 @@ spec:
             secretKeyRef:
               name: chartsnap-mysql
               key: MYSQL_PASSWORD
-        command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
+        command: ['bash', '-c', 'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done']
       containers:
       - name: app
         image: "wandb/local:latest"
@@ -2139,6 +2180,16 @@ spec:
         - configMapRef:
             name: chartsnap-kafka-configmap
         env:
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-license"
+              key: "license"
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-license"
+              key: "license"
         - name: GOMEMLIMIT
           valueFrom:
             resourceFieldRef:
@@ -2213,18 +2264,6 @@ spec:
               name: chartsnap-app-config
               key: SLACK_SECRET
               optional: true
-        - name: LICENSE
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-app-config
-              key: LICENSE
-              optional: true
-        - name: GORILLA_LICENSE
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-app-config
-              key: LICENSE
-              optional: true
         - name: GORILLA_SESSION_LENGTH
           value: "720h"
         - name: OPERATOR_ENABLED
@@ -2258,7 +2297,7 @@ spec:
         - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
           value: chartsnap-run-updates-shadow
         - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
-          value: "12"
+          value: "100"
         - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
           value: >
             {
@@ -2268,7 +2307,7 @@ spec:
                 "name": "wandb",
                 "prefix": "wandb-overflow"
               },
-              "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
+              "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)"
             }
 
         - name: GORILLA_SETTINGS_CACHE
@@ -2507,7 +2546,7 @@ spec:
         command:
         - bash
         - -c
-        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
+        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
         envFrom:
         - configMapRef:
             name: chartsnap-bucket-configmap
@@ -2585,6 +2624,11 @@ spec:
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
         - name: GORILLA_HISTORY_STORE
           value: 'http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: GORILLA_LICENSE_CERT_PATH
           value: /jwks.json
         - name: GORILLA_LOCKER
@@ -2607,6 +2651,11 @@ spec:
           value: ''
         - name: GORILLA_USAGE_STORE
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: MYSQL_DATABASE
           value: 'wandb_local'
         - name: MYSQL_HOST
@@ -2711,6 +2760,11 @@ spec:
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
         - name: GORILLA_HISTORY_STORE
           value: 'http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: GORILLA_LICENSE_CERT_PATH
           value: /jwks.json
         - name: GORILLA_LOCKER
@@ -2733,6 +2787,11 @@ spec:
           value: ''
         - name: GORILLA_USAGE_STORE
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: MYSQL_DATABASE
           value: 'wandb_local'
         - name: MYSQL_HOST
@@ -2836,6 +2895,11 @@ spec:
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
         - name: GORILLA_HISTORY_STORE
           value: 'http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: GORILLA_LICENSE_CERT_PATH
           value: /jwks.json
         - name: GORILLA_LOCKER
@@ -2858,6 +2922,11 @@ spec:
           value: ''
         - name: GORILLA_USAGE_STORE
           value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: 'license'
+              name: 'chartsnap-license'
         - name: REDIS
           value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
         securityContext:
@@ -2976,6 +3045,16 @@ spec:
         - secretRef:
             name: chartsnap-global-secret
         env:
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-license"
+              key: "license"
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-license"
+              key: "license"
         - name: GOMEMLIMIT
           valueFrom:
             resourceFieldRef:
@@ -3155,6 +3234,16 @@ spec:
           containerPort: 9994
           protocol: TCP
         env:
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-license"
+              key: "license"
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-license"
+              key: "license"
         - name: ONLY_SERVICE
           value: weave
         - name: WANDB_PUBLIC_BASE_URL
@@ -3218,6 +3307,16 @@ spec:
           fi
           python -m weave.clear_cache
         env:
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-license"
+              key: "license"
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-license"
+              key: "license"
         - name: WEAVE_LOCAL_ARTIFACT_DIR
           value: /vol/weave/cache
         - name: WEAVE_CACHE_CLEAR_INTERVAL
@@ -3580,7 +3679,7 @@ kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-connection"
   labels:
-    helm.sh/chart: operator-wandb-0.32.4
+    helm.sh/chart: operator-wandb-0.32.9
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
