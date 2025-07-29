@@ -46,45 +46,53 @@ secretName: {{ include "wandb.bucket.secret" . }}
 {{- if eq $path "" -}}
 
 {{- if eq $provider "cw" -}}
-{{- $url = "cw://$(BUCKET_NAME)" -}}
+  {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
+    {{- $url = "cw://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)" -}}
+  {{- else -}}
+    {{- $url = "cw://$(BUCKET_NAME)" -}}
+  {{- end -}}
 {{- end -}}
 
 {{- if eq $provider "az" -}}
-{{- $url = "az://$(BUCKET_NAME)" -}}
+  {{- $url = "az://$(BUCKET_NAME)" -}}
 {{- end -}}
 
 {{- if eq $provider "gcs" -}}
-{{- $url = "gs://$(BUCKET_NAME)" -}}
+  {{- $url = "gs://$(BUCKET_NAME)" -}}
 {{- end -}}
 
 {{- if eq $provider "s3" -}}
-{{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
-{{- $url = "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)" -}}
-{{- else -}}
-{{- $url = "s3://$(BUCKET_NAME)" -}}
-{{- end -}}
+  {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
+    {{- $url = "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)" -}}
+  {{- else -}}
+    {{- $url = "s3://$(BUCKET_NAME)" -}}
+  {{- end -}}
 {{- end -}}
 
 {{- else -}}
 
 {{- if eq $provider "cw" -}}
-{{- $url = "cw://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
+  {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
+    {{- $url = "cw://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
+  {{- else -}}
+    {{- $url = "cw://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
+  {{- end -}}
 {{- end -}}
 
 {{- if eq $provider "az" -}}
-{{- $url = "az://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
+  {{- $url = "az://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
 {{- end -}}
 
 {{- if eq $provider "gcs" -}}
-{{- $url = "gs://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
+  {{- $url = "gs://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
 {{- end -}}
 
 {{- if eq $provider "s3" -}}
-{{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
-{{- $url = "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
-{{- else -}}
-{{- $url = "s3://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
-{{- end -}}
+  {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
+    {{- $url = "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
+  {{- else -}}
+    {{- $url = "s3://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
+  {{- end -}}
 {{- end -}}
 
 {{- end -}}
