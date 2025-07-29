@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-executor-configmap
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+data: {}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-executor-secret
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  {{- if ne .Values.global.email.smtp.host "" }}
+  GORILLA_EMAIL_SINK: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
+  {{- else }}
+  GORILLA_EMAIL_SINK: "https://api.wandb.ai/email/dispatch"
+  {{- end }}
+  SLACK_SECRET: {{ default "" .Values.global.slack.secret }}
+  {{- if ne .Values.global.auth.oidc.clientId ""  }}
+  GORILLA_OIDC_CLIENT_SECRET: {{ .Values.global.auth.oidc.secret }}
+  {{- end }}
