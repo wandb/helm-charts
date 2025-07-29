@@ -47,6 +47,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ .Release.Name }}-clickhouse-configmap
+            - configMapRef:
+                name: {{ .Release.Name }}-kafka-configmap
           env:
             - name: WF_CLICKHOUSE_PASS
               valueFrom:
@@ -54,9 +56,9 @@ spec:
                   name: {{ include "wandb.clickhouse.passwordSecret" . }}
                   key: {{ .Values.global.clickhouse.passwordSecret.passwordKey }}
             - name: WF_KAFKA_BROKER_HOST
-              value: "{{ .Values.bufstream.host }}"
+              value: "$(KAFKA_BROKER_HOST)"
             - name: WF_KAFKA_BROKER_PORT
-              value: "{{ .Values.bufstream.port }}"
+              value: "$(KAFKA_BROKER_PORT)"
             {{- include "weaveTrace.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
             - name: WANDB_INTERNAL_SERVICE_TOKEN
