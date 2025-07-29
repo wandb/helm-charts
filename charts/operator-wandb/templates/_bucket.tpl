@@ -13,6 +13,26 @@
 {{ .Release.Name }}-bucket-configmap
 {{- end -}}
 
+
+{{/*
+  THIS IS FOR INTERNAL USE ONLY
+  any end user attempting to set these may experience undefined behavior 
+*/}}
+{{- define "wandb.bucket.cwIdentity" -}}
+- name: COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+  valueFrom:
+    secretKeyRef:
+      name: "wandb-internal-cw-identity"
+      key: "accessKeyId"
+      optional: true
+- name: COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: "wandb-internal-cw-identity"
+      key: "secretKey"
+      optional: true
+{{- end -}}
+
 {{- define "wandb.bucket" -}}
 {{- $url := "" -}}
 {{- $path := "" -}}
