@@ -1286,7 +1286,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-ca-certs
   labels:
-    helm.sh/chart: operator-wandb-0.32.9
+    helm.sh/chart: operator-wandb-0.32.10
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -3299,7 +3299,7 @@ spec:
           type: RuntimeDefault
       serviceAccountName: chartsnap-reloader
 ---
-# Source: operator-wandb/charts/weave-trace/templates/deployment.yaml
+# Source: operator-wandb/charts/weave-trace/templates/deployment-server.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -3394,6 +3394,8 @@ spec:
             name: chartsnap-global-secret
         - configMapRef:
             name: chartsnap-clickhouse-configmap
+        - configMapRef:
+            name: chartsnap-kafka-configmap
         env:
         - name: LICENSE
           valueFrom:
@@ -3419,11 +3421,18 @@ spec:
           value: "http://localhost:8080/traces"
         - name: WF_ENFORCE_PASSWORD_LENGTH
           value: "false"
+        - name: WEAVE_ENABLE_ONLINE_EVAL
+          value: "true"
         - name: WF_CLICKHOUSE_PASS
           valueFrom:
             secretKeyRef:
               name: chartsnap-clickhouse
               key: CLICKHOUSE_PASSWORD
+        # Set from kafka-configmap
+        - name: WF_KAFKA_BROKER_HOST
+          value: "$(KAFKA_BROKER_HOST)"
+        - name: WF_KAFKA_BROKER_PORT
+          value: "$(KAFKA_BROKER_PORT)"
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
@@ -3641,7 +3650,7 @@ spec:
           sizeLimit: 20Gi
           medium:
 ---
-# Source: operator-wandb/charts/weave-trace/templates/deployment.yaml
+# Source: operator-wandb/charts/weave-trace/templates/deployment-server.yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -4400,7 +4409,7 @@ kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-connection"
   labels:
-    helm.sh/chart: operator-wandb-0.32.9
+    helm.sh/chart: operator-wandb-0.32.10
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -4428,7 +4437,7 @@ kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-weave"
   labels:
-    helm.sh/chart: operator-wandb-0.32.9
+    helm.sh/chart: operator-wandb-0.32.10
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
