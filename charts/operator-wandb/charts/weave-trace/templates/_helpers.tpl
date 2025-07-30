@@ -33,6 +33,13 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 {{ printf "%s-migrate" (include "weaveTrace.fullname" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{/*
+Create a default fully qualified name for the weave-worker deployment. (Should be something like wandb-weave-trace-worker)
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "weaveWorker.fullname" -}}
+{{ printf "%s-worker" (include "weaveTrace.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
 
 {{/*
 Create chart name and version as used by the chart label.
