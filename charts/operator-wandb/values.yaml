@@ -1381,8 +1381,6 @@ metric-observer:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     GORILLA_TRACER:
       value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
-
-    ### I'm unsure the following are necessary
     POD_NAME:
       valueFrom:
         fieldRef:
@@ -1397,6 +1395,8 @@ metric-observer:
           fieldPath: metadata.namespace
     GORILLA_TSHIRT_SIZE:
       value: "{{ .Values.global.size }}"
+    GORILLA_STATIC_HOST:
+      value: "{{ .Values.global.host }}"
 
     ##### The following are unique/extra critical to metric-observer
     GORILLA_RUN_UPDATE_SHADOW_QUEUE:
@@ -1419,7 +1419,7 @@ metric-observer:
       value: request.cpu
     GORILLA_FRONTEND_HOST:
       value: "{{ .Values.global.host }}"
-    # buckets are used for overflow of messages
+    # buckets are used for overflow of messages in pubsub, so this is critical
     BUCKET_ACCESS_KEY:
       valueFrom:
         secretKeyRef:
@@ -1439,19 +1439,6 @@ metric-observer:
           key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
           optional: true
 
-    # I'm pretty sure it's safe to skip these - we use these during
-    # setup of the slack integration, but by the time MO runs the slack integration,
-    # we already have all the info we need embedded in the integration
-    # GORILLA_SLACK_CLIENT_ID:
-    #    value: "{{ required "slack client id required" .Values.secretRefs.slack.alertsApp.clientId }}"
-    # GORILLA_SLACK_SECRET:
-    #    value: "{{ required "slack secret required" .Values.secretRefs.slack.alertsApp.secret }}"
-
-    # don't believe this is used
-    # GORILLA_STATIC_HOST:
-    #   value: "{{ .Values.global.host }}"
-
-  # I don't know how to valid envFrom/what's up with it
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -1467,7 +1454,6 @@ metric-observer:
       env: {}
       envFrom: {}
       resources:
-        # TODO: these still need to be validated in fmbtest
         limits:
           cpu: 1000m
           memory: 1Gi
@@ -1497,7 +1483,6 @@ metric-observer:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
         optional: true
-  traceRatio: 1.0  # DO NOT SUBMIT
 
 settingsMigrationJob:
   install: false
