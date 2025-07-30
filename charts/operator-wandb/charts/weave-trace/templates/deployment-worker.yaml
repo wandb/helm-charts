@@ -81,4 +81,19 @@ spec:
             - "src.workers.scoring_worker"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+---
+{{- $secret := (lookup "v1" "Secret" .Release.Namespace "weave-worker-auth") -}}
+{{- $value := "" -}}
+{{- if $secret -}}
+{{-   $value = index $secret.data "key" -}}
+{{- else -}}
+{{-   $value = randAlphaNum 32 | b64enc -}}
+{{- end -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: weave-worker-auth
+type: Opaque
+data:
+  key: {{ $value }}
 {{- end }}
