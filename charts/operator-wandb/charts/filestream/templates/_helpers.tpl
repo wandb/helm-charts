@@ -100,7 +100,7 @@ Create the name of the service account to use
 {{- if .Values.global.pubSub.enabled -}}
   {{- if .Values.global.pubSub.host -}}
 pubsub://{{ .Values.global.pubSub.host }}/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}/{{ .Values.pubSub.subscription }}
-  {{- else }}
+  {{- else -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}/{{ .Values.pubSub.subscription }}
   {{- end -}}
 
