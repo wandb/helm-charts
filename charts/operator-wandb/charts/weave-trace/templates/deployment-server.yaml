@@ -79,6 +79,8 @@ spec:
             {{- end }}
             - configMapRef:
                 name: {{ .Release.Name }}-clickhouse-configmap
+            - configMapRef:
+                name: {{ .Release.Name }}-kafka-configmap
           env:
             {{ include "wandb.license" . | nindent 12 }}
             - name: PORT
@@ -95,11 +97,18 @@ spec:
               value: "{{ .Values.global.host }}/traces"
             - name: WF_ENFORCE_PASSWORD_LENGTH
               value: "false"
+            - name: WEAVE_ENABLE_ONLINE_EVAL
+              value: "true"
             - name: WF_CLICKHOUSE_PASS
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.clickhouse.passwordSecret" . }}
                   key: {{ .Values.global.clickhouse.passwordSecret.passwordKey }}
+            # Set from kafka-configmap
+            - name: WF_KAFKA_BROKER_HOST
+              value: "$(KAFKA_BROKER_HOST)"
+            - name: WF_KAFKA_BROKER_PORT
+              value: "$(KAFKA_BROKER_PORT)"
             {{- include "weaveTrace.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           {{- if not .Values.datadog.enabled }}
