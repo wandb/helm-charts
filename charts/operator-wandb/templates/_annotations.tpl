@@ -37,3 +37,26 @@ Handles merging a set of service annotations
 {{- toYaml $allAnnotations -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "wandb.gksFuseAnnotations" -}}
+{{- if .Values.fuse.enabled }}
+{{- if and (eq (include "wandb.bucket" . | fromYaml).provider "gcs") (eq .Values.global.cloudProvider "gcp") }}
+gke-gcsfuse/volumes: "true"
+{{- if index .Values.fuse.resources.limits "ephemeral-storage" }}
+ gke-gcsfuse/ephemeral-storage-limit: "{{ index .Values.fuse.resources.limits "ephemeral-storage" }}"
+{{- end -}}
+{{- if .Values.fuse.resources.requests.cpu }}
+ gke-gcsfuse/cpu-request: "{{ .Values.fuse.resources.requests.cpu }}"
+{{- end -}}
+{{- if .Values.fuse.resources.limits.cpu }}
+ gke-gcsfuse/cpu-limit: "{{ .Values.fuse.resources.limits.cpu }}"
+{{- end -}}
+{{- if .Values.fuse.resources.requests.memory }}
+ gke-gcsfuse/memory-request: "{{ .Values.fuse.resources.requests.memory }}"
+{{- end -}}
+{{- if .Values.fuse.resources.limits.memory }}
+ gke-gcsfuse/memory-limit: "{{ .Values.fuse.resources.limits.memory }}"
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
