@@ -13,7 +13,7 @@ Handles merging a set of deployment annotations
 {{- end -}}
 
 {{/*
-Handles merging a set of deployment annotations
+Handles merging a set of statefulset annotations
 */}}
 {{- define "wandb-base.statefulsetAnnotations" -}}
 {{- $allAnnotations := merge (default (dict) (default (dict) .Values.statefulset).annotations) .Values.global.statefulset.annotations -}}
@@ -45,7 +45,7 @@ Handles merging a set of pod annotations
 {{/*
 Handles merging a set of non-selector labels
 */}}
-{{- define "wandb.podLabels" -}}
+{{- define "wandb-base.podLabels" -}}
 {{- $allLabels := merge .Values.podLabels .Values.global.pod.labels -}}
 {{- if $allLabels -}}
 {{-   range $key, $value := $allLabels }}
@@ -57,7 +57,7 @@ Handles merging a set of non-selector labels
 {{/*
 Handles merging a set of labels for services
 */}}
-{{- define "wandb.serviceLabels" -}}
+{{- define "wandb-base.serviceLabels" -}}
 {{- $allLabels := merge .Values.serviceLabels .Values.global.service.labels -}}
 {{- if $allLabels -}}
 {{-   range $key, $value := $allLabels }}

@@ -74,10 +74,12 @@ otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset
 
 {{- define "wandb.internalJWTMap" -}}
 '{
-{{- range $value := .Values.internalJWTMap -}}
+{{- $items := list -}}
+{{- range $value := .Values.app.internalJWTMap -}}
 {{- if and (not (empty $value.subject)) (not (empty $value.issuer)) }}
-{{- printf "%q: %q" $value.subject $value.issuer }},
+{{- $items = append $items (printf "%q: %q" $value.subject $value.issuer) -}}
 {{- end -}}
 {{- end -}}
+{{- join ", " $items -}}
 }'
 {{- end -}}
