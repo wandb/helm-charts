@@ -469,7 +469,7 @@ metadata:
   labels:
 data:
   # T-shirt size for deployment
-  GORILLA_TSHIRT_SIZE: "dGVzdGluZw=="
+  GORILLA_TSHIRT_SIZE: dGVzdGluZw==
   GORILLA_ONPREM: dHJ1ZQ==
 ---
 # Source: operator-wandb/templates/glue.yaml
@@ -1445,7 +1445,7 @@ data:
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
   GORILLA_AUTH_METHOD: implicit
-  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{}'
+  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{"system:serviceaccount:default:chartsnap-weave-trace": "https://kubernetes.default.svc.cluster.local"}'
   GORILLA_TSHIRT_SIZE: "testing"
 ---
 # Source: operator-wandb/templates/app.yaml
@@ -1513,6 +1513,7 @@ metadata:
   name: chartsnap-console-configmap
   labels:
 data:
+  # ex: AWS("arn:aws:iam::{acc_number}:role/{customer_namespace}-node")
   BUCKET_ACCESS_IDENTITY: "unknown"
   AUTH_SERVICE: "chartsnap-app:8080"
   OPERATOR_NAMESPACE: "default"
@@ -1728,11 +1729,6 @@ data:
   GLUE_ENABLED: "true"
   GORILLA_GLUE_CONTAINER_PORT: "9173"
   HOST: "http://localhost:8080"
-
-# GORILLA_ENABLED
-#   value: "true"
-# PROXY_PASS_BACKEND_HOST
-#   value: "$(CHARTSNAP_API_SERVICE_HOST):$(CHARTSNAP_API_SERVICE_PORT)"
 ---
 # Source: operator-wandb/templates/mysql.yaml
 apiVersion: v1
@@ -1801,11 +1797,13 @@ metadata:
   name: chartsnap-weave-configmap
   labels:
 data:
-  ONLY_SERVICE: "weave"
+  GORILLA_ONPREM: "true"
+  PORT: "9994"
+  WANDB_BASE_URL: "http://chartsnap-app:8080/"
   WANDB_PUBLIC_BASE_URL: "http://localhost:8080"
   WEAVE_LOG_FORMAT: "json"
-  WANDB_BASE_URL: "http://chartsnap-app:8080/"
   WEAVE_SERVER_NUM_WORKERS: "4"
+  WEAVE_SERVER_URL: "http://127.0.0.1:9994"
   GORILLA_TSHIRT_SIZE: "testing"
   WEAVE_LOCAL_ARTIFACT_DIR: "/vol/weave/cache"
   WEAVE_CACHE_CLEAR_INTERVAL: "24"
@@ -3263,14 +3261,14 @@ spec:
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/name: app
         maxSkew: 1
-        topologyKey: zone
+        topologyKey: topology.kubernetes.io/zone
         whenUnsatisfiable: ScheduleAnyway
       - labelSelector:
           matchLabels:
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/name: app
         maxSkew: 1
-        topologyKey: hostname
+        topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
       - name: wandb-ca-certs
@@ -3358,6 +3356,9 @@ spec:
           initialDelaySeconds: 20
           periodSeconds: 5
         resources:
+          limits:
+            cpu: "2"
+            memory: 2Gi
           requests:
             cpu: 100m
             memory: 128Mi
@@ -3376,14 +3377,14 @@ spec:
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/name: console
         maxSkew: 1
-        topologyKey: zone
+        topologyKey: topology.kubernetes.io/zone
         whenUnsatisfiable: ScheduleAnyway
       - labelSelector:
           matchLabels:
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/name: console
         maxSkew: 1
-        topologyKey: hostname
+        topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
 ---
 # Source: operator-wandb/charts/parquet/templates/deployment.yaml
@@ -3583,14 +3584,14 @@ spec:
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/name: parquet
         maxSkew: 1
-        topologyKey: zone
+        topologyKey: topology.kubernetes.io/zone
         whenUnsatisfiable: ScheduleAnyway
       - labelSelector:
           matchLabels:
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/name: parquet
         maxSkew: 1
-        topologyKey: hostname
+        topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
       - name: wandb-ca-certs
@@ -3913,14 +3914,14 @@ spec:
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/name: weave-trace
         maxSkew: 1
-        topologyKey: zone
+        topologyKey: topology.kubernetes.io/zone
         whenUnsatisfiable: ScheduleAnyway
       - labelSelector:
           matchLabels:
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/name: weave-trace
         maxSkew: 1
-        topologyKey: hostname
+        topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
 ---
 # Source: operator-wandb/charts/weave/templates/deployment.yaml
@@ -3962,8 +3963,6 @@ spec:
           value: "local-123456789-123456789-123456789-1234"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
-        - name: ONLY_SERVICE
-          value: "weave"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -3971,7 +3970,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "wandb/weave-python:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9994
@@ -4000,13 +3999,8 @@ spec:
           name: cache
       - name: weave-cache-clear
         command:
-        - /bin/bash
-        - -c
-        - |
-          if [ -f /var/app/weave-python/venv/bin/activate ]; then
-            source /var/app/weave-python/venv/bin/activate
-          fi
-          python -m weave.clear_cache
+        - python
+        - weave-public/weave_query/scripts/clear_cache.py
         envFrom:
         - configMapRef:
             name: chartsnap-weave-configmap
@@ -4015,8 +4009,6 @@ spec:
           value: "local-123456789-123456789-123456789-1234"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
-        - name: ONLY_SERVICE
-          value: "weave"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -4024,7 +4016,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "wandb/weave-python:latest"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -4048,14 +4040,14 @@ spec:
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/name: weave
         maxSkew: 1
-        topologyKey: zone
+        topologyKey: topology.kubernetes.io/zone
         whenUnsatisfiable: ScheduleAnyway
       - labelSelector:
           matchLabels:
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/name: weave
         maxSkew: 1
-        topologyKey: hostname
+        topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
       - emptyDir:
@@ -4693,6 +4685,7 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
 spec:
+  concurrencyPolicy: Forbid
   schedule: "* * * * *"
   jobTemplate:
     spec:
@@ -4864,14 +4857,14 @@ spec:
                 app.kubernetes.io/instance: chartsnap
                 app.kubernetes.io/name: parquet
             maxSkew: 1
-            topologyKey: zone
+            topologyKey: topology.kubernetes.io/zone
             whenUnsatisfiable: ScheduleAnyway
           - labelSelector:
               matchLabels:
                 app.kubernetes.io/instance: chartsnap
                 app.kubernetes.io/name: parquet
             maxSkew: 1
-            topologyKey: hostname
+            topologyKey: kubernetes.io/hostname
             whenUnsatisfiable: ScheduleAnyway
 ---
 # Source: operator-wandb/templates/tests/test-weave.yaml

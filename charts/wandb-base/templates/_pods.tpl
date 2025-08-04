@@ -20,9 +20,23 @@ spec:
   {{- end }}
   containers:
     {{- include "wandb-base.containers" (dict "containers" .podData.containers "root" $.root "source" "containers") | nindent 4 }}
-  {{- with uniq (compact (concat (default list $.root.Values.imagePullSecrets) (default list $.root.Values.global.imagePullSecrets))) }}
+  {{- $combinedSecrets := concat (default list $.root.Values.imagePullSecrets) (default list $.root.Values.global.imagePullSecrets) }}
+  {{- $secretNames := list }}
+  {{- range $secret := $combinedSecrets }}
+    {{- if kindIs "string" $secret }}
+      {{- $secretNames = append $secretNames $secret }}
+    {{- else if kindIs "map" $secret }}
+      {{- if hasKey $secret "name" }}
+        {{- $secretNames = append $secretNames $secret.name }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- $uniqueSecretNames := uniq (compact $secretNames) }}
+  {{- if $uniqueSecretNames }}
   imagePullSecrets:
-    {{- tpl (toYaml . | nindent 4) $.root }}
+    {{- range $name := $uniqueSecretNames }}
+    - name: {{ tpl $name $.root }}
+    {{- end }}
   {{- end }}
   {{- if .podData.initContainers }}
   initContainers:

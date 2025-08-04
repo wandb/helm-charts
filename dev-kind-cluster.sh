@@ -39,6 +39,10 @@ while [ "$#" -gt 0 ]; do
       usage
       ;;
     -n|--name)
+      if [ -z "$2" ] || [ "${2:0:1}" = "-" ]; then
+        echo "Error: Missing or invalid cluster name after --name flag"
+        exit 1
+      fi
       cluster_name="$2"
       shift 2
       ;;
@@ -52,10 +56,18 @@ while [ "$#" -gt 0 ]; do
       ;;
     --http-port)
       ingress_http_port="$2"
+      if ! [[ "$ingress_http_port" =~ ^[0-9]+$ ]] || [ "$ingress_http_port" -lt 1 ] || [ "$ingress_http_port" -gt 65535 ]; then
+        echo "Error: Invalid HTTP port. Port must be an integer between 1 and 65535."
+        exit 1
+      fi
       shift 2
       ;;
     --https-port)
       ingress_https_port="$2"
+      if ! [[ "$ingress_https_port" =~ ^[0-9]+$ ]] || [ "$ingress_https_port" -lt 1 ] || [ "$ingress_https_port" -gt 65535 ]; then
+        echo "Error: Invalid HTTPS port. Port must be an integer between 1 and 65535."
+        exit 1
+      fi
       shift 2
       ;;
     *)

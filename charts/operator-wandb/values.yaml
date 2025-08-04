@@ -21,7 +21,6 @@ global:
   # Example:
   # imagePullSecrets: &imagePullSecrets
   #   - my-registry-secret
-  imagePullSecrets: &imagePullSecrets
 
   cloudProvider: ""
 
@@ -347,7 +346,7 @@ parquet:
         horizontal:
           enabled: true
           maxReplicas: 2
-          minReplicas: 1
+          minReplicas: 2
     medium:
       resources:
         limits:
@@ -360,7 +359,7 @@ parquet:
         horizontal:
           enabled: true
           maxReplicas: 3
-          minReplicas: 1
+          minReplicas: 2
     large:
       resources:
         limits:
@@ -407,8 +406,11 @@ app:
   image:
     repository: wandb/local
     tag: latest
+  # TODO(dpanzella) Read from here for backwards compatability, needs to be moved so API can access as well
+  internalJWTMap:
+    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace"
+      issuer: "https://kubernetes.default.svc.cluster.local"
   env:
-#    GORILLA_AUTH_JWK_URL: "http://localhost:8083/api/jwks.json"
     GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
     GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE: "/usr/local/bin/view-spec-updater-linux"
     GORILLA_GLUE_CONTAINER_PORT: "8083"
@@ -569,7 +571,7 @@ weave:
     size: 20Gi
     medium: ""
   image:
-    repository: wandb/local
+    repository: wandb/weave-python
     tag: latest
   service:
     ports:
@@ -603,13 +605,8 @@ weave:
           mountPath: /vol/weave/cache
     weave-cache-clear:
       command:
-        - /bin/bash
-        - -c
-        - |
-          if [ -f /var/app/weave-python/venv/bin/activate ]; then
-            source /var/app/weave-python/venv/bin/activate
-          fi
-          python -m weave.clear_cache
+        - python
+        - weave-public/weave_query/scripts/clear_cache.py
       resources:
         requests:
           cpu: 100m
@@ -617,8 +614,6 @@ weave:
       volumeMounts:
         - name: cache
           mountPath: /vol/weave/cache
-  env:
-    ONLY_SERVICE: weave
   volumes:
     - name: cache
       emptyDir:
@@ -638,7 +633,7 @@ weave:
         horizontal:
           enabled: true
           maxReplicas: 2
-          minReplicas: 1
+          minReplicas: 2
     medium:
       resources:
         limits:
@@ -651,7 +646,7 @@ weave:
         horizontal:
           enabled: true
           maxReplicas: 3
-          minReplicas: 1
+          minReplicas: 2
     large:
       resources:
         limits:
@@ -764,7 +759,7 @@ weave-trace:
           memory: 8Gi
         requests:
           cpu: "3"
-          memory: 4Gi
+          memory: 6Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -777,7 +772,7 @@ weave-trace:
           memory: 8Gi
         requests:
           cpu: "3"
-          memory: 4Gi
+          memory: 6Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -790,7 +785,7 @@ weave-trace:
           memory: 8Gi
         requests:
           cpu: "3"
-          memory: 4Gi
+          memory: 6Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -948,6 +943,13 @@ console:
         initialDelaySeconds: 20
         periodSeconds: 5
         failureThreshold: 120
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"
   role:
     create: true
     type: ClusterRole
@@ -1006,13 +1008,6 @@ flat-run-fields-updater:
   containers:
     flat-run-fields-updater:
       args: ["flat-run-fields-updater"]
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 1Gi
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
   image:
@@ -1026,10 +1021,10 @@ flat-run-fields-updater:
       resources:
         limits:
           cpu: "2"
-          memory: 2Gi
+          memory: 4Gi
         requests:
           cpu: "1"
-          memory: 1Gi
+          memory: 2Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -1039,10 +1034,10 @@ flat-run-fields-updater:
       resources:
         limits:
           cpu: "2"
-          memory: 2Gi
+          memory: 4Gi
         requests:
           cpu: "1"
-          memory: 1Gi
+          memory: 2Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -1052,10 +1047,10 @@ flat-run-fields-updater:
       resources:
         limits:
           cpu: "2"
-          memory: 2Gi
+          memory: 4Gi
         requests:
           cpu: "1"
-          memory: 1Gi
+          memory: 3Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -1065,10 +1060,10 @@ flat-run-fields-updater:
       resources:
         limits:
           cpu: "2"
-          memory: 2Gi
+          memory: 4Gi
         requests:
           cpu: "1"
-          memory: 1Gi
+          memory: 3Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -1078,10 +1073,10 @@ flat-run-fields-updater:
       resources:
         limits:
           cpu: "2"
-          memory: 2Gi
+          memory: 4Gi
         requests:
           cpu: "1"
-          memory: 1Gi
+          memory: 3Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -1120,12 +1115,6 @@ filestream:
   containers:
     filestream:
       args: ["filestream"]
-      requests:
-        cpu: 500m
-        memory: 4Gi
-      limits:
-        cpu: 4000m
-        memory: 8Gi
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
   image:
@@ -1133,7 +1122,73 @@ filestream:
     tag: latest
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
-
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 1
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 1
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 1
 executor:
   install: false
   deploymentPostfix: "bc"
@@ -1425,8 +1480,6 @@ bufstream:
           memory: 4Gi
 
 glue:
-  # install: false
-  imagePullSecrets: *imagePullSecrets
   service:
     enabled: false
   envFrom:
@@ -1542,8 +1595,6 @@ glue:
           memory: 2Gi
 
 api:
-  install: false
-  imagePullSecrets: *imagePullSecrets
   service:
     enabled: true
     loadBalancerHealthCheckPath: "/ready"
@@ -1701,7 +1752,6 @@ api:
 
 filemeta:
   install: false
-  imagePullSecrets: *imagePullSecrets
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1794,7 +1844,6 @@ frontend:
   install: false
   podSecurityContext:
     runAsUser: 101
-  imagePullSecrets: *imagePullSecrets
   image:
     repository: wandb/frontend-nginx
     tag: latest
@@ -1902,7 +1951,6 @@ frontend:
 
 settingsMigrationJob:
   install: false
-  imagePullSecrets: *imagePullSecrets
   image:
     repository: wandb/megabinary
     tag: latest
