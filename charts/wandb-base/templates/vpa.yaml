@@ -1,4 +1,6 @@
-{{- if .Values.autoscaling.vertical.enabled }}
+{{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
+{{- $vpaSizing := merge .Values.autoscaling.vertical (default (dict) $sizingInfo.autoscaling.vertical) }}
+{{- if $vpaSizing.enabled }}
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
@@ -11,10 +13,10 @@ spec:
     kind: {{ .Values.kind }}
     name: {{ include "wandb-base.fullname" . }}
   updatePolicy:
-    updateMode: {{ .Values.autoscaling.vertical.updateMode }}
+    updateMode: {{ $vpaSizing.updateMode }}
   resourcePolicy:
     containerPolicies:
-      {{- with .Values.autoscaling.vertical.containerPolicies }}
+      {{- with $vpaSizing.containerPolicies }}
       {{- toYaml . | nindent 6 }}
       {{- end }}
 {{- end }}
