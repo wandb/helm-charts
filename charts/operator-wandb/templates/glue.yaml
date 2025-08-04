@@ -1,19 +1,55 @@
 apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ .Release.Name }}-glue-secret
-  labels:
-    {{- include "wandb.commonLabels" . | nindent 4 }}
-stringData:
-
----
-apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-glue-configmap
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
+  # Basic service configuration
+  GORILLA_GLUE_CONTAINER_PORT: "8080"
+
+  GORILLA_GLUE_FRONTEND_HOST: "{{ .Values.global.host }}"
+  GORILLA_GLUE_LICENSE_CERT_PATH: "/jwks.json"
+
+  # Values that correspond to existing configurations from gorilla.yaml
+  GORILLA_GLUE_SWEEP_PROVIDER: "{{ .Values.global.sweepProvider | default (printf "http://%s-app:8082" .Release.Name) }}"
+  GORILLA_GLUE_SESSION_LENGTH: "{{ .Values.global.auth.sessionLengthHours }}h"
+  GORILLA_GLUE_DEV: "false"
+  GORILLA_GLUE_USE_PARQUET_HISTORY_STORE: "true"
+  GORILLA_GLUE_COLLECT_AUDIT_LOGS: "true"
+  GORILLA_GLUE_TASK_QUEUE_WORKER_ENABLED: "false"
+  GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
+  GORILLA_GLUE_DEFAULT_REGION: "minio-local"
+  GORILLA_GLUE_DISABLE_TELEMETRY: "true"
+  GORILLA_GLUE_FILE_STORE_IS_PROXIED: "false"
+
+  GORILLA_GLUE_ARTIFACT_GC_ENABLED: "false"
+  GORILLA_ARTIFACTS_GC_BATCH_SIZE: {{ .Values.artifactsGc.BatchSize | quote }}
+  GORILLA_ARTIFACTS_GC_NUM_WORKERS: {{ .Values.artifactsGc.NumWorkers | quote }}
+  GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS: {{ .Values.artifactsGc.DeleteFilesNumWorkers | quote }}
+
+  # Task configuration (existing values)
   GORILLA_GLUE_TASK_PROVIDER: "memory://"
   GORILLA_GLUE_TASK_CONFIG_PATH: "/gorilla_glue_tasks_local.yaml"
   GORILLA_GLUE_TASK_STORE: "memory://"
+
+  # ClickHouse configuration using existing clickhouse variables
+  {{- if .Values.global.clickhouse.host }}
+  GORILLA_GLUE_CLICKHOUSE_ADDRESS: "http://$(WF_CLICKHOUSE_HOST):$(WF_CLICKHOUSE_PORT)"
+  {{- end }}
+
+  # Activity store configuration
+  GORILLA_GLUE_ACTIVITY_STORE_ENABLE: "true"
+  GORILLA_GLUE_ACTIVITY_STORE_SERVE: "true"
+  GORILLA_GLUE_ACTIVITY_STORE_BACKFILL_ENABLE: "true"
+
+  # Monitoring configurations
+  {{- if and .Values.global .Values.global.observability }}
+    {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
+  GORILLA_GLUE_STATSD_HOST: "0.0.0.0"
+  GORILLA_GLUE_STATSD_PORT: "8125"
+    {{- end }}
+  {{- end }}
+
+  # Clear task dedupe key configuration
+  GORILLA_GLUE_CLEAR_TASK_DEDUPE_KEY_ENABLED: "false"

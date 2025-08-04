@@ -1,14 +1,39 @@
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-global-configmap
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
+  {{- if and .Values.global .Values.global.observability }}
+    {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
+  GORILLA_STATSD_HOST: "0.0.0.0"
+    {{- end }}
+  {{- end }}
+
+  GORILLA_STATSD_PORT: "8125"
+  # T-shirt size for deployment
+  GORILLA_TSHIRT_SIZE: {{ .Values.global.size | default "small" | quote }}
+  GORILLA_ONPREM: "true"
+
+  ONPREM: "true"
+
+---
+apiVersion: v1
 kind: Secret
 metadata:
   name: {{ .Release.Name }}-global-secret
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-stringData:
-  {{- range $key, $value := .Values.global.extraEnv }}
-  {{ $key }}: {{ $value | quote }}
-  {{- end }}
-  {{- if ne (.Values.global.statsig.apiKey | default "") "" }}
-  GORILLA_STATSIG_KEY: {{ .Values.global.statsig.apiKey | quote }}
+data:
+  GORILLA_STATSIG_KEY: {{ default "" .Values.global.statsig.apiKey | b64enc }}
+  GORILLA_EMAIL_SINK: {{ include "wandb.emailSink" . | b64enc }}
+  GORILLA_SLACK_CLIENT_ID: {{ default "" .Values.global.slack.clientId | b64enc }}
+  GORILLA_SLACK_SECRET: {{ default "" .Values.global.slack.secret | b64enc }}
+  {{- if ne .Values.global.auth.oidc.clientId ""  }}
+  GORILLA_OIDC_CLIENT_SECRET: {{ .Values.global.auth.oidc.secret }}
   {{- end }}
 
+  SLACK_CLIENT_ID: {{ default "" .Values.global.slack.clientId | b64enc }}
+  SLACK_SECRET: {{ default "" .Values.global.slack.secret | b64enc }}
