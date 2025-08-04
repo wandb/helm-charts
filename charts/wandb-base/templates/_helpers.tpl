@@ -67,7 +67,7 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{- define "wandb-base.reloaderannotations" -}}
+{{- define "wandb-base.reloaderAnnotations" -}}
 {{- $configmaps := "" }}
 {{- $secrets := "" }}
 {{- range $name, $type := .Values.envFrom }}
