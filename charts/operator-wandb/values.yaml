@@ -269,1218 +269,13 @@ ingress:
       server: https://acme-v02.api.letsencrypt.org/directory
       email: support@wandb.com
 
+nameOverride: ""
+fullnameOverride: ""
+
 artifactsGc:
   BatchSize: 0
   NumWorkers: 0
   DeleteFilesNumWorkers: 0
-
-parquet:
-  install: true
-  deploymentPostfix: "bc"
-  image:
-    repository: wandb/megabinary
-    tag: latest
-  fuse:
-    enabled: false
-    resources:
-      requests:
-        cpu: 1
-        memory: 1Gi
-      limits:
-        cpu: 2
-        memory: 2Gi
-        ephemeral-storage: 10Gi
-    fileCacheCapacity: 9.5Gi
-  envFrom:
-    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
-    "{{ .Release.Name }}-global-secret": "secretRef"
-    "{{ .Release.Name }}-parquet-configmap": "configMapRef"
-    "{{ .Release.Name }}-parquet-secret": "secretRef"
-  envTpls:
-    - '{{ include "wandb.downwardEnvs" . }}'
-    - '{{ include "wandb.bucketEnvs" . }}'
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.queueEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
-    - '{{ include "wandb.observabilityEnvs" . }}'
-    - '{{ include "wandb.license" . }}'
-  podAnnotationsTpl:
-    - '{{ include "wandb.gksFuseAnnotations" . }}'
-  containers:
-    parquet:
-      args: ["parquet"]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
-  cronJobs:
-    parquet-backfill:
-      containers:
-        backfill-job:
-          args: ["glue"]
-          env:
-            GORILLA_GLUE_EXECUTE: "true"
-            GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
-          envFrom:
-            "{{ .Release.Name }}-glue-configmap": "configMapRef"
-      concurrencyPolicy: Forbid
-      schedule: "* * * * *"
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
-
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
-  size: ""
-  sizing:
-    small:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 16Gi
-        requests:
-          cpu: "1"
-          memory: 8Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 2
-          minReplicas: 2
-    medium:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 32Gi
-        requests:
-          cpu: "2"
-          memory: 24Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 3
-          minReplicas: 2
-    large:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 32Gi
-        requests:
-          cpu: "3"
-          memory: 24Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 4
-          minReplicas: 2
-    xlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 32Gi
-        requests:
-          cpu: "3"
-          memory: 24Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 5
-          minReplicas: 2
-    xxlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 64Gi
-        requests:
-          cpu: "3"
-          memory: 48Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 6
-          minReplicas: 2
-
-app:
-  install: true
-  deploymentPostfix: "bc"
-  image:
-    repository: wandb/local
-    tag: latest
-  # TODO(dpanzella) Read from here for backwards compatability, needs to be moved so API can access as well
-  internalJWTMap:
-    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace"
-      issuer: "https://kubernetes.default.svc.cluster.local"
-  env:
-    GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
-    GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE: "/usr/local/bin/view-spec-updater-linux"
-    GORILLA_GLUE_CONTAINER_PORT: "8083"
-    BUCKET_QUEUE: internal://
-    GORILLA_TASK_CONFIG_PATH: "/etc/service/gorilla-glue/glue_tasks_local.yaml"
-    GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/usr/local/bin/view-spec-updater-linux"
-  envFrom:
-    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
-    "{{ .Release.Name }}-global-secret": "secretRef"
-    "{{ .Release.Name }}-api-secret": "secretRef"
-    "{{ .Release.Name }}-api-configmap": "configMapRef"
-    "{{ .Release.Name }}-glue-secret": "secretRef"
-    "{{ .Release.Name }}-glue-configmap": "configMapRef"
-    "{{ .Release.Name }}-gorilla-session-key": "secretRef"
-    "{{ .Release.Name }}-frontend-configmap": "configMapRef"
-    "{{ .Release.Name }}-app-configmap": "configMapRef"
-    "{{ .Release.Name }}-app-secret": "secretRef"
-  envTpls:
-    - '{{ include "wandb.downwardEnvs" . }}'
-    - '{{ include "wandb.bucketEnvs" . }}'
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.queueEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
-    - '{{ include "wandb.observabilityEnvs" . }}'
-    - '{{ include "wandb.license" . }}'
-  service:
-    ports:
-      - port: 8080
-        protocol: TCP
-        name: app
-      - port: 8181
-        protocol: TCP
-        name: prometheus
-      - port: 8082
-        protocol: TCP
-        name: anaconda
-      - port: 8083
-        protocol: TCP
-        name: local
-  initContainers:
-    init-db:
-      image:
-        repository: wandb/local
-        tag: latest
-      command:
-        [
-          "bash",
-          "-c",
-          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
-        ]
-  containers:
-    app:
-      ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-        - name: prometheus
-          containerPort: 8181
-          protocol: TCP
-        - name: anaconda
-          containerPort: 8082
-          protocol: TCP
-        - name: local
-          containerPort: 8083
-          protocol: TCP
-        - name: gorilla-statsd
-          containerPort: 8125
-          protocol: TCP
-      livenessProbe:
-        httpGet:
-          path: /healthz
-          port: http
-      readinessProbe:
-        httpGet:
-          path: /ready
-          port: http
-        initialDelaySeconds: 20
-        periodSeconds: 5
-      startupProbe:
-        httpGet:
-          path: /ready
-          port: http
-        initialDelaySeconds: 20
-        periodSeconds: 5
-        failureThreshold: 120
-      lifecycle:
-        preStop:
-          exec:
-            command: ["sleep", "25"]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
-  role:
-    create: true
-    rules:
-      - apiGroups: [""]
-        resources: ["secrets"]
-        verbs: ["get", "create", "update", "delete"]
-      - apiGroups: [""]
-        resources: ["namespaces"]
-        verbs: ["get"]
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
-  size: ""
-  sizing:
-    small:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
-    medium:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "2"
-          memory: 4Gi
-    large:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "2"
-          memory: 4Gi
-    xlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "2"
-          memory: 4Gi
-    xxlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "2"
-          memory: 4Gi
-
-nginx:
-  install: false
-
-weave:
-  install: true
-  deploymentPostfix: "bc"
-  cache:
-    intervalInHours: 24
-    size: 20Gi
-    medium: ""
-  image:
-    repository: wandb/weave-python
-    tag: latest
-  service:
-    ports:
-      - port: 9994
-        protocol: TCP
-        name: weave
-  envFrom:
-    "{{ .Release.Name }}-weave-configmap": "configMapRef"
-  containers:
-    weave:
-      ports:
-        - name: http
-          containerPort: 9994
-          protocol: TCP
-      livenessProbe:
-        httpGet:
-          path: /__weave/hello
-          port: http
-      readinessProbe:
-        httpGet:
-          path: /__weave/hello
-          port: http
-      startupProbe:
-        httpGet:
-          path: /__weave/hello
-          port: http
-        failureThreshold: 12
-        periodSeconds: 10
-      volumeMounts:
-        - name: cache
-          mountPath: /vol/weave/cache
-    weave-cache-clear:
-      command:
-        - python
-        - weave-public/weave_query/scripts/clear_cache.py
-      resources:
-        requests:
-          cpu: 100m
-          memory: 128Mi
-      volumeMounts:
-        - name: cache
-          mountPath: /vol/weave/cache
-  volumes:
-    - name: cache
-      emptyDir:
-        sizeLimit: '{{ .Values.cache.size }}'
-        medium: '{{ .Values.cache.medium }}'
-  size: ""
-  sizing:
-    small:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 16Gi
-        requests:
-          cpu: "1"
-          memory: 8Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 2
-          minReplicas: 2
-    medium:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 32Gi
-        requests:
-          cpu: "2"
-          memory: 24Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 3
-          minReplicas: 2
-    large:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 32Gi
-        requests:
-          cpu: "3"
-          memory: 24Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 4
-          minReplicas: 2
-    xlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 32Gi
-        requests:
-          cpu: "3"
-          memory: 24Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 5
-          minReplicas: 2
-    xxlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 64Gi
-        requests:
-          cpu: "3"
-          memory: 48Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 6
-          minReplicas: 2
-
-weave-trace:
-  install: false
-  deploymentPostfix: "bc"
-  image:
-    repository: wandb/weave-trace
-    tag: latest
-  datadog:
-    enabled: false
-  envFrom:
-    "{{ .Release.Name }}-global-secret": "secretRef"
-    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
-    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
-  env:
-    WF_CLICKHOUSE_PASS:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-          key: '{{ .Values.global.clickhouse.passwordSecret.passwordKey }}'
-  initContainers:
-    weave-trace-migrate:
-      command: ["python", "migrator.py"]
-  containers:
-    weave-trace:
-      ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-  service:
-    ports:
-      - name: http
-        port: 8722
-        protocol: TCP
-  size: ""
-  sizing:
-    small:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "1"
-          memory: 4Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 2
-          minReplicas: 2
-    medium:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "2"
-          memory: 4Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 3
-          minReplicas: 1
-    large:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "3"
-          memory: 6Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 4
-          minReplicas: 2
-    xlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "3"
-          memory: 6Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 5
-          minReplicas: 2
-    xxlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "3"
-          memory: 6Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 6
-          minReplicas: 2
-
-console:
-  install: true
-  deploymentPostfix: "bc"
-  service:
-    enabled: true
-    type: ClusterIP
-    loadBalancerHealthCheckPath: "/console/api/healthz"
-    ports:
-    - port: 8082
-      protocol: TCP
-      name: console
-  image:
-    repository: wandb/console
-    tag: latest
-  envFrom:
-    "{{ .Release.Name }}-console-configmap": "configMapRef"
-  proxy:
-    httpProxy: ""
-    httpsProxy: ""
-    noProxy: ""
-    debug: false
-  containers:
-    console:
-      ports:
-        - name: http
-          containerPort: 8082
-          protocol: TCP
-      livenessProbe:
-        httpGet:
-          path: /console/api/healthz
-          port: http
-      readinessProbe:
-        httpGet:
-          path: /console/api/ready
-          port: http
-        initialDelaySeconds: 20
-        periodSeconds: 5
-      startupProbe:
-        httpGet:
-          path: /console/api/ready
-          port: http
-        initialDelaySeconds: 20
-        periodSeconds: 5
-        failureThreshold: 120
-      resources:
-        requests:
-          cpu: "1"
-          memory: "1Gi"
-        limits:
-          cpu: "2"
-          memory: "2Gi"
-  role:
-    create: true
-    type: ClusterRole
-    rules:
-      - apiGroups: [""]
-        resources: ["secrets"]
-        verbs: ["get", "list", "watch", "patch", "create"]
-      - apiGroups: [""]
-        resources: ["namespaces", "pods", "pods/log", "configmaps", "services", "serviceaccounts", "events"]
-        verbs: ["get", "list"]
-      - apiGroups: ["apps"]
-        resources: ["deployments", "statefulsets", "daemonsets", "replicasets", "controllerrevisions"]
-        verbs: ["get", "list"]
-      - apiGroups: ["apps"]
-        resources: ["deployments/status", "statefulsets/status", "daemonsets/status", "replicasets/status"]
-        verbs: ["get"]
-      - apiGroups: ["apps.wandb.com"]
-        resources: ["weightsandbiases"]
-        verbs: ["get"]
-
-flat-run-fields-updater:
-  install: false
-  deploymentPostfix: "bc"
-  pubsub:
-    subscriptions: ""
-  service:
-    enabled: false
-  autoscaling:
-    horizontal:
-      enabled: true
-      maxReplicas: 10
-      minReplicas: 1
-      targetCPUUtilizationPercentage: 80
-      # targetMemoryUtilizationPercentage: 80
-  terminationGracePeriodSeconds: 60
-  env:
-    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
-      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
-  envFrom:
-    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
-    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-configmap": "configMapRef"
-    "{{ .Release.Name }}-global-secret": "secretRef"
-    "{{ .Release.Name }}-flat-run-fields-updater-secret": "secretRef"
-    "{{ .Release.Name }}-flat-run-fields-updater-configmap": "configMapRef"
-  envTpls:
-    - '{{ include "wandb.downwardEnvs" . }}'
-    - '{{ include "wandb.bucketEnvs" . }}'
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.queueEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
-    - '{{ include "wandb.observabilityEnvs" . }}'
-    - '{{ include "wandb.license" . }}'
-  containers:
-    flat-run-fields-updater:
-      args: ["flat-run-fields-updater"]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
-  image:
-    repository: wandb/megabinary
-    tag: latest
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
-  size: ""
-  sizing:
-    small:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 2
-          minReplicas: 1
-    medium:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 3
-          minReplicas: 1
-    large:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 3Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 4
-          minReplicas: 1
-    xlarge:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 3Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 5
-          minReplicas: 1
-    xxlarge:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 3Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 6
-          minReplicas: 1
-
-filestream:
-  install: false
-  deploymentPostfix: "bc"
-  service:
-    enabled: false
-  autoscaling:
-    horizontal:
-      enabled: false
-  terminationGracePeriodSeconds: 60
-  envFrom:
-    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
-    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-configmap": "configMapRef"
-    "{{ .Release.Name }}-global-secret": "secretRef"
-    "{{ .Release.Name }}-filestream-secret": "secretRef"
-    "{{ .Release.Name }}-filestream-configmap": "configMapRef"
-  envTpls:
-    - '{{ include "wandb.downwardEnvs" . }}'
-    - '{{ include "wandb.bucketEnvs" . }}'
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.queueEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
-    - '{{ include "wandb.observabilityEnvs" . }}'
-    - '{{ include "wandb.license" . }}'
-  env:
-    GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
-      value: '{{ include "wandb.fileStreamStoreConsumer" . }}'
-  containers:
-    filestream:
-      args: ["filestream"]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
-  image:
-    repository: wandb/megabinary
-    tag: latest
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
-  size: ""
-  sizing:
-    small:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 2
-          minReplicas: 1
-    medium:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 3
-          minReplicas: 1
-    large:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "3"
-          memory: 6Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 4
-          minReplicas: 1
-    xlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "3"
-          memory: 6Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 5
-          minReplicas: 1
-    xxlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "3"
-          memory: 6Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 6
-          minReplicas: 1
-executor:
-  install: false
-  deploymentPostfix: "bc"
-  service:
-    enabled: false
-  autoscaling:
-    horizontal:
-      enabled: false
-  terminationGracePeriodSeconds: 60
-  envFrom:
-    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
-    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-configmap": "configMapRef"
-    "{{ .Release.Name }}-global-secret": "secretRef"
-    "{{ .Release.Name }}-executor-secret": "secretRef"
-    "{{ .Release.Name }}-executor-configmap": "configMapRef"
-  envTpls:
-    - '{{ include "wandb.downwardEnvs" . }}'
-    - '{{ include "wandb.bucketEnvs" . }}'
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.queueEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
-    - '{{ include "wandb.observabilityEnvs" . }}'
-    - '{{ include "wandb.license" . }}'
-  containers:
-    executor:
-      args: ["executor"]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
-  image:
-    repository: wandb/megabinary
-    tag: latest
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
-  size: ""
-  sizing:
-    small:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 16Gi
-        requests:
-          cpu: "1"
-          memory: 8Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 2
-          minReplicas: 1
-    medium:
-      resources:
-        limits:
-          cpu: "6"
-          memory: 32Gi
-        requests:
-          cpu: "4"
-          memory: 24Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 3
-          minReplicas: 1
-    large:
-      resources:
-        limits:
-          cpu: "6"
-          memory: 32Gi
-        requests:
-          cpu: "4"
-          memory: 24Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 4
-          minReplicas: 2
-    xlarge:
-      resources:
-        limits:
-          cpu: "6"
-          memory: 32Gi
-        requests:
-          cpu: "4"
-          memory: 24Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 5
-          minReplicas: 2
-    xxlarge:
-      resources:
-        limits:
-          cpu: "6"
-          memory: 64Gi
-        requests:
-          cpu: "4"
-          memory: 48Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 6
-          minReplicas: 2
-
-mysql:
-  install: false
-  persistence:
-    size: 20Gi
-    storageClass: ""
-
-yace:
-  install: false
-  regions: ["ap-south-1"]
-  pod:
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "5000"
-      prometheus.io/path: "/metrics"
-      prometheus.io/scheme: http
-
-redis:
-  install: true
-  nameOverride: "redis"
-  architecture: standalone
-  auth:
-    enabled: false
-    existingSecret: '{{ include "wandb.redis.passwordSecret" . }}'
-    existingSecretPasswordKey: "{{ .Values.global.redis.secret.secretKey }}"
-  metrics:
-    enabled: false
-    service:
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9121"
-        prometheus.io/path: "/metrics"
-
-prometheus:
-  install: true
-
-  instance:
-    install: true
-
-  redis-exporter:
-    install: true
-
-  mysql-exporter:
-    install: true
-
-stackdriver:
-  install: false
-  pod:
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "9255"
-      prometheus.io/path: "/metrics"
-      prometheus.io/scheme: http
-
-otel:
-  install: true
-
-  # Consider deploying with a deployment rather than a daemonset to avoid
-  # redundant metrics. In setups where both are scraping the same endpoints,
-  # this redundancy occurs as both scrape the same points.
-  daemonset:
-    install: true
-
-  # By default, we use only the daemonset which, along with the Prometheus
-  # receiver, gathers most necessary metrics.
-  # - To forward Kafka metrics to an external system, you will need to scrape a
-  #   promethus endpoint which causes duplicated metrics that get repoted.
-  deployment:
-    install: false
-
-#   # cannot use install because schema validation will fail.
-#   enabled: true
-
-#   resources:
-#     limits:
-#       cpu: 100m
-#       memory: 200M
-#   configMap:
-#     create: false
-
-#   command:
-#     name: otelcol-contrib
-#     extraArgs: ["--config=/conf/config.yaml"]
-#   extraVolumes:
-#     - name: "otel-config"
-#       configMap:
-#         name: "otel-config"
-#         items:
-#           - key: config
-#             path: config.yaml
-#         defaultMode: 420
-#   extraVolumeMounts:
-#     - name: "otel-config"
-#       mountPath: /conf/config.yaml
-
-nameOverride: ""
-fullnameOverride: ""
-
-# It is *strongly* recommended to supply passwords yourself for production installs.
-kafka:
-  install: false
-  controller:
-    persistence:
-      size: 30Gi
-  sasl:
-    interbroker:
-      password: "inter-broker"
-    controller:
-      password: "controller-pw"
-    # The client usernames and passwords are alias references from the global values section at the beginning of this file.
-    # Please update the values there to ensure proper propagation to the application
-    client:
-      users:
-        - *kafkaUser
-      passwords: *kafkaPassword
-    existingSecret: *kafkaSecretName
-
-  kraft:
-    # This field is a UUID. It is *strongly* recommended to supply a new UUID yourself for production installs.
-    clusterId: "ffFF1H3AQKGdBnsqAbJKew"
-  metrics:
-    jmx:
-      enabled: true
-
-etcd:
-  replicaCount: 3
-  persistence:
-    enabled: true
-    size: 10Gi
-  autoCompactionMode: periodic
-  autoCompactionRetention: 30s
-  removeMemberOnContainerTermination: false
-  resourcesPreset: none
-  auth:
-    rbac:
-      create: false
-      enabled: false
-    token:
-      enabled: false
-  metrics:
-    useSeparateEndpoint: true
-  customLivenessProbe:
-    httpGet:
-      port: 9090
-      path: /livez
-      scheme: "HTTP"
-    initialDelaySeconds: 10
-    periodSeconds: 30
-    timeoutSeconds: 15
-    failureThreshold: 10
-  customReadinessProbe:
-    httpGet:
-      port: 9090
-      path: /readyz
-      scheme: "HTTP"
-    initialDelaySeconds: 20
-    timeoutSeconds: 10
-  extraEnvVars:
-    - name: ETCD_LISTEN_CLIENT_HTTP_URLS
-      value: "http://0.0.0.0:8080"
-
-bufstream:
-  install: false
-  storage:
-    use: '{{ (include "wandb.bucket" . | fromYaml).provider }}'
-    gcs:
-      bucket: '{{ include "wandb.bufstream.bucket.name" . }}'
-    s3:
-      bucket: '{{ include "wandb.bufstream.bucket.name" . }}'
-      accessKeyId: '{{ (include "wandb.bucket" . | fromYaml).accessKey }}'
-      secretName: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
-      secretKeyName: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
-      region: '{{ (include "wandb.bucket" . | fromYaml).region }}'
-      endpoint: '{{ include "wandb.bufstream.bucket.endpoint" . }}'
-  metadata:
-    use: etcd
-    etcd:
-      addresses:
-        - host: "{{ .Release.Name }}-etcd.{{ .Release.Namespace }}.svc.cluster.local"
-          port: 2379
-  bufstream:
-    deployment:
-      resources:
-        requests:
-          cpu: "1"
-          memory: 4Gi
-
-glue:
-  service:
-    enabled: false
-  envFrom:
-    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
-    "{{ .Release.Name }}-global-secret": "secretRef"
-    "{{ .Release.Name }}-glue-secret": "secretRef"
-    "{{ .Release.Name }}-glue-configmap": "configMapRef"
-  envTpls:
-    - '{{ include "wandb.downwardEnvs" . }}'
-    - '{{ include "wandb.bucketEnvs" . }}'
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.queueEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
-    - '{{ include "wandb.observabilityEnvs" . }}'
-    - '{{ include "wandb.license" . }}'
-  initContainers:
-    init-db:
-      image:
-        repository: wandb/local
-        tag: latest
-      command:
-        [
-          "bash",
-          "-c",
-          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
-        ]
-    migrate-db:
-      command:
-        [
-          "bash",
-          "-c",
-          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
-        ]
-  containers:
-    glue:
-      args: ["glue"]
-      env: {}
-      envFrom: {}
-      ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-      livenessProbe:
-        httpGet:
-          path: /healthz
-          port: 8080
-        initialDelaySeconds: 30
-        periodSeconds: 1
-        timeoutSeconds: 1
-        successThreshold: 1
-        failureThreshold: 3
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
-  image:
-    repository: wandb/megabinary
-    tag: latest
-  role:
-    create: true
-    rules:
-      - apiGroups: [""]
-        resources: ["secrets"]
-        verbs: ["get", "create", "update", "delete"]
-      - apiGroups: [""]
-        resources: ["namespaces"]
-        verbs: ["get"]
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
-  size: ""
-  sizing:
-    small:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 1Gi
-    medium:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
-    large:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
-    xlarge:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
-    xxlarge:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
 
 api:
   service:
@@ -1638,6 +433,336 @@ api:
           maxReplicas: 6
           minReplicas: 2
 
+app:
+  install: true
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/local
+    tag: latest
+  # TODO(dpanzella) Read from here for backwards compatability, needs to be moved so API can access as well
+  internalJWTMap:
+    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace"
+      issuer: "https://kubernetes.default.svc.cluster.local"
+  env:
+    GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
+    GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE: "/usr/local/bin/view-spec-updater-linux"
+    GORILLA_GLUE_CONTAINER_PORT: "8083"
+    BUCKET_QUEUE: internal://
+    GORILLA_TASK_CONFIG_PATH: "/etc/service/gorilla-glue/glue_tasks_local.yaml"
+    GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/usr/local/bin/view-spec-updater-linux"
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-api-secret": "secretRef"
+    "{{ .Release.Name }}-api-configmap": "configMapRef"
+    "{{ .Release.Name }}-glue-secret": "secretRef"
+    "{{ .Release.Name }}-glue-configmap": "configMapRef"
+    "{{ .Release.Name }}-gorilla-session-key": "secretRef"
+    "{{ .Release.Name }}-frontend-configmap": "configMapRef"
+    "{{ .Release.Name }}-app-configmap": "configMapRef"
+    "{{ .Release.Name }}-app-secret": "secretRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+  service:
+    enabled: true
+    ports:
+      - port: 8080
+        protocol: TCP
+        name: app
+      - port: 8181
+        protocol: TCP
+        name: prometheus
+      - port: 8082
+        protocol: TCP
+        name: anaconda
+      - port: 8083
+        protocol: TCP
+        name: local
+  initContainers:
+    init-db:
+      image:
+        repository: wandb/local
+        tag: latest
+      command:
+        [
+          "bash",
+          "-c",
+          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+        ]
+  containers:
+    app:
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: prometheus
+          containerPort: 8181
+          protocol: TCP
+        - name: anaconda
+          containerPort: 8082
+          protocol: TCP
+        - name: local
+          containerPort: 8083
+          protocol: TCP
+        - name: gorilla-statsd
+          containerPort: 8125
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: http
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: http
+        initialDelaySeconds: 20
+        periodSeconds: 5
+      startupProbe:
+        httpGet:
+          path: /ready
+          port: http
+        initialDelaySeconds: 20
+        periodSeconds: 5
+        failureThreshold: 120
+      lifecycle:
+        preStop:
+          exec:
+            command: ["sleep", "25"]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get", "create", "update", "delete"]
+      - apiGroups: [""]
+        resources: ["namespaces"]
+        verbs: ["get"]
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+    medium:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+
+console:
+  install: true
+  deploymentPostfix: "bc"
+  service:
+    enabled: true
+    type: ClusterIP
+    loadBalancerHealthCheckPath: "/console/api/healthz"
+    ports:
+    - port: 8082
+      protocol: TCP
+      name: console
+  image:
+    repository: wandb/console
+    tag: latest
+  envFrom:
+    "{{ .Release.Name }}-console-configmap": "configMapRef"
+  proxy:
+    httpProxy: ""
+    httpsProxy: ""
+    noProxy: ""
+    debug: false
+  containers:
+    console:
+      ports:
+        - name: http
+          containerPort: 8082
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /console/api/healthz
+          port: http
+      readinessProbe:
+        httpGet:
+          path: /console/api/ready
+          port: http
+        initialDelaySeconds: 20
+        periodSeconds: 5
+      startupProbe:
+        httpGet:
+          path: /console/api/ready
+          port: http
+        initialDelaySeconds: 20
+        periodSeconds: 5
+        failureThreshold: 120
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"
+  role:
+    create: true
+    type: ClusterRole
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get", "list", "watch", "patch", "create"]
+      - apiGroups: [""]
+        resources: ["namespaces", "pods", "pods/log", "configmaps", "services", "serviceaccounts", "events"]
+        verbs: ["get", "list"]
+      - apiGroups: ["apps"]
+        resources: ["deployments", "statefulsets", "daemonsets", "replicasets", "controllerrevisions"]
+        verbs: ["get", "list"]
+      - apiGroups: ["apps"]
+        resources: ["deployments/status", "statefulsets/status", "daemonsets/status", "replicasets/status"]
+        verbs: ["get"]
+      - apiGroups: ["apps.wandb.com"]
+        resources: ["weightsandbiases"]
+        verbs: ["get"]
+
+executor:
+  install: false
+  deploymentPostfix: "bc"
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-executor-secret": "secretRef"
+    "{{ .Release.Name }}-executor-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+  containers:
+    executor:
+      args: ["executor"]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 16Gi
+        requests:
+          cpu: "1"
+          memory: 8Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          cpu: "6"
+          memory: 32Gi
+        requests:
+          cpu: "4"
+          memory: 24Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "6"
+          memory: 32Gi
+        requests:
+          cpu: "4"
+          memory: 24Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "6"
+          memory: 32Gi
+        requests:
+          cpu: "4"
+          memory: 24Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "6"
+          memory: 64Gi
+        requests:
+          cpu: "4"
+          memory: 48Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+
 filemeta:
   install: false
   image:
@@ -1722,6 +847,210 @@ filemeta:
         requests:
           cpu: "1"
           memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 1
+
+filestream:
+  install: false
+  deploymentPostfix: "bc"
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-filestream-secret": "secretRef"
+    "{{ .Release.Name }}-filestream-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+  env:
+    GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
+      value: '{{ include "wandb.fileStreamStoreConsumer" . }}'
+  containers:
+    filestream:
+      args: ["filestream"]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 1
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 1
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 1
+
+flat-run-fields-updater:
+  install: false
+  deploymentPostfix: "bc"
+  pubsub:
+    subscriptions: ""
+  env:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-flat-run-fields-updater-secret": "secretRef"
+    "{{ .Release.Name }}-flat-run-fields-updater-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+  containers:
+    flat-run-fields-updater:
+      args: ["flat-run-fields-updater"]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 1
+    xlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 1
+    xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -1837,13 +1166,278 @@ frontend:
           maxReplicas: 6
           minReplicas: 2
 
+glue:
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-glue-secret": "secretRef"
+    "{{ .Release.Name }}-glue-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+  initContainers:
+    init-db:
+      image:
+        repository: wandb/local
+        tag: latest
+      command:
+        [
+          "bash",
+          "-c",
+          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+        ]
+    migrate-db:
+      command:
+        [
+          "bash",
+          "-c",
+          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
+        ]
+  containers:
+    glue:
+      args: ["glue"]
+      env: {}
+      envFrom: {}
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        initialDelaySeconds: 30
+        periodSeconds: 1
+        timeoutSeconds: 1
+        successThreshold: 1
+        failureThreshold: 3
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get", "create", "update", "delete"]
+      - apiGroups: [""]
+        resources: ["namespaces"]
+        verbs: ["get"]
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+    large:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+    xlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+    xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+
+parquet:
+  install: true
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  service:
+    enabled: true
+    ports:
+      - port: 8087
+        protocol: TCP
+        name: parquet
+  fuse:
+    enabled: false
+    resources:
+      requests:
+        cpu: 1
+        memory: 1Gi
+      limits:
+        cpu: 2
+        memory: 2Gi
+        ephemeral-storage: 10Gi
+    fileCacheCapacity: 9.5Gi
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-parquet-configmap": "configMapRef"
+    "{{ .Release.Name }}-parquet-secret": "secretRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+  podAnnotationsTpl:
+    - '{{ include "wandb.gksFuseAnnotations" . }}'
+  containers:
+    parquet:
+      args: ["parquet"]
+      ports:
+        - name: parquet
+          containerPort: 8087
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8087
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8087
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  cronJobs:
+    parquet-backfill:
+      containers:
+        backfill-job:
+          args: ["glue"]
+          env:
+            GORILLA_GLUE_EXECUTE: "true"
+            GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
+          envFrom:
+            "{{ .Release.Name }}-glue-configmap": "configMapRef"
+      concurrencyPolicy: Forbid
+      schedule: "* * * * *"
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 16Gi
+        requests:
+          cpu: "1"
+          memory: 8Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
+    medium:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 32Gi
+        requests:
+          cpu: "2"
+          memory: 24Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 2
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 32Gi
+        requests:
+          cpu: "3"
+          memory: 24Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 32Gi
+        requests:
+          cpu: "3"
+          memory: 24Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 64Gi
+        requests:
+          cpu: "3"
+          memory: 48Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+
 settingsMigrationJob:
   install: false
   image:
     repository: wandb/megabinary
     tag: latest
-  service:
-    enabled: false
   role:
     create: true
     rules:
@@ -1901,6 +1495,444 @@ settingsMigrationJob:
           envFrom:
             "{{ .Release.Name }}-smj-secret": "secretRef"
           args: ["settings-migration-job"]
+
+weave:
+  install: true
+  deploymentPostfix: "bc"
+  cache:
+    intervalInHours: 24
+    size: 20Gi
+    medium: ""
+  image:
+    repository: wandb/weave-python
+    tag: latest
+  service:
+    enabled: true
+    ports:
+      - port: 9994
+        protocol: TCP
+        name: weave
+  envFrom:
+    "{{ .Release.Name }}-weave-configmap": "configMapRef"
+  containers:
+    weave:
+      ports:
+        - name: http
+          containerPort: 9994
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /__weave/hello
+          port: http
+      readinessProbe:
+        httpGet:
+          path: /__weave/hello
+          port: http
+      startupProbe:
+        httpGet:
+          path: /__weave/hello
+          port: http
+        failureThreshold: 12
+        periodSeconds: 10
+      volumeMounts:
+        - name: cache
+          mountPath: /vol/weave/cache
+    weave-cache-clear:
+      command:
+        - python
+        - weave-public/weave_query/scripts/clear_cache.py
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+      volumeMounts:
+        - name: cache
+          mountPath: /vol/weave/cache
+  volumes:
+    - name: cache
+      emptyDir:
+        sizeLimit: '{{ .Values.cache.size }}'
+        medium: '{{ .Values.cache.medium }}'
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 16Gi
+        requests:
+          cpu: "1"
+          memory: 8Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
+    medium:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 32Gi
+        requests:
+          cpu: "2"
+          memory: 24Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 2
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 32Gi
+        requests:
+          cpu: "3"
+          memory: 24Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 32Gi
+        requests:
+          cpu: "3"
+          memory: 24Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 64Gi
+        requests:
+          cpu: "3"
+          memory: 48Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+
+weave-trace:
+  install: false
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/weave-trace
+    tag: latest
+  datadog:
+    enabled: false
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
+  env:
+    WF_CLICKHOUSE_PASS:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
+          key: '{{ .Values.global.clickhouse.passwordSecret.passwordKey }}'
+  initContainers:
+    weave-trace-migrate:
+      command: ["python", "migrator.py"]
+  containers:
+    weave-trace:
+      command:
+        - uvicorn
+      args:
+        - "src.trace_server:app"
+        - "--host"
+        - "0.0.0.0"
+        - "--port"
+        - "8080"
+      livenessProbe:
+        httpGet:
+          path: /traces/health
+          port: http
+        timeoutSeconds: 2
+        failureThreshold: 5
+      readinessProbe:
+        httpGet:
+          path: /traces/health
+          port: http
+        timeoutSeconds: 2
+        failureThreshold: 5
+      startupProbe:
+        httpGet:
+          path: /traces/health
+          port: http
+        failureThreshold: 12
+        periodSeconds: 10
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+  service:
+    enabled: true
+    ports:
+      - name: http
+        port: 8722
+        protocol: TCP
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
+    medium:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+
+nginx:
+  install: false
+
+mysql:
+  install: false
+  persistence:
+    size: 20Gi
+    storageClass: ""
+
+yace:
+  install: false
+  regions: ["ap-south-1"]
+  pod:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "5000"
+      prometheus.io/path: "/metrics"
+      prometheus.io/scheme: http
+
+redis:
+  install: true
+  nameOverride: "redis"
+  architecture: standalone
+  auth:
+    enabled: false
+    existingSecret: '{{ include "wandb.redis.passwordSecret" . }}'
+    existingSecretPasswordKey: "{{ .Values.global.redis.secret.secretKey }}"
+  metrics:
+    enabled: false
+    service:
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9121"
+        prometheus.io/path: "/metrics"
+
+prometheus:
+  install: true
+
+  instance:
+    install: true
+
+  redis-exporter:
+    install: true
+
+  mysql-exporter:
+    install: true
+
+stackdriver:
+  install: false
+  pod:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9255"
+      prometheus.io/path: "/metrics"
+      prometheus.io/scheme: http
+
+otel:
+  install: true
+
+  # Consider deploying with a deployment rather than a daemonset to avoid
+  # redundant metrics. In setups where both are scraping the same endpoints,
+  # this redundancy occurs as both scrape the same points.
+  daemonset:
+    install: true
+
+  # By default, we use only the daemonset which, along with the Prometheus
+  # receiver, gathers most necessary metrics.
+  # - To forward Kafka metrics to an external system, you will need to scrape a
+  #   promethus endpoint which causes duplicated metrics that get repoted.
+  deployment:
+    install: false
+
+#   # cannot use install because schema validation will fail.
+#   enabled: true
+
+#   resources:
+#     limits:
+#       cpu: 100m
+#       memory: 200M
+#   configMap:
+#     create: false
+
+#   command:
+#     name: otelcol-contrib
+#     extraArgs: ["--config=/conf/config.yaml"]
+#   extraVolumes:
+#     - name: "otel-config"
+#       configMap:
+#         name: "otel-config"
+#         items:
+#           - key: config
+#             path: config.yaml
+#         defaultMode: 420
+#   extraVolumeMounts:
+#     - name: "otel-config"
+#       mountPath: /conf/config.yaml
+
+# It is *strongly* recommended to supply passwords yourself for production installs.
+kafka:
+  install: false
+  controller:
+    persistence:
+      size: 30Gi
+  sasl:
+    interbroker:
+      password: "inter-broker"
+    controller:
+      password: "controller-pw"
+    # The client usernames and passwords are alias references from the global values section at the beginning of this file.
+    # Please update the values there to ensure proper propagation to the application
+    client:
+      users:
+        - *kafkaUser
+      passwords: *kafkaPassword
+    existingSecret: *kafkaSecretName
+
+  kraft:
+    # This field is a UUID. It is *strongly* recommended to supply a new UUID yourself for production installs.
+    clusterId: "ffFF1H3AQKGdBnsqAbJKew"
+  metrics:
+    jmx:
+      enabled: true
+
+etcd:
+  replicaCount: 3
+  persistence:
+    enabled: true
+    size: 10Gi
+  autoCompactionMode: periodic
+  autoCompactionRetention: 30s
+  removeMemberOnContainerTermination: false
+  resourcesPreset: none
+  auth:
+    rbac:
+      create: false
+      enabled: false
+    token:
+      enabled: false
+  metrics:
+    useSeparateEndpoint: true
+  customLivenessProbe:
+    httpGet:
+      port: 9090
+      path: /livez
+      scheme: "HTTP"
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 15
+    failureThreshold: 10
+  customReadinessProbe:
+    httpGet:
+      port: 9090
+      path: /readyz
+      scheme: "HTTP"
+    initialDelaySeconds: 20
+    timeoutSeconds: 10
+  extraEnvVars:
+    - name: ETCD_LISTEN_CLIENT_HTTP_URLS
+      value: "http://0.0.0.0:8080"
+
+bufstream:
+  install: false
+  storage:
+    use: '{{ (include "wandb.bucket" . | fromYaml).provider }}'
+    gcs:
+      bucket: '{{ include "wandb.bufstream.bucket.name" . }}'
+    s3:
+      bucket: '{{ include "wandb.bufstream.bucket.name" . }}'
+      accessKeyId: '{{ (include "wandb.bucket" . | fromYaml).accessKey }}'
+      secretName: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
+      secretKeyName: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
+      region: '{{ (include "wandb.bucket" . | fromYaml).region }}'
+      endpoint: '{{ include "wandb.bufstream.bucket.endpoint" . }}'
+  metadata:
+    use: etcd
+    etcd:
+      addresses:
+        - host: "{{ .Release.Name }}-etcd.{{ .Release.Namespace }}.svc.cluster.local"
+          port: 2379
+  bufstream:
+    deployment:
+      resources:
+        requests:
+          cpu: "1"
+          memory: 4Gi
 
 reloader:
   install: false
