@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-api-configmap
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  GORILLA_PORT: "8081"
+  GORILLA_FRONTEND_HOST: "{{ .Values.global.host }}"
+  GORILLA_LICENSE_CERT_PATH: "/jwks.json"
+  GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL: "true"
+  {{- if ne .Values.global.auth.oidc.clientId "" }}
+  GORILLA_OIDC_CLIENT_ID: "{{ .Values.global.auth.oidc.clientId }}"
+  GORILLA_OIDC_AUTH_METHOD: "{{ .Values.global.auth.oidc.authMethod }}"
+  GORILLA_OIDC_ISSUER: "{{ .Values.global.auth.oidc.issuer }}"
+  {{- end }}
+  GORILLA_SESSION_LENGTH: "{{ .Values.global.auth.sessionLengthHours }}h"
+  {{- if .Values.extraCors }}
+  GORILLA_CORS_ORIGINS: "{{ join "," .Values.extraCors }}"
+  {{- end }}
+  GORILLA_SWEEP_PROVIDER: "{{ .Values.global.sweepProvider | default (printf "http://%s-app:8082" .Release.Name) }}"
+  GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
+  GORILLA_LIMITER: "noop://"
+  GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
+  GORILLA_SCHEMA_FILE: "/schema.graphql"
+{{/*  GORILLA_COLLECT_AUDIT_LOGS: "true"*/}}
+  GORILLA_USE_PARQUET_HISTORY_STORE: "true"
+  GORILLA_PARQUET_PORT: "8087"
+  GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648"
+  GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
+  GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
+  GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
+  GORILLA_AUTH_METHOD: implicit
+  {{- if index .Values.global "weave-trace" "enabled" }}
+  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: {{ tpl (include "wandb.internalJWTMap" .) . }}
+  {{- end }}
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-api-secret
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data: {}
