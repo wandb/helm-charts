@@ -5,6 +5,11 @@ settings = {
         "minikube",
         "kind-kind",
     ],
+    "forwardedPorts": {
+        "app": 8080,
+        "console": 8082,
+        "weave-trace": 8722,
+    },
     "installMinio": True,
     "installIngress": False,
     "values": "default",
@@ -37,7 +42,13 @@ else:
 
 allow_k8s_contexts(settings.get("allowed_k8s_contexts"))
 
-current_values = read_yaml(settings["operator-wandb-values"])
+current_values = read_yaml('./charts/operator-wandb/values.yaml')
+local_values = read_yaml(settings["operator-wandb-values"])
+for key, value in local_values.items():
+    if key in current_values:
+        current_values[key].update(value)
+    else:
+        current_values[key] = value
 
 if settings.get("installMinio"):
     k8s_yaml('./test-configs/minio/default.yaml')
@@ -47,7 +58,8 @@ if settings.get("installMinio"):
         objects=[
             'minio:service',
             'minio:namespace'
-        ]
+        ],
+        port_forwards="9090:9090"
     )
 
 if settings.get("installIngress"):
@@ -105,38 +117,59 @@ for key, value in settings["additionalValues"].items():
     helmSetValues.append(key + '=' + value)
 
 k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")], set=helmSetValues))
-k8s_resource('wandb-app', port_forwards=8080, objects=['wandb-app:ServiceAccount:default', 'wandb-app-config:secret:default'])
-k8s_resource('wandb-console', port_forwards=8082, objects=['wandb-console:ServiceAccount:default', 'wandb-console:clusterrole:default', 'wandb-console:clusterrolebinding:default'])
+app_names = {}
+for app in ['app', 'console', 'executor', 'parquet', 'weave', 'weave-trace']:
+    app_names[app] = 'wandb-' + app
+    postfix = current_values.get(app, {}).get('deploymentPostfix', "")
+    if postfix != "":
+        app_names[app] += '-' + postfix
+k8s_resource(app_names['app'], port_forwards=settings["forwardedPorts"]["app"], objects=['wandb-app:ServiceAccount:default'])
+k8s_resource(app_names['console'], port_forwards=settings["forwardedPorts"]["console"], objects=['wandb-console:ServiceAccount:default'])
 if current_values.get('executor', {}).get('install', False):
-    k8s_resource('wandb-executor',objects=['wandb-executor:ServiceAccount:default'])
+    k8s_resource(app_names['executor'],objects=['wandb-executor:ServiceAccount:default'])
 k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)
 k8s_resource('wandb-otel-daemonset',objects=['wandb-otel-daemonset:ServiceAccount:default', 'wandb-otel-daemonset:clusterrole:default', 'wandb-otel-daemonset:clusterrolebinding:default'])
-k8s_resource('wandb-parquet',objects=['wandb-parquet:ServiceAccount:default'])
+k8s_resource(app_names['parquet'],objects=['wandb-parquet:ServiceAccount:default'])
 k8s_resource('wandb-prometheus-server',objects=['wandb-prometheus-server:ServiceAccount:default', 'wandb-prometheus-server:clusterrole:default', 'wandb-prometheus-server:clusterrolebinding:default'])
 k8s_resource('wandb-redis-master',objects=['wandb-redis-master:ServiceAccount:default'])
 if current_values.get('reloader', {}).get('install', False):
     k8s_resource('wandb-reloader',objects=['wandb-reloader:ServiceAccount:default'])
-k8s_resource('wandb-weave',objects=['wandb-weave:ServiceAccount:default'])
+k8s_resource(app_names['weave'],objects=['wandb-weave:ServiceAccount:default'])
 if current_values.get('weave-trace', {}).get('install', False):
-    k8s_resource('wandb-weave-trace', port_forwards=8722)
+    k8s_resource(app_names['weave-trace'], port_forwards=settings["forwardedPorts"]["weave-trace"])
+
+configObjects = [
+    'wandb-api-configmap:configmap:default',
+    'wandb-app-configmap:configmap:default',
+    'wandb-bucket-configmap:configmap:default',
+    'wandb-bucket:secret:default',
+    'wandb-ca-certs:configmap:default',
+    'wandb-clickhouse-configmap:configmap:default',
+    'wandb-console-configmap:configmap:default',
+    'wandb-executor-configmap:configmap:default',
+    'wandb-flat-run-fields-updater-configmap:configmap:default',
+    'wandb-frontend-configmap:configmap:default',
+    'wandb-local-configmap:configmap:default',
+    'wandb-parquet-configmap:configmap:default',
+    'wandb-weave-trace-configmap:configmap:default',
+    'wandb-weave-configmap:configmap:default',
+    'wandb-filestream-configmap:configmap:default',
+    'wandb-global-secret:secret:default',
+    'wandb-glue-configmap:configmap:default',
+    'wandb-kafka-configmap:configmap:default',
+    'wandb-kafka:secret:default',
+    'wandb-mysql-configmap:configmap:default',
+    'wandb-redis-configmap:configmap:default',
+    'wandb-redis-secret:secret:default',
+    'wandb-gorilla-session-key:secret:default',
+]
+
+# if current_values.get('weave-trace', {}).get('install', False):
+#     configObjects.append('wandb-clickhouse-configmap:configmap:default')
+
 k8s_resource(
     new_name='wandb-configs',
-    objects=[
-        'wandb-bucket-configmap:configmap:default',
-        'wandb-bucket:secret:default',
-        'wandb-ca-certs:configmap:default',
-        'wandb-clickhouse-configmap:configmap:default',
-        'wandb-global-secret:secret:default',
-        'wandb-glue-configmap:configmap:default',
-        'wandb-glue-secret:secret:default',
-        'wandb-gorilla-configmap:configmap:default',
-        'wandb-gorilla-secret:secret:default',
-        'wandb-kafka-configmap:configmap:default',
-        'wandb-kafka:secret:default',
-        'wandb-mysql-configmap:configmap:default',
-        'wandb-redis-configmap:configmap:default',
-        'wandb-redis-secret:secret:default',
-    ]
+    objects=configObjects
 )
-k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:default', 'wandb-gorilla-session-key:secret:default', 'wandb-clickhouse:secret:default'], trigger_mode=TRIGGER_MODE_MANUAL)
+k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:default', 'wandb-clickhouse:secret:default'], trigger_mode=TRIGGER_MODE_MANUAL)
 k8s_resource(new_name='PVCs', objects=['wandb-mysql-data:PersistentVolumeClaim:default', 'wandb-prometheus-server:PersistentVolumeClaim:default'], trigger_mode=TRIGGER_MODE_MANUAL)
