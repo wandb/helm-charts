@@ -8,6 +8,7 @@ metadata:
   {{- if .Values.addReloaderAnnotations }}
   annotations:
     {{- tpl (include "wandb-base.reloaderannotations" . | nindent 4) . }}
+    {{- tpl (include "wandb-base.statefulsetAnnotations" . | nindent 4) . }}
   {{- end }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
@@ -17,44 +18,5 @@ spec:
     matchLabels:
       {{- include "wandb-base.selectorLabels" . | nindent 6 }}
   template:
-    metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      labels:
-        {{- include "wandb-base.labels" . | nindent 8 }}
-        {{- with .Values.podLabels }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
-    spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "wandb-base.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      {{- if .Values.initContainers }}
-      initContainers:
-        {{- include "wandb-base.containers" (dict "containers" .Values.initContainers "root" .) | nindent 8 }}
-      {{- end }}
-      containers:
-        {{- include "wandb-base.containers" (dict "containers" .Values.containers "root" .) | nindent 8 }}
-      {{- with .Values.volumes }}
-      volumes:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+    {{- include "wandb-base.pod" (dict "podData" $ "root" $) | nindent 4 }}
 {{- end }}
