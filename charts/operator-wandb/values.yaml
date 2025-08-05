@@ -600,9 +600,9 @@ console:
     type: ClusterIP
     loadBalancerHealthCheckPath: "/console/api/healthz"
     ports:
-    - port: 8082
-      protocol: TCP
-      name: console
+      - port: 8082
+        protocol: TCP
+        name: console
   image:
     repository: wandb/console
     tag: latest
@@ -651,13 +651,35 @@ console:
         resources: ["secrets"]
         verbs: ["get", "list", "watch", "patch", "create"]
       - apiGroups: [""]
-        resources: ["namespaces", "pods", "pods/log", "configmaps", "services", "serviceaccounts", "events"]
+        resources:
+          [
+            "namespaces",
+            "pods",
+            "pods/log",
+            "configmaps",
+            "services",
+            "serviceaccounts",
+            "events",
+          ]
         verbs: ["get", "list"]
       - apiGroups: ["apps"]
-        resources: ["deployments", "statefulsets", "daemonsets", "replicasets", "controllerrevisions"]
+        resources:
+          [
+            "deployments",
+            "statefulsets",
+            "daemonsets",
+            "replicasets",
+            "controllerrevisions",
+          ]
         verbs: ["get", "list"]
       - apiGroups: ["apps"]
-        resources: ["deployments/status", "statefulsets/status", "daemonsets/status", "replicasets/status"]
+        resources:
+          [
+            "deployments/status",
+            "statefulsets/status",
+            "daemonsets/status",
+            "replicasets/status",
+          ]
         verbs: ["get"]
       - apiGroups: ["apps.wandb.com"]
         resources: ["weightsandbiases"]
@@ -1550,8 +1572,8 @@ weave:
   volumes:
     - name: cache
       emptyDir:
-        sizeLimit: '{{ .Values.cache.size }}'
-        medium: '{{ .Values.cache.medium }}'
+        sizeLimit: "{{ .Values.cache.size }}"
+        medium: "{{ .Values.cache.medium }}"
   size: ""
   sizing:
     small:
@@ -1638,7 +1660,7 @@ weave-trace:
       valueFrom:
         secretKeyRef:
           name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-          key: '{{ .Values.global.clickhouse.passwordSecret.passwordKey }}'
+          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
   initContainers:
     weave-trace-migrate:
       command: ["python", "migrator.py"]
@@ -1760,6 +1782,112 @@ weave-trace:
           maxReplicas: 6
           minReplicas: 2
 
+weave-trace-worker:
+  install: false
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/weave-trace
+    tag: latest
+  datadog:
+    enabled: false
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
+  env:
+    WF_CLICKHOUSE_PASS:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
+          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+    WANDB_INTERNAL_SERVICE_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: weave-worker-auth
+          key: key
+  containers:
+    weave-trace-worker:
+      command:
+        - python
+      args:
+        - "-m"
+        - "src.workers.scoring_worker"
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+  service:
+    ports:
+      - name: http
+        port: 8722
+        protocol: TCP
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
+    medium:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
 nginx:
   install: false
 
