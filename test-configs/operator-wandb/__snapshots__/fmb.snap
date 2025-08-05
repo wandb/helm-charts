@@ -1977,6 +1977,31 @@ rules:
   verbs:
   - get
 ---
+# Source: operator-wandb/charts/metric-observer/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chartsnap-metric-observer
+  labels:
+    helm.sh/chart: metric-observer-0.8.0
+    app.kubernetes.io/name: metric-observer
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+---
 # Source: operator-wandb/charts/reloader/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -2095,6 +2120,26 @@ subjects:
 roleRef:
   kind: Role
   name: chartsnap-glue
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: operator-wandb/charts/metric-observer/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chartsnap-metric-observer
+  labels:
+    helm.sh/chart: metric-observer-0.8.0
+    app.kubernetes.io/name: metric-observer
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+- kind: ServiceAccount
+  name: chartsnap-metric-observer
+  namespace: default
+roleRef:
+  kind: Role
+  name: chartsnap-metric-observer
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: operator-wandb/charts/reloader/templates/rolebinding.yaml
@@ -5049,7 +5094,7 @@ spec:
           value: "true"
         - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
           value: "true"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_METRIC_OBSERVER
           value: 'pubsub:/playground-111/run-updates-shadow/metric-observer'
         - name: PUBSUB_EMULATOR_HOST
           value: "pubsub-wandb-base:8085"
@@ -5572,7 +5617,6 @@ spec:
         args:
         - "--log-level=info"
         - "--reload-on-create=true"
-        - "--reload-on-delete=true"
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
