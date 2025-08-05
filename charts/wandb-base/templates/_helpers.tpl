@@ -67,7 +67,7 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{- define "wandb-base.reloaderannotations" -}}
+{{- define "wandb-base.reloaderAnnotations" -}}
 {{- $configmaps := "" }}
 {{- $secrets := "" }}
 {{- range $name, $type := .Values.envFrom }}
@@ -97,4 +97,21 @@ configmap.reloader.stakater.com/reload: {{ $configmaps | trimSuffix "," }}
 secret.reloader.stakater.com/reload: {{ $secrets | trimSuffix "," }}
 {{- end }}
 reloader.stakater.com/auto: "true"
+{{- end }}
+
+{{- define "wandb-base.sizingInfo" }}
+{{- $size := default "" (coalesce .Values.size .Values.global.size) }}
+{{- $sizingInfo := default (dict) (get .Values.sizing $size) }}
+{{- $defaultSize := default (dict) (get .Values.sizing "default") }}
+{{- $mergedSize := merge $sizingInfo $defaultSize }}
+
+{{- toYaml $mergedSize }}
+{{- end }}
+
+{{- define "wandb-base.topologySpreadConstraints" }}
+{{- $topologyConstraints := default (deepCopy .Values.topologySpreadConstraints) list }}
+  {{- range $constraint := $topologyConstraints }}
+  {{- $_ := set $constraint "labelSelector" (dict "matchLabels" (include "wandb-base.selectorLabels" $ | fromYaml)) }}
+  {{- end }}
+{{- toYaml $topologyConstraints }}
 {{- end }}
