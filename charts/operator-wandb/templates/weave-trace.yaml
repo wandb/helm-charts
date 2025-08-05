@@ -11,3 +11,23 @@ data:
   WANDB_BASE_URL: "http://{{ .Release.Name }}-app:8080/"
   WF_TRACE_SERVER_URL: "{{ .Values.global.host }}/traces"
   WF_ENFORCE_PASSWORD_LENGTH: "false"
+  WEAVE_ENABLE_ONLINE_EVAL: {{ (get  .Values "weave-trace-worker").install | quote }}
+  WEAVE_TRACE_SERVER_BASE_URL: "{{ .Values.global.host }}/traces"
+
+{{ if (get  .Values "weave-trace-worker").install }}
+---
+{{- $secret := (lookup "v1" "Secret" .Release.Namespace "weave-worker-auth") -}}
+{{- $value := "" -}}
+{{- if $secret -}}
+{{-   $value = index $secret.data "key" -}}
+{{- else -}}
+{{-   $value = randAlphaNum 32 | b64enc -}}
+{{- end -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: weave-worker-auth
+type: Opaque
+data:
+  key: {{ $value }}
+{{ end }}
