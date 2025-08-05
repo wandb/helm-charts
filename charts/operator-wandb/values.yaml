@@ -855,6 +855,8 @@ filemeta:
 filestream:
   install: false
   deploymentPostfix: "bc"
+  pubsub:
+    subscriptions: ""
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -1288,8 +1290,10 @@ metric-observer:
   image:
     repository: wandb/megabinary
     tag: latest
+  pubsub:
+    subscription: ""
   env:
-    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_METRIC_OBSERVER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
@@ -1328,6 +1332,15 @@ metric-observer:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
+  role:
+    create: true
+    rules:
+      - apiGroups: [ "" ]
+        resources: [ "secrets" ]
+        verbs: [ "get" ]
+      - apiGroups: [ "" ]
+        resources: [ "namespaces" ]
+        verbs: [ "get" ]
   volumes:
     - name: wandb-ca-certs
       configMap:
@@ -2021,7 +2034,7 @@ reloader:
     #     tag: v1.3.0
     watchGlobally: false
     reloadOnCreate: true
-    reloadOnDelete: true
+    reloadOnDelete: false
 
 clickhouse:
   install: false
