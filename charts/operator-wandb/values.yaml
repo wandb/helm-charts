@@ -1655,19 +1655,12 @@ weave-trace:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
     "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
   env:
     WF_CLICKHOUSE_PASS:
       valueFrom:
         secretKeyRef:
           name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
           key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
-    KAFKA_CLIENT_PASSWORD:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ include "wandb.kafka.passwordSecret" . }}'
-          key: '{{ include "wandb.kafka.passwordSecret.passwordKey" .}}'
-          optional: false
   initContainers:
     weave-trace-migrate:
       command: ["python", "migrator.py"]
@@ -1801,19 +1794,17 @@ weave-trace-worker:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
     "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
   env:
     WF_CLICKHOUSE_PASS:
       valueFrom:
         secretKeyRef:
           name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
           key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
-    KAFKA_CLIENT_PASSWORD:
+    WANDB_INTERNAL_SERVICE_TOKEN:
       valueFrom:
         secretKeyRef:
-          name: '{{ include "wandb.kafka.passwordSecret" . }}'
-          key: "{{ include "wandb.kafka.passwordSecret.passwordKey" .}}"
-          optional: false
+          name: weave-worker-auth
+          key: key
   containers:
     weave-trace-worker:
       command:
