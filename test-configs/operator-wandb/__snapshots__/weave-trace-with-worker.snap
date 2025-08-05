@@ -644,6 +644,11 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: weave-worker-auth
+  labels:
+    app.kubernetes.io/managed-by: "Helm"
+  annotations:
+    meta.helm.sh/release-name: "chartsnap"
+    meta.helm.sh/release-namespace: "default"
 type: Opaque
 data:
   key: '###DYNAMIC_FIELD###'
@@ -1964,6 +1969,9 @@ data:
   WF_ENFORCE_PASSWORD_LENGTH: "false"
   WEAVE_ENABLE_ONLINE_EVAL: "true"
   WEAVE_TRACE_SERVER_BASE_URL: "http://localhost:8080/traces"
+  WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME: "weave-worker-auth"
+  KAFKA_BROKER_HOST: "bufstream.bufstream.svc.cluster.local"
+  KAFKA_BROKER_PORT: "9092"
 ---
 # Source: operator-wandb/templates/weave.yaml
 apiVersion: v1
@@ -5271,7 +5279,7 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
   annotations:
-    configmap.reloader.stakater.com/reload: chartsnap-clickhouse-configmap,chartsnap-kafka-configmap,chartsnap-weave-trace-configmap
+    configmap.reloader.stakater.com/reload: chartsnap-clickhouse-configmap,chartsnap-weave-trace-configmap
     secret.reloader.stakater.com/reload: chartsnap-global-secret
     reloader.stakater.com/auto: "true"
 spec:
@@ -5302,14 +5310,17 @@ spec:
         - secretRef:
             name: chartsnap-global-secret
         - configMapRef:
-            name: chartsnap-kafka-configmap
-        - configMapRef:
             name: chartsnap-weave-trace-configmap
         env:
         - name: GLOBAL_ADMIN_API_KEY
           value: "local-123456789-123456789-123456789-1234"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
+        - name: WANDB_INTERNAL_SERVICE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: key
+              name: weave-worker-auth
         - name: WF_CLICKHOUSE_PASS
           valueFrom:
             secretKeyRef:
@@ -5370,7 +5381,7 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
   annotations:
-    configmap.reloader.stakater.com/reload: chartsnap-clickhouse-configmap,chartsnap-global-configmap,chartsnap-kafka-configmap,chartsnap-weave-trace-configmap
+    configmap.reloader.stakater.com/reload: chartsnap-clickhouse-configmap,chartsnap-global-configmap,chartsnap-weave-trace-configmap
     secret.reloader.stakater.com/reload: chartsnap-global-secret
     reloader.stakater.com/auto: "true"
 spec:
@@ -5405,8 +5416,6 @@ spec:
             name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-kafka-configmap
         - configMapRef:
             name: chartsnap-weave-trace-configmap
         env:
@@ -5469,8 +5478,6 @@ spec:
             name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-kafka-configmap
         - configMapRef:
             name: chartsnap-weave-trace-configmap
         env:
