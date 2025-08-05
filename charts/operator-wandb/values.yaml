@@ -600,9 +600,9 @@ console:
     type: ClusterIP
     loadBalancerHealthCheckPath: "/console/api/healthz"
     ports:
-    - port: 8082
-      protocol: TCP
-      name: console
+      - port: 8082
+        protocol: TCP
+        name: console
   image:
     repository: wandb/console
     tag: latest
@@ -651,13 +651,35 @@ console:
         resources: ["secrets"]
         verbs: ["get", "list", "watch", "patch", "create"]
       - apiGroups: [""]
-        resources: ["namespaces", "pods", "pods/log", "configmaps", "services", "serviceaccounts", "events"]
+        resources:
+          [
+            "namespaces",
+            "pods",
+            "pods/log",
+            "configmaps",
+            "services",
+            "serviceaccounts",
+            "events",
+          ]
         verbs: ["get", "list"]
       - apiGroups: ["apps"]
-        resources: ["deployments", "statefulsets", "daemonsets", "replicasets", "controllerrevisions"]
+        resources:
+          [
+            "deployments",
+            "statefulsets",
+            "daemonsets",
+            "replicasets",
+            "controllerrevisions",
+          ]
         verbs: ["get", "list"]
       - apiGroups: ["apps"]
-        resources: ["deployments/status", "statefulsets/status", "daemonsets/status", "replicasets/status"]
+        resources:
+          [
+            "deployments/status",
+            "statefulsets/status",
+            "daemonsets/status",
+            "replicasets/status",
+          ]
         verbs: ["get"]
       - apiGroups: ["apps.wandb.com"]
         resources: ["weightsandbiases"]
@@ -1550,8 +1572,8 @@ weave:
   volumes:
     - name: cache
       emptyDir:
-        sizeLimit: '{{ .Values.cache.size }}'
-        medium: '{{ .Values.cache.medium }}'
+        sizeLimit: "{{ .Values.cache.size }}"
+        medium: "{{ .Values.cache.medium }}"
   size: ""
   sizing:
     small:
@@ -1639,7 +1661,13 @@ weave-trace:
       valueFrom:
         secretKeyRef:
           name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-          key: '{{ .Values.global.clickhouse.passwordSecret.passwordKey }}'
+          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+    KAFKA_CLIENT_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.kafka.passwordSecret" . }}'
+          key: '{{ include "wandb.kafka.passwordSecret.passwordKey" .}}'
+          optional: false
   initContainers:
     weave-trace-migrate:
       command: ["python", "migrator.py"]
@@ -1779,7 +1807,13 @@ weave-trace-worker:
       valueFrom:
         secretKeyRef:
           name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-          key: '{{ .Values.global.clickhouse.passwordSecret.passwordKey }}'
+          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+    KAFKA_CLIENT_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.kafka.passwordSecret" . }}'
+          key: "{{ include "wandb.kafka.passwordSecret.passwordKey" .}}"
+          optional: false
   containers:
     weave-trace-worker:
       command:
