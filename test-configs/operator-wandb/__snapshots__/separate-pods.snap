@@ -271,30 +271,6 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
-# Source: operator-wandb/templates/api.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: chartsnap-api-secret
-  labels:
-stringData:
-  GORILLA_EMAIL_SINK: "https://api.wandb.ai/email/dispatch"
-  SLACK_SECRET:
----
-# Source: operator-wandb/templates/app.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: chartsnap-app-secret
-  labels:
-    helm.sh/chart: operator-wandb-0.33.0
-    app.kubernetes.io/name: operator-wandb
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.0.0"
-    app.kubernetes.io/managed-by: Helm
-type: Opaque
-stringData: {}
----
 # Source: operator-wandb/templates/bucket.yaml
 apiVersion: v1
 kind: Secret
@@ -316,54 +292,6 @@ metadata:
 data:
   CLICKHOUSE_PASSWORD: '###DYNAMIC_FIELD###'
 ---
-# Source: operator-wandb/templates/executor.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: chartsnap-executor-secret
-  labels:
-    helm.sh/chart: operator-wandb-0.33.0
-    app.kubernetes.io/name: operator-wandb
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.0.0"
-    app.kubernetes.io/managed-by: Helm
-type: Opaque
-stringData:
-  GORILLA_EMAIL_SINK: "https://api.wandb.ai/email/dispatch"
-  SLACK_SECRET:
----
-# Source: operator-wandb/templates/filestream.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: chartsnap-filestream-secret
-  labels:
-    helm.sh/chart: operator-wandb-0.33.0
-    app.kubernetes.io/name: operator-wandb
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.0.0"
-    app.kubernetes.io/managed-by: Helm
-type: Opaque
-stringData:
-  GORILLA_EMAIL_SINK: "https://api.wandb.ai/email/dispatch"
-  SLACK_SECRET:
----
-# Source: operator-wandb/templates/flat-run-fields-updater.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: chartsnap-flat-run-fields-updater-secret
-  labels:
-stringData: {}
----
-# Source: operator-wandb/templates/frontend.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: chartsnap-frontend-secret
-  labels:
-stringData: {}
----
 # Source: operator-wandb/templates/global.yaml
 apiVersion: v1
 kind: Secret
@@ -371,18 +299,11 @@ metadata:
   name: chartsnap-global-secret
   labels:
 data:
-  # T-shirt size for deployment
-  GORILLA_TSHIRT_SIZE: dGVzdGluZw==
-  GORILLA_ONPREM: dHJ1ZQ==
----
-# Source: operator-wandb/templates/glue.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: chartsnap-glue-secret
-  labels:
-stringData:
-  GORILLA_EMAIL_SINK: "https://api.wandb.ai/email/dispatch"
+  GORILLA_STATSIG_KEY:
+  GORILLA_EMAIL_SINK: aHR0cHM6Ly9hcGkud2FuZGIuYWkvZW1haWwvZGlzcGF0Y2g=
+  GORILLA_SLACK_CLIENT_ID:
+  GORILLA_SLACK_SECRET:
+  SLACK_CLIENT_ID:
   SLACK_SECRET:
 ---
 # Source: operator-wandb/templates/kafka.yaml
@@ -423,9 +344,7 @@ kind: Secret
 metadata:
   name: chartsnap-parquet-secret
   labels:
-stringData:
-  GORILLA_EMAIL_SINK: "https://api.wandb.ai/email/dispatch"
-  SLACK_SECRET:
+data: {}
 ---
 # Source: operator-wandb/templates/redis.yaml
 apiVersion: v1
@@ -1255,7 +1174,7 @@ data:
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
   GORILLA_AUTH_METHOD: implicit
-  GORILLA_TSHIRT_SIZE: "testing"
+  GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
 ---
 # Source: operator-wandb/templates/app.yaml
 apiVersion: v1
@@ -1365,8 +1284,6 @@ metadata:
   labels:
 data:
   GORILLA_FILE_HOST: "http://localhost:8080"
-  # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
-  GORILLA_STATSD_PORT: "8125"
   GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
@@ -1469,6 +1386,20 @@ data:
     }
     main "$@"
 ---
+# Source: operator-wandb/templates/global.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-global-configmap
+  labels:
+data:
+  # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
+  GORILLA_STATSD_PORT: "8125"
+  # T-shirt size for deployment
+  GORILLA_TSHIRT_SIZE: "testing"
+  GORILLA_ONPREM: "true"
+  ONPREM: "true"
+---
 # Source: operator-wandb/templates/glue.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -1568,10 +1499,6 @@ data:
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648" # 2GB
   GORILLA_COLLECT_AUDIT_LOGS: "true"
-  # Monitoring and observability
-  GORILLA_STATSD_PORT: "8125"
-  # T-shirt size configuration
-  GORILLA_TSHIRT_SIZE: "testing"
 ---
 # Source: operator-wandb/templates/redis.yaml
 apiVersion: v1
@@ -1595,7 +1522,6 @@ data:
   API_PATH_PREFIX: "/traces"
   WANDB_PUBLIC_BASE_URL: "http://localhost:8080"
   WANDB_BASE_URL: "http://chartsnap-app:8080/"
-  GORILLA_TSHIRT_SIZE: "testing"
   WF_TRACE_SERVER_URL: "http://localhost:8080/traces"
   WF_ENFORCE_PASSWORD_LENGTH: "false"
 ---
@@ -1613,7 +1539,6 @@ data:
   WEAVE_LOG_FORMAT: "json"
   WEAVE_SERVER_NUM_WORKERS: "4"
   WEAVE_SERVER_URL: "http://127.0.0.1:9994"
-  GORILLA_TSHIRT_SIZE: "testing"
   WEAVE_LOCAL_ARTIFACT_DIR: "/vol/weave/cache"
   WEAVE_CACHE_CLEAR_INTERVAL: "24"
 ---
@@ -2255,10 +2180,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - name: http
-    port: 80
+  - name: parquet
+    port: 8087
     protocol: TCP
-    targetPort: http
   selector:
     app.kubernetes.io/name: parquet
     app.kubernetes.io/instance: chartsnap
@@ -2574,8 +2498,8 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
   annotations:
-    configmap.reloader.stakater.com/reload: chartsnap-api-configmap,chartsnap-bucket-configmap,chartsnap-kafka-configmap,chartsnap-mysql-configmap,chartsnap-redis-configmap
-    secret.reloader.stakater.com/reload: chartsnap-api-secret,chartsnap-global-secret,chartsnap-gorilla-session-key
+    configmap.reloader.stakater.com/reload: chartsnap-api-configmap,chartsnap-bucket-configmap,chartsnap-global-configmap,chartsnap-kafka-configmap,chartsnap-mysql-configmap,chartsnap-redis-configmap
+    secret.reloader.stakater.com/reload: chartsnap-global-secret,chartsnap-gorilla-session-key
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
@@ -2599,10 +2523,10 @@ spec:
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
-        - secretRef:
-            name: chartsnap-api-secret
         - configMapRef:
             name: chartsnap-bucket-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
         - secretRef:
@@ -2775,10 +2699,10 @@ spec:
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
-        - secretRef:
-            name: chartsnap-api-secret
         - configMapRef:
             name: chartsnap-bucket-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
         - secretRef:
@@ -2918,10 +2842,10 @@ spec:
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
-        - secretRef:
-            name: chartsnap-api-secret
         - configMapRef:
             name: chartsnap-bucket-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
         - secretRef:
@@ -3062,6 +2986,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -3105,8 +3030,8 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
   annotations:
-    configmap.reloader.stakater.com/reload: chartsnap-api-configmap,chartsnap-app-configmap,chartsnap-bucket-configmap,chartsnap-frontend-configmap,chartsnap-glue-configmap,chartsnap-kafka-configmap,chartsnap-mysql-configmap,chartsnap-redis-configmap
-    secret.reloader.stakater.com/reload: chartsnap-api-secret,chartsnap-app-secret,chartsnap-global-secret,chartsnap-glue-secret,chartsnap-gorilla-session-key
+    configmap.reloader.stakater.com/reload: chartsnap-api-configmap,chartsnap-app-configmap,chartsnap-bucket-configmap,chartsnap-frontend-configmap,chartsnap-global-configmap,chartsnap-glue-configmap,chartsnap-kafka-configmap,chartsnap-mysql-configmap,chartsnap-redis-configmap
+    secret.reloader.stakater.com/reload: chartsnap-global-secret,chartsnap-gorilla-session-key
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
@@ -3128,22 +3053,18 @@ spec:
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
-        - secretRef:
-            name: chartsnap-api-secret
         - configMapRef:
             name: chartsnap-app-configmap
-        - secretRef:
-            name: chartsnap-app-secret
         - configMapRef:
             name: chartsnap-bucket-configmap
         - configMapRef:
             name: chartsnap-frontend-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
         - configMapRef:
             name: chartsnap-glue-configmap
-        - secretRef:
-            name: chartsnap-glue-secret
         - secretRef:
             name: chartsnap-gorilla-session-key
         - configMapRef:
@@ -3347,22 +3268,18 @@ spec:
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
-        - secretRef:
-            name: chartsnap-api-secret
         - configMapRef:
             name: chartsnap-app-configmap
-        - secretRef:
-            name: chartsnap-app-secret
         - configMapRef:
             name: chartsnap-bucket-configmap
         - configMapRef:
             name: chartsnap-frontend-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
         - configMapRef:
             name: chartsnap-glue-configmap
-        - secretRef:
-            name: chartsnap-glue-secret
         - secretRef:
             name: chartsnap-gorilla-session-key
         - configMapRef:
@@ -3515,6 +3432,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -3620,8 +3538,8 @@ spec:
             cpu: "2"
             memory: 2Gi
           requests:
-            cpu: "1"
-            memory: 1Gi
+            cpu: 100m
+            memory: 100Mi
       serviceAccountName: chartsnap-console
       securityContext:
         fsGroup: 0
@@ -3631,6 +3549,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -3659,8 +3578,8 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
   annotations:
-    configmap.reloader.stakater.com/reload: chartsnap-bucket-configmap,chartsnap-glue-configmap,chartsnap-kafka-configmap,chartsnap-mysql-configmap,chartsnap-redis-configmap
-    secret.reloader.stakater.com/reload: chartsnap-global-secret,chartsnap-glue-secret
+    configmap.reloader.stakater.com/reload: chartsnap-bucket-configmap,chartsnap-global-configmap,chartsnap-glue-configmap,chartsnap-kafka-configmap,chartsnap-mysql-configmap,chartsnap-redis-configmap
+    secret.reloader.stakater.com/reload: chartsnap-global-secret
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
@@ -3684,12 +3603,12 @@ spec:
         envFrom:
         - configMapRef:
             name: chartsnap-bucket-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
         - configMapRef:
             name: chartsnap-glue-configmap
-        - secretRef:
-            name: chartsnap-glue-secret
         - configMapRef:
             name: chartsnap-kafka-configmap
         - configMapRef:
@@ -3851,12 +3770,12 @@ spec:
         envFrom:
         - configMapRef:
             name: chartsnap-bucket-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
         - configMapRef:
             name: chartsnap-glue-configmap
-        - secretRef:
-            name: chartsnap-glue-secret
         - configMapRef:
             name: chartsnap-kafka-configmap
         - configMapRef:
@@ -3992,12 +3911,12 @@ spec:
         envFrom:
         - configMapRef:
             name: chartsnap-bucket-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
         - configMapRef:
             name: chartsnap-glue-configmap
-        - secretRef:
-            name: chartsnap-glue-secret
         - configMapRef:
             name: chartsnap-kafka-configmap
         - configMapRef:
@@ -4134,6 +4053,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -4177,8 +4097,8 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
   annotations:
-    configmap.reloader.stakater.com/reload: chartsnap-bucket-configmap,chartsnap-kafka-configmap,chartsnap-mysql-configmap,chartsnap-parquet-configmap,chartsnap-redis-configmap
-    secret.reloader.stakater.com/reload: chartsnap-global-secret,chartsnap-parquet-secret
+    configmap.reloader.stakater.com/reload: chartsnap-bucket-configmap,chartsnap-global-configmap,chartsnap-kafka-configmap,chartsnap-mysql-configmap,chartsnap-parquet-configmap,chartsnap-redis-configmap
+    secret.reloader.stakater.com/reload: chartsnap-global-secret
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
@@ -4202,6 +4122,8 @@ spec:
         envFrom:
         - configMapRef:
             name: chartsnap-bucket-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
         - configMapRef:
@@ -4210,8 +4132,6 @@ spec:
             name: chartsnap-mysql-configmap
         - configMapRef:
             name: chartsnap-parquet-configmap
-        - secretRef:
-            name: chartsnap-parquet-secret
         - configMapRef:
             name: chartsnap-redis-configmap
         env:
@@ -4335,6 +4255,28 @@ spec:
           readOnlyRootFilesystem: false
         image: "wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8087
+          name: parquet
+          protocol: TCP
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8087
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 30
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /ready
+            port: 8087
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 30
         resources:
           requests:
             cpu: 100m
@@ -4356,6 +4298,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -4690,6 +4633,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -5009,6 +4953,8 @@ spec:
             envFrom:
             - configMapRef:
                 name: chartsnap-bucket-configmap
+            - configMapRef:
+                name: chartsnap-global-configmap
             - secretRef:
                 name: chartsnap-global-secret
             - configMapRef:
@@ -5019,8 +4965,6 @@ spec:
                 name: chartsnap-mysql-configmap
             - configMapRef:
                 name: chartsnap-parquet-configmap
-            - secretRef:
-                name: chartsnap-parquet-secret
             - configMapRef:
                 name: chartsnap-redis-configmap
             env:

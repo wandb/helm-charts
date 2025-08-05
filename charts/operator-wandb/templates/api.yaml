@@ -15,12 +15,6 @@ data:
   GORILLA_OIDC_ISSUER: "{{ .Values.global.auth.oidc.issuer }}"
   {{- end }}
   GORILLA_SESSION_LENGTH: "{{ .Values.global.auth.sessionLengthHours }}h"
-  {{- if and .Values.global .Values.global.observability }}
-    {{- if eq (default "custom" .Values.global.observability.mode) "otel" }}
-  GORILLA_STATSD_PORT: "8125"
-  GORILLA_STATSD_HOST: "0.0.0.0"
-    {{- end }}
-  {{- end }}
   {{- if .Values.extraCors }}
   GORILLA_CORS_ORIGINS: "{{ join "," .Values.extraCors }}"
   {{- end }}
@@ -40,22 +34,4 @@ data:
   {{- if index .Values.global "weave-trace" "enabled" }}
   GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: {{ tpl (include "wandb.internalJWTMap" .) . }}
   {{- end }}
-  GORILLA_TSHIRT_SIZE: "{{ .Values.global.size }}"
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ .Release.Name }}-api-secret
-  labels:
-    {{- include "wandb.commonLabels" . | nindent 4 }}
-stringData:
-  {{- if ne .Values.global.email.smtp.host "" }}
-  GORILLA_EMAIL_SINK: "smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}"
-  {{- else }}
-  GORILLA_EMAIL_SINK: "https://api.wandb.ai/email/dispatch"
-  {{- end }}
-  SLACK_SECRET: {{ default "" .Values.global.slack.secret }}
-  {{- if ne .Values.global.auth.oidc.clientId ""  }}
-  GORILLA_OIDC_CLIENT_SECRET: {{ .Values.global.auth.oidc.secret }}
-  {{- end }}
+  GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"

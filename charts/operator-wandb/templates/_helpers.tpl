@@ -83,3 +83,11 @@ otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset
 {{- join ", " $items -}}
 }'
 {{- end -}}
+
+{{- define "wandb.emailSink" -}}
+{{- if ne .Values.global.email.smtp.host "" -}}
+smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}
+{{- else -}}
+https://api.wandb.ai/email/dispatch
+{{- end -}}
+{{- end -}}
