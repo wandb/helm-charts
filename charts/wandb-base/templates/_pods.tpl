@@ -53,7 +53,7 @@ spec:
   {{- end }}
   serviceAccountName: {{ include "wandb-base.serviceAccountName" $.root }}
   securityContext:
-   {{- tpl (toYaml .podData.podSecurityContext | nindent 4) $.root }}
+   {{- tpl (toYaml (merge (default dict .podData.podSecurityContext) $.root.Values.podSecurityContext) | nindent 4) $.root }}
   {{- with .podData.terminationGracePeriodSeconds }}
   terminationGracePeriodSeconds: {{ . }}
   {{- end }}
