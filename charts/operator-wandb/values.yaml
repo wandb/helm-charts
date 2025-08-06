@@ -499,6 +499,17 @@ flat-run-fields-updater:
 history:
   traceRatio: 1.0
   install: false
+  fuse:
+    enabled: false
+    resources:
+      limits:
+        cpu: 100m
+        memory: 100Mi
+        cache: 90Gi
+        ephemeral-storage: 100Gi
+      requests:
+        cpu: 100m
+        memory: 100Mi
   kind: StatefulSet
   pubSub:
     subscription: "history"
@@ -517,6 +528,15 @@ history:
         targetPort: 8081
         protocol: TCP
   terminationGracePeriodSeconds: 60
+  podAnnotations:
+    {{- if .Values.fuse.enabled }}
+    gke-gcsfuse/volumes: "true"
+    gke-gcsfuse/ephemeral-storage-limit: "{{ index .Values.fuse.resources.limits "ephemeral-storage" }}"
+    gke-gcsfuse/cpu-request: "{{ .Values.fuse.resources.requests.cpu }}"
+    gke-gcsfuse/cpu-limit: "{{ .Values.fuse.resources.limits.cpu }}"
+    gke-gcsfuse/memory-request: "{{ .Values.fuse.resources.requests.memory }}"
+    gke-gcsfuse/memory-limit: "{{ .Values.fuse.resources.limits.memory }}"
+    {{- end }}
   env:
     A_KAFKA_CLIENT_PASSWORD:
       valueFrom:
@@ -643,8 +663,10 @@ history:
       volumeMounts:
         - name: history-data-volume
           mountPath: /storage
-        - name: history-data-cache
+        {{- if .Values.fuse.enabled }}
+        - name: fuse
           mountPath: /cache
+        {{- end }}
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
         - name: wandb-ca-certs-user
@@ -664,15 +686,19 @@ history:
         resources:
           requests:
             storage: 50Gi
-    - metadata:
-        name: history-data-cache
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 50Gi
   volumes:
+    {{- if .Values.fuse.enabled }}
+    - name: fuse
+      csi:
+        driver: gcsfuse.csi.storage.gke.io
+        readOnly: true
+        volumeAttributes:
+          bucketName: {{ (include "wandb.bucket" . | fromYaml).name }}
+          mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,metadata-cache:stat-cache-max-size-mb:-1,metadata-cache:type-cache-max-size-mb:-1,file-system:kernel-list-cache-ttl-secs:-1,metadata-cache:ttl-secs:-1"
+          fileCacheCapacity: "{{ .Values.fuse.cache }}"
+          fileCacheForRangeRead: "true"
+          gcsfuseMetadataPrefetchOnMount: "true"
+    {{- end }}
     - name: wandb-ca-certs
       configMap:
         name: "{{ .Release.Name }}-ca-certs"
