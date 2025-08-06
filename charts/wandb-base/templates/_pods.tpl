@@ -3,9 +3,11 @@ metadata:
   {{- if or .podData.podAnnotations .podData.podAnnotationsTpls }}
   annotations:
     {{- range .podData.podAnnotationsTpls }}
-    {{- tpl . $.root | nindent 4 }}
+      {{- tpl . $.root | nindent 4 }}
     {{- end }}
-    {{- tpl (toYaml .podData.podAnnotations | nindent 4) .root }}
+    {{- if .podData.podAnnotations }}
+      {{- tpl (toYaml .podData.podAnnotations | nindent 4) .root }}
+    {{- end }}
     {{- tpl (include "wandb-base.podAnnotations" $.root | nindent 4) .root }}
   {{- end }}
   labels:
