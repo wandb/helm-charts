@@ -79,6 +79,21 @@ Global values will override any chart-specific values.
   value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
 {{- end -}}
 
+{{- define "wandb.bucket.cwIdentity" -}}
+- name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+  valueFrom:
+    secretKeyRef:
+      name: "gorilla-coreweave-caios"
+      key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID"
+      optional: true
+- name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: "gorilla-coreweave-caios"
+      key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY"
+      optional: true
+{{- end -}}
+
 {{- define "wandb.mysqlEnvs" -}}
 - name: MYSQL_PASSWORD
   valueFrom:
