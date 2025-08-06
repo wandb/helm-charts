@@ -3,9 +3,11 @@ metadata:
   {{- if or .podData.podAnnotations .podData.podAnnotationsTpls }}
   annotations:
     {{- range .podData.podAnnotationsTpls }}
-    {{- tpl . $.root | nindent 4 }}
+      {{- tpl . $.root | nindent 4 }}
     {{- end }}
-    {{- tpl (toYaml .podData.podAnnotations | nindent 4) .root }}
+    {{- if .podData.podAnnotations }}
+      {{- tpl (toYaml .podData.podAnnotations | nindent 4) .root }}
+    {{- end }}
     {{- tpl (include "wandb-base.podAnnotations" $.root | nindent 4) .root }}
   {{- end }}
   labels:
@@ -51,7 +53,7 @@ spec:
   {{- end }}
   serviceAccountName: {{ include "wandb-base.serviceAccountName" $.root }}
   securityContext:
-   {{- tpl (toYaml .podData.podSecurityContext | nindent 4) $.root }}
+   {{- tpl (toYaml (merge (default dict .podData.podSecurityContext) $.root.Values.podSecurityContext) | nindent 4) $.root }}
   {{- with .podData.terminationGracePeriodSeconds }}
   terminationGracePeriodSeconds: {{ . }}
   {{- end }}
