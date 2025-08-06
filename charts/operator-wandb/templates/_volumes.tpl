@@ -24,3 +24,29 @@
         path: redis_ca.pem
     optional: true
 {{- end -}}
+
+{{- define "wandb.gcsFuseVolumeMounts" }}
+{{- if .Values.fuse.enabled }}
+- name: fuse
+  mountPath: "/{{ (include "wandb.bucket" . | fromYaml).name }}"
+{{- end }}
+{{- end }}
+
+{{- define "wandb.gcsFuseVolumes" }}
+{{- if .Values.fuse.enabled }}
+- name: fuse
+{{- if and (eq (include "wandb.bucket" . | fromYaml).provider "gcs") (eq .Values.global.cloudProvider "gcp") }}
+  csi:
+    driver: gcsfuse.csi.storage.gke.io
+    readOnly: true
+    volumeAttributes:
+      bucketName: {{ (include "wandb.bucket" . | fromYaml).name }}
+      mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,metadata-cache:stat-cache-max-size-mb:-1,metadata-cache:type-cache-max-size-mb:-1,file-system:kernel-list-cache-ttl-secs:-1,metadata-cache:ttl-secs:-1"
+      fileCacheCapacity: "{{ .Values.fuse.fileCacheCapacity }}"
+      fileCacheForRangeRead: "true"
+      gcsfuseMetadataPrefetchOnMount: "true"
+{{- else }}
+  emptyDir: {}
+{{- end }}
+{{- end }}
+{{- end }}

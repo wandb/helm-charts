@@ -855,6 +855,8 @@ filemeta:
 filestream:
   install: false
   deploymentPostfix: "bc"
+  pubsub:
+    subscriptions: ""
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -1278,6 +1280,83 @@ glue:
           cpu: "1"
           memory: 2Gi
 
+metric-observer:
+  install: false
+  autoscaling:
+    horizontal:
+      enabled: true
+      maxReplicas: 3
+      minReplicas: 1
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  pubsub:
+    subscription: ""
+  env:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_METRIC_OBSERVER:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-flat-run-fields-updater-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+  containers:
+    metric-observer:
+      args: ["metric-observer"]
+      env: {}
+      envFrom: {}
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+        requests:
+          cpu: 250m
+          memory: 256Mi
+      volumeMounts:
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get"]
+      - apiGroups: [""]
+        resources: ["namespaces"]
+        verbs: ["get"]
+  volumes:
+    - name: wandb-ca-certs
+      configMap:
+        name: "{{ .Release.Name }}-ca-certs"
+    - name: wandb-ca-certs-user
+      configMap:
+        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
+        optional: true
+    - name: redis-ca
+      secret:
+        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
+        items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+        optional: true
+
 parquet:
   install: true
   deploymentPostfix: "bc"
@@ -1318,8 +1397,8 @@ parquet:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.license" . }}'
-  podAnnotationsTpl:
-    - '{{ include "wandb.gksFuseAnnotations" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.gcsFuseAnnotations" . }}'
   containers:
     parquet:
       args: ["parquet"]
@@ -1347,6 +1426,7 @@ parquet:
         successThreshold: 1
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
+        - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
   cronJobs:
     parquet-backfill:
       containers:
@@ -1357,13 +1437,16 @@ parquet:
             GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
           envFrom:
             "{{ .Release.Name }}-glue-configmap": "configMapRef"
+          volumeMountsTpls:
+            - '{{ include "wandb.caCertsVolumeMounts" . }}'
       concurrencyPolicy: Forbid
       schedule: "* * * * *"
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+      volumesTpls:
+        - '{{ include "wandb.caCertsVolumes" . }}'
 
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
+    - '{{ include "wandb.gcsFuseVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -1955,7 +2038,7 @@ reloader:
     #     tag: v1.3.0
     watchGlobally: false
     reloadOnCreate: true
-    reloadOnDelete: true
+    reloadOnDelete: false
 
 clickhouse:
   install: false
