@@ -1063,13 +1063,17 @@ flat-run-fields-updater:
 history:
   install: false
   kind: StatefulSet
+  replicaCount: 1
   pubsub:
-    subscriptions: "history"
+    subscriptions: "history-updater"
   kafka:
-    consumerGroup: "history"
+    consumerGroup: "history-updater"
   image:
     repository: wandb/megabinary
     tag: latest
+  podSecurityContext:
+    runAsUser: 1000
+    fsGroup: 1000
   service:
     enabled: true
     headless: true
@@ -1089,10 +1093,27 @@ history:
         memory: 2Gi
         ephemeral-storage: 10Gi
     fileCacheCapacity: 9.5Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: history-data-volume
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+    - metadata:
+        name: history-cache-volume
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 500Gi
   env:
     GORILLA_PORT:
       value: "8087"
-    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_HISTORY:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_HISTORY_UPDATER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
@@ -1111,7 +1132,7 @@ history:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   podAnnotationsTpl:
-    - '{{ include "wandb.gksFuseAnnotations" . }}'
+    - '{{ include "wandb.gcsFuseAnnotations" . }}'
   containers:
     history:
       args: ["history"]
@@ -1139,8 +1160,13 @@ history:
         successThreshold: 1
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
+        - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
+      volumeMounts:
+        - name: history-data-volume
+          mountPath: /data
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
+    - '{{ include "wandb.gcsFuseVolumes" . }}'
   size: ""
   sizing:
     small:
