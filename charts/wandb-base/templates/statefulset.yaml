@@ -1,4 +1,4 @@
-{{- if eq .Values.kind "Statefulset" }}
+{{- if eq .Values.kind "StatefulSet" }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -11,8 +11,15 @@ metadata:
     {{- tpl (include "wandb-base.statefulsetAnnotations" . | nindent 4) . }}
   {{- end }}
 spec:
+  {{- if .Values.service.headless }}
+  serviceName: {{ include "wandb-base.fullname" . }}-headless
+  {{- end }}
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  {{- if .Values.volumeClaimTemplates }}
+  volumeClaimTemplates:
+    {{- tpl (toYaml . | nindent 4) $ }}
   {{- end }}
   selector:
     matchLabels:
