@@ -14,25 +14,6 @@
 {{- end -}}
 
 
-{{/*
-  THIS IS FOR INTERNAL USE ONLY
-  any end user attempting to set these may experience undefined behavior 
-*/}}
-{{- define "wandb.bucket.cwIdentity" -}}
-- name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
-  valueFrom:
-    secretKeyRef:
-      name: "gorilla-coreweave-caios"
-      key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID"
-      optional: true
-- name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
-  valueFrom:
-    secretKeyRef:
-      name: "gorilla-coreweave-caios"
-      key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY"
-      optional: true
-{{- end -}}
-
 {{- define "wandb.bucket" -}}
 {{- $url := "" -}}
 {{- $path := "" -}}
