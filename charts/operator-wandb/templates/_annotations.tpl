@@ -38,7 +38,7 @@ Handles merging a set of service annotations
 {{- end -}}
 {{- end -}}
 
-{{- define "wandb.gksFuseAnnotations" -}}
+{{- define "wandb.gcsFuseAnnotations" -}}
 {{- /* https://cloud.google.com/kubernetes-engine/docs/how-to/cloud-storage-fuse-csi-driver-sidecar */ -}}
 {{- if .Values.fuse.enabled }}
 {{- if and (eq (include "wandb.bucket" . | fromYaml).provider "gcs") (eq .Values.global.cloudProvider "gcp") }}
