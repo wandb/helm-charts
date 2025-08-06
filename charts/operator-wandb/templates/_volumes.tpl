@@ -45,6 +45,11 @@
       fileCacheCapacity: "{{ .Values.fuse.fileCacheCapacity }}"
       fileCacheForRangeRead: "true"
       gcsfuseMetadataPrefetchOnMount: "true"
+{{- if .Values.fuse.cachePVC }}
+- name: gke-gcsfuse-cache
+  persistentVolumeClaim:
+    claimName: {{ .Values.fuse.cachePVC }}
+{{- end }}
 {{- else }}
   emptyDir: {}
 {{- end }}
