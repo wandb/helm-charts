@@ -959,7 +959,9 @@ flat-run-fields-updater:
   install: false
   deploymentPostfix: "bc"
   pubsub:
-    subscriptions: ""
+    subscriptions: "flat-run-fields-updater"
+  kafka:
+    consumerGroup: "flat-run-fields-updater"
   env:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
@@ -1057,6 +1059,130 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 6
           minReplicas: 1
+
+history:
+  install: false
+  kind: StatefulSet
+  pubsub:
+    subscriptions: "history"
+  kafka:
+    consumerGroup: "history"
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  service:
+    enabled: true
+    headless: true
+    type: ClusterIP
+    ports:
+      - port: 8087
+        protocol: TCP
+        name: http
+  fuse:
+    enabled: false
+    resources:
+      requests:
+        cpu: 1
+        memory: 1Gi
+      limits:
+        cpu: 2
+        memory: 2Gi
+        ephemeral-storage: 10Gi
+    fileCacheCapacity: 9.5Gi
+  env:
+    GORILLA_PORT:
+      value: "8087"
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_HISTORY:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+  podAnnotationsTpl:
+    - '{{ include "wandb.gksFuseAnnotations" . }}'
+  containers:
+    history:
+      args: ["history"]
+      ports:
+        - name: http
+          containerPort: 8087
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8087
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8087
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 16Gi
+        requests:
+          cpu: "1"
+          memory: 8Gi
+    medium:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 32Gi
+        requests:
+          cpu: "2"
+          memory: 24Gi
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 32Gi
+        requests:
+          cpu: "3"
+          memory: 24Gi
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 32Gi
+        requests:
+          cpu: "3"
+          memory: 24Gi
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 64Gi
+        requests:
+          cpu: "3"
+          memory: 48Gi
 
 frontend:
   install: false
