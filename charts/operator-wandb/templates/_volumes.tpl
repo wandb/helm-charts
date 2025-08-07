@@ -41,10 +41,15 @@
     readOnly: true
     volumeAttributes:
       bucketName: {{ (include "wandb.bucket" . | fromYaml).name }}
-      mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,metadata-cache:stat-cache-max-size-mb:-1,metadata-cache:type-cache-max-size-mb:-1,file-system:kernel-list-cache-ttl-secs:-1,metadata-cache:ttl-secs:-1"
+      mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,file-cache:download-chunk-size-mb:3,metadata-cache:stat-cache-max-size-mb:-1,metadata-cache:type-cache-max-size-mb:-1,file-system:kernel-list-cache-ttl-secs:-1,metadata-cache:ttl-secs:-1"
       fileCacheCapacity: "{{ .Values.fuse.fileCacheCapacity }}"
       fileCacheForRangeRead: "true"
       gcsfuseMetadataPrefetchOnMount: "true"
+{{- if .Values.fuse.cachePVC }}
+- name: gke-gcsfuse-cache
+  persistentVolumeClaim:
+    claimName: {{ .Values.fuse.cachePVC }}
+{{- end }}
 {{- else }}
   emptyDir: {}
 {{- end }}
