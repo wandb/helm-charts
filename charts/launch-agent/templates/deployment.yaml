@@ -117,6 +117,8 @@ spec:
             {{- if .Values.oidc.enabled }}
             - name: WANDB_IDENTITY_TOKEN_FILE
               value: "{{ .Values.oidc.tokenPath }}/oidc-token"
+            - name: WANDB_CREDENTIALS_FILE
+              value: "/home/launch_agent/.wandb-creds-config/credentials.json"
             {{- end }}
           volumeMounts:
             - name: ssh-dir
@@ -157,6 +159,8 @@ spec:
               mountPath: /home/launch_agent/kaniko
             {{ end }}
             {{- if .Values.oidc.enabled }}
+            - name: wandb-creds-config
+              mountPath: /home/launch_agent/.wandb-creds-config
             - name: oidc-token
               mountPath: {{ .Values.oidc.tokenPath }}
               readOnly: true
@@ -202,6 +206,8 @@ spec:
             claimName: {{ .Values.kanikoPvcName }}
         {{- end }}
         {{ if .Values.oidc.enabled }}
+        - name: wandb-creds-config
+          emptyDir: {}
         - name: oidc-token
           projected:
             sources:
