@@ -1340,8 +1340,8 @@ parquet:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.license" . }}'
-  podAnnotationsTpl:
-    - '{{ include "wandb.gksFuseAnnotations" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.gcsFuseAnnotations" . }}'
   containers:
     parquet:
       args: ["parquet"]
@@ -1369,6 +1369,7 @@ parquet:
         successThreshold: 1
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
+        - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
   cronJobs:
     parquet-backfill:
       containers:
@@ -1379,13 +1380,16 @@ parquet:
             GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
           envFrom:
             "{{ .Release.Name }}-glue-configmap": "configMapRef"
+          volumeMountsTpls:
+            - '{{ include "wandb.caCertsVolumeMounts" . }}'
       concurrencyPolicy: Forbid
       schedule: "* * * * *"
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+      volumesTpls:
+        - '{{ include "wandb.caCertsVolumes" . }}'
 
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
+    - '{{ include "wandb.gcsFuseVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -1516,6 +1520,8 @@ settingsMigrationJob:
           envFrom:
             "{{ .Release.Name }}-smj-secret": "secretRef"
           args: ["settings-migration-job"]
+  podDisruptionBudget:
+    enabled: false
 
 weave:
   install: true
