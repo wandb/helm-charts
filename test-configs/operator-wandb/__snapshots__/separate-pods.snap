@@ -279,7 +279,7 @@ metadata:
   labels:
 data:
   ACCESS_KEY: bWluaW8=
-  SECRET_KEY: dGVzdCU0MCUzQyUzRSUyNSU3QiU3RCU3QyU1RSUyMiUyMCU1QyUyQnBhc3N3b3Jk
+  SECRET_KEY: dGVzdHBhc3N3b3Jk
 ---
 # Source: operator-wandb/templates/clickhouse.yaml
 apiVersion: v1
@@ -1182,7 +1182,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-app-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.3
+    helm.sh/chart: operator-wandb-0.33.4
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1214,7 +1214,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-ca-certs
   labels:
-    helm.sh/chart: operator-wandb-0.33.3
+    helm.sh/chart: operator-wandb-0.33.4
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1256,7 +1256,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-executor-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.3
+    helm.sh/chart: operator-wandb-0.33.4
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1269,7 +1269,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-filestream-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.3
+    helm.sh/chart: operator-wandb-0.33.4
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1462,7 +1462,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-local-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.3
+    helm.sh/chart: operator-wandb-0.33.4
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1526,6 +1526,11 @@ data:
   WANDB_BASE_URL: "http://chartsnap-api:8081/"
   WF_TRACE_SERVER_URL: "http://localhost:8080/traces"
   WF_ENFORCE_PASSWORD_LENGTH: "false"
+  WEAVE_ENABLE_ONLINE_EVAL: "false"
+  WEAVE_TRACE_SERVER_BASE_URL: "http://localhost:8080/traces"
+  WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME: "weave-worker-auth"
+  KAFKA_BROKER_HOST: "bufstream.bufstream.svc.cluster.local"
+  KAFKA_BROKER_PORT: "9092"
 ---
 # Source: operator-wandb/templates/weave.yaml
 apiVersion: v1
@@ -2619,6 +2624,8 @@ spec:
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
           value: noop://
         - name: KAFKA_CLIENT_PASSWORD
@@ -2795,6 +2802,8 @@ spec:
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
           value: noop://
         - name: KAFKA_CLIENT_PASSWORD
@@ -2937,6 +2946,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
           value: noop://
@@ -3153,6 +3164,8 @@ spec:
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
           value: noop://
         - name: KAFKA_CLIENT_PASSWORD
@@ -3366,6 +3379,8 @@ spec:
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
           value: noop://
         - name: KAFKA_CLIENT_PASSWORD
@@ -3536,8 +3551,8 @@ spec:
             cpu: "2"
             memory: 2Gi
           requests:
-            cpu: 100m
-            memory: 100Mi
+            cpu: 50m
+            memory: 64Mi
       serviceAccountName: chartsnap-console
       securityContext:
         fsGroup: 0
@@ -3692,6 +3707,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
           value: noop://
@@ -3860,6 +3877,8 @@ spec:
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
           value: noop://
         - name: KAFKA_CLIENT_PASSWORD
@@ -4000,6 +4019,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
           value: noop://
@@ -4212,6 +4233,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
           value: noop://
@@ -4747,8 +4770,8 @@ spec:
             cpu: 4000m
             memory: 8Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 50m
+            memory: 64Mi
       volumes:
       - name: initdb
         configMap:
@@ -5045,6 +5068,8 @@ spec:
               value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_SETTINGS_CACHE
               value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+            - name: GORILLA_USAGE_METRICS_CACHE
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_TASK_QUEUE
               value: noop://
             - name: KAFKA_CLIENT_PASSWORD
@@ -5149,7 +5174,7 @@ kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-connection"
   labels:
-    helm.sh/chart: operator-wandb-0.33.3
+    helm.sh/chart: operator-wandb-0.33.4
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
