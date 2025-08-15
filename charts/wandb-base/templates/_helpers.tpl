@@ -87,7 +87,7 @@ Create the name of the service account to use
 {{- define "wandb-base.replicaCount" }}
 {{- $desiredReplicas := .Values.replicaCount }}
 {{- if .Values.autoscaling.horizontal.enabled }}
-  {{- $hpa := lookup "autoscaling/v2" "HorizontalPodAutoscaler" .Release.Namespace (include "wandb-base.fullname" .) }}
+  {{- $hpa := lookup "autoscaling/v2" "HorizontalPodAutoscaler" .Release.Namespace (include "wandb-base.fullname" . | trimAll "") }}
     {{- if and $hpa (gt $hpa.status.currentReplicas 0) }}
       {{- $desiredReplicas = $hpa.status.currentReplicas }}
     {{- end }}
