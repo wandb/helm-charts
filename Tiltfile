@@ -9,7 +9,7 @@ settings = {
         "app": 8080,
         "console": 8082,
         "weave-trace": 8722,
-        "anaconda2": 8084,
+        "anaconda2": "8084:8082",
     },
     "installMinio": True,
     "installIngress": False,
