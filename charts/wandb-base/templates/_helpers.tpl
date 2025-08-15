@@ -115,3 +115,14 @@ reloader.stakater.com/auto: "true"
   {{- end }}
 {{- toYaml $topologyConstraints }}
 {{- end }}
+
+{{- define "wandb-base.replicaCount" }}
+{{- $desiredReplicas := .Values.replicaCount }}
+{{- if .Values.autoscaling.horizontal.enabled }}
+  {{- $hpa := lookup "autoscaling/v2" "HorizontalPodAutoscaler" .Release.Namespace (include "wandb-base.fullname" .) }}
+    {{- if $hpa }}
+      {{- $desiredReplicas = $hpa.status.desiredReplicas }}
+    {{- end }}
+{{- end }}
+{{- print $desiredReplicas }}
+{{- end }}
