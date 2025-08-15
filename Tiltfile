@@ -9,13 +9,14 @@ settings = {
         "app": 8080,
         "console": 8082,
         "weave-trace": 8722,
+        "anaconda2": "8084:8082",
     },
     "installMinio": True,
     "installIngress": False,
     "values": "default",
     "defaultValues": {
         "global.mysql.password": "password",
-        "global.extraEnv.GLOBAL_ADMIN_API_KEY": "",
+        "global.env.GLOBAL_ADMIN_API_KEY": "",
         "reloader.install": "true",
     },
     "additionalValues": {},
@@ -116,6 +117,11 @@ for key, value in settings["defaultValues"].items():
 for key, value in settings["additionalValues"].items():
     helmSetValues.append(key + '=' + value)
 
+# Disable anaconda in app if separate anaconda2 service is enabled
+if current_values.get('anaconda2', {}).get('install', False):
+    helmSetValues.append('app.extraEnv.ANACONDA_ENABLED=false')
+    helmSetValues.append('global.anaconda2.enabled=true')
+
 k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")], set=helmSetValues))
 app_names = {}
 for app in ['app', 'console', 'executor', 'parquet', 'weave', 'weave-trace']:
@@ -125,6 +131,8 @@ for app in ['app', 'console', 'executor', 'parquet', 'weave', 'weave-trace']:
         app_names[app] += '-' + postfix
 k8s_resource(app_names['app'], port_forwards=settings["forwardedPorts"]["app"], objects=['wandb-app:ServiceAccount:default'])
 k8s_resource(app_names['console'], port_forwards=settings["forwardedPorts"]["console"], objects=['wandb-console:ServiceAccount:default'])
+if current_values.get('anaconda2', {}).get('install', False):
+    k8s_resource('wandb-anaconda2', port_forwards=settings["forwardedPorts"]["anaconda2"], objects=['wandb-anaconda2:ServiceAccount:default'])
 if current_values.get('executor', {}).get('install', False):
     k8s_resource(app_names['executor'],objects=['wandb-executor:ServiceAccount:default'])
 k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)
