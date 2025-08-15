@@ -103,7 +103,7 @@ reloader.stakater.com/auto: "true"
 {{- $size := default "" (coalesce .Values.size .Values.global.size) }}
 {{- $sizingInfo := default (dict) (get .Values.sizing $size) }}
 {{- $defaultSize := default (dict) (get .Values.sizing "default") }}
-{{- $mergedSize := merge $sizingInfo $defaultSize }}
+{{- $mergedSize := mergeOverwrite $defaultSize $sizingInfo }}
 
 {{- toYaml $mergedSize }}
 {{- end }}
