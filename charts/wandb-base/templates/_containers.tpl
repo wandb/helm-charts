@@ -14,7 +14,7 @@
     {{- $_ = set $container "root" $.root }}
     {{- if eq $.source "containers" }}
       {{/* Merge in resources from .Values.resources to support legacy chart values */}}
-      {{- $_ = set $container "resources" (merge (default (dict) ($.root.Values.resources)) (default (dict) ($container.resources))) }}
+      {{- $_ = set $container "resources" (merge (default (dict) ($container.resources)) (default (dict) ($.root.Values.resources))) }}
 
       {{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" $.root) }}
       {{- if $sizingInfo  }}
