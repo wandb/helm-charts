@@ -67,38 +67,6 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{- define "wandb-base.reloaderAnnotations" -}}
-{{- $configmaps := "" }}
-{{- $secrets := "" }}
-{{- range $name, $type := .Values.envFrom }}
-{{- if eq $type "configMapRef" }}
-{{ $configmaps = printf "%s%s," $configmaps $name }}
-{{- end -}}
-{{- if eq $type "secretRef" }}
-{{ $secrets = printf "%s%s," $secrets $name }}
-{{- end -}}
-{{- end -}}
-
-{{- range .Values.containers }}
-{{- range $name, $type := .envFrom }}
-{{- if eq $type "configMapRef" }}
-{{ $configmaps = printf "%s%s," $configmaps $name }}
-{{- end -}}
-{{- if eq $type "secretRef" }}
-{{ $secrets = printf "%s%s," $secrets $name }}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-
-{{- if $configmaps }}
-configmap.reloader.stakater.com/reload: {{ $configmaps | trimSuffix "," }}
-{{- end }}
-{{- if $secrets }}
-secret.reloader.stakater.com/reload: {{ $secrets | trimSuffix "," }}
-{{- end }}
-reloader.stakater.com/auto: "true"
-{{- end }}
-
 {{- define "wandb-base.sizingInfo" }}
 {{- $size := default "" (coalesce .Values.size .Values.global.size) }}
 {{- $sizingInfo := default (dict) (get .Values.sizing $size) }}
