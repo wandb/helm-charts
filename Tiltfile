@@ -9,13 +9,14 @@ settings = {
         "app": 8080,
         "console": 8082,
         "weave-trace": 8722,
+        "anaconda2": 8084,
     },
     "installMinio": True,
     "installIngress": False,
     "values": "default",
     "defaultValues": {
         "global.mysql.password": "password",
-        "global.extraEnv.GLOBAL_ADMIN_API_KEY": "",
+        "global.env.GLOBAL_ADMIN_API_KEY": "",
         "reloader.install": "true",
     },
     "additionalValues": {},
@@ -131,7 +132,7 @@ for app in ['app', 'console', 'executor', 'parquet', 'weave', 'weave-trace']:
 k8s_resource(app_names['app'], port_forwards=settings["forwardedPorts"]["app"], objects=['wandb-app:ServiceAccount:default'])
 k8s_resource(app_names['console'], port_forwards=settings["forwardedPorts"]["console"], objects=['wandb-console:ServiceAccount:default'])
 if current_values.get('anaconda2', {}).get('install', False):
-    k8s_resource('wandb-anaconda2', port_forwards=8084, objects=['wandb-anaconda2:ServiceAccount:default'])
+    k8s_resource('wandb-anaconda2', port_forwards=settings["forwardedPorts"]["anaconda2"], objects=['wandb-anaconda2:ServiceAccount:default'])
 if current_values.get('executor', {}).get('install', False):
     k8s_resource(app_names['executor'],objects=['wandb-executor:ServiceAccount:default'])
 k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)

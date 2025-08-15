@@ -27,20 +27,27 @@ spec:
   - ports:
     - port: 6379
 ---
-<<<<<<< HEAD
-# Source: operator-wandb/charts/anaconda2/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
+# Source: operator-wandb/charts/anaconda2/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
 metadata:
   name: chartsnap-anaconda2
   labels:
-    helm.sh/chart: anaconda2-0.7.2
+    helm.sh/chart: anaconda2-0.8.3
     app.kubernetes.io/name: anaconda2
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "0.71.0-anaconda2.0"
+    app.kubernetes.io/version: "0.71.1"
     app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
-=======
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: anaconda2
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
 # Source: operator-wandb/charts/api/templates/pdb.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -187,7 +194,19 @@ spec:
       app.kubernetes.io/name: weave
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
->>>>>>> origin
+---
+# Source: operator-wandb/charts/anaconda2/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-anaconda2
+  labels:
+    helm.sh/chart: anaconda2-0.8.3
+    app.kubernetes.io/name: anaconda2
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.71.1"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
 ---
 # Source: operator-wandb/charts/api/templates/serviceaccount.yaml
 apiVersion: v1
@@ -1217,6 +1236,22 @@ data:
     ARGS+=("--include" "/opt/bitnami/redis/etc/master.conf")
     exec redis-server "${ARGS[@]}"
 ---
+# Source: operator-wandb/templates/anaconda2.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-anaconda2-configmap
+  labels:
+    helm.sh/chart: operator-wandb-0.33.11
+    app.kubernetes.io/name: operator-wandb
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  ANACONDA2_DISABLE_FILE_LOGGING: "true"
+  DD_SERVICE: "anaconda2"
+  PORT: "8082"
+---
 # Source: operator-wandb/templates/api.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -1229,7 +1264,7 @@ data:
   GORILLA_LICENSE_CERT_PATH: "/jwks.json"
   GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL: "true"
   GORILLA_SESSION_LENGTH: "720h"
-  GORILLA_SWEEP_PROVIDER: "http://chartsnap-app:8082"
+  GORILLA_SWEEP_PROVIDER: "http://chartsnap-anaconda2:8082"
   GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
   GORILLA_LIMITER: "noop://"
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
@@ -1249,7 +1284,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-app-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.10
+    helm.sh/chart: operator-wandb-0.33.11
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1261,6 +1296,7 @@ data:
   PARQUET_HOST: "http://chartsnap-parquet:8087"
   OPERATOR_ENABLED: "true"
   LOGGING_ENABLED: "true"
+  GORILLA_SWEEP_PROVIDER: "http://chartsnap-anaconda2:8082"
 ---
 # Source: operator-wandb/templates/bucket.yaml
 apiVersion: v1
@@ -1281,11 +1317,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-ca-certs
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: operator-wandb-0.32.5
-=======
-    helm.sh/chart: operator-wandb-0.33.10
->>>>>>> origin
+    helm.sh/chart: operator-wandb-0.33.11
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1327,7 +1359,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-executor-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.10
+    helm.sh/chart: operator-wandb-0.33.11
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1340,7 +1372,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-filestream-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.10
+    helm.sh/chart: operator-wandb-0.33.11
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1486,7 +1518,7 @@ data:
   GORILLA_GLUE_FRONTEND_HOST: "http://localhost:8080"
   GORILLA_GLUE_LICENSE_CERT_PATH: "/jwks.json"
   # Values that correspond to existing configurations from gorilla.yaml
-  GORILLA_GLUE_SWEEP_PROVIDER: "http://chartsnap-app:8082"
+  GORILLA_GLUE_SWEEP_PROVIDER: "http://chartsnap-anaconda2:8082"
   GORILLA_GLUE_SESSION_LENGTH: "720h"
   GORILLA_GLUE_DEV: "false"
   GORILLA_GLUE_USE_PARQUET_HISTORY_STORE: "true"
@@ -1534,7 +1566,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-local-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.10
+    helm.sh/chart: operator-wandb-0.33.11
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -2063,29 +2095,6 @@ roleRef:
   name: chartsnap-app
   apiGroup: rbac.authorization.k8s.io
 ---
-<<<<<<< HEAD
-# Source: operator-wandb/charts/anaconda2/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-anaconda2
-  labels:
-    helm.sh/chart: anaconda2-0.7.2
-    app.kubernetes.io/name: anaconda2
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "0.71.0-anaconda2.0"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  type: ClusterIP
-  ports:
-  - name: http
-    port: 8082
-    protocol: TCP
-    targetPort: http
-  selector:
-    app.kubernetes.io/name: anaconda2
-    app.kubernetes.io/instance: chartsnap
-=======
 # Source: operator-wandb/charts/glue/templates/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -2129,7 +2138,28 @@ subjects:
 - kind: ServiceAccount
   name: chartsnap-reloader
   namespace: default
->>>>>>> origin
+---
+# Source: operator-wandb/charts/anaconda2/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-anaconda2
+  labels:
+    helm.sh/chart: anaconda2-0.8.3
+    app.kubernetes.io/name: anaconda2
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.71.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8082
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/name: anaconda2
+    app.kubernetes.io/instance: chartsnap
 ---
 # Source: operator-wandb/charts/api/templates/service.yaml
 apiVersion: v1
@@ -2595,12 +2625,13 @@ kind: Deployment
 metadata:
   name: chartsnap-anaconda2
   labels:
-    helm.sh/chart: anaconda2-0.7.2
+    helm.sh/chart: anaconda2-0.8.3
     app.kubernetes.io/name: anaconda2
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "0.71.0-anaconda2.0"
+    app.kubernetes.io/version: "0.71.1"
     app.kubernetes.io/managed-by: Helm
   annotations:
+    configmap.reloader.stakater.com/reload: chartsnap-anaconda2-configmap
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
@@ -2611,39 +2642,30 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.7.2
+        helm.sh/chart: anaconda2-0.8.3
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "0.71.0-anaconda2.0"
+        app.kubernetes.io/version: "0.71.1"
         app.kubernetes.io/managed-by: Helm
     spec:
-      serviceAccountName: chartsnap-anaconda2
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
       containers:
       - name: anaconda2
         envFrom:
+        - configMapRef:
+            name: chartsnap-anaconda2-configmap
         env:
-        - name: ANACONDA2_DISABLE_FILE_LOGGING
-          value: "true"
         - name: DD_AGENT_HOST
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
-        - name: DD_SERVICE
-          value: anaconda2
         - name: DD_TRACE_AGENT_HOSTNAME
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
-        - name: PORT
-          value: "8082"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -2651,7 +2673,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/anaconda2:0.71.0-anaconda2.0"
+        image: "wandb/anaconda2:0.71.1"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
@@ -2674,8 +2696,33 @@ spec:
             cpu: "1"
             memory: 1Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: "1"
+            memory: 1Gi
+      serviceAccountName: chartsnap-anaconda2
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: anaconda2
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: anaconda2
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
 ---
 # Source: operator-wandb/charts/api/templates/deployment.yaml
 apiVersion: apps/v1
@@ -2895,610 +2942,6 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
-<<<<<<< HEAD
-      volumes:
-      - configMap:
-          name: 'chartsnap-ca-certs'
-        name: wandb-ca-certs
-      - configMap:
-          name: 'noCertProvided'
-          optional: true
-        name: wandb-ca-certs-user
-      - name: redis-ca
-        secret:
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
-          secretName: 'chartsnap-redis-secret'
----
-# Source: operator-wandb/charts/app/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chartsnap-app
-  labels:
-    helm.sh/chart: app-0.1.0
-    app.kubernetes.io/name: app
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "0.33.0"
-    wandb.com/app-name: app-0.1.0
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    reloader.stakater.com/auto: "true"
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: app
-      app.kubernetes.io/instance: chartsnap
-      helm.sh/chart: app-0.1.0
-      app.kubernetes.io/name: app
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/version: "0.33.0"
-      wandb.com/app-name: app-0.1.0
-      app.kubernetes.io/managed-by: Helm
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: app-0.1.0
-        app.kubernetes.io/name: app
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "0.33.0"
-        wandb.com/app-name: app-0.1.0
-        app.kubernetes.io/managed-by: Helm
-      annotations:
-        checksum/secret: 297dfac9d2647e9c9e459baa6b659848ccf6050aaaa7561599f3b1f2f199b570
-    spec:
-      serviceAccountName: chartsnap-app
-      securityContext:
-        runAsUser: 999
-        runAsGroup: 0
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsNonRoot: true
-      # Extend the pods shutdown grace period from the default of 30s to 60s.
-      # This goes in the pod template spec.
-      terminationGracePeriodSeconds: 60
-      initContainers:
-      - name: init-db
-        image: "wandb/local:latest"
-        env:
-        - name: MYSQL_PORT
-          value: "3306"
-        - name: MYSQL_HOST
-          value: "chartsnap-mysql"
-        - name: MYSQL_DATABASE
-          value: "wandb_local"
-        - name: MYSQL_USER
-          value: "wandb"
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-mysql
-              key: MYSQL_PASSWORD
-        command: ['bash', '-c', "until mysql -h$MYSQL_HOST -u$MYSQL_USER -p$MYSQL_PASSWORD -D$MYSQL_DATABASE -P$MYSQL_PORT --execute=\"SELECT 1\"; do echo waiting for db; sleep 2; done"]
-      containers:
-      - name: app
-        image: "wandb/local:latest"
-        securityContext:
-          capabilities:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
-          privileged: false
-        volumeMounts:
-        ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-        - name: prometheus
-          containerPort: 8181
-          protocol: TCP
-        - name: anaconda
-          containerPort: 8082
-          protocol: TCP
-        - name: local
-          containerPort: 8083
-          protocol: TCP
-        - name: gorilla-statsd
-          containerPort: 8125
-          protocol: TCP
-        envFrom:
-        - configMapRef:
-            name: chartsnap-bucket-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - secretRef:
-            name: chartsnap-gorilla-secret
-        - secretRef:
-            name: chartsnap-gorilla-session-key
-        - configMapRef:
-            name: chartsnap-kafka-configmap
-        env:
-        - name: GOMEMLIMIT
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.memory
-        - name: GLUE_ENABLED
-          value: "false"
-        ## TODO: Turn this on when we are ready to remove the gorilla service from wandb/local
-        #
-        # - name: GORILLA_ENABLED
-        #   value: "false"
-        # - name: PROXY_PASS_BACKEND_HOST
-        #   value: "$(CHARTSNAP_API_SERVICE_HOST):$(CHARTSNAP_API_SERVICE_PORT)"
-        #
-        - name: GORILLA_GLUE_CONTAINER_PORT
-          value: "9173"
-        - name: BUCKET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "ACCESS_KEY"
-              optional: true
-        - name: BUCKET_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: "SECRET_KEY"
-              optional: true
-        - name: BUCKET
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: HOST
-          value: "http://localhost:8080"
-        - name: MYSQL_PORT
-          value: "3306"
-        - name: MYSQL_HOST
-          value: "chartsnap-mysql"
-        - name: MYSQL_DATABASE
-          value: "wandb_local"
-        - name: MYSQL_USER
-          value: "wandb"
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-mysql
-              key: MYSQL_PASSWORD
-        - name: MYSQL
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)"
-        - name: WEAVE_SERVICE
-          value: "chartsnap-weave:9994"
-        - name: PARQUET_HOST
-          value: "http://chartsnap-parquet:8087"
-        - name: PARQUET_ENABLED
-          value: "true"
-        - name: A_REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-redis-secret
-              optional: true
-              key: REDIS_PASSWORD
-        - name: REDIS_PORT
-          value: "6379"
-        - name: REDIS_HOST
-          value: "chartsnap-redis-master"
-        - name: REDIS_PARAMS
-          value: "?ttlInSeconds=604800"
-        - name: REDIS
-          value: "redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
-        - name: SLACK_CLIENT_ID
-          value: ""
-        - name: SLACK_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-app-config
-              key: SLACK_SECRET
-              optional: true
-        - name: LICENSE
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-app-config
-              key: LICENSE
-              optional: true
-        - name: GORILLA_LICENSE
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-app-config
-              key: LICENSE
-              optional: true
-        - name: GORILLA_SESSION_LENGTH
-          value: "720h"
-        - name: OPERATOR_ENABLED
-          value: 'true'
-        - name: LOGGING_ENABLED
-          value: 'true'
-        - name: AZURE_STORAGE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-bucket"
-              key: ACCESS_KEY
-              optional: true
-        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: G_HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        - name: BANNERS
-          value: "{}"
-        - name: OVERFLOW_BUCKET_ADDR
-          value: "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)"
-        - name: KAFKA_CLIENT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-kafka
-              key: KAFKA_CLIENT_PASSWORD
-              optional: true
-        - name: KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE
-          value: chartsnap-run-updates-shadow
-        - name: KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS
-          value: "12"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE
-          value: >
-            {
-
-              "overflow-bucket": {
-                "store": "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)",
-                "name": "wandb",
-                "prefix": "wandb-overflow"
-              },
-              "addr": "kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?producer_batch_bytes=1048576&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)&replication_factor=3"
-            }
-
-        - name: GORILLA_SETTINGS_CACHE
-          value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_SWEEP_PROVIDER
-          value: "http://chartsnap-app:8082"
-        - name: GORILLA_METADATA_CACHE
-          value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_AUDITOR_CACHE
-          value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_LOCKER
-          value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_CACHE
-          value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_FILE_METADATA_SOURCE
-          value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_HISTORY_STORE
-          value: "http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_ARTIFACTS_GC_BATCH_SIZE
-          value: "0"
-        - name: GORILLA_ARTIFACTS_GC_NUM_WORKERS
-          value: "0"
-        - name: GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
-          value: "0"
-        - name: GORILLA_PARQUET_ARROW_BUFFER_SIZE
-          value: "2147483648" # 2GB
-        - name: GORILLA_TSHIRT_SIZE
-          value:
-        - name: BUCKET_QUEUE
-          value: "internal://"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_FILEMETA_ENABLED
-          value: "false"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        ## TODO: If we want to remove the api service from wandb/local, we can uncomment this if else block
-        #
-        # # If we disabled the api, we still want to have a healthcheck fror the frontend/nginx
-        # # We also can't just disable the migrations which would make the health endpint return 200
-        # # because glue, parquet, and filemeta are still running in the local container.
-        # livenessProbe:
-        #   httpGet:
-        #     path: /proxy/healthz
-        #     port: http
-        # readinessProbe:
-        #   httpGet:
-        #     path: /proxy/healthz
-        #     port: http
-        #   initialDelaySeconds: 20
-        #   periodSeconds: 5
-        # startupProbe:
-        #   httpGet:
-        #     path: /proxy/healthz
-        #     port: http
-        #   initialDelaySeconds: 20
-        #   periodSeconds: 5
-        #   failureThreshold: 120
-        #
-        # Increase the sleep before SIGTERM to 25s. I had this as 5s previously and it wasn't enough.
-        lifecycle:
-          preStop:
-            exec:
-              command: ["sleep", "25"]
-        resources:
-          limits:
-            cpu: 4000m
-            memory: 8Gi
-          requests:
-            cpu: 100m
-            memory: 128Mi
-      volumes:
----
-# Source: operator-wandb/charts/console/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chartsnap-console
-  labels:
-    helm.sh/chart: console-0.1.0
-    app.kubernetes.io/name: console
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.16.0"
-    wandb.com/app-name: console-0.1.0
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    reloader.stakater.com/auto: "true"
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: console
-      app.kubernetes.io/instance: chartsnap
-      helm.sh/chart: console-0.1.0
-      app.kubernetes.io/name: console
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/version: "1.16.0"
-      wandb.com/app-name: console-0.1.0
-      app.kubernetes.io/managed-by: Helm
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: console-0.1.0
-        app.kubernetes.io/name: console
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "1.16.0"
-        wandb.com/app-name: console-0.1.0
-        app.kubernetes.io/managed-by: Helm
-      annotations:
-    spec:
-      serviceAccountName: chartsnap-console
-      securityContext:
-        runAsUser: 1000
-        runAsGroup: 0
-        fsGroup: 1000
-        fsGroupChangePolicy: OnRootMismatch
-        runAsNonRoot: true
-      # Extend the pods shutdown grace period from the default of 30s to 60s.
-      # This goes in the pod template spec.
-      terminationGracePeriodSeconds: 60
-      containers:
-      - name: console
-        image: "wandb/console:latest"
-        securityContext:
-          capabilities:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
-          privileged: false
-        ports:
-        - name: http
-          containerPort: 8082
-          protocol: TCP
-        env:
-        - name: AUTH_SERVICE
-          value: chartsnap-app:8080
-        - name: OPERATOR_NAMESPACE
-          value: default
-        - name: RELEASE_NAME
-          value: chartsnap
-        - name: RELEASE_NAMESPACE
-          value: default
-        - name: PROMETHEUS_SERVER
-          value: "http://chartsnap-prometheus-server"
-        - name: BANNERS
-          value: "{}"
-        - name: G_HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        # Optional HTTP proxy configuration
-        - name: BUCKET_ACCESS_IDENTITY
-          value: "unknown"
-        - name: BUCKET_QUEUE
-          value: "internal://"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: TESTING
-          value: "true"
-        livenessProbe:
-          httpGet:
-            path: /console/api/healthz
-            port: http
-        readinessProbe:
-          httpGet:
-            path: /console/api/ready
-            port: http
-          initialDelaySeconds: 20
-          periodSeconds: 5
-        startupProbe:
-          httpGet:
-            path: /console/api/ready
-            port: http
-          initialDelaySeconds: 20
-          periodSeconds: 5
-          failureThreshold: 120
-        # Increase the sleep before SIGTERM to 25s. I had this as 5s previously and it wasn't enough.
-        lifecycle:
-          preStop:
-            exec:
-              command: ["sleep", "25"]
-        resources:
-          limits:
-            cpu: 1
-            memory: 500Mi
-          requests:
-            cpu: 100m
-            memory: 128Mi
----
-# Source: operator-wandb/charts/filemeta/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chartsnap-filemeta
-  labels:
-    helm.sh/chart: filemeta-0.7.2
-    app.kubernetes.io/name: filemeta
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    configmap.reloader.stakater.com/reload: chartsnap-bucket-configmap,chartsnap-mysql-configmap,chartsnap-redis-configmap
-    secret.reloader.stakater.com/reload: chartsnap-global-secret
-    reloader.stakater.com/auto: "true"
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: filemeta
-      app.kubernetes.io/instance: chartsnap
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: filemeta-0.7.2
-        app.kubernetes.io/name: filemeta
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      serviceAccountName: chartsnap-filemeta
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      containers:
-      - name: filemeta
-        args:
-        - filemeta
-        envFrom:
-        - configMapRef:
-            name: chartsnap-bucket-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-mysql-configmap
-        - configMapRef:
-            name: chartsnap-redis-configmap
-        env:
-        - name: AZURE_STORAGE_KEY
-          valueFrom:
-            secretKeyRef:
-              key: 'ACCESS_KEY'
-              name: 'chartsnap-bucket'
-              optional: true
-        - name: A_MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: 'MYSQL_PASSWORD'
-              name: 'chartsnap-mysql'
-        - name: A_REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: 'REDIS_PASSWORD'
-              name: 'chartsnap-redis-secret'
-              optional: true
-        - name: BUCKET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              key: 'ACCESS_KEY'
-              name: 'chartsnap-bucket'
-              optional: true
-        - name: BUCKET_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              key: 'SECRET_KEY'
-              name: 'chartsnap-bucket'
-              optional: true
-        - name: GORILLA_FILE_METADATA_SOURCE
-          value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL
-          value: "true"
-        - name: GORILLA_FILE_STORE
-          value: 's3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)'
-        - name: GORILLA_METADATA_STORE
-          value: 'mysql://$(MYSQL_USER):$(A_MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
-        - name: GORILLA_ONPREM
-          value: "true"
-        - name: GORILLA_SETTINGS_CACHE
-          value: 'redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_STORAGE_BUCKET
-          value: 's3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)'
-        - name: GORILLA_TASK_QUEUE
-          value: 'noop://'
-        - name: GORILLA_TRACER
-          value: 'otlp+grpc://chartsnap-otel-daemonset:4317?trace_ratio=0'
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
-        imagePullPolicy: IfNotPresent
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 1Gi
-          requests:
-            cpu: 250m
-            memory: 256Mi
----
-# Source: operator-wandb/charts/glue/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chartsnap-glue
-  labels:
-    helm.sh/chart: glue-0.7.2
-    app.kubernetes.io/name: glue
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    configmap.reloader.stakater.com/reload: chartsnap-bucket-configmap,chartsnap-glue-configmap,chartsnap-gorilla-configmap,chartsnap-mysql-configmap,chartsnap-redis-configmap
-    secret.reloader.stakater.com/reload: chartsnap-global-secret,chartsnap-glue-secret,chartsnap-gorilla-secret,chartsnap-gorilla-session-key
-    reloader.stakater.com/auto: "true"
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: glue
-      app.kubernetes.io/instance: chartsnap
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: glue-0.7.2
-        app.kubernetes.io/name: glue
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      serviceAccountName: chartsnap-glue
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-=======
->>>>>>> origin
       initContainers:
       - name: init-db
         command:
@@ -5741,6 +5184,38 @@ spec:
           sizeLimit: '20Gi'
         name: cache
 ---
+# Source: operator-wandb/charts/anaconda2/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: chartsnap-anaconda2
+  labels:
+    helm.sh/chart: anaconda2-0.8.3
+    app.kubernetes.io/name: anaconda2
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.71.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: chartsnap-anaconda2
+  minReplicas: 2
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
 # Source: operator-wandb/charts/mysql/templates/statefulset.yaml
 apiVersion: apps/v1
 kind: StatefulSet
@@ -6251,11 +5726,7 @@ kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-connection"
   labels:
-<<<<<<< HEAD
-    helm.sh/chart: operator-wandb-0.32.5
-=======
-    helm.sh/chart: operator-wandb-0.33.10
->>>>>>> origin
+    helm.sh/chart: operator-wandb-0.33.11
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"

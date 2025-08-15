@@ -15,7 +15,6 @@ if ! helm plugin list | grep -q "cascade"; then
   echo "  helm plugin install https://github.com/origranot/helm-cascade"
   exit 1
 fi
-# helm cascade build ./charts/operator-wandb/
 
 function main() {
   local chart="operator-wandb"
@@ -23,6 +22,10 @@ function main() {
 
   local func="$1"
   case "$func" in
+    build)
+      echo "Building operator-wandb"
+      helm cascade build "./charts/$chart"
+      ;;
     update)
       echo "Updating operator-wandb snapshots"
       helm chartsnap -c "./charts/$chart" -u -f "./$values_dir/$chart"
@@ -38,6 +41,7 @@ A helper script for the helm-chartsnap plugin https://github.com/jlandowner/helm
 Usage: $0 [COMMAND]
 
 Commands:
+  build,    build the operator-wandb chart
   update,   execute chartsnap to update the snapshots
   run,      executes chartsnap to test helm changes
 EOF
