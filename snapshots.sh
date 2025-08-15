@@ -9,6 +9,14 @@ if ! helm plugin list | grep -q "chartsnap"; then
   exit 1
 fi
 
+if ! helm plugin list | grep -q "cascade"; then
+  echo "❌ helm cascade plugin is not installed"
+  echo "Please install it by running:"
+  echo "  helm plugin install https://github.com/origranot/helm-cascade"
+  exit 1
+fi
+# helm cascade build ./charts/operator-wandb/
+
 function main() {
   local chart="operator-wandb"
   local values_dir="test-configs"

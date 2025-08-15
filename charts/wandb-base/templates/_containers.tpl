@@ -3,17 +3,47 @@
   containing the . from the calling context
  */}}
 {{- define "wandb-base.containers" -}}
-{{- range $containerName, $containerSource := .containers -}}
-{{- $container := dict }}
-{{- $_ := deepCopy $containerSource | merge $container }}
-{{- $_ = set $container "name" $containerName }}
-{{- $_ = set $container "securityContext" (coalesce $container.securityContext $.root.Values.securityContext) }}
-{{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
-{{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
-{{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env))) }}
-{{- $_ = set $container "root" $.root }}
-{{- include "wandb-base.container" $container -}}
-{{- end }}
+  {{- range $containerName, $containerSource := .containers -}}
+    {{- $container := dict }}
+    {{- $_ := deepCopy $containerSource | merge $container }}
+    {{- $_ = set $container "name" $containerName }}
+    {{- $_ = set $container "securityContext" (coalesce $container.securityContext (merge $.root.Values.securityContext $.root.Values.container.securityContext)) }}
+    {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
+    {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
+    {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $.root.Values.global.env $.root.Values.global.extraEnv) }}
+    {{- $_ = set $container "root" $.root }}
+    {{- if eq $.source "containers" }}
+      {{/* Merge in resources from .Values.resources to support legacy chart values */}}
+      {{- $_ = set $container "resources" (merge (default (dict) ($container.resources)) (default (dict) ($.root.Values.resources))) }}
+
+      {{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" $.root) }}
+      {{- if $sizingInfo  }}
+        {{- $_ = set $container "resources" (merge (default (dict) ($container.resources)) (default (dict) ($sizingInfo.resources))) }}
+      {{- end }}
+
+      {{- if $sizingInfo.env }}
+        {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($sizingInfo.env))) }}
+      {{- end }}
+    {{- end }}
+
+    {{- /* We prerender the envTpls and put them into an array for searching */ -}}
+    {{- $envTpls := list }}
+    {{- if $.root.Values.envTpls }}
+      {{- range $.root.Values.envTpls }}
+        {{- $envTpls = concat $envTpls (tpl . $.root | fromYamlArray) }}
+      {{- end }}
+    {{- end }}
+
+    {{- /* Iterate over the envvars rendered from envTpls, and remove any specified in env to avoid setElementOrder errors */ -}}
+    {{- range $index, $envVar := $envTpls }}
+      {{- if hasKey $container.env $envVar.name }}
+        {{- $envTpls = without $envTpls $envVar }}
+      {{- end }}
+    {{- end }}
+    {{- $_ = set $container "envTpls" $envTpls }}
+
+    {{ include "wandb-base.container" $container }}
+  {{- end }}
 {{- end }}
 
 {{- define "wandb-base.container" }}
@@ -31,6 +61,9 @@
     {{- tpl (include "wandb-base.envFrom" . | nindent 4) $.root }}
   {{- end }}
   env:
+  {{- if .envTpls }}
+    {{- .envTpls | toYaml | nindent 4 }}
+  {{- end }}
   {{- if .env }}
     {{- tpl (include "wandb-base.env" . | nindent 4) $.root }}
   {{- end }}
@@ -64,20 +97,25 @@
   resources:
     {{- toYaml .resources | nindent 4 }}
   {{- end }}
-  {{- with .volumeMounts }}
+  {{- if or .volumeMounts .volumeMountsTpls }}
   volumeMounts:
-    {{- toYaml . | nindent 4 }}
+    {{- range .volumeMountsTpls }}
+{{ tpl . $.root | indent 4 }}
+    {{- end }}
+    {{- if .volumeMounts }}
+{{ tpl (toYaml .volumeMounts | nindent 4) $.root }}
+    {{- end }}
   {{- end }}
 {{- end }}
 
 {{- define "wandb-base.env" -}}
 {{- range $key, $value := .env -}}
-{{- if kindIs "string" $value }}
-- name: {{ $key }}
-  value: {{ $value | quote }}
-{{- else }}
+{{- if kindIs "map" $value }}
 - name: {{ $key }}
 {{- toYaml $value | nindent 2 }}
+{{- else }}
+- name: {{ $key }}
+  value: {{ toString $value | quote }}
 {{- end -}}
 {{- end -}}
 {{- end -}}

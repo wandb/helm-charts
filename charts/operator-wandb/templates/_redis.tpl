@@ -118,7 +118,7 @@ include the proprietary query parameters used by WandB.
 {{- define "wandb.redis.connectionString" -}}
 {{- $password := include "wandb.redis.password" . }}
 {{- if or $password .Values.global.redis.secret.secretName }}
-redis://:$(A_REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
 {{- else }}
 redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
 {{- end }}
