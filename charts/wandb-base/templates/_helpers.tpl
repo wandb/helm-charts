@@ -76,6 +76,13 @@ Create the name of the service account to use
 {{- toYaml $mergedSize }}
 {{- end }}
 
+{{- define "wandb-base.sizingInfoHorizontal" }}
+{{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
+{{- $hpaSizing := mergeOverwrite $sizingInfo.autoscaling.horizontal .Values.autoscaling.horizontal }}
+
+{{- toYaml $hpaSizing }}
+{{- end }}
+
 {{- define "wandb-base.topologySpreadConstraints" }}
 {{- $topologyConstraints := default (deepCopy .Values.topologySpreadConstraints) list }}
   {{- range $constraint := $topologyConstraints }}
@@ -86,7 +93,8 @@ Create the name of the service account to use
 
 {{- define "wandb-base.replicaCount" }}
 {{- $desiredReplicas := .Values.replicaCount }}
-{{- if .Values.autoscaling.horizontal.enabled }}
+{{- $hpaSizing := fromYaml (include "wandb-base.sizingInfoHorizontal" .) }}
+{{- if $hpaSizing.enabled }}
   {{- $hpa := lookup "autoscaling/v2" "HorizontalPodAutoscaler" .Release.Namespace (include "wandb-base.fullname" . | trimAll "") }}
     {{- if and $hpa (gt $hpa.status.currentReplicas 0) }}
       {{- $desiredReplicas = $hpa.status.currentReplicas }}
