@@ -388,6 +388,202 @@ global:
 - [ ] Perform end-to-end testing
 - [ ] Document runbooks and procedures
 
+## Weave with Altinity ClickHouse
+
+For production-grade ClickHouse deployments with high availability and advanced cluster management, you can use the [Altinity ClickHouse Operator](https://github.com/Altinity/clickhouse-operator).
+
+### Prerequisites
+- Kubernetes 1.19+
+- Helm 3.5.2+
+- ClickHouse 21.11+
+
+### Step 1: Install Altinity ClickHouse Operator
+
+```bash
+# Add Altinity helm repository
+helm repo add altinity https://docs.altinity.com/clickhouse-operator/
+helm repo update
+
+# Install the operator
+kubectl create namespace clickhouse-operator
+helm install clickhouse-operator altinity/altinity-clickhouse-operator \
+  --namespace clickhouse-operator
+```
+
+### Step 2: Deploy ClickHouse Cluster for Weave Traces
+
+```yaml
+# weave-clickhouse-cluster.yaml
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: weave-clickhouse
+  namespace: wandb
+spec:
+  configuration:
+    users:
+      wandb/password: "your-secure-password"
+      wandb/profile: default
+    profiles:
+      default/max_memory_usage: "10000000000"
+    clusters:
+      - name: weave-cluster
+        layout:
+          shardsCount: 1
+          replicasCount: 2
+    zookeeper:
+      nodes:
+        - host: zookeeper.zookeeper.svc.cluster.local
+  defaults:
+    templates:
+      podTemplate: pod-template
+      dataVolumeClaimTemplate: data-volume-template
+      serviceTemplate: service-template
+  templates:
+    podTemplates:
+      - name: pod-template
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:23.8
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 2Gi
+                limits:
+                  cpu: 2000m
+                  memory: 8Gi
+    volumeClaimTemplates:
+      - name: data-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 100Gi
+          storageClassName: gp3
+    serviceTemplates:
+      - name: service-template
+        spec:
+          ports:
+            - name: http
+              port: 8123
+            - name: tcp
+              port: 9000
+          type: ClusterIP
+```
+
+### Step 3: Deploy W&B with Weave Components
+
+```yaml
+# wandb-weave-deployment.yaml
+apiVersion: apps.wandb.com/v1
+kind: WeightsAndBiases
+metadata:
+  name: wandb-weave
+  namespace: wandb
+spec:
+  values:
+    global:
+      host: "https://wandb.company.com"
+      license: "your-license-key"
+      size: "medium"
+      
+      # External ClickHouse managed by Altinity operator
+      clickhouse:
+        host: "weave-clickhouse-weave-cluster"
+        port: 8123
+        database: "weave_trace_db"
+        user: "wandb"
+        passwordSecret:
+          name: "clickhouse-credentials"
+          passwordKey: "CLICKHOUSE_PASSWORD"
+        replicated: true  # Enable for multi-replica ClickHouse
+    
+    # Enable Weave components
+    weave:
+      install: true
+      replicaCount: 2
+      cache:
+        intervalInHours: 24
+        size: 20Gi
+    
+    weave-trace:
+      install: true
+      replicaCount: 2
+    
+    weave-trace-worker:
+      install: true
+      replicaCount: 3
+    
+    # Core W&B components
+    api:
+      enabled: true
+      replicaCount: 2
+    app:
+      install: true
+      replicaCount: 2
+    frontend:
+      install: true
+      replicaCount: 2
+    
+    # External data stores
+    mysql:
+      install: false
+    redis:
+      install: false
+    clickhouse:
+      install: false  # Using Altinity-managed ClickHouse
+```
+
+### Step 4: Create Required Secrets
+
+```bash
+# Create ClickHouse credentials secret
+kubectl create secret generic clickhouse-credentials \
+  --from-literal=CLICKHOUSE_PASSWORD='your-secure-password' \
+  --namespace wandb
+
+# Create other required secrets (MySQL, Redis, etc.)
+kubectl create secret generic mysql-credentials \
+  --from-literal=MYSQL_PASSWORD='mysql-password' \
+  --namespace wandb
+```
+
+### Step 5: Deploy the Stack
+
+```bash
+# Apply ClickHouse cluster first
+kubectl apply -f weave-clickhouse-cluster.yaml
+
+# Wait for ClickHouse cluster to be ready
+kubectl wait --for=condition=Ready chi/weave-clickhouse --timeout=600s -n wandb
+
+# Deploy W&B with weave
+kubectl apply -f wandb-weave-deployment.yaml
+```
+
+### Step 6: Verify Installation
+
+```bash
+# Check ClickHouse cluster status
+kubectl get chi -n wandb
+
+# Check W&B weave components
+kubectl get pods -n wandb | grep weave
+
+# Test ClickHouse connectivity
+kubectl exec -it chi-weave-clickhouse-weave-cluster-0-0-0 -n wandb -- clickhouse-client
+```
+
+### Benefits of Altinity Operator
+- **High Availability**: Automatic ClickHouse replication and failover
+- **Scaling**: Easy horizontal scaling of ClickHouse clusters
+- **Monitoring**: Built-in Prometheus metrics and Grafana dashboards
+- **Backup**: Automated backup and restore capabilities
+- **Upgrades**: Zero-downtime ClickHouse version upgrades
+- **Storage**: Dynamic persistent volume management
+
 ## Scaling Considerations
 
 ### Horizontal Scaling
