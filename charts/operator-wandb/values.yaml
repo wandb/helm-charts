@@ -1206,6 +1206,7 @@ glue:
     "{{ .Release.Name }}-glue-configmap": "configMapRef"
   envTpls:
     - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
@@ -1335,6 +1336,7 @@ metric-observer:
     "{{ .Release.Name }}-flat-run-fields-updater-configmap": "configMapRef"
   envTpls:
     - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
@@ -1565,24 +1567,6 @@ settingsMigrationJob:
           - update
           - patch
   env:
-    AZURE_STORAGE_KEY:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
-          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
-          optional: true
-    BUCKET_ACCESS_KEY:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
-          key: '{{ (include "wandb.bucket" . | fromYaml).accessKeyName }}'
-          optional: true
-    BUCKET_SECRET_KEY:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ (include "wandb.bucket" . | fromYaml).secretName }}'
-          key: '{{ (include "wandb.bucket" . | fromYaml).secretKeyName }}'
-          optional: true
     SMJ_FILE_STORE:
       value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     SMJ_K8S_ACTIVE_SPEC_SECRET_NAME:
@@ -1595,6 +1579,9 @@ settingsMigrationJob:
           fieldPath: metadata.namespace
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.bucket.cwIdentity" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
   kind: Job
   jobs:
     smj:
