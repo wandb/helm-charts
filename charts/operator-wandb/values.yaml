@@ -879,6 +879,68 @@ filemeta:
           maxReplicas: 6
           minReplicas: 1
 
+anaconda2:
+  install: false
+  service:
+    enabled: true
+    loadBalancerHealthCheckPath: "/ping"
+    type: ClusterIP
+    ports:
+      - port: 8082
+        targetPort: http
+        protocol: TCP
+        name: http
+  env:
+    DD_TRACE_AGENT_HOSTNAME:
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
+    DD_AGENT_HOST:
+      valueFrom:
+        fieldRef:
+          fieldPath: status.hostIP
+  envFrom:
+    "{{ .Release.Name }}-anaconda2-configmap": "configMapRef"
+  containers:
+    anaconda2:
+      env: {}
+      envFrom: {}
+      ports:
+        - name: http
+          containerPort: 8082
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /ping
+          port: http
+        timeoutSeconds: 2
+        failureThreshold: 5
+      readinessProbe:
+        httpGet:
+          path: /ping
+          port: http
+        timeoutSeconds: 2
+        failureThreshold: 5
+  image:
+    repository: wandb/anaconda2
+    tag: 0.71.1
+  role:
+    enabled: false
+  sizing:
+    default:
+      resources:
+        limits:
+          cpu: "1"
+          memory: 1Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 2
+
 filestream:
   install: false
   deploymentPostfix: "bc"
