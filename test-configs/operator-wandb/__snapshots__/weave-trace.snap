@@ -438,7 +438,7 @@ metadata:
   labels:
 data:
   ACCESS_KEY: bWluaW8=
-  SECRET_KEY: dGVzdCU0MCUzQyUzRSUyNSU3QiU3RCU3QyU1RSUyMiUyMCU1QyUyQnBhc3N3b3Jk
+  SECRET_KEY: dGVzdHBhc3N3b3Jk
 ---
 # Source: operator-wandb/templates/clickhouse.yaml
 apiVersion: v1
@@ -1435,7 +1435,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-app-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.1
+    helm.sh/chart: operator-wandb-0.33.14
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1467,7 +1467,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-ca-certs
   labels:
-    helm.sh/chart: operator-wandb-0.33.1
+    helm.sh/chart: operator-wandb-0.33.14
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1509,7 +1509,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-executor-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.1
+    helm.sh/chart: operator-wandb-0.33.14
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1522,7 +1522,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-filestream-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.1
+    helm.sh/chart: operator-wandb-0.33.14
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1555,6 +1555,9 @@ data:
   REACT_APP_ENVIRONMENT_IS_PRIVATE: "true"
   REACT_APP_ANALYTICS_DISABLED: "true"
   WEAVE_TRACES_ENABLED: 'true'
+  SERVER_FLAG_WEAVE_1_PERCENTAGE: "100"
+  WEAVE_ENABLED: "true"
+  OPERATOR_ENABLED: "true"
 ---
 # Source: operator-wandb/templates/frontend.yaml
 apiVersion: v1
@@ -1713,7 +1716,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-local-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.33.1
+    helm.sh/chart: operator-wandb-0.33.14
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1774,9 +1777,14 @@ data:
   PORT: "8080"
   API_PATH_PREFIX: "/traces"
   WANDB_PUBLIC_BASE_URL: "http://localhost:8080"
-  WANDB_BASE_URL: "http://chartsnap-app:8080/"
+  WANDB_BASE_URL: "http://chartsnap-api:8081/"
   WF_TRACE_SERVER_URL: "http://localhost:8080/traces"
   WF_ENFORCE_PASSWORD_LENGTH: "false"
+  WEAVE_ENABLE_ONLINE_EVAL: "false"
+  WEAVE_TRACE_SERVER_BASE_URL: "http://localhost:8080/traces"
+  WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME: "weave-worker-auth"
+  KAFKA_BROKER_HOST: "bufstream.bufstream.svc.cluster.local"
+  KAFKA_BROKER_PORT: "9092"
 ---
 # Source: operator-wandb/templates/weave.yaml
 apiVersion: v1
@@ -3005,6 +3013,18 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID"
+              optional: true
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY"
+              optional: true
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
@@ -3067,6 +3087,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_SETTINGS_CACHE
+          value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_TASK_QUEUE
           value: "noop://"
@@ -3187,6 +3209,18 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID"
+              optional: true
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY"
+              optional: true
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
@@ -3249,6 +3283,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_SETTINGS_CACHE
+          value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_TASK_QUEUE
           value: "noop://"
@@ -3336,6 +3372,18 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID"
+              optional: true
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY"
+              optional: true
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
@@ -3398,6 +3446,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_SETTINGS_CACHE
+          value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_TASK_QUEUE
           value: "noop://"
@@ -3499,7 +3549,7 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
   annotations:
-    configmap.reloader.stakater.com/reload: chartsnap-api-configmap,chartsnap-app-configmap,chartsnap-bucket-configmap,chartsnap-frontend-configmap,chartsnap-global-configmap,chartsnap-glue-configmap,chartsnap-kafka-configmap,chartsnap-mysql-configmap,chartsnap-redis-configmap
+    configmap.reloader.stakater.com/reload: chartsnap-api-configmap,chartsnap-app-configmap,chartsnap-bucket-configmap,chartsnap-frontend-configmap,chartsnap-global-configmap,chartsnap-glue-configmap,chartsnap-kafka-configmap,chartsnap-local-configmap,chartsnap-mysql-configmap,chartsnap-redis-configmap
     secret.reloader.stakater.com/reload: chartsnap-global-secret,chartsnap-gorilla-session-key
     reloader.stakater.com/auto: "true"
 spec:
@@ -3539,6 +3589,8 @@ spec:
         - configMapRef:
             name: chartsnap-kafka-configmap
         - configMapRef:
+            name: chartsnap-local-configmap
+        - configMapRef:
             name: chartsnap-mysql-configmap
         - configMapRef:
             name: chartsnap-redis-configmap
@@ -3559,6 +3611,18 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID"
+              optional: true
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY"
+              optional: true
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
@@ -3621,6 +3685,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_SETTINGS_CACHE
+          value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_TASK_QUEUE
           value: "noop://"
@@ -3760,6 +3826,8 @@ spec:
         - configMapRef:
             name: chartsnap-kafka-configmap
         - configMapRef:
+            name: chartsnap-local-configmap
+        - configMapRef:
             name: chartsnap-mysql-configmap
         - configMapRef:
             name: chartsnap-redis-configmap
@@ -3780,6 +3848,18 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID"
+              optional: true
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY"
+              optional: true
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
@@ -3842,6 +3922,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_SETTINGS_CACHE
+          value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_TASK_QUEUE
           value: "noop://"
@@ -4019,8 +4101,8 @@ spec:
             cpu: "2"
             memory: 2Gi
           requests:
-            cpu: 100m
-            memory: 100Mi
+            cpu: 50m
+            memory: 64Mi
       serviceAccountName: chartsnap-console
       securityContext:
         fsGroup: 0
@@ -4175,6 +4257,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_SETTINGS_CACHE
+          value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_TASK_QUEUE
           value: "noop://"
@@ -4343,6 +4427,8 @@ spec:
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_SETTINGS_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_USAGE_METRICS_CACHE
+          value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_TASK_QUEUE
           value: "noop://"
         - name: KAFKA_CLIENT_PASSWORD
@@ -4484,6 +4570,8 @@ spec:
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_SETTINGS_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_USAGE_METRICS_CACHE
+          value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_TASK_QUEUE
           value: "noop://"
         - name: KAFKA_CLIENT_PASSWORD
@@ -4589,6 +4677,7 @@ spec:
       app.kubernetes.io/instance: chartsnap
   template:
     metadata:
+      annotations: {}
       labels:
         helm.sh/chart: parquet-0.8.0
         app.kubernetes.io/name: parquet
@@ -4632,6 +4721,18 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID"
+              optional: true
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: "gorilla-coreweave-caios"
+              key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY"
+              optional: true
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
@@ -4694,6 +4795,8 @@ spec:
         - name: GORILLA_METADATA_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_SETTINGS_CACHE
+          value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+        - name: GORILLA_USAGE_METRICS_CACHE
           value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
         - name: GORILLA_TASK_QUEUE
           value: "noop://"
@@ -4996,7 +5099,6 @@ spec:
         args:
         - "--log-level=info"
         - "--reload-on-create=true"
-        - "--reload-on-delete=true"
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
@@ -5263,6 +5365,9 @@ spec:
         image: "wandb/weave-python:latest"
         imagePullPolicy: IfNotPresent
         resources:
+          limits:
+            cpu: 4
+            memory: 12Gi
           requests:
             cpu: 100m
             memory: 128Mi
@@ -5417,8 +5522,8 @@ spec:
               if [[ "${OK}" == "imok" ]]; then exit 0; else exit 1; fi
         resources:
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 50m
+            memory: 64Mi
         volumeMounts:
         - name: data
           mountPath: /bitnami/clickhouse-keeper
@@ -5568,8 +5673,8 @@ spec:
           value: /opt/bitnami/clickhouse/secrets/CLICKHOUSE_PASSWORD
         resources:
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 50m
+            memory: 64Mi
         ports:
         - name: http
           containerPort: 8123
@@ -5741,8 +5846,8 @@ spec:
             cpu: 4000m
             memory: 8Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: 50m
+            memory: 64Mi
       volumes:
       - name: initdb
         configMap:
@@ -5976,6 +6081,18 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+              valueFrom:
+                secretKeyRef:
+                  name: "gorilla-coreweave-caios"
+                  key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID"
+                  optional: true
+            - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: "gorilla-coreweave-caios"
+                  key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY"
+                  optional: true
             - name: AZURE_STORAGE_KEY
               valueFrom:
                 secretKeyRef:
@@ -6039,6 +6156,8 @@ spec:
               value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
             - name: GORILLA_SETTINGS_CACHE
               value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
+            - name: GORILLA_USAGE_METRICS_CACHE
+              value: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
             - name: GORILLA_TASK_QUEUE
               value: "noop://"
             - name: KAFKA_CLIENT_PASSWORD
@@ -6088,6 +6207,14 @@ spec:
               requests:
                 cpu: 100m
                 memory: 128Mi
+            volumeMounts:
+            - name: wandb-ca-certs
+              mountPath: /usr/local/share/ca-certificates/inline
+            - name: wandb-ca-certs-user
+              mountPath: /usr/local/share/ca-certificates/configmap
+            - name: redis-ca
+              mountPath: /etc/ssl/certs/redis_ca.pem
+              subPath: redis_ca.pem
           restartPolicy: Never
           serviceAccountName: chartsnap-parquet
           securityContext: null
@@ -6106,6 +6233,21 @@ spec:
             maxSkew: 1
             topologyKey: kubernetes.io/hostname
             whenUnsatisfiable: ScheduleAnyway
+          volumes:
+          - name: wandb-ca-certs
+            configMap:
+              name: "chartsnap-ca-certs"
+          - name: wandb-ca-certs-user
+            configMap:
+              name: 'noCertProvided'
+              optional: true
+          - name: redis-ca
+            secret:
+              secretName: 'chartsnap-redis-secret'
+              items:
+              - key: REDIS_CA_CERT
+                path: redis_ca.pem
+              optional: true
 ---
 # Source: operator-wandb/templates/tests/test-weave.yaml
 apiVersion: v1
@@ -6187,7 +6329,7 @@ kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-connection"
   labels:
-    helm.sh/chart: operator-wandb-0.33.1
+    helm.sh/chart: operator-wandb-0.33.14
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -6215,7 +6357,7 @@ kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-weave"
   labels:
-    helm.sh/chart: operator-wandb-0.33.1
+    helm.sh/chart: operator-wandb-0.33.14
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"

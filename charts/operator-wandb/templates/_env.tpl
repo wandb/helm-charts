@@ -46,6 +46,8 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.redis.connectionString" . | trim | quote }}
 - name: GORILLA_SETTINGS_CACHE
   value: {{ include "wandb.redis.connectionString" . | trim | quote }}
+- name: GORILLA_USAGE_METRICS_CACHE
+  value: {{ include "wandb.redis.connectionString" . | trim | quote }}
 - name: GORILLA_TASK_QUEUE
   value: {{ include "wandb.redis.taskQueue" . | trim | quote }}
 {{- end -}}
@@ -77,6 +79,21 @@ Global values will override any chart-specific values.
   value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
 - name: GORILLA_STORAGE_BUCKET
   value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
+{{- end -}}
+
+{{- define "wandb.bucket.cwIdentity" -}}
+- name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+  valueFrom:
+    secretKeyRef:
+      name: "gorilla-coreweave-caios"
+      key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID"
+      optional: true
+- name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: "gorilla-coreweave-caios"
+      key: "GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY"
+      optional: true
 {{- end -}}
 
 {{- define "wandb.mysqlEnvs" -}}

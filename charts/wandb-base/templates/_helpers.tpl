@@ -67,45 +67,20 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
-{{- define "wandb-base.reloaderAnnotations" -}}
-{{- $configmaps := "" }}
-{{- $secrets := "" }}
-{{- range $name, $type := .Values.envFrom }}
-{{- if eq $type "configMapRef" }}
-{{ $configmaps = printf "%s%s," $configmaps $name }}
-{{- end -}}
-{{- if eq $type "secretRef" }}
-{{ $secrets = printf "%s%s," $secrets $name }}
-{{- end -}}
-{{- end -}}
-
-{{- range .Values.containers }}
-{{- range $name, $type := .envFrom }}
-{{- if eq $type "configMapRef" }}
-{{ $configmaps = printf "%s%s," $configmaps $name }}
-{{- end -}}
-{{- if eq $type "secretRef" }}
-{{ $secrets = printf "%s%s," $secrets $name }}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-
-{{- if $configmaps }}
-configmap.reloader.stakater.com/reload: {{ $configmaps | trimSuffix "," }}
-{{- end }}
-{{- if $secrets }}
-secret.reloader.stakater.com/reload: {{ $secrets | trimSuffix "," }}
-{{- end }}
-reloader.stakater.com/auto: "true"
-{{- end }}
-
 {{- define "wandb-base.sizingInfo" }}
 {{- $size := default "" (coalesce .Values.size .Values.global.size) }}
 {{- $sizingInfo := default (dict) (get .Values.sizing $size) }}
 {{- $defaultSize := default (dict) (get .Values.sizing "default") }}
-{{- $mergedSize := merge $sizingInfo $defaultSize }}
+{{- $mergedSize := mergeOverwrite $defaultSize $sizingInfo }}
 
 {{- toYaml $mergedSize }}
+{{- end }}
+
+{{- define "wandb-base.sizingInfoHorizontal" }}
+{{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
+{{- $hpaSizing := mergeOverwrite $sizingInfo.autoscaling.horizontal .Values.autoscaling.horizontal }}
+
+{{- toYaml $hpaSizing }}
 {{- end }}
 
 {{- define "wandb-base.topologySpreadConstraints" }}
@@ -114,4 +89,16 @@ reloader.stakater.com/auto: "true"
   {{- $_ := set $constraint "labelSelector" (dict "matchLabels" (include "wandb-base.selectorLabels" $ | fromYaml)) }}
   {{- end }}
 {{- toYaml $topologyConstraints }}
+{{- end }}
+
+{{- define "wandb-base.replicaCount" }}
+{{- $desiredReplicas := .Values.replicaCount }}
+{{- $hpaSizing := fromYaml (include "wandb-base.sizingInfoHorizontal" .) }}
+{{- if $hpaSizing.enabled }}
+  {{- $hpa := lookup "autoscaling/v2" "HorizontalPodAutoscaler" .Release.Namespace (include "wandb-base.fullname" . | trimAll "") }}
+    {{- if and $hpa (gt $hpa.status.currentReplicas 0) }}
+      {{- $desiredReplicas = $hpa.status.currentReplicas }}
+    {{- end }}
+{{- end }}
+{{- print $desiredReplicas }}
 {{- end }}
