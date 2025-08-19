@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-app-rename-cleanup
+  annotations:
+    "helm.sh/hook": pre-upgrade,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "-5"
+data:
+  pre_upgrade.sh: |
+    #!/bin/bash
+
+    NAMESPACE="{{ .Release.Namespace }}"
+    RELEASE="{{ .Release.Name }}"
+    DEPLOYMENTS="app parquet weave weave-trace"
+
+    for deployment in ${DEPLOYMENTS}; do
+      output=$(kubectl -n "$NAMESPACE" get deployment "${RELEASE}-${deployment}" 2>&1)
+      status=$?
+      if [ $status -eq 0 ]; then
+        echo "Annotating deployment '${RELEASE}-${deployment}' in namespace '$NAMESPACE'..."
+        kubectl -n "$NAMESPACE" annotate deployment "${RELEASE}-${deployment}" "helm.sh/resource-policy=keep" --overwrite
+      else
+        if echo "$output" | grep -qi "(NotFound)\|not found"; then
+          echo "Deployment '${RELEASE}-${deployment}' not found; skipping annotation."
+        else
+          echo "Error checking deployment '${RELEASE}-${deployment}': $output" >&2
+          exit $status
+        fi
+      fi
+    done
+
+  post_upgrade.sh: |
+    #!/bin/bash
+
+    NAMESPACE="{{ .Release.Namespace }}"
+    RELEASE="{{ .Release.Name }}"
+    DEPLOYMENTS="app parquet weave weave-trace"
+
+    for deployment in ${DEPLOYMENTS}; do
+      output=$(kubectl -n "$NAMESPACE" get deployment "${RELEASE}-${deployment}" 2>&1)
+      status=$?
+      if [ $status -eq 0 ]; then
+        echo "Waiting for deployment '${RELEASE}-${deployment}-bc' to become available..."
+        kubectl -n "$NAMESPACE" rollout status deploy/"${RELEASE}-${deployment}-bc" || exit $?
+
+        echo "Deleting deployment '${RELEASE}-${deployment}' in namespace '$NAMESPACE'..."
+        kubectl -n "$NAMESPACE" delete deployment "${RELEASE}-${deployment}" || exit $?
+      else
+        if echo "$output" | grep -qi "(NotFound)\|not found"; then
+          echo "Deployment '${RELEASE}-${deployment}' not found; skipping delete."
+        else
+          echo "Error checking deployment '${RELEASE}-${deployment}': $output" >&2
+          exit $status
+        fi
+      fi
+    done

@@ -607,6 +607,74 @@ app:
           cpu: "2"
           memory: 4Gi
 
+appRenamePreHook:
+  install: true
+  kind: Job
+  podDisruptionBudget:
+    enabled: false
+  jobs:
+    app-rename-pre-hook:
+      containers:
+        app-rename-pre-hook:
+          command:
+            - sh
+            - -c
+            - /cleanup-scripts/pre_upgrade.sh
+          volumeMounts:
+            - name: app-rename-cleanup
+              mountPath: /cleanup-scripts
+      volumes:
+        - name: app-rename-cleanup
+          configMap:
+            name: "{{ .Release.Name }}-app-rename-cleanup"
+            defaultMode: 0755
+  image:
+    repository: alpine/k8s
+    tag: 1.31.12
+  helmHook:
+    enabled: true
+    hook: "pre-upgrade"
+  role:
+    create: true
+    rules:
+      - apiGroups: ["apps"]
+        resources: ["deployments"]
+        verbs: ["get", "patch"]
+
+appRenamePostHook:
+  install: true
+  kind: Job
+  podDisruptionBudget:
+    enabled: false
+  jobs:
+    app-rename-post-hook:
+      containers:
+        app-rename-post-hook:
+          command:
+            - sh
+            - -c
+            - /cleanup-scripts/post_upgrade.sh
+          volumeMounts:
+            - name: app-rename-cleanup
+              mountPath: /cleanup-scripts
+      volumes:
+        - name: app-rename-cleanup
+          configMap:
+            name: "{{ .Release.Name }}-app-rename-cleanup"
+            defaultMode: 0755
+  image:
+    repository: alpine/k8s
+    tag: 1.31.12
+  helmHook:
+    enabled: true
+    hook: "post-upgrade"
+  role:
+    create: true
+    rules:
+      - apiGroups: ["apps"]
+        resources: ["deployments"]
+        verbs: ["get", "delete", "list", "watch"]
+
 console:
   install: true
   deploymentPostfix: "bc"
@@ -2046,6 +2114,7 @@ weave-trace-worker:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+
 nginx:
   install: false
 
