@@ -56,6 +56,12 @@ app.kubernetes.io/name: {{ include "wandb-base.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "wandb-base.helmHookAnnotations" -}}
+"helm.sh/hook": {{ .Values.helmHook.hook | quote }}
+"helm.sh/hook-weight": {{ .Values.helmHook.hookWeight | quote }}
+"helm.sh/hook-delete-policy": {{ .Values.helmHook.hookDeletePolicy | quote }}
+{{ end }}
+
 {{/*
 Create the name of the service account to use
 */}}
