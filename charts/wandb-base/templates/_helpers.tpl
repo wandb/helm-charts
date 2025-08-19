@@ -57,10 +57,15 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{- define "wandb-base.helmHookAnnotations" -}}
-"helm.sh/hook": {{ .Values.helmHook.hook | quote }}
+{{- $hook := required "Values.helmHook.hook must be set when helmHook.enabled is true" .Values.helmHook.hook -}}
+"helm.sh/hook": {{ $hook | quote }}
+{{- if .Values.helmHook.hookWeight }}
 "helm.sh/hook-weight": {{ .Values.helmHook.hookWeight | quote }}
+{{- end }}
+{{- if .Values.helmHook.hookDeletePolicy }}
 "helm.sh/hook-delete-policy": {{ .Values.helmHook.hookDeletePolicy | quote }}
-{{ end }}
+{{- end }}
+{{- end }}
 
 {{/*
 Create the name of the service account to use
