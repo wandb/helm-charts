@@ -6,9 +6,14 @@ metadata:
   name: {{ printf "%s-%s" $.Release.Name $jobName }}
   labels:
     {{- include "wandb-base.labels" $ | nindent 4 }}
-  {{- with $job.annotations }}
+  {{- if (or $job.annotations $.Values.helmHook.enabled) }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- if $job.annotations }}
+      {{- toYaml $job.annotations | nindent 4 }}
+    {{- end }}
+    {{- if $.Values.helmHook.enabled }}
+      {{- include "wandb-base.helmHookAnnotations" $ | nindent 4 }}
+    {{- end }}
   {{- end }}
 spec:
   {{- with $job.ttlSecondsAfterFinished }}
