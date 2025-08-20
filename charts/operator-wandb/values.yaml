@@ -1024,8 +1024,8 @@ anaconda2:
 filestream:
   install: false
   deploymentPostfix: "bc"
-  pubsub:
-    subscriptions: ""
+  pubSub:
+    subscription: ""
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -1128,8 +1128,10 @@ filestream:
 flat-run-fields-updater:
   install: false
   deploymentPostfix: "bc"
-  pubsub:
-    subscriptions: ""
+  pubSub:
+    subscription: ""
+  kafka:
+    consumerGroup: "flat-run-fields-updater"
   env:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
@@ -1461,8 +1463,10 @@ metric-observer:
   image:
     repository: wandb/megabinary
     tag: latest
-  pubsub:
+  pubSub:
     subscription: ""
+  kafka:
+    consumerGroup: "metric-observer"
   env:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_METRIC_OBSERVER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
@@ -1530,6 +1534,138 @@ metric-observer:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
         optional: true
+
+history:
+  install: false
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  service:
+    enabled: true
+    ports:
+      - port: 8087
+        protocol: TCP
+        name: history
+  pubSub:
+    subscription: ""
+  kafka:
+    consumerGroup: "history"
+  env:
+    GORILLA_PORT:
+      value: "8087"
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_HISTORY_UPDATER:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-mysql-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucket.cwIdentity" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+  containers:
+    history:
+      args: ["history"]
+      ports:
+        - name: history
+          containerPort: 8087
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8087
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8087
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 1
+    xlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 1
+    xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 1
 
 parquet:
   install: true
