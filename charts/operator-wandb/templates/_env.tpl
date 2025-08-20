@@ -145,6 +145,10 @@ Global values will override any chart-specific values.
   valueFrom:
     resourceFieldRef:
       resource: limits.memory
+- name: GOMAXPROCS
+  valueFrom:
+    resourceFieldRef:
+      resource: limits.cpu
 - name: POD_NAME
   valueFrom:
     fieldRef:
