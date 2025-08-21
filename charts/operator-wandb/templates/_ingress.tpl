@@ -73,6 +73,13 @@ It expects a dictionary with two entries:
       name: {{ $.Release.Name }}-api
       port: 
         number: 8081
+- pathType: Prefix
+  path: /graphql2
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
 {{- if .Values.global.api.additionalPaths.analytics }}
 - pathType: Prefix
   path: /analytics
@@ -157,6 +164,13 @@ It expects a dictionary with two entries:
 {{- if .Values.global.api.additionalPaths.artifacts }}
 - pathType: Prefix
   path: /artifacts
+  backend:
+    service:
+      name: {{ $.Release.Name }}-api
+      port:
+        number: 8081
+- pathType: Prefix
+  path: /artifactsV2
   backend:
     service:
       name: {{ $.Release.Name }}-api
