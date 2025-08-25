@@ -1604,6 +1604,7 @@ parquet:
         - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
   cronJobs:
     parquet-backfill:
+      enabled: false
       containers:
         backfill-job:
           args: ["glue"]
@@ -1612,13 +1613,19 @@ parquet:
             GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
           envFrom:
             "{{ .Release.Name }}-glue-configmap": "configMapRef"
+          resources:
+            requests:
+              cpu: 1
+              memory: 1Gi
+            limits:
+              cpu: 1
+              memory: 1Gi
           volumeMountsTpls:
             - '{{ include "wandb.caCertsVolumeMounts" . }}'
       concurrencyPolicy: Forbid
       schedule: "* * * * *"
       volumesTpls:
         - '{{ include "wandb.caCertsVolumes" . }}'
-
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
     - '{{ include "wandb.gcsFuseVolumes" . }}'
