@@ -1,4 +1,10 @@
 {{- range $jobName, $job := .Values.jobs }}
+{{/*
+  Since an empty bool is false, and we want the unspecified value to be true,
+  we create a dictionary with enabled=true and mergeOverwrite the provided values
+*/}}
+{{- $job := mergeOverwrite (dict "enabled" true) $job}}
+{{- if $job.enabled }}
   {{- $_ := set $job "restartPolicy" (default "Never" $job.restartPolicy ) }}
 apiVersion: batch/v1
 kind: Job
@@ -25,4 +31,5 @@ spec:
   template:
     {{- include "wandb-base.pod" (dict "podData" $job "root" $) | nindent 8 }}
 ---
+{{- end }}
 {{- end }}
