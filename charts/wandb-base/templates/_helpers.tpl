@@ -82,7 +82,7 @@ Create the name of the service account to use
 {{- if eq .Values.strategy.type "RollingUpdate"  }}
 type: RollingUpdate
 rollingUpdate:
-  {{ toYaml .Values.strategy.rollingUpdate }}
+  {{- toYaml .Values.strategy.rollingUpdate | nindent 2 }}
 {{ else if eq .Values.strategy.type "Recreate" }}
 type: Recreate
 {{- end }}
