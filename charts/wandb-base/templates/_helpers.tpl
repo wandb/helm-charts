@@ -126,9 +126,6 @@ type: OnDelete
 {{- $desiredReplicas := .Values.replicaCount }}
 {{- $hpaSizing := fromYaml (include "wandb-base.sizingInfoHorizontal" .) }}
 {{- if $hpaSizing.enabled }}
-  {{- if $hpaSizing.replicaCount }}
-    {{- $desiredReplicas = $hpaSizing.replicaCount }}
-  {{- end }}
   {{- $hpa := lookup "autoscaling/v2" "HorizontalPodAutoscaler" .Release.Namespace (include "wandb-base.fullname" . | trimAll "") }}
     {{- if and $hpa (gt $hpa.status.currentReplicas 0) }}
       {{- $desiredReplicas = $hpa.status.currentReplicas }}
