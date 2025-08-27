@@ -78,6 +78,26 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{- define "wandb-base.deploymentRolloutStrategy" -}}
+{{- if eq .Values.strategy.type "RollingUpdate"  }}
+type: RollingUpdate
+rollingUpdate:
+  {{ toYaml .Values.strategy.rollingUpdate }}
+{{ else if eq .Values.strategy.type "Recreate" }}
+type: Recreate
+{{- end }}
+{{- end }}
+
+{{- define "wandb-base.statefulsetRolloutStrategy" -}}
+{{- if eq .Values.strategy.type "RollingUpdate"  }}
+type: RollingUpdate
+rollingUpdate:
+  {{ toYaml .Values.strategy.rollingUpdate }}
+{{ else if eq .Values.strategy.type "OnDelete" }}
+type: OnDelete
+{{- end }}
+{{- end }}
+
 {{- define "wandb-base.sizingInfo" }}
 {{- $size := default "" (coalesce .Values.size .Values.global.size) }}
 {{- $sizingInfo := default (dict) (get .Values.sizing $size) }}
@@ -106,6 +126,9 @@ Create the name of the service account to use
 {{- $desiredReplicas := .Values.replicaCount }}
 {{- $hpaSizing := fromYaml (include "wandb-base.sizingInfoHorizontal" .) }}
 {{- if $hpaSizing.enabled }}
+  {{- if $hpaSizing.replicaCount }}
+    {{- $desiredReplicas = $hpaSizing.replicaCount }}
+  {{- end }}
   {{- $hpa := lookup "autoscaling/v2" "HorizontalPodAutoscaler" .Release.Namespace (include "wandb-base.fullname" . | trimAll "") }}
     {{- if and $hpa (gt $hpa.status.currentReplicas 0) }}
       {{- $desiredReplicas = $hpa.status.currentReplicas }}
