@@ -25,16 +25,6 @@ Handles merging a set of deployment labels
 {{- end -}}
 
 {{/*
-Handles merging a set of statefulset annotations
-*/}}
-{{- define "wandb-base.statefulsetAnnotations" -}}
-{{- $allAnnotations := merge (default (dict) (default (dict) .Values.statefulset).annotations) .Values.global.statefulset.annotations -}}
-{{- if $allAnnotations -}}
-{{- toYaml $allAnnotations -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
 Handles merging a set of statefulset labels
 */}}
 {{- define "wandb-base.statefulsetLabels" -}}
@@ -43,6 +33,16 @@ Handles merging a set of statefulset labels
 {{-   range $key, $value := $allLabels }}
 {{ $key }}: {{ $value | trunc 63 | quote }}
 {{-   end }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Handles merging a set of statefulset annotations
+*/}}
+{{- define "wandb-base.statefulsetAnnotations" -}}
+{{- $allAnnotations := merge (default (dict) (default (dict) .Values.statefulset).annotations) .Values.global.statefulset.annotations -}}
+{{- if $allAnnotations -}}
+{{- toYaml $allAnnotations -}}
 {{- end -}}
 {{- end -}}
 

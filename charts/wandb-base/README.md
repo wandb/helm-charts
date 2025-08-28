@@ -197,51 +197,101 @@ In this example:
 - The `app` container will use the image `myapp:v1.0.0` with pull policy `Always`
 - The `sidecar` container will use the chart-level image `nginx:1.21.6` with pull policy `IfNotPresent`
 
-### Deployment and StatefulSet Labels and Annotations
+### Global Common Labels and Annotations
 
-The chart supports adding custom labels and annotations to Deployment and StatefulSet resources. These can be defined at multiple levels, with the following precedence (highest to lowest):
+The chart supports a comprehensive labeling and annotation system with `global.common` values that apply to **ALL resources** (deployments, jobs, services, ingress, etc.). This provides a single place to configure labels and annotations for your entire application.
 
-1. Local configuration (`deployment.labels` / `deployment.annotations` or `statefulset.labels` / `statefulset.annotations`)
-2. Global configuration (`global.deployment.labels` / `global.deployment.annotations` or `global.statefulset.labels` / `global.statefulset.annotations`)
+#### Configuration Levels (highest to lowest precedence):
 
-Example:
+1. **Resource-specific** (`deployment.labels`, `service.annotations`, etc.)
+2. **Global resource-specific** (`global.deployment.labels`, `global.service.annotations`, etc.)  
+3. **Local common** (`common.labels`, `common.annotations`)
+4. **Global common** (`global.common.labels`, `global.common.annotations`)
+
+#### Universal Labels and Annotations (Recommended)
+
+Use `global.common` for labels/annotations that should apply to **everything**:
 
 ```yaml
-# Global deployment labels and annotations (applies to all deployments using this chart)
+# These labels/annotations will be applied to ALL resources
 global:
-  deployment:
+  common:
     labels:
       environment: "production"
       team: "platform"
+      app.kubernetes.io/part-of: "wandb"
     annotations:
-      deployment.kubernetes.io/managed-by: "argocd"
+      argocd.argoproj.io/managed-by: "argocd"
+      prometheus.io/scrape: "true"
 
-# Local deployment labels and annotations (specific to this chart instance)
+# Local common labels for this specific chart instance
+common:
+  labels:
+    chart-instance: "api-server"
+  annotations:
+    deployed-by: "helm"
+```
+
+#### Resource-Specific Overrides
+
+For resource-specific customization:
+
+```yaml
+# Global settings for all deployments
+global:
+  deployment:
+    labels:
+      workload-type: "deployment"
+    annotations:
+      deployment.kubernetes.io/strategy: "rolling"
+
+# Local deployment settings for this chart
 deployment:
   labels:
-    app.component: "api"
+    component: "api"
   annotations:
     deployment.kubernetes.io/revision-policy: "manual"
 
-# For StatefulSets
+# StatefulSet-specific settings
 global:
   statefulset:
     labels:
       persistence: "enabled"
     annotations:
       statefulset.kubernetes.io/pod-management-policy: "parallel"
-
-statefulset:
-  labels:
-    storage.type: "ssd"
-  annotations:
-    statefulset.kubernetes.io/update-strategy: "rolling"
 ```
 
-In this example:
-- The deployment will have both global and local labels merged together
-- Local labels override global labels when there are conflicts
-- All annotations are merged without conflicts
+#### Complete Example
+
+```yaml
+# Applied to ALL resources (deployments, jobs, services, ingress, etc.)
+global:
+  common:
+    labels:
+      app.kubernetes.io/part-of: "wandb-platform"
+      environment: "production"
+      managed-by: "platform-team"
+    annotations:
+      monitoring.example.com/scrape: "true"
+      argocd.argoproj.io/instance: "wandb-prod"
+
+# Applied to specific resource types
+global:
+  deployment:
+    labels:
+      workload-type: "deployment"
+    annotations:
+      deployment.kubernetes.io/managed-by: "argocd"
+
+# Local chart overrides
+deployment:
+  labels:
+    component: "api-server"
+  annotations:
+    deployment.kubernetes.io/restart-policy: "always"
+```
+
+**Result**: Every resource gets the common labels/annotations, plus any resource-specific ones, with proper precedence handling.
 
 ## Common Configuration Options
 
