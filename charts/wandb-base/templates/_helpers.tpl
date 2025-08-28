@@ -46,6 +46,10 @@ helm.sh/chart: {{ include "wandb-base.chart" . }}
 app.kubernetes.io/version: {{ .Values.image.tag | trunc 63 | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- $commonLabels := merge (default (dict) .Values.common.labels) (default (dict) .Values.global.common.labels) }}
+{{- range $key, $value := $commonLabels }}
+{{ $key }}: {{ $value | trunc 63 | quote }}
+{{- end }}
 {{- end }}
 
 {{/*
@@ -133,4 +137,14 @@ type: OnDelete
     {{- end }}
 {{- end }}
 {{- print $desiredReplicas }}
+{{- end }}
+
+{{/*
+Common annotations - merges global and local common annotations
+*/}}
+{{- define "wandb-base.commonAnnotations" -}}
+{{- $commonAnnotations := merge (default (dict) .Values.common.annotations) (default (dict) .Values.global.common.annotations) }}
+{{- if $commonAnnotations }}
+{{- toYaml $commonAnnotations }}
+{{- end }}
 {{- end }}
