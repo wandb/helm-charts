@@ -197,32 +197,128 @@ In this example:
 - The `app` container will use the image `myapp:v1.0.0` with pull policy `Always`
 - The `sidecar` container will use the chart-level image `nginx:1.21.6` with pull policy `IfNotPresent`
 
+### Global Common Labels and Annotations
+
+The chart supports a comprehensive labeling and annotation system with `global.common` values that apply to **ALL resources** (deployments, jobs, services, ingress, etc.). This provides a single place to configure labels and annotations for your entire application.
+
+#### Configuration Levels (highest to lowest precedence):
+
+1. **Resource-specific** (`deployment.labels`, `service.annotations`, etc.)
+2. **Global resource-specific** (`global.deployment.labels`, `global.service.annotations`, etc.)  
+3. **Local common** (`common.labels`, `common.annotations`)
+4. **Global common** (`global.common.labels`, `global.common.annotations`)
+
+#### Universal Labels and Annotations (Recommended)
+
+Use `global.common` for labels/annotations that should apply to **everything**:
+
+```yaml
+# These labels/annotations will be applied to ALL resources
+global:
+  common:
+    labels:
+      environment: "production"
+      team: "platform"
+      app.kubernetes.io/part-of: "wandb"
+    annotations:
+      argocd.argoproj.io/managed-by: "argocd"
+      prometheus.io/scrape: "true"
+
+# Local common labels for this specific chart instance
+common:
+  labels:
+    chart-instance: "api-server"
+  annotations:
+    deployed-by: "helm"
+```
+
+#### Resource-Specific Overrides
+
+For resource-specific customization:
+
+```yaml
+# Global settings for all deployments
+global:
+  deployment:
+    labels:
+      workload-type: "deployment"
+    annotations:
+      deployment.kubernetes.io/strategy: "rolling"
+
+# Local deployment settings for this chart
+deployment:
+  labels:
+    component: "api"
+  annotations:
+    deployment.kubernetes.io/revision-policy: "manual"
+
+# StatefulSet-specific settings
+global:
+  statefulset:
+    labels:
+      persistence: "enabled"
+    annotations:
+      statefulset.kubernetes.io/pod-management-policy: "parallel"
+```
+
+#### Complete Example
+
+```yaml
+# Applied to ALL resources (deployments, jobs, services, ingress, etc.)
+global:
+  common:
+    labels:
+      app.kubernetes.io/part-of: "wandb-platform"
+      environment: "production"
+      managed-by: "platform-team"
+    annotations:
+      monitoring.example.com/scrape: "true"
+      argocd.argoproj.io/instance: "wandb-prod"
+
+# Applied to specific resource types
+global:
+  deployment:
+    labels:
+      workload-type: "deployment"
+    annotations:
+      deployment.kubernetes.io/managed-by: "argocd"
+
+# Local chart overrides
+deployment:
+  labels:
+    component: "api-server"
+  annotations:
+    deployment.kubernetes.io/restart-policy: "always"
+```
+
+**Result**: Every resource gets the common labels/annotations, plus any resource-specific ones, with proper precedence handling.
+
 ## Common Configuration Options
 
 ### Basic Chart Configuration
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `replicaCount` | Number of replicas for the deployment | `1` |
-| `image.repository` | Container image repository | `nginx` |
-| `image.tag` | Container image tag | `""` (defaults to chart appVersion) |
-| `image.pullPolicy` | Container image pull policy | `IfNotPresent` |
-| `nameOverride` | Override the name of the chart | `""` |
-| `fullnameOverride` | Override the full name of the chart | `""` |
-| `kind` | Type of resource to create (Deployment or StatefulSet) | `Deployment` |
+| Parameter          | Description                                            | Default                             |
+| ------------------ | ------------------------------------------------------ | ----------------------------------- |
+| `replicaCount`     | Number of replicas for the deployment                  | `1`                                 |
+| `image.repository` | Container image repository                             | `nginx`                             |
+| `image.tag`        | Container image tag                                    | `""` (defaults to chart appVersion) |
+| `image.pullPolicy` | Container image pull policy                            | `IfNotPresent`                      |
+| `nameOverride`     | Override the name of the chart                         | `""`                                |
+| `fullnameOverride` | Override the full name of the chart                    | `""`                                |
+| `kind`             | Type of resource to create (Deployment or StatefulSet) | `Deployment`                        |
 
 ### Pod Configuration
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `podAnnotations` | Annotations to add to pods | `{}` |
-| `podLabels` | Labels to add to pods | `{}` |
-| `podSecurityContext` | Security context for pods | See values.yaml |
-| `securityContext` | Default security context for containers | See values.yaml |
-| `nodeSelector` | Node selector for pods | `{}` |
-| `tolerations` | Tolerations for pods | `[]` |
-| `affinity` | Affinity rules for pods | `{}` |
-| `topologySpreadConstraints` | Topology spread constraints for pods | See values.yaml |
+| Parameter                   | Description                             | Default         |
+| --------------------------- | --------------------------------------- | --------------- |
+| `podAnnotations`            | Annotations to add to pods              | `{}`            |
+| `podLabels`                 | Labels to add to pods                   | `{}`            |
+| `podSecurityContext`        | Security context for pods               | See values.yaml |
+| `securityContext`           | Default security context for containers | See values.yaml |
+| `nodeSelector`              | Node selector for pods                  | `{}`            |
+| `tolerations`               | Tolerations for pods                    | `[]`            |
+| `affinity`                  | Affinity rules for pods                 | `{}`            |
+| `topologySpreadConstraints` | Topology spread constraints for pods    | See values.yaml |
 
 ### Container Configuration
 
@@ -252,11 +348,11 @@ containers:
 
 ### Service Configuration
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `service.enabled` | Enable service creation | `true` |
-| `service.type` | Service type | `ClusterIP` |
-| `service.ports` | Service ports | See values.yaml |
+| Parameter         | Description             | Default         |
+| ----------------- | ----------------------- | --------------- |
+| `service.enabled` | Enable service creation | `true`          |
+| `service.type`    | Service type            | `ClusterIP`     |
+| `service.ports`   | Service ports           | See values.yaml |
 
 ### Autoscaling Configuration
 

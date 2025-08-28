@@ -1,6 +1,6 @@
 {{- define "wandb-base.pod" }}
 metadata:
-  {{- if or .podData.podAnnotations .podData.podAnnotationsTpls }}
+  {{- if or .podData.podAnnotations .podData.podAnnotationsTpls (include "wandb-base.podAnnotations" $.root) (include "wandb-base.commonAnnotations" $.root) }}
   annotations:
     {{- range .podData.podAnnotationsTpls }}
       {{- tpl . $.root | nindent 4 }}
@@ -9,12 +9,11 @@ metadata:
       {{- tpl (toYaml .podData.podAnnotations | nindent 4) .root }}
     {{- end }}
     {{- tpl (include "wandb-base.podAnnotations" $.root | nindent 4) .root }}
+    {{- tpl (include "wandb-base.commonAnnotations" $.root | nindent 4) .root }}
   {{- end }}
   labels:
     {{- tpl (include "wandb-base.labels" $.root | nindent 4) $.root }}
-    {{- with .podData.podLabels }}
-    {{- tpl (toYaml . | nindent 4) $.root }}
-    {{- end }}
+    {{- tpl (include "wandb-base.podLabels" $.root | nindent 4) $.root }}
 spec:
   {{- with .podData.affinity }}
   affinity:
