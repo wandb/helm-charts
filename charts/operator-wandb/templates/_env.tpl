@@ -96,6 +96,15 @@ Global values will override any chart-specific values.
       optional: true
 {{- end -}}
 
+{{- define "wandb.statsigEnvs" -}}
+- name: STATSIG_API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: "gorilla-statsig"
+      key: "STATSIG_API_KEY"
+      optional: true
+{{- end -}}
+
 {{- define "wandb.mysqlEnvs" -}}
 - name: MYSQL_PASSWORD
   valueFrom:
