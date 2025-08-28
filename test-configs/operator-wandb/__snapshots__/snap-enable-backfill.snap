@@ -158,6 +158,32 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
+# Source: operator-wandb/charts/appRenamePostHook/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-app-rename-post-hook
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: appRenamePostHook
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.31.12"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: operator-wandb/charts/appRenamePreHook/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-app-rename-pre-hook
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: appRenamePreHook
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.31.12"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
 # Source: operator-wandb/charts/console/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -1839,6 +1865,48 @@ rules:
   verbs:
   - get
 ---
+# Source: operator-wandb/charts/appRenamePostHook/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chartsnap-app-rename-post-hook
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: appRenamePostHook
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.31.12"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - delete
+  - list
+  - watch
+---
+# Source: operator-wandb/charts/appRenamePreHook/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chartsnap-app-rename-pre-hook
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: appRenamePreHook
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.31.12"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - patch
+---
 # Source: operator-wandb/charts/reloader/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -1918,6 +1986,46 @@ subjects:
 roleRef:
   kind: Role
   name: chartsnap-app
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: operator-wandb/charts/appRenamePostHook/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chartsnap-app-rename-post-hook
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: appRenamePostHook
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.31.12"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+- kind: ServiceAccount
+  name: chartsnap-app-rename-post-hook
+  namespace: default
+roleRef:
+  kind: Role
+  name: chartsnap-app-rename-post-hook
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: operator-wandb/charts/appRenamePreHook/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chartsnap-app-rename-pre-hook
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: appRenamePreHook
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.31.12"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+- kind: ServiceAccount
+  name: chartsnap-app-rename-pre-hook
+  namespace: default
+roleRef:
+  kind: Role
+  name: chartsnap-app-rename-pre-hook
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: operator-wandb/charts/reloader/templates/rolebinding.yaml
@@ -2418,11 +2526,6 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: anaconda2
@@ -2430,7 +2533,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.10.1
+        helm.sh/chart: anaconda2-0.8.6
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -2527,11 +2630,6 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: app
@@ -2539,7 +2637,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.10.1
+        helm.sh/chart: app-0.8.6
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3024,11 +3122,6 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: console
@@ -3036,7 +3129,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.10.1
+        helm.sh/chart: console-0.8.6
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3130,11 +3223,6 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: parquet
@@ -3143,7 +3231,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.10.1
+        helm.sh/chart: parquet-0.8.6
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3590,11 +3678,6 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: weave
@@ -3602,7 +3685,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.10.1
+        helm.sh/chart: weave-0.8.6
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3980,6 +4063,158 @@ spec:
         requests:
           storage: "8Gi"
 ---
+# Source: operator-wandb/charts/appRenamePostHook/templates/job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chartsnap-app-rename-post-hook
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: appRenamePostHook
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.31.12"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: appRenamePostHook-0.8.6
+        app.kubernetes.io/name: appRenamePostHook
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "1.31.12"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: app-rename-post-hook
+        command:
+        - sh
+        - -c
+        - /cleanup-scripts/post_upgrade.sh
+        envFrom:
+        env:
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "alpine/k8s:1.31.12"
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - mountPath: /cleanup-scripts
+          name: app-rename-cleanup
+      restartPolicy: Never
+      serviceAccountName: chartsnap-app-rename-post-hook
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: appRenamePostHook
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: appRenamePostHook
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+---
+# Source: operator-wandb/charts/appRenamePreHook/templates/job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chartsnap-app-rename-pre-hook
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: appRenamePreHook
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.31.12"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: appRenamePreHook-0.8.6
+        app.kubernetes.io/name: appRenamePreHook
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "1.31.12"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: app-rename-pre-hook
+        command:
+        - sh
+        - -c
+        - /cleanup-scripts/pre_upgrade.sh
+        envFrom:
+        env:
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "alpine/k8s:1.31.12"
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - mountPath: /cleanup-scripts
+          name: app-rename-cleanup
+      restartPolicy: Never
+      serviceAccountName: chartsnap-app-rename-pre-hook
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: appRenamePreHook
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: appRenamePreHook
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+---
 # Source: operator-wandb/charts/parquet/templates/cronjob.yaml
 apiVersion: batch/v1
 kind: CronJob
@@ -3999,7 +4234,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.10.1
+            helm.sh/chart: parquet-0.8.6
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -4225,40 +4460,6 @@ spec:
                 path: redis_ca.pem
               optional: true
 ---
-# Source: operator-wandb/charts/appRenamePostHook/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-app-rename-post-hook
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: appRenamePostHook
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.31.12"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": "post-upgrade"
-    "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
-automountServiceAccountToken: true
----
-# Source: operator-wandb/charts/appRenamePreHook/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-app-rename-pre-hook
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: appRenamePreHook
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.31.12"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": "pre-upgrade"
-    "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
-automountServiceAccountToken: true
----
 # Source: operator-wandb/templates/app_rename_cleanup.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -4319,104 +4520,6 @@ data:
       fi
     done
 ---
-# Source: operator-wandb/charts/appRenamePostHook/templates/role.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: chartsnap-app-rename-post-hook
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: appRenamePostHook
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.31.12"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": "post-upgrade"
-    "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
-rules:
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - get
-  - delete
-  - list
-  - watch
----
-# Source: operator-wandb/charts/appRenamePreHook/templates/role.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: chartsnap-app-rename-pre-hook
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: appRenamePreHook
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.31.12"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": "pre-upgrade"
-    "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
-rules:
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - get
-  - patch
----
-# Source: operator-wandb/charts/appRenamePostHook/templates/rolebinding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: chartsnap-app-rename-post-hook
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: appRenamePostHook
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.31.12"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": "post-upgrade"
-    "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
-subjects:
-- kind: ServiceAccount
-  name: chartsnap-app-rename-post-hook
-  namespace: default
-roleRef:
-  kind: Role
-  name: chartsnap-app-rename-post-hook
-  apiGroup: rbac.authorization.k8s.io
----
-# Source: operator-wandb/charts/appRenamePreHook/templates/rolebinding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: chartsnap-app-rename-pre-hook
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: appRenamePreHook
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.31.12"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": "pre-upgrade"
-    "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
-subjects:
-- kind: ServiceAccount
-  name: chartsnap-app-rename-pre-hook
-  namespace: default
-roleRef:
-  kind: Role
-  name: chartsnap-app-rename-pre-hook
-  apiGroup: rbac.authorization.k8s.io
----
 # Source: operator-wandb/templates/tests/test-connection.yaml
 apiVersion: v1
 kind: Pod
@@ -4444,171 +4547,3 @@ spec:
     - -c
     - "pip install wandb==0.19.9 && (timeout=240; start_time=$(date +%s); until wandb verify || [ $(($(date +%s) - start_time)) -gt $timeout ]; do echo 'wandb verify failed, retrying...' && cat /tmp/debug-cli.root.log; sleep 10; done)"
   restartPolicy: Never
----
-# Source: operator-wandb/charts/appRenamePostHook/templates/job.yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: chartsnap-app-rename-post-hook
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: appRenamePostHook
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.31.12"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": "post-upgrade"
-    "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
-spec:
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: appRenamePostHook-0.10.1
-        app.kubernetes.io/name: appRenamePostHook
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "1.31.12"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      containers:
-      - name: app-rename-post-hook
-        command:
-        - sh
-        - -c
-        - /cleanup-scripts/post_upgrade.sh
-        envFrom:
-        env:
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "alpine/k8s:1.31.12"
-        imagePullPolicy: IfNotPresent
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-        volumeMounts:
-        - mountPath: /cleanup-scripts
-          name: app-rename-cleanup
-      restartPolicy: Never
-      serviceAccountName: chartsnap-app-rename-post-hook
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      topologySpreadConstraints:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: appRenamePostHook
-        maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfiable: ScheduleAnyway
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: appRenamePostHook
-        maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-      volumes:
-      - configMap:
-          defaultMode: 493
-          name: 'chartsnap-app-rename-cleanup'
-        name: app-rename-cleanup
----
-# Source: operator-wandb/charts/appRenamePreHook/templates/job.yaml
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: chartsnap-app-rename-pre-hook
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: appRenamePreHook
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.31.12"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": "pre-upgrade"
-    "helm.sh/hook-weight": "0"
-    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
-spec:
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: appRenamePreHook-0.10.1
-        app.kubernetes.io/name: appRenamePreHook
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "1.31.12"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      containers:
-      - name: app-rename-pre-hook
-        command:
-        - sh
-        - -c
-        - /cleanup-scripts/pre_upgrade.sh
-        envFrom:
-        env:
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "alpine/k8s:1.31.12"
-        imagePullPolicy: IfNotPresent
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-        volumeMounts:
-        - mountPath: /cleanup-scripts
-          name: app-rename-cleanup
-      restartPolicy: Never
-      serviceAccountName: chartsnap-app-rename-pre-hook
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      topologySpreadConstraints:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: appRenamePreHook
-        maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfiable: ScheduleAnyway
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: appRenamePreHook
-        maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-      volumes:
-      - configMap:
-          defaultMode: 493
-          name: 'chartsnap-app-rename-cleanup'
-        name: app-rename-cleanup
