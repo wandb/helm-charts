@@ -197,32 +197,78 @@ In this example:
 - The `app` container will use the image `myapp:v1.0.0` with pull policy `Always`
 - The `sidecar` container will use the chart-level image `nginx:1.21.6` with pull policy `IfNotPresent`
 
+### Deployment and StatefulSet Labels and Annotations
+
+The chart supports adding custom labels and annotations to Deployment and StatefulSet resources. These can be defined at multiple levels, with the following precedence (highest to lowest):
+
+1. Local configuration (`deployment.labels` / `deployment.annotations` or `statefulset.labels` / `statefulset.annotations`)
+2. Global configuration (`global.deployment.labels` / `global.deployment.annotations` or `global.statefulset.labels` / `global.statefulset.annotations`)
+
+Example:
+
+```yaml
+# Global deployment labels and annotations (applies to all deployments using this chart)
+global:
+  deployment:
+    labels:
+      environment: "production"
+      team: "platform"
+    annotations:
+      deployment.kubernetes.io/managed-by: "argocd"
+
+# Local deployment labels and annotations (specific to this chart instance)
+deployment:
+  labels:
+    app.component: "api"
+  annotations:
+    deployment.kubernetes.io/revision-policy: "manual"
+
+# For StatefulSets
+global:
+  statefulset:
+    labels:
+      persistence: "enabled"
+    annotations:
+      statefulset.kubernetes.io/pod-management-policy: "parallel"
+
+statefulset:
+  labels:
+    storage.type: "ssd"
+  annotations:
+    statefulset.kubernetes.io/update-strategy: "rolling"
+```
+
+In this example:
+- The deployment will have both global and local labels merged together
+- Local labels override global labels when there are conflicts
+- All annotations are merged without conflicts
+
 ## Common Configuration Options
 
 ### Basic Chart Configuration
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `replicaCount` | Number of replicas for the deployment | `1` |
-| `image.repository` | Container image repository | `nginx` |
-| `image.tag` | Container image tag | `""` (defaults to chart appVersion) |
-| `image.pullPolicy` | Container image pull policy | `IfNotPresent` |
-| `nameOverride` | Override the name of the chart | `""` |
-| `fullnameOverride` | Override the full name of the chart | `""` |
-| `kind` | Type of resource to create (Deployment or StatefulSet) | `Deployment` |
+| Parameter          | Description                                            | Default                             |
+| ------------------ | ------------------------------------------------------ | ----------------------------------- |
+| `replicaCount`     | Number of replicas for the deployment                  | `1`                                 |
+| `image.repository` | Container image repository                             | `nginx`                             |
+| `image.tag`        | Container image tag                                    | `""` (defaults to chart appVersion) |
+| `image.pullPolicy` | Container image pull policy                            | `IfNotPresent`                      |
+| `nameOverride`     | Override the name of the chart                         | `""`                                |
+| `fullnameOverride` | Override the full name of the chart                    | `""`                                |
+| `kind`             | Type of resource to create (Deployment or StatefulSet) | `Deployment`                        |
 
 ### Pod Configuration
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `podAnnotations` | Annotations to add to pods | `{}` |
-| `podLabels` | Labels to add to pods | `{}` |
-| `podSecurityContext` | Security context for pods | See values.yaml |
-| `securityContext` | Default security context for containers | See values.yaml |
-| `nodeSelector` | Node selector for pods | `{}` |
-| `tolerations` | Tolerations for pods | `[]` |
-| `affinity` | Affinity rules for pods | `{}` |
-| `topologySpreadConstraints` | Topology spread constraints for pods | See values.yaml |
+| Parameter                   | Description                             | Default         |
+| --------------------------- | --------------------------------------- | --------------- |
+| `podAnnotations`            | Annotations to add to pods              | `{}`            |
+| `podLabels`                 | Labels to add to pods                   | `{}`            |
+| `podSecurityContext`        | Security context for pods               | See values.yaml |
+| `securityContext`           | Default security context for containers | See values.yaml |
+| `nodeSelector`              | Node selector for pods                  | `{}`            |
+| `tolerations`               | Tolerations for pods                    | `[]`            |
+| `affinity`                  | Affinity rules for pods                 | `{}`            |
+| `topologySpreadConstraints` | Topology spread constraints for pods    | See values.yaml |
 
 ### Container Configuration
 
@@ -252,11 +298,11 @@ containers:
 
 ### Service Configuration
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `service.enabled` | Enable service creation | `true` |
-| `service.type` | Service type | `ClusterIP` |
-| `service.ports` | Service ports | See values.yaml |
+| Parameter         | Description             | Default         |
+| ----------------- | ----------------------- | --------------- |
+| `service.enabled` | Enable service creation | `true`          |
+| `service.type`    | Service type            | `ClusterIP`     |
+| `service.ports`   | Service ports           | See values.yaml |
 
 ### Autoscaling Configuration
 
