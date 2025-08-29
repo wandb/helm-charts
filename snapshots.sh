@@ -32,7 +32,6 @@ EOF
 function main() {
   local chart="operator-wandb"
   local values_dir="test-configs"
-  local chart_dir="charts/$chart"
 
   if [ $# -eq 0 ]; then
     usage
