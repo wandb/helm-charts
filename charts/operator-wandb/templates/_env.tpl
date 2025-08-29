@@ -97,11 +97,11 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.statsigEnvs" -}}
-- name: STATSIG_API_KEY
+- name: GORILLA_STATSIG_KEY
   valueFrom:
     secretKeyRef:
       name: "gorilla-statsig"
-      key: "STATSIG_API_KEY"
+      key: "GORILLA_STATSIG_KEY"
       optional: true
 {{- end -}}
 
