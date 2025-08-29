@@ -1,5 +1,6 @@
 {{- if .Values.service.enabled }}
-{{- if and (eq .Values.global.cloudProvider "gcp") .Values.service.loadBalancer.enabled }}
+{{- $loadBalancer := mergeOverwrite .Values.global.loadBalancer .Values.service.loadBalancer }}
+{{- if and (eq .Values.global.cloudProvider "gcp") $loadBalancer.enabled }}
 ---
 apiVersion: cloud.google.com/v1
 kind: BackendConfig
@@ -12,14 +13,14 @@ spec:
   securityPolicy:
     name: {{ .Values.global.gcpSecurityPolicy }}
   {{- end }}
-  timeoutSec: {{ .Values.service.loadBalancer.timeoutSec }}
+  timeoutSec: {{ $loadBalancer.timeoutSec }}
   connectionDraining:
-    drainingTimeoutSec: {{ .Values.service.loadBalancer.connectionDraining.drainingTimeoutSec }}
+    drainingTimeoutSec: {{ $loadBalancer.connectionDraining.drainingTimeoutSec }}
   healthCheck:
-    checkIntervalSec: {{ .Values.service.loadBalancer.healthCheck.checkIntervalSec }}
-    timeoutSec: {{ .Values.service.loadBalancer.healthCheck.timeoutSec }}
-    healthyThreshold: {{ .Values.service.loadBalancer.healthCheck.healthyThreshold }}
-    unhealthyThreshold: {{ .Values.service.loadBalancer.healthCheck.unhealthyThreshold }}
+    checkIntervalSec: {{ $loadBalancer.healthCheck.checkIntervalSec }}
+    timeoutSec: {{ $loadBalancer.healthCheck.timeoutSec }}
+    healthyThreshold: {{ $loadBalancer.healthCheck.healthyThreshold }}
+    unhealthyThreshold: {{ $loadBalancer.healthCheck.unhealthyThreshold }}
 
 {{- end }}
 ---
@@ -35,14 +36,14 @@ metadata:
   annotations:
     {{- tpl (include "wandb-base.commonAnnotations" . | nindent 4) . }}
     {{- tpl (include "wandb-base.serviceAnnotations" . | nindent 4) . }}
-    {{- if .Values.service.loadBalancer.enabled }}
+    {{- if $loadBalancer.enabled }}
       {{- if eq .Values.global.cloudProvider "aws" }}
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "{{ .Values.service.loadBalancer.healthCheck.healthyThreshold }}"
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "{{ .Values.service.loadBalancer.healthCheck.unhealthyThreshold }}"
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "{{ .Values.service.loadBalancer.healthCheck.checkIntervalSec }}"
-    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "{{ .Values.service.loadBalancer.healthCheck.timeoutSec }}"
-        {{- if .Values.service.loadBalancer.healthCheck.path }}
-    alb.ingress.kubernetes.io/healthcheck-path: {{ .Values.service.loadBalancer.healthCheck.path }}
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "{{ $loadBalancer.healthCheck.healthyThreshold }}"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "{{ $loadBalancer.healthCheck.unhealthyThreshold }}"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "{{ $loadBalancer.healthCheck.checkIntervalSec }}"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "{{ $loadBalancer.healthCheck.timeoutSec }}"
+        {{- if $loadBalancer.healthCheck.path }}
+    alb.ingress.kubernetes.io/healthcheck-path: {{ $loadBalancer.healthCheck.path }}
         {{- end }}
       {{- end }}
       {{- if eq .Values.global.cloudProvider "gcp" }}
