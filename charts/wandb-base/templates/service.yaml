@@ -12,7 +12,15 @@ spec:
   securityPolicy:
     name: {{ .Values.global.gcpSecurityPolicy }}
   {{- end }}
-  timeoutSec: 120
+  timeoutSec: {{ .Values.service.loadBalancer.timeoutSec }}
+  connectionDraining:
+    drainingTimeoutSec: {{ .Values.service.loadBalancer.connectionDraining.drainingTimeoutSec }}
+  healthCheck:
+    checkIntervalSec: {{ .Values.service.loadBalancer.healthCheck.checkIntervalSec }}
+    timeoutSec: {{ .Values.service.loadBalancer.healthCheck.timeoutSec }}
+    healthyThreshold: {{ .Values.service.loadBalancer.healthCheck.healthyThreshold }}
+    unhealthyThreshold: {{ .Values.service.loadBalancer.healthCheck.unhealthyThreshold }}
+
 {{- end }}
 ---
 apiVersion: v1
@@ -27,8 +35,26 @@ metadata:
   annotations:
     {{- tpl (include "wandb-base.commonAnnotations" . | nindent 4) . }}
     {{- tpl (include "wandb-base.serviceAnnotations" . | nindent 4) . }}
-    {{- if and ( eq .Values.global.cloudProvider "aws" ) .Values.service.loadBalancerHealthCheckPath }}
-    alb.ingress.kubernetes.io/healthcheck-path: {{ .Values.service.loadBalancerHealthCheckPath }}
+    {{- if eq .Values.global.cloudProvider "aws" }}
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "{{ .Values.service.loadBalancer.healthCheck.healthyThreshold }}"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "{{ .Values.service.loadBalancer.healthCheck.unhealthyThreshold }}"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "{{ .Values.service.loadBalancer.healthCheck.checkIntervalSec }}"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "{{ .Values.service.loadBalancer.healthCheck.timeoutSec }}"
+      {{- if .Values.service.loadBalancer.healthCheck.path }}
+    alb.ingress.kubernetes.io/healthcheck-path: {{ .Values.service.loadBalancer.healthCheck.path }}
+      {{- end }}
+    {{- end }}
+    {{- if eq .Values.global.cloudProvider "azure" }}
+    appgw.ingress.kubernetes.io/request-timeout: "{{ .Values.service.loadBalancer.timeoutSec }}"
+    appgw.ingress.kubernetes.io/connection-draining: "true"
+    appgw.ingress.kubernetes.io/connection-draining-timeout: "{{ .Values.service.loadBalancer.connectionDraining.drainingTimeoutSec }}"
+    appgw.ingress.kubernetes.io/health-probe-timeout: "{{ .Values.service.loadBalancer.healthCheck.timeoutSec }}"
+    appgw.ingress.kubernetes.io/health-probe-interval: "{{ .Values.service.loadBalancer.healthCheck.checkIntervalSec }}"
+    appgw.ingress.kubernetes.io/health-probe-unhealthy-threshold: "{{ .Values.service.loadBalancer.healthCheck.unhealthyThreshold }}"
+    appgw.ingress.kubernetes.io/health-probe-healthy-threshold: "{{ .Values.service.loadBalancer.healthCheck.healthyThreshold }}"
+      {{- if .Values.service.loadBalancer.healthCheck.path }}
+    appgw.ingress.kubernetes.io/health-probe-path: {{ .Values.service.loadBalancer.healthCheck.path }}
+      {{- end }}
     {{- end }}
     {{- if eq .Values.global.cloudProvider "gcp" }}
     cloud.google.com/neg: '{"ingress": true}'
