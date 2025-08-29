@@ -1242,7 +1242,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-anaconda2-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.34.8
+    helm.sh/chart: operator-wandb-0.34.10
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1284,7 +1284,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-app-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.34.8
+    helm.sh/chart: operator-wandb-0.34.10
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1318,7 +1318,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-ca-certs
   labels:
-    helm.sh/chart: operator-wandb-0.34.8
+    helm.sh/chart: operator-wandb-0.34.10
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1360,7 +1360,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-executor-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.34.8
+    helm.sh/chart: operator-wandb-0.34.10
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1373,7 +1373,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-filestream-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.34.8
+    helm.sh/chart: operator-wandb-0.34.10
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -1567,7 +1567,7 @@ kind: ConfigMap
 metadata:
   name: chartsnap-local-configmap
   labels:
-    helm.sh/chart: operator-wandb-0.34.8
+    helm.sh/chart: operator-wandb-0.34.10
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -4154,6 +4154,14 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
+        volumeMounts:
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       serviceAccountName: chartsnap-filemeta
       securityContext:
         fsGroup: 0
@@ -4179,6 +4187,21 @@ spec:
         maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/glue/templates/deployment.yaml
 apiVersion: apps/v1
@@ -5837,7 +5860,7 @@ kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-connection"
   labels:
-    helm.sh/chart: operator-wandb-0.34.8
+    helm.sh/chart: operator-wandb-0.34.10
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
