@@ -16,9 +16,27 @@ if ! helm plugin list | grep -q "cascade"; then
   exit 1
 fi
 
+function usage() {
+  cat <<EOF
+A helper script for the helm-chartsnap plugin https://github.com/jlandowner/helm-chartsnap
+
+Usage: $0 [COMMAND]
+
+Commands:
+  build,    build the operator-wandb chart
+  update,   execute chartsnap to update the snapshots
+  run,      executes chartsnap to test helm changes
+EOF
+}
+
 function main() {
   local chart="operator-wandb"
   local values_dir="test-configs"
+
+  if [ $# -eq 0 ]; then
+    usage
+    exit 1
+  fi
 
   local func="$1"
   case "$func" in
@@ -35,16 +53,8 @@ function main() {
       helm chartsnap -c "./charts/$chart" -f "./$values_dir/$chart"
       ;;
     *)
-      cat <<EOF
-A helper script for the helm-chartsnap plugin https://github.com/jlandowner/helm-chartsnap
-
-Usage: $0 [COMMAND]
-
-Commands:
-  build,    build the operator-wandb chart
-  update,   execute chartsnap to update the snapshots
-  run,      executes chartsnap to test helm changes
-EOF
+      usage
+      exit 1
       ;;
   esac
 }
