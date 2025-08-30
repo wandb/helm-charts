@@ -20,7 +20,7 @@ Return the db port
 Return the db host
 */}}
 {{- define "wandb.mysql.host" -}}
-{{- if eq .Values.global.mysql.host "" -}}
+{{- if not .Values.global.mysql.host -}}
 {{ printf "%s-%s" .Release.Name "mysql" }}
 {{- else -}}
 {{ .Values.global.mysql.host }}

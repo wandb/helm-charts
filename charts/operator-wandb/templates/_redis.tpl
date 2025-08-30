@@ -24,7 +24,7 @@ Return the redis port, if it contains a query string, only return the port
 Return the redis host, defaulting to the release name prefix if available.
 */}}
 {{- define "wandb.redis.host" -}}
-{{- if eq .Values.global.redis.host "" -}}
+{{- if not .Values.global.redis.host -}}
 {{ printf "%s-%s" .Release.Name "redis-master" }}
 {{- else -}}
 {{ .Values.global.redis.host }}
