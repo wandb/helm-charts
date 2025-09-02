@@ -59,6 +59,21 @@ global:
     labels: {}
     annotations: {}
 
+  # Global nodeSelector and tolerations applied to all deployments/pods
+  # This allows scheduling all components on specific nodes (e.g., GPU nodes)
+  nodeSelector: {}
+  # Example:
+  # nodeSelector:
+  #   kubernetes.io/hostname: gpusrv15
+
+  tolerations: []
+  # Example:
+  # tolerations:
+  # - effect: NoSchedule
+  #   key: dedicated
+  #   operator: Equal
+  #   value: gpu
+
   extraEnvFrom: {}
   extraEnv: {}
 
@@ -2175,6 +2190,10 @@ redis:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9121"
         prometheus.io/path: "/metrics"
+    # Apply global nodeSelector and tolerations to Redis
+  master:
+    nodeSelector: {} # Will be overridden by global values
+    tolerations: [] # Will be overridden by global values
 
 prometheus:
   install: true
@@ -2243,7 +2262,15 @@ kafka:
   install: false
   controller:
     persistence:
-      size: 30Gi
+      size:
+        30Gi
+        # Apply global nodeSelector and tolerations to Kafka controllers
+    nodeSelector: {} # Will be overridden by global values
+    tolerations: [] # Will be overridden by global values
+  # Apply global nodeSelector and tolerations to Kafka brokers
+  broker:
+    nodeSelector: {} # Will be overridden by global values
+    tolerations: [] # Will be overridden by global values
   sasl:
     interbroker:
       password: "inter-broker"
@@ -2281,6 +2308,9 @@ etcd:
       enabled: false
   metrics:
     useSeparateEndpoint: true
+    # Apply global nodeSelector and tolerations to etcd
+  nodeSelector: {} # Will be overridden by global values
+  tolerations: [] # Will be overridden by global values
   customLivenessProbe:
     httpGet:
       port: 9090
@@ -2345,7 +2375,12 @@ clickhouse:
     existingSecretKey: "{{- .Values.global.clickhouse.passwordSecret.passwordKey -}}"
 
   shards: 1
-  replicaCount: 1
+  replicaCount:
+    1
+
+    # Apply global nodeSelector and tolerations to ClickHouse
+  nodeSelector: {} # Will be overridden by global values
+  tolerations: [] # Will be overridden by global values
 
   persistentVolumeClaimRetentionPolicy:
     enabled: true
@@ -2357,6 +2392,9 @@ clickhouse:
     storageClass: ""
 
   keeper:
+    # Apply global nodeSelector and tolerations to ClickHouse Keeper
+    nodeSelector: {} # Will be overridden by global values
+    tolerations: [] # Will be overridden by global values
     persistentVolumeClaimRetentionPolicy:
       enabled: true
       whenScaled: Retain
