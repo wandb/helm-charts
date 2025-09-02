@@ -96,7 +96,81 @@ global:
   
   # Deployment size (small, medium, large)
   size: "small"
+  
+  # Global nodeSelector and tolerations applied to all deployments/pods
+  nodeSelector: {}
+  tolerations: []
 ```
+
+### Global Pod Scheduling
+
+The chart supports global `nodeSelector` and `tolerations` configuration that applies to **ALL components** (W&B services, databases, monitoring, etc.). This provides centralized control over pod scheduling across your entire W&B deployment.
+
+#### Configuration Levels (highest to lowest precedence):
+
+1. **Component-specific** (`api.nodeSelector`, `console.tolerations`, etc.)
+2. **Local chart-level** (`nodeSelector`, `tolerations` in individual subcharts)
+3. **Global** (`global.nodeSelector`, `global.tolerations`)
+
+#### Universal Scheduling (Recommended for GPU Deployments)
+
+Use `global.nodeSelector` and `global.tolerations` for scheduling constraints that should apply to **everything**:
+
+```yaml
+# Schedule all components on specific nodes (e.g., GPU nodes)
+global:
+  nodeSelector:
+    kubernetes.io/hostname: gpusrv15
+    node-type: gpu
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: gpu
+  - effect: NoSchedule
+    key: nvidia.com/gpu
+    operator: Equal
+    value: "true"
+```
+
+#### Component-Specific Overrides
+
+For component-specific scheduling requirements:
+
+```yaml
+# Global settings for all components
+global:
+  nodeSelector:
+    node-type: gpu
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: gpu
+
+# Override for console to run on management nodes
+console:
+  nodeSelector:
+    node-type: management
+  tolerations:
+  - effect: NoSchedule
+    key: management-only
+    operator: Equal
+    value: "true"
+
+# Redis-specific scheduling (for third-party charts)
+redis:
+  master:
+    nodeSelector:
+      node-type: database
+    tolerations:
+    - effect: NoSchedule
+      key: database
+      operator: Equal
+      value: "true"
+```
+
+**Result**: All W&B components get the global GPU scheduling, the console runs on management nodes, and Redis runs on database nodes.
 
 ### Component-Specific Configuration
 

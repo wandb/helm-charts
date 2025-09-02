@@ -10,10 +10,18 @@
 {{- end -}}
 
 {{- define "wandb.nodeSelector" -}}
-{{- $nodeSelector := default .Values.global.nodeSelector .Values.nodeSelector -}}
+{{- $nodeSelector := mergeOverwrite (default dict .Values.global.nodeSelector) (default dict .Values.nodeSelector) -}}
 {{- if $nodeSelector }}
 nodeSelector:
   {{- toYaml $nodeSelector | nindent 2 }}
+{{- end }}
+{{- end -}}
+
+{{- define "wandb.tolerations" -}}
+{{- $tolerations := concat (default list .Values.global.tolerations) (default list .Values.tolerations) -}}
+{{- if $tolerations }}
+tolerations:
+  {{- toYaml $tolerations | nindent 2 }}
 {{- end }}
 {{- end -}}
 

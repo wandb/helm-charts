@@ -293,6 +293,100 @@ deployment:
 
 **Result**: Every resource gets the common labels/annotations, plus any resource-specific ones, with proper precedence handling.
 
+### Global Pod Scheduling
+
+The chart supports global `nodeSelector` and `tolerations` configuration that applies to **ALL pods** (deployments, jobs, cronjobs, etc.). This provides centralized control over pod scheduling constraints while allowing for component-specific overrides.
+
+#### Configuration Levels (highest to lowest precedence):
+
+1. **Pod-specific** (defined directly in pod configuration)
+2. **Local chart-level** (`nodeSelector`, `tolerations`)
+3. **Global** (`global.nodeSelector`, `global.tolerations`)
+
+#### Universal Scheduling (Recommended for GPU/Specialized Nodes)
+
+Use `global.nodeSelector` and `global.tolerations` for scheduling constraints that should apply to **all pods**:
+
+```yaml
+# Schedule all pods on GPU nodes
+global:
+  nodeSelector:
+    kubernetes.io/hostname: gpusrv15
+    node-type: gpu
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: gpu
+  - effect: NoSchedule
+    key: nvidia.com/gpu
+    operator: Equal
+    value: "true"
+
+# Local chart configuration (applies only to this chart instance)
+nodeSelector:
+  workload-type: api-server
+```
+
+#### Component-Specific Overrides
+
+For pod-specific scheduling requirements:
+
+```yaml
+# Global settings for all pods
+global:
+  nodeSelector:
+    node-type: gpu
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: gpu
+
+# Local chart settings
+nodeSelector:
+  workload-type: backend
+
+# Override for specific containers/jobs
+jobs:
+  migration:
+    nodeSelector:
+      workload-type: database-maintenance
+    tolerations:
+    - effect: NoSchedule
+      key: maintenance
+      operator: Equal
+      value: "true"
+```
+
+#### Complete Example
+
+```yaml
+# Applied to ALL pods (deployments, jobs, cronjobs)
+global:
+  nodeSelector:
+    node-type: gpu
+    kubernetes.io/arch: amd64
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: gpu
+
+# Local chart overrides
+nodeSelector:
+  component: api-server
+
+# Pod-specific overrides
+jobs:
+  backup:
+    nodeSelector:
+      workload-type: maintenance
+    tolerations: []  # Remove global GPU tolerations for backup job
+```
+
+**Result**: All pods get GPU node scheduling, API server pods also get component labeling, and backup jobs run on maintenance nodes without GPU requirements.
+
 ## Common Configuration Options
 
 ### Basic Chart Configuration
