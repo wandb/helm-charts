@@ -139,3 +139,18 @@ Return the redis caCert
 {{- "noop://" }}
 {{- end }}
 {{- end }}
+
+{{- define "wandb.executor.taskQueue" -}}
+{{- $cs := include "wandb.redis.connectionString" . }}
+{{- $params := include "wandb.redis.parametersQuery" . }}
+{{- $concur := .Values.workerConcurrency }}
+{{- if $concur -}}
+  {{- if $params }}
+    {{- $cs = printf "%s&" $cs -}}
+  {{- else }}
+    {{- $cs = printf "%s?" $cs -}}
+  {{- end }}
+  {{- $cs = printf "%sconcurrency=%s" $cs ($concur | toString) -}}
+{{- end }}
+{{- print $cs }}
+{{- end }}
