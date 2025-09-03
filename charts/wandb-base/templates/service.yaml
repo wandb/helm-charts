@@ -1,5 +1,6 @@
 {{- if .Values.service.enabled }}
-{{- if eq .Values.global.cloudProvider "gcp" }}
+{{- $loadBalancer := mergeOverwrite .Values.global.loadBalancer .Values.service.loadBalancer }}
+{{- if and (eq .Values.global.cloudProvider "gcp") $loadBalancer.enabled }}
 ---
 apiVersion: cloud.google.com/v1
 kind: BackendConfig
@@ -12,7 +13,15 @@ spec:
   securityPolicy:
     name: {{ .Values.global.gcpSecurityPolicy }}
   {{- end }}
-  timeoutSec: 120
+  timeoutSec: {{ $loadBalancer.timeoutSec }}
+  connectionDraining:
+    drainingTimeoutSeconds: {{ $loadBalancer.connectionDraining.drainingTimeoutSeconds }}
+  healthCheck:
+    checkIntervalSec: {{ $loadBalancer.healthCheck.checkIntervalSec }}
+    timeoutSec: {{ $loadBalancer.healthCheck.timeoutSec }}
+    healthyThreshold: {{ $loadBalancer.healthCheck.healthyThreshold }}
+    unhealthyThreshold: {{ $loadBalancer.healthCheck.unhealthyThreshold }}
+
 {{- end }}
 ---
 apiVersion: v1
@@ -27,12 +36,20 @@ metadata:
   annotations:
     {{- tpl (include "wandb-base.commonAnnotations" . | nindent 4) . }}
     {{- tpl (include "wandb-base.serviceAnnotations" . | nindent 4) . }}
-    {{- if and ( eq .Values.global.cloudProvider "aws" ) .Values.service.loadBalancerHealthCheckPath }}
-    alb.ingress.kubernetes.io/healthcheck-path: {{ .Values.service.loadBalancerHealthCheckPath }}
-    {{- end }}
-    {{- if eq .Values.global.cloudProvider "gcp" }}
+    {{- if $loadBalancer.enabled }}
+      {{- if eq .Values.global.cloudProvider "aws" }}
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "{{ $loadBalancer.healthCheck.healthyThreshold }}"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "{{ $loadBalancer.healthCheck.unhealthyThreshold }}"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "{{ $loadBalancer.healthCheck.checkIntervalSec }}"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "{{ $loadBalancer.healthCheck.timeoutSec }}"
+        {{- if $loadBalancer.healthCheck.path }}
+    alb.ingress.kubernetes.io/healthcheck-path: {{ $loadBalancer.healthCheck.path }}
+        {{- end }}
+      {{- end }}
+      {{- if eq .Values.global.cloudProvider "gcp" }}
     cloud.google.com/neg: '{"ingress": true}'
     cloud.google.com/backend-config: '{"default": "{{ include "wandb-base.fullname" . }}-backend-config"}'
+      {{- end }}
     {{- end }}
 spec:
   type: {{ .Values.service.type }}

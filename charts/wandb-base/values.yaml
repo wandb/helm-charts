@@ -5,6 +5,7 @@
 kind: Deployment
 
 global:
+  cloudProvider: ""  # cloud provider, e.g. aws, gcp, azure
   env: {}
   imagePullSecrets: []
   # DEPRECATED - Added for backwards compatibility with previous charts
@@ -25,6 +26,11 @@ global:
   service:
     labels: {}
     annotations: {}
+  loadBalancer:
+    timeoutSec: 120
+    connectionDraining:
+      enabled: true
+      drainingTimeoutSeconds: 60
 
 replicaCount: 1
 
@@ -101,7 +107,7 @@ strategy:
     maxUnavailable: 0
 
 # https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#lifecycle
-terminationGracePeriodSeconds: 60
+terminationGracePeriodSeconds: 75
 
 topologySpreadConstraints:
   - maxSkew: 1
@@ -270,8 +276,20 @@ service:
   enabled: false
   labels: {}
   annotations: {}
-  # This path is currently only used for AWS ALB health checks
-  loadBalancerHealthCheckPath: ""
+  # Additional configuration for cloud provider load balancers, make sure to set the cloud provider in the global section.
+  loadBalancer:
+    # Enabling this adds annotations for AWS load balancers or creates a BackendConfig for GCP.
+    enabled: true
+#    timeoutSec: 120
+#    connectionDraining:
+#      enabled: true
+#      drainingTimeoutSeconds: 60
+    healthCheck:
+      path: ""
+      checkIntervalSec: 5
+      timeoutSec: 2
+      healthyThreshold: 2
+      unhealthyThreshold: 2
   # This sets the service type more information can be found here: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
   type: ClusterIP
   ports:
