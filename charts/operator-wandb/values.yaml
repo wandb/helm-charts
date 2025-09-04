@@ -196,6 +196,12 @@ global:
   # - This naming convention is required for `update-ca-certificates` to parse and add each
   #   certificate to the system CA store on Ubuntu-based systems.
 
+  loadBalancer:
+    timeoutSeconds: 120
+    connectionDraining:
+      enabled: true
+      drainingTimeoutSeconds: 60
+
   # List of custom CA certificates in PEM format.
   customCACerts: []
   # Name of a ConfigMap containing additional .crt files for CA certificates.
@@ -280,7 +286,9 @@ artifactsGc:
 api:
   service:
     enabled: true
-    loadBalancerHealthCheckPath: "/ready"
+    loadBalancer:
+      healthCheck:
+        path: "/ready"
     type: ClusterIP
     ports:
       - port: 8081
@@ -344,8 +352,7 @@ api:
       livenessProbe:
         httpGet:
           path: /healthz
-          port: 8081
-        initialDelaySeconds: 30
+          port: api
         periodSeconds: 5
         timeoutSeconds: 1
         successThreshold: 1
@@ -355,8 +362,14 @@ api:
           path: /ready
           port: api
         periodSeconds: 5
-        successThreshold: 1
-        failureThreshold: 5
+        successThreshold: 2
+        failureThreshold: 3
+      startupProbe:
+        httpGet:
+          path: /ready
+          port: api
+        periodSeconds: 1
+        failureThreshold: 600
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
   image:
@@ -540,15 +553,16 @@ app:
         httpGet:
           path: /ready
           port: http
-        initialDelaySeconds: 20
         periodSeconds: 5
+        successThreshold: 2
+        failureThreshold: 2
       startupProbe:
         httpGet:
           path: /ready
           port: http
         initialDelaySeconds: 20
-        periodSeconds: 5
-        failureThreshold: 120
+        periodSeconds: 1
+        failureThreshold: 600
       lifecycle:
         preStop:
           exec:
@@ -683,7 +697,9 @@ console:
   service:
     enabled: true
     type: ClusterIP
-    loadBalancerHealthCheckPath: "/console/api/healthz"
+    loadBalancer:
+      healthCheck:
+        path: "/console/api/healthz"
     ports:
       - port: 8082
         protocol: TCP
@@ -712,14 +728,14 @@ console:
         httpGet:
           path: /console/api/ready
           port: http
-        initialDelaySeconds: 20
         periodSeconds: 5
+        successThreshold: 2
+        failureThreshold: 2
       startupProbe:
         httpGet:
           path: /console/api/ready
           port: http
-        initialDelaySeconds: 20
-        periodSeconds: 5
+        periodSeconds: 1
         failureThreshold: 120
       resources:
         requests:
@@ -977,13 +993,14 @@ anaconda2:
   install: false
   service:
     enabled: true
-    loadBalancerHealthCheckPath: "/ping"
     type: ClusterIP
     ports:
       - port: 8082
         targetPort: http
         protocol: TCP
         name: http
+    loadBalancer:
+      enabled: false
   env:
     DD_TRACE_AGENT_HOSTNAME:
       valueFrom:
@@ -1014,7 +1031,13 @@ anaconda2:
           path: /ping
           port: http
         timeoutSeconds: 2
-        failureThreshold: 5
+        failureThreshold: 2
+      startupProbe:
+        httpGet:
+          path: /ping
+          port: http
+        failureThreshold: 60
+        periodSeconds: 1
   image:
     repository: wandb/anaconda2
     tag: latest
@@ -1260,7 +1283,9 @@ frontend:
         defaultMode: 0755
   service:
     enabled: true
-    loadBalancerHealthCheckPath: "/ready"
+    loadBalancer:
+      healthCheck:
+        path: "/ready"
     type: ClusterIP
     ports:
       - port: 8080
@@ -1402,12 +1427,17 @@ glue:
       livenessProbe:
         httpGet:
           path: /healthz
-          port: 8080
-        initialDelaySeconds: 30
+          port: http
         periodSeconds: 1
         timeoutSeconds: 1
         successThreshold: 1
         failureThreshold: 3
+      startupProbe:
+        httpGet:
+          path: /healthz
+          port: http
+        failureThreshold: 60
+        periodSeconds: 1
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
   image:
@@ -1562,6 +1592,8 @@ parquet:
       - port: 8087
         protocol: TCP
         name: parquet
+    loadBalancer:
+      enabled: false
   fuse:
     enabled: false
     resources:
@@ -1604,21 +1636,24 @@ parquet:
       livenessProbe:
         httpGet:
           path: /healthz
-          port: 8087
-        initialDelaySeconds: 30
-        periodSeconds: 30
-        timeoutSeconds: 30
+          port: parquet
+        periodSeconds: 10
+        timeoutSeconds: 10
         failureThreshold: 3
         successThreshold: 1
       readinessProbe:
         httpGet:
           path: /ready
-          port: 8087
-        initialDelaySeconds: 30
-        periodSeconds: 30
-        timeoutSeconds: 30
-        failureThreshold: 3
-        successThreshold: 1
+          port: parquet
+        periodSeconds: 5
+        successThreshold: 2
+        failureThreshold: 2
+      startupProbe:
+        httpGet:
+          path: /healthz
+          port: parquet
+        failureThreshold: 60
+        periodSeconds: 1
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
         - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
@@ -1784,6 +1819,8 @@ weave:
       - port: 9994
         protocol: TCP
         name: weave
+    loadBalancer:
+      enabled: false
   envFrom:
     "{{ .Release.Name }}-weave-configmap": "configMapRef"
   containers:
@@ -1804,8 +1841,8 @@ weave:
         httpGet:
           path: /__weave/hello
           port: http
-        failureThreshold: 12
-        periodSeconds: 10
+        failureThreshold: 24
+        periodSeconds: 5
       volumeMounts:
         - name: cache
           mountPath: /vol/weave/cache
@@ -1873,10 +1910,10 @@ weave:
       resources:
         limits:
           cpu: "4"
-          memory: 32Gi
+          memory: 48Gi
         requests:
           cpu: "3"
-          memory: 24Gi
+          memory: 32Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -1933,7 +1970,7 @@ weave-trace:
           path: /traces/health
           port: http
         timeoutSeconds: 2
-        failureThreshold: 5
+        failureThreshold: 10
       readinessProbe:
         httpGet:
           path: /traces/health
@@ -1944,8 +1981,8 @@ weave-trace:
         httpGet:
           path: /traces/health
           port: http
-        failureThreshold: 12
-        periodSeconds: 10
+        failureThreshold: 24
+        periodSeconds: 5
       ports:
         - name: http
           containerPort: 8080
@@ -1955,6 +1992,9 @@ weave-trace:
           mountPath: /tmp/weave-trace/internal-jwt
   service:
     enabled: true
+    loadBalancer:
+      healthCheck:
+        path: /traces/health
     ports:
       - name: http
         targetPort: 8080
