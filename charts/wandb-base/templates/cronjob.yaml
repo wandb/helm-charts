@@ -6,8 +6,8 @@
 */}}
 {{- $cronJob := mergeOverwrite (dict "enabled" true) $cronJob}}
 {{/* I am so sorry, but I needed to make the old exportHistoryToParquet enabled flag work somehow, and could find no other way. */}}
-{{- if or ($cronJob.enabled) (and (eq $cronJobName "parquet-backfill") (dig "cronJob" "exportHistoryToParquet" "enabled" false $.Values.AsMap)) }}
-  {{- $_ := set $cronJob "restartPolicy" (default "Never" $cronJob.restartPolicy) }}
+{{- $cronEnabled := (or ($cronJob.enabled) (and (eq $cronJobName "parquet-backfill") (dig "cronJob" "exportHistoryToParquet" "enabled" false $.Values.AsMap))) }}
+{{- $_ := set $cronJob "restartPolicy" (default "Never" $cronJob.restartPolicy) }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -21,10 +21,10 @@ metadata:
 spec:
   concurrencyPolicy: {{ $cronJob.concurrencyPolicy }}
   schedule: "{{ $cronJob.schedule }}"
+  suspend: {{ or $cronJob.suspend (not $cronEnabled) }}
   jobTemplate:
     spec:
       template:
         {{- include "wandb-base.pod" (dict "podData" $cronJob "root" $) | nindent 8 }}
 ---
-{{- end }}
 {{- end }}
