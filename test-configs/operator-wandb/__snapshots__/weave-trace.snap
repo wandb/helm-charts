@@ -3070,7 +3070,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.10.2
+        helm.sh/chart: anaconda2-0.10.3
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3114,11 +3114,17 @@ spec:
             port: http
           timeoutSeconds: 2
         readinessProbe:
-          failureThreshold: 5
+          failureThreshold: 2
           httpGet:
             path: /ping
             port: http
           timeoutSeconds: 2
+        startupProbe:
+          failureThreshold: 60
+          httpGet:
+            path: /ping
+            port: http
+          periodSeconds: 1
         resources:
           limits:
             cpu: "1"
@@ -3135,7 +3141,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 75
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -3179,7 +3185,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: api-0.10.2
+        helm.sh/chart: api-0.10.3
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3365,18 +3371,23 @@ spec:
           failureThreshold: 3
           httpGet:
             path: /healthz
-            port: 8081
-          initialDelaySeconds: 30
+            port: api
           periodSeconds: 5
           successThreshold: 1
           timeoutSeconds: 1
         readinessProbe:
-          failureThreshold: 5
+          failureThreshold: 3
           httpGet:
             path: /ready
             port: api
           periodSeconds: 5
-          successThreshold: 1
+          successThreshold: 2
+        startupProbe:
+          failureThreshold: 600
+          httpGet:
+            path: /ready
+            port: api
+          periodSeconds: 1
         resources:
           requests:
             cpu: 100m
@@ -3745,7 +3756,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 75
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -3804,7 +3815,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.10.2
+        helm.sh/chart: app-0.10.3
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4021,18 +4032,19 @@ spec:
             path: /healthz
             port: http
         readinessProbe:
+          failureThreshold: 2
           httpGet:
             path: /ready
             port: http
-          initialDelaySeconds: 20
           periodSeconds: 5
+          successThreshold: 2
         startupProbe:
-          failureThreshold: 120
+          failureThreshold: 600
           httpGet:
             path: /ready
             port: http
           initialDelaySeconds: 20
-          periodSeconds: 5
+          periodSeconds: 1
         lifecycle:
           preStop:
             exec:
@@ -4254,7 +4266,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 75
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -4313,7 +4325,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.10.2
+        helm.sh/chart: console-0.10.3
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4347,18 +4359,18 @@ spec:
             path: /console/api/healthz
             port: http
         readinessProbe:
+          failureThreshold: 2
           httpGet:
             path: /console/api/ready
             port: http
-          initialDelaySeconds: 20
           periodSeconds: 5
+          successThreshold: 2
         startupProbe:
           failureThreshold: 120
           httpGet:
             path: /console/api/ready
             port: http
-          initialDelaySeconds: 20
-          periodSeconds: 5
+          periodSeconds: 1
         resources:
           limits:
             cpu: "2"
@@ -4375,7 +4387,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 75
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -4416,7 +4428,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: glue-0.10.2
+        helm.sh/chart: glue-0.10.3
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4594,11 +4606,16 @@ spec:
           failureThreshold: 3
           httpGet:
             path: /healthz
-            port: 8080
-          initialDelaySeconds: 30
+            port: http
           periodSeconds: 1
           successThreshold: 1
           timeoutSeconds: 1
+        startupProbe:
+          failureThreshold: 60
+          httpGet:
+            path: /healthz
+            port: http
+          periodSeconds: 1
         resources:
           requests:
             cpu: 100m
@@ -4951,7 +4968,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 75
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -5011,7 +5028,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.10.2
+        helm.sh/chart: parquet-0.10.3
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5189,20 +5206,23 @@ spec:
           failureThreshold: 3
           httpGet:
             path: /healthz
-            port: 8087
-          initialDelaySeconds: 30
-          periodSeconds: 30
+            port: parquet
+          periodSeconds: 10
           successThreshold: 1
-          timeoutSeconds: 30
+          timeoutSeconds: 10
         readinessProbe:
-          failureThreshold: 3
+          failureThreshold: 2
           httpGet:
             path: /ready
-            port: 8087
-          initialDelaySeconds: 30
-          periodSeconds: 30
-          successThreshold: 1
-          timeoutSeconds: 30
+            port: parquet
+          periodSeconds: 5
+          successThreshold: 2
+        startupProbe:
+          failureThreshold: 60
+          httpGet:
+            path: /healthz
+            port: parquet
+          periodSeconds: 1
         resources:
           requests:
             cpu: 100m
@@ -5224,7 +5244,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 75
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -5476,7 +5496,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-trace-0.10.2
+        helm.sh/chart: weave-trace-0.10.3
         app.kubernetes.io/name: weave-trace
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5525,7 +5545,7 @@ spec:
           name: http
           protocol: TCP
         livenessProbe:
-          failureThreshold: 5
+          failureThreshold: 10
           httpGet:
             path: /traces/health
             port: http
@@ -5537,11 +5557,11 @@ spec:
             port: http
           timeoutSeconds: 2
         startupProbe:
-          failureThreshold: 12
+          failureThreshold: 24
           httpGet:
             path: /traces/health
             port: http
-          periodSeconds: 10
+          periodSeconds: 5
         resources:
           requests:
             cpu: 100m
@@ -5591,7 +5611,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 75
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -5643,7 +5663,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.10.2
+        helm.sh/chart: weave-0.10.3
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5681,11 +5701,11 @@ spec:
             path: /__weave/hello
             port: http
         startupProbe:
-          failureThreshold: 12
+          failureThreshold: 24
           httpGet:
             path: /__weave/hello
             port: http
-          periodSeconds: 10
+          periodSeconds: 5
         resources:
           requests:
             cpu: 100m
@@ -5733,7 +5753,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
+      terminationGracePeriodSeconds: 75
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -6388,7 +6408,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.10.2
+            helm.sh/chart: parquet-0.10.3
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -6973,7 +6993,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: appRenamePostHook-0.10.2
+        helm.sh/chart: appRenamePostHook-0.10.3
         app.kubernetes.io/name: appRenamePostHook
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "1.31.12"
@@ -7057,7 +7077,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: appRenamePreHook-0.10.2
+        helm.sh/chart: appRenamePreHook-0.10.3
         app.kubernetes.io/name: appRenamePreHook
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "1.31.12"
