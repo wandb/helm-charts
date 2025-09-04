@@ -117,9 +117,9 @@ include the proprietary query parameters used by WandB.
 */}}
 {{- define "wandb.redis.connectionString" -}}
 {{- $password := include "wandb.redis.password" . }}
-{{- if or $password .Values.global.redis.secret.secretName }}
+{{- if or $password .Values.global.redis.secret.secretName -}}
 redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-{{- else }}
+{{- else -}}
 redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
 {{- end }}
 {{- end }}
@@ -138,4 +138,19 @@ Return the redis caCert
 {{- else }}
 {{- "noop://" }}
 {{- end }}
+{{- end }}
+
+{{- define "wandb.executor.taskQueue" -}}
+{{- $cs := include "wandb.redis.connectionString" . }}
+{{- $params := include "wandb.redis.parametersQuery" . }}
+{{- $concur := .Values.workerConcurrency }}
+{{- if $concur -}}
+  {{- if $params }}
+    {{- $cs = printf "%s&" $cs -}}
+  {{- else }}
+    {{- $cs = printf "%s?" $cs -}}
+  {{- end }}
+  {{- $cs = printf "%sconcurrency=%s" $cs ($concur | toString) -}}
+{{- end }}
+{{- print $cs }}
 {{- end }}
