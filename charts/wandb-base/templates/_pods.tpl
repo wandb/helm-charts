@@ -43,7 +43,13 @@ spec:
   initContainers:
     {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers") | nindent 4 }}
   {{- end }}
-  {{- $nodeSelector := mergeOverwrite (default dict $.root.Values.global.nodeSelector) (default dict $.root.Values.nodeSelector) (default dict .podData.nodeSelector) }}
+  {{- $nodeSelector := default dict .podData.nodeSelector -}}
+  {{- if not $nodeSelector -}}
+  {{-   $nodeSelector = default dict $.root.Values.nodeSelector -}}
+  {{- end -}}
+  {{- if not $nodeSelector -}}
+  {{-   $nodeSelector = default dict $.root.Values.global.nodeSelector -}}
+  {{- end -}}
   {{- if $nodeSelector }}
   nodeSelector:
     {{- tpl (toYaml $nodeSelector | nindent 4) $.root }}
@@ -57,7 +63,13 @@ spec:
   {{- with .podData.terminationGracePeriodSeconds }}
   terminationGracePeriodSeconds: {{ . }}
   {{- end }}
-  {{- $tolerations := concat (default list $.root.Values.global.tolerations) (default list $.root.Values.tolerations) (default list .podData.tolerations) }}
+  {{- $tolerations := default list .podData.tolerations -}}
+  {{- if not $tolerations -}}
+  {{-   $tolerations = default list $.root.Values.tolerations -}}
+  {{- end -}}
+  {{- if not $tolerations -}}
+  {{-   $tolerations = default list $.root.Values.global.tolerations -}}
+  {{- end -}}
   {{- if $tolerations }}
   tolerations:
     {{- tpl (toYaml $tolerations | nindent 4) $.root }}
