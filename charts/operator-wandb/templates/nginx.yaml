@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-nginx-configmap
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    worker_processes  auto;
+
+    error_log  /var/log/nginx/error.log notice;
+    pid        /tmp/nginx.pid;
+
+
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+      server {
+        listen 8080;
+        proxy_set_header Host $host;
+        location / {
+          proxy_pass http://{{ .Release.Name }}-app:8080;
+        }
+        location /console {
+          proxy_pass http://{{ .Release.Name }}-console:8082;
+        }
+        {{- if .Values.api.install }}
+        location /api {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /graphql {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /graphql2 {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /analytics {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /oidc {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /proxy {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /files {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /debug {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /service-redirect {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /service-dangerzone {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /scim {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /admin/audit_logs {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /artifacts {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        location /artifactsV2 {
+          proxy_pass http://{{ .Release.Name }}-api:8081;
+        }
+        {{- end }}
+        {{- if (get .Values "weave-trace").install }}
+        location /traces {
+          proxy_pass http://{{ .Release.Name }}-weave-trace:8722;
+        }
+        {{- end }}
+      }
+    }

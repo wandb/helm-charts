@@ -6,10 +6,7 @@ settings = {
         "kind-kind",
     ],
     "forwardedPorts": {
-        "app": 8080,
-        "console": 8082,
-        "weave-trace": 8722,
-        "anaconda2": "8084:8082",
+        "nginx": 8080,
     },
     "installMinio": True,
     "installIngress": False,
@@ -129,10 +126,11 @@ for app in ['app', 'console', 'executor', 'parquet', 'weave', 'weave-trace']:
     postfix = current_values.get(app, {}).get('deploymentPostfix', "")
     if postfix != "":
         app_names[app] += '-' + postfix
-k8s_resource(app_names['app'], port_forwards=settings["forwardedPorts"]["app"], objects=['wandb-app:ServiceAccount:default'])
-k8s_resource(app_names['console'], port_forwards=settings["forwardedPorts"]["console"], objects=['wandb-console:ServiceAccount:default'])
+k8s_resource(app_names['app'], objects=['wandb-app:ServiceAccount:default'])
+k8s_resource(app_names['console'])
+k8s_resource("wandb-nginx", port_forwards=settings["forwardedPorts"]["nginx"], objects=['wandb-console:ServiceAccount:default'])
 if current_values.get('anaconda2', {}).get('install', False):
-    k8s_resource('wandb-anaconda2', port_forwards=settings["forwardedPorts"]["anaconda2"], objects=['wandb-anaconda2:ServiceAccount:default'])
+    k8s_resource('wandb-anaconda2', objects=['wandb-anaconda2:ServiceAccount:default'])
 if current_values.get('executor', {}).get('install', False):
     k8s_resource(app_names['executor'],objects=['wandb-executor:ServiceAccount:default'])
 k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)
@@ -143,8 +141,8 @@ k8s_resource('wandb-redis-master',objects=['wandb-redis-master:ServiceAccount:de
 if current_values.get('reloader', {}).get('install', False):
     k8s_resource('wandb-reloader',objects=['wandb-reloader:ServiceAccount:default'])
 k8s_resource(app_names['weave'],objects=['wandb-weave:ServiceAccount:default'])
-if current_values.get('weave-trace', {}).get('install', False):
-    k8s_resource(app_names['weave-trace'], port_forwards=settings["forwardedPorts"]["weave-trace"])
+# if current_values.get('weave-trace', {}).get('install', False):
+#     k8s_resource(app_names['weave-trace'])
 
 configObjects = [
     'wandb-api-configmap:configmap:default',
