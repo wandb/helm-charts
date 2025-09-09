@@ -19,8 +19,11 @@ data:
     http {
       server {
         listen 8080;
-        proxy_set_header Host $host;
+        proxy_set_header Host $host:8080;
         location / {
+          proxy_pass http://{{ .Release.Name }}-app:8080;
+        }
+        location /oidc {
           proxy_pass http://{{ .Release.Name }}-app:8080;
         }
         location /console {
@@ -75,5 +78,14 @@ data:
           proxy_pass http://{{ .Release.Name }}-weave-trace:8722;
         }
         {{- end }}
+        location /bucket {
+          proxy_set_header Host minio.minio.svc.cluster.local:9000;
+          proxy_pass http://minio.minio.svc.cluster.local:9000;
+        }
+
+{{/*        {{- if eq .Values.global.bucket.name "" }}*/}}
+{{/*        location /s3 {*/}}
+{{/*          proxy_pass http://{{ .Release.Name }}-s3:9000;*/}}
+{{/*        }*/}}
       }
     }
