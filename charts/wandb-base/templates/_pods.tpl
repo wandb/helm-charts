@@ -43,9 +43,16 @@ spec:
   initContainers:
     {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers") | nindent 4 }}
   {{- end }}
-  {{- with .podData.nodeSelector }}
+  {{- $nodeSelector := default dict .podData.nodeSelector -}}
+  {{- if not $nodeSelector -}}
+  {{-   $nodeSelector = default dict $.root.Values.nodeSelector -}}
+  {{- end -}}
+  {{- if not $nodeSelector -}}
+  {{-   $nodeSelector = default dict $.root.Values.global.nodeSelector -}}
+  {{- end -}}
+  {{- if $nodeSelector }}
   nodeSelector:
-    {{- tpl (toYaml . | nindent 4) $.root }}
+    {{- tpl (toYaml $nodeSelector | nindent 4) $.root }}
   {{- end }}
   {{- if .podData.restartPolicy }}
   restartPolicy: {{ .podData.restartPolicy }}
@@ -56,9 +63,16 @@ spec:
   {{- with .podData.terminationGracePeriodSeconds }}
   terminationGracePeriodSeconds: {{ . }}
   {{- end }}
-  {{- with .podData.tolerations }}
+  {{- $tolerations := default list .podData.tolerations -}}
+  {{- if not $tolerations -}}
+  {{-   $tolerations = default list $.root.Values.tolerations -}}
+  {{- end -}}
+  {{- if not $tolerations -}}
+  {{-   $tolerations = default list $.root.Values.global.tolerations -}}
+  {{- end -}}
+  {{- if $tolerations }}
   tolerations:
-    {{- tpl (toYaml . | nindent 4) $.root }}
+    {{- tpl (toYaml $tolerations | nindent 4) $.root }}
   {{- end }}
   topologySpreadConstraints:
     {{- include "wandb-base.topologySpreadConstraints" $.root | nindent 4 }}
