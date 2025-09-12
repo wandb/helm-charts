@@ -13,9 +13,17 @@ data:
 {{- if $secret }}
   MYSQL_ROOT_PASSWORD: {{ $secret.data.MYSQL_ROOT_PASSWORD }}
   MYSQL_PASSWORD: {{ default ($secret.data.MYSQL_PASSWORD) (include "wandb.mysql.password" . | b64enc) }}
+  {{- if $secret.data.MYSQL_CA_CERT }}
+  MYSQL_CA_CERT: {{ $secret.data.MYSQL_CA_CERT }}
+  {{- else if .Values.global.mysql.caCert }}
+  MYSQL_CA_CERT: {{ .Values.global.mysql.caCert | b64enc }}
+  {{- end }}
 {{- else }}
   MYSQL_ROOT_PASSWORD: {{ randAlphaNum 64 | b64enc }}
   MYSQL_PASSWORD: {{ default (randAlphaNum 64) (include "wandb.mysql.password" .) | b64enc }}
+  {{- if .Values.global.mysql.caCert }}
+  MYSQL_CA_CERT: {{ .Values.global.mysql.caCert | b64enc }}
+  {{- end }}
 {{- end }}
 
 {{- end }}
@@ -32,3 +40,16 @@ data:
   MYSQL_HOST: "{{ include "wandb.mysql.host" . }}"
   MYSQL_DATABASE: "{{ include "wandb.mysql.database" . }}"
   MYSQL_USER: "{{ include "wandb.mysql.user" . }}"
+
+
+{{- if not (eq .Values.global.mysql.caCert "") }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-mysql-ca-cert
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  MYSQL_CA_CERT: {{ .Values.global.mysql.caCert | b64enc }}
+{{- end }}
