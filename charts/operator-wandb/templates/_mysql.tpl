@@ -52,7 +52,7 @@ Return the db password
 Return the db connection string
 */}}
 {{- define "wandb.mysql" -}}
-mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred{{- if .Values.global.mysql.caCert }}&ssl-ca=/etc/ssl/certs/mysql_ca.pem{{- end }}
+mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred{{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") }}&ssl-ca=/etc/ssl/certs/mysql_ca.pem{{- end }}
 {{- end -}}
 
 
