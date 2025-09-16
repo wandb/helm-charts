@@ -6,6 +6,9 @@
 - name: redis-ca
   mountPath: /etc/ssl/certs/redis_ca.pem
   subPath: redis_ca.pem
+- name: mysql-ca
+  mountPath: /etc/ssl/certs/mysql_ca.pem
+  subPath: mysql_ca.pem
 {{- end -}}
 
 {{- define "wandb.caCertsVolumes" -}}
@@ -22,6 +25,13 @@
     items:
       - key: REDIS_CA_CERT
         path: redis_ca.pem
+    optional: true
+- name: mysql-ca
+  secret:
+    secretName: "{{ .Release.Name }}-mysql-ca-cert"
+    items:
+      - key: MYSQL_CA_CERT
+        path: mysql_ca.pem
     optional: true
 {{- end -}}
 
