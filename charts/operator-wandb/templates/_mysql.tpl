@@ -59,15 +59,5 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
 {{- end -}}
 {{- end -}}
 
-{{/*
-Return the MySQL health check command for init containers
-*/}}
-{{- define "wandb.mysql.healthCheckCommand" -}}
-{{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") -}}
-until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca=/etc/ssl/certs/mysql_ca.pem --execute="SELECT 1"; do echo waiting for db; sleep 2; done
-{{- else -}}
-until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; do echo waiting for db; sleep 2; done
-{{- end -}}
-{{- end -}}
 
 
