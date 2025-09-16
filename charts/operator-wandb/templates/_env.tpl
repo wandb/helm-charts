@@ -113,6 +113,11 @@ Global values will override any chart-specific values.
     secretKeyRef:
       name: {{ include "wandb.mysql.passwordSecret" . | quote}}
       key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+{{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") }}
+{{/* Environment variable for future gorilla implementation of CA cert verification */}}
+- name: MYSQL_CA_CERT_PATH
+  value: "/etc/ssl/certs/mysql_ca.pem"
+{{- end }}
 - name: MYSQL
   value: {{ include "wandb.mysql" . | trim | quote }}
 - name: GORILLA_ANALYTICS_SINK
