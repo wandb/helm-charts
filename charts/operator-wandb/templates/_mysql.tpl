@@ -52,7 +52,20 @@ Return the db password
 Return the db connection string
 */}}
 {{- define "wandb.mysql" -}}
+{{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") -}}
+{{/* 
+TODO: The ssl-ca parameter is currently ignored by the Go MySQL driver.
+For proper CA certificate verification, the gorilla application needs to:
+1. Check for MYSQL_CA_CERT_PATH environment variable
+2. Register a named TLS config using mysql.RegisterTLSConfig()
+3. Use tls=wandb-mysql-ca instead of ssl-ca parameter
+The certificate is already mounted at /etc/ssl/certs/mysql_ca.pem
+*/}}
+mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred&ssl-ca=/etc/ssl/certs/mysql_ca.pem
+{{- else -}}
 mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
 {{- end -}}
+{{- end -}}
+
 
 
