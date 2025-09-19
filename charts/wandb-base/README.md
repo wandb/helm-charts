@@ -165,8 +165,11 @@ Container images can be defined at multiple levels, with the following precedenc
 
 The image configuration at each level includes:
 - `repository`: The image repository
-- `tag`: The image tag
+- `tag`: The image tag (optional)
+- `digest`: The image digest for immutable image references (optional)
 - `pullPolicy`: The image pull policy
+
+**Image Reference Precedence:** When both `digest` and `tag` are provided, `digest` takes precedence for enhanced security and immutability. If neither is provided, the image defaults to `:latest`.
 
 When a container doesn't specify its own image configuration, it inherits the chart-level image configuration. This allows you to set a default image for all containers while still being able to override it for specific containers.
 
@@ -182,20 +185,35 @@ image:
 # Container-specific image configurations
 containers:
   app:
-    # This container uses its own image configuration
+    # This container uses digest for immutable reference (most secure)
     image:
       repository: myapp
-      tag: "v1.0.0"
+      digest: "sha256:abc123def456..."  # digest takes precedence over tag
+      tag: "v1.0.0"                    # ignored when digest is provided
       pullPolicy: Always
+  worker:
+    # This container uses a specific tag
+    image:
+      repository: worker
+      tag: "v2.1.0"
+      pullPolicy: IfNotPresent
   sidecar:
     # This container doesn't specify an image, so it will use the chart-level image
     env:
       SIDECAR_MODE: "true"
+  monitor:
+    # This container has empty tag/digest, so it defaults to :latest
+    image:
+      repository: monitor
+      # tag: ""    # empty - will default to :latest
+      # digest: "" # empty - will default to :latest
 ```
 
 In this example:
-- The `app` container will use the image `myapp:v1.0.0` with pull policy `Always`
+- The `app` container will use the digest `myapp@sha256:abc123def456...` (digest takes precedence)
+- The `worker` container will use the tag `worker:v2.1.0`
 - The `sidecar` container will use the chart-level image `nginx:1.21.6` with pull policy `IfNotPresent`
+- The `monitor` container will default to `monitor:latest` (fallback when both tag and digest are empty)
 
 ### Global Common Labels and Annotations
 
