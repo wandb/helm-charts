@@ -293,6 +293,108 @@ deployment:
 
 **Result**: Every resource gets the common labels/annotations, plus any resource-specific ones, with proper precedence handling.
 
+### Global Pod Scheduling
+
+The chart supports global `nodeSelector` and `tolerations` configuration that applies to **ALL pods** (deployments, jobs, cronjobs, etc.). This provides centralized control over pod scheduling constraints while allowing for component-specific overrides.
+
+#### Fallback Configuration Logic:
+
+The scheduling configuration uses **fallback behavior** (not cumulative):
+
+1. **First, check if pod-specific config exists** → use that configuration
+2. **If not, check if chart-level config exists** → use that configuration  
+3. **If neither exists, check if global config exists** → use that configuration
+4. **If none exist** → no scheduling constraints are applied
+
+**Important**: Configurations are **NOT merged** - only the highest priority non-empty configuration is used.
+
+#### Universal Scheduling (Recommended for Production/Dedicated Nodes)
+
+Use `global.nodeSelector` and `global.tolerations` for scheduling constraints that should apply to **all pods**:
+
+```yaml
+# Global configuration - applies to all pods that don't have more specific config
+global:
+  nodeSelector:
+    environment: production
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: production
+
+# Chart-level configuration - overrides global for this chart only
+nodeSelector:
+  workload-type: api-server
+  # This completely replaces the global nodeSelector
+  # (no merging with global.nodeSelector)
+```
+
+#### Component-Specific Overrides
+
+For pod-specific scheduling requirements:
+
+```yaml
+# Global settings - used as fallback when no more specific config exists
+global:
+  nodeSelector:
+    environment: production
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: production
+
+# Chart-level settings - completely override global settings
+nodeSelector:
+  workload-type: backend
+  # The global nodeSelector is ignored for this chart
+
+# Pod-specific overrides - completely override chart-level and global settings
+jobs:
+  migration:
+    nodeSelector:
+      workload-type: database-maintenance
+      # All global and chart-level nodeSelector config is ignored for this job
+    tolerations:
+    - effect: NoSchedule
+      key: maintenance
+      operator: Equal
+      value: "true"
+      # All global and chart-level tolerations are ignored for this job
+```
+
+#### Complete Example
+
+```yaml
+# Global fallback - used when no more specific config exists
+global:
+  nodeSelector:
+    environment: production
+    kubernetes.io/arch: amd64
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: production
+
+# Chart-level config - completely replaces global config for this chart
+nodeSelector:
+  component: api-server
+
+# Pod-specific config - completely replaces chart-level and global config
+jobs:
+  backup:
+    nodeSelector:
+      workload-type: maintenance
+    # No tolerations defined, so no tolerations are applied (not even global ones)
+```
+
+**Result**: 
+- Most pods in this chart use `nodeSelector: {component: api-server}` (chart-level config)
+- The backup job uses `nodeSelector: {workload-type: maintenance}` and no tolerations
+- Other charts without their own nodeSelector would use the global production configuration
+
 ## Common Configuration Options
 
 ### Basic Chart Configuration
