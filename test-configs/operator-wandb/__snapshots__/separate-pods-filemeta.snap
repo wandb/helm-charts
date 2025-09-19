@@ -5337,6 +5337,13 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /vol/weave/cache
           name: cache
       - name: weave-cache-clear
@@ -5396,6 +5403,20 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - emptyDir:
           medium: ''
           sizeLimit: '20Gi'
