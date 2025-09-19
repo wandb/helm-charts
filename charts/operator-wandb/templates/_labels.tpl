@@ -10,10 +10,7 @@
 {{- end -}}
 
 {{- define "wandb.nodeSelector" -}}
-{{- $nodeSelector := default dict .Values.nodeSelector -}}
-{{- if not $nodeSelector -}}
-{{-   $nodeSelector = default dict .Values.global.nodeSelector -}}
-{{- end -}}
+{{- $nodeSelector := coalesce .Values.nodeSelector .Values.global.nodeSelector -}}
 {{- if $nodeSelector }}
 nodeSelector:
   {{- toYaml $nodeSelector | nindent 2 }}
@@ -21,10 +18,7 @@ nodeSelector:
 {{- end -}}
 
 {{- define "wandb.tolerations" -}}
-{{- $tolerations := default list .Values.tolerations -}}
-{{- if not $tolerations -}}
-{{-   $tolerations = default list .Values.global.tolerations -}}
-{{- end -}}
+{{- $tolerations := coalesce .Values.tolerations .Values.global.tolerations -}}
 {{- if $tolerations }}
 tolerations:
   {{- toYaml $tolerations | nindent 2 }}
