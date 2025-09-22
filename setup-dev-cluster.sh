@@ -2,7 +2,7 @@
 set -o errexit
 
 # Default configuration
-cluster_name="kind"
+cluster_name="wandb-helm-charts"
 create_registry=true
 install_ingress=false
 ingress_http_port=80
