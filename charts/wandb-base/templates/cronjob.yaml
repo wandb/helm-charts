@@ -1,14 +1,27 @@
 {{- range $cronJobName, $cronJob := .Values.cronJobs }}
-  {{- $_ := set $cronJob "restartPolicy" (default "Never" $cronJob.restartPolicy) }}
+
+{{/*
+  Since an empty bool is false, and we want the unspecified value to be true,
+  we create a dictionary with enabled=true and mergeOverwrite the provided values
+*/}}
+{{- $cronJob := mergeOverwrite (dict "enabled" true) $cronJob}}
+{{/* I am so sorry, but I needed to make the old exportHistoryToParquet enabled flag work somehow, and could find no other way. */}}
+{{- $cronEnabled := (or ($cronJob.enabled) (and (eq $cronJobName "parquet-backfill") (dig "cronJob" "exportHistoryToParquet" "enabled" false $.Values.AsMap))) }}
+{{- $_ := set $cronJob "restartPolicy" (default "Never" $cronJob.restartPolicy) }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: {{ printf "%s-%s" $.Release.Name $cronJobName }}
   labels:
     {{- include "wandb-base.labels" $ | nindent 4 }}
+  {{- if (include "wandb-base.commonAnnotations" $) }}
+  annotations:
+    {{- tpl (include "wandb-base.commonAnnotations" $ | nindent 4) $ }}
+  {{- end }}
 spec:
   concurrencyPolicy: {{ $cronJob.concurrencyPolicy }}
   schedule: "{{ $cronJob.schedule }}"
+  suspend: {{ or $cronJob.suspend (not $cronEnabled) }}
   jobTemplate:
     spec:
       template:

@@ -111,6 +111,27 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
+# Source: operator-wandb/charts/executor/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-executor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: executor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: executor
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
 # Source: operator-wandb/charts/filestream/templates/pdb.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -284,6 +305,19 @@ metadata:
   labels:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: console
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: operator-wandb/charts/executor/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-executor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: executor
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
@@ -1468,7 +1502,6 @@ metadata:
   name: chartsnap-frontend-configmap
   labels:
 data:
-  PUBLIC_URL: "http://localhost:8080"
   REACT_APP_GIT_TAG: "HEAD"
   REACT_APP_HOST: "http://localhost:8080"
   REACT_APP_ENVIRONMENT_NAME: "local"
@@ -2751,6 +2784,11 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: anaconda2
@@ -2758,7 +2796,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.9.0
+        helm.sh/chart: anaconda2-0.11.0
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -2877,6 +2915,11 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: api
@@ -2884,7 +2927,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: api-0.9.0
+        helm.sh/chart: api-0.11.0
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3010,7 +3053,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -3027,6 +3070,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3232,7 +3281,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -3249,6 +3298,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3421,7 +3476,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -3438,6 +3493,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3545,6 +3606,11 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: app
@@ -3552,7 +3618,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.9.0
+        helm.sh/chart: app-0.11.0
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3682,7 +3748,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -3699,6 +3765,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3943,7 +4015,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -3960,6 +4032,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -4081,6 +4159,11 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: console
@@ -4088,7 +4171,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.9.0
+        helm.sh/chart: console-0.11.0
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4189,6 +4272,275 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
 ---
+# Source: operator-wandb/charts/executor/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-executor-bc
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: executor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: executor
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: executor-0.11.0
+        app.kubernetes.io/name: executor
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: executor
+        args:
+        - executor
+        envFrom:
+        - configMapRef:
+            name: chartsnap-bucket-configmap
+        - configMapRef:
+            name: chartsnap-executor-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
+        - secretRef:
+            name: chartsnap-global-secret
+        - configMapRef:
+            name: chartsnap-kafka-configmap
+        - configMapRef:
+            name: chartsnap-mysql-configmap
+        - configMapRef:
+            name: chartsnap-redis-configmap
+        env:
+        - name: G_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+              name: gorilla-coreweave-caios
+              optional: true
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+              name: gorilla-coreweave-caios
+              optional: true
+        - name: AZURE_STORAGE_KEY
+          valueFrom:
+            secretKeyRef:
+              key: ACCESS_KEY
+              name: chartsnap-bucket
+              optional: true
+        - name: BUCKET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: ACCESS_KEY
+              name: chartsnap-bucket
+              optional: true
+        - name: BUCKET_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: SECRET_KEY
+              name: chartsnap-bucket
+              optional: true
+        - name: BUCKET
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
+        - name: GORILLA_FILE_STORE
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
+        - name: GORILLA_STORAGE_BUCKET
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
+        - name: MYSQL
+          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+        - name: GORILLA_ANALYTICS_SINK
+          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+        - name: GORILLA_METADATA_STORE
+          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+        - name: GORILLA_RUN_STORE
+          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+        - name: GORILLA_USAGE_STORE
+          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
+              optional: true
+        - name: REDIS
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_AUDITOR_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_FILE_METADATA_SOURCE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_LOCKER
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_METADATA_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_SETTINGS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: KAFKA_CLIENT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: KAFKA_CLIENT_PASSWORD
+              name: chartsnap-kafka
+              optional: true
+        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+          value: pubsub:/playground-111/filestream
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
+          value: pubsub:/playground-111/run-updates-shadow
+        - name: GORILLA_HISTORY_STORE
+          value: http://chartsnap-parquet:8087/_goRPC_,bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
+        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+          value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
+        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
+          value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: license
+              name: chartsnap-license
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: license
+              name: chartsnap-license
+        - name: BIGTABLE_EMULATOR_HOST
+          value: "bigtable-wandb-base:8086"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_DEV
+          value: "true"
+        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
+          value: "true"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        - name: GORILLA_PUBSUB_INSECURE
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
+          value: "false"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
+          value: "true"
+        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
+          value: "true"
+        - name: GORILLA_TASK_QUEUE
+          value: 'redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)&concurrency=10'
+        - name: PUBSUB_EMULATOR_HOST
+          value: "pubsub-wandb-base:8085"
+        - name: PUBSUB_PROJECT_ID
+          value: "playground-111"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "wandb/megabinary:latest"
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+      serviceAccountName: chartsnap-executor
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: executor
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: executor
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
+---
 # Source: operator-wandb/charts/filestream/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -4204,6 +4556,11 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: filestream
@@ -4211,7 +4568,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: filestream-0.9.0
+        helm.sh/chart: filestream-0.11.0
         app.kubernetes.io/name: filestream
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4335,7 +4692,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4352,6 +4709,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -4467,6 +4830,11 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: flat-run-fields-updater
@@ -4474,7 +4842,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: flat-run-fields-updater-0.9.0
+        helm.sh/chart: flat-run-fields-updater-0.11.0
         app.kubernetes.io/name: flat-run-fields-updater
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4586,7 +4954,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4718,6 +5086,8 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: glue
@@ -4725,7 +5095,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: glue-0.9.0
+        helm.sh/chart: glue-0.11.0
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4849,7 +5219,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4866,6 +5236,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5056,7 +5432,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -5073,6 +5449,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5237,7 +5619,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -5254,6 +5636,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5355,6 +5743,11 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: metric-observer
@@ -5362,7 +5755,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: metric-observer-0.9.0
+        helm.sh/chart: metric-observer-0.11.0
         app.kubernetes.io/name: metric-observer
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5486,7 +5879,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -5503,6 +5896,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5623,6 +6022,11 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: parquet
@@ -5631,7 +6035,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.9.0
+        helm.sh/chart: parquet-0.11.0
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5755,7 +6159,7 @@ spec:
         - name: GORILLA_USAGE_METRICS_CACHE
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -5772,6 +6176,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -6100,6 +6510,11 @@ metadata:
     reloader.stakater.com/auto: "true"
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: weave
@@ -6107,7 +6522,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.9.0
+        helm.sh/chart: weave-0.11.0
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6177,6 +6592,13 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /vol/weave/cache
           name: cache
       - name: weave-cache-clear
@@ -6258,6 +6680,20 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - emptyDir:
           medium: ''
           sizeLimit: '20Gi'
@@ -6461,7 +6897,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: redis
-        image: docker.io/bitnami/redis:7.2.4-debian-12-r9
+        image: docker.io/bitnamilegacy/redis:7.2.4-debian-12-r9
         imagePullPolicy: "IfNotPresent"
         securityContext:
           allowPrivilegeEscalation: false
@@ -6575,12 +7011,13 @@ metadata:
 spec:
   concurrencyPolicy: Forbid
   schedule: "* * * * *"
+  suspend: true
   jobTemplate:
     spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.9.0
+            helm.sh/chart: parquet-0.11.0
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -6706,7 +7143,7 @@ spec:
             - name: GORILLA_USAGE_METRICS_CACHE
               value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_TASK_QUEUE
-              value: noop://
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: KAFKA_CLIENT_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -6723,6 +7160,12 @@ spec:
               value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
             - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
               value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+            - name: GORILLA_STATSIG_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: GORILLA_STATSIG_KEY
+                  name: gorilla-statsig
+                  optional: true
             - name: LICENSE
               valueFrom:
                 secretKeyRef:
@@ -6773,9 +7216,12 @@ spec:
             image: "wandb/megabinary:latest"
             imagePullPolicy: IfNotPresent
             resources:
+              limits:
+                cpu: 1
+                memory: 1Gi
               requests:
-                cpu: 100m
-                memory: 128Mi
+                cpu: 1
+                memory: 1Gi
             volumeMounts:
             - name: wandb-ca-certs
               mountPath: /usr/local/share/ca-certificates/inline
@@ -7064,7 +7510,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: appRenamePostHook-0.9.0
+        helm.sh/chart: appRenamePostHook-0.11.0
         app.kubernetes.io/name: appRenamePostHook
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "1.31.12"
@@ -7170,7 +7616,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: appRenamePreHook-0.9.0
+        helm.sh/chart: appRenamePreHook-0.11.0
         app.kubernetes.io/name: appRenamePreHook
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "1.31.12"

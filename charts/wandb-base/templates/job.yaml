@@ -1,4 +1,10 @@
 {{- range $jobName, $job := .Values.jobs }}
+{{/*
+  Since an empty bool is false, and we want the unspecified value to be true,
+  we create a dictionary with enabled=true and mergeOverwrite the provided values
+*/}}
+{{- $job := mergeOverwrite (dict "enabled" true) $job}}
+{{- if $job.enabled }}
   {{- $_ := set $job "restartPolicy" (default "Never" $job.restartPolicy ) }}
 apiVersion: batch/v1
 kind: Job
@@ -6,8 +12,9 @@ metadata:
   name: {{ printf "%s-%s" $.Release.Name $jobName }}
   labels:
     {{- include "wandb-base.labels" $ | nindent 4 }}
-  {{- if (or $job.annotations $.Values.helmHook.enabled) }}
+  {{- if (or $job.annotations $.Values.helmHook.enabled (include "wandb-base.commonAnnotations" $)) }}
   annotations:
+    {{- tpl (include "wandb-base.commonAnnotations" $ | nindent 4) $ }}
     {{- if $job.annotations }}
       {{- toYaml $job.annotations | nindent 4 }}
     {{- end }}
@@ -25,4 +32,5 @@ spec:
   template:
     {{- include "wandb-base.pod" (dict "podData" $job "root" $) | nindent 8 }}
 ---
+{{- end }}
 {{- end }}

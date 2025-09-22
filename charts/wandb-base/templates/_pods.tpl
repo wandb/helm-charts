@@ -1,6 +1,6 @@
 {{- define "wandb-base.pod" }}
 metadata:
-  {{- if or .podData.podAnnotations .podData.podAnnotationsTpls }}
+  {{- if or .podData.podAnnotations .podData.podAnnotationsTpls (include "wandb-base.podAnnotations" $.root) (include "wandb-base.commonAnnotations" $.root) }}
   annotations:
     {{- range .podData.podAnnotationsTpls }}
       {{- tpl . $.root | nindent 4 }}
@@ -9,12 +9,11 @@ metadata:
       {{- tpl (toYaml .podData.podAnnotations | nindent 4) .root }}
     {{- end }}
     {{- tpl (include "wandb-base.podAnnotations" $.root | nindent 4) .root }}
+    {{- tpl (include "wandb-base.commonAnnotations" $.root | nindent 4) .root }}
   {{- end }}
   labels:
     {{- tpl (include "wandb-base.labels" $.root | nindent 4) $.root }}
-    {{- with .podData.podLabels }}
-    {{- tpl (toYaml . | nindent 4) $.root }}
-    {{- end }}
+    {{- tpl (include "wandb-base.podLabels" $.root | nindent 4) $.root }}
 spec:
   {{- with .podData.affinity }}
   affinity:
@@ -44,9 +43,10 @@ spec:
   initContainers:
     {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers") | nindent 4 }}
   {{- end }}
-  {{- with .podData.nodeSelector }}
+  {{- $nodeSelector := coalesce .podData.nodeSelector $.root.Values.nodeSelector $.root.Values.global.nodeSelector -}}
+  {{- if $nodeSelector }}
   nodeSelector:
-    {{- tpl (toYaml . | nindent 4) $.root }}
+    {{- tpl (toYaml $nodeSelector | nindent 4) $.root }}
   {{- end }}
   {{- if .podData.restartPolicy }}
   restartPolicy: {{ .podData.restartPolicy }}
@@ -57,9 +57,10 @@ spec:
   {{- with .podData.terminationGracePeriodSeconds }}
   terminationGracePeriodSeconds: {{ . }}
   {{- end }}
-  {{- with .podData.tolerations }}
+  {{- $tolerations := coalesce .podData.tolerations $.root.Values.tolerations $.root.Values.global.tolerations -}}
+  {{- if $tolerations }}
   tolerations:
-    {{- tpl (toYaml . | nindent 4) $.root }}
+    {{- tpl (toYaml $tolerations | nindent 4) $.root }}
   {{- end }}
   topologySpreadConstraints:
     {{- include "wandb-base.topologySpreadConstraints" $.root | nindent 4 }}

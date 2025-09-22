@@ -17,10 +17,10 @@ global:
   licenseSecret:
     name: ""
     key: ""
-  # List of image pull secrets for accessing private container registries.
-  # Example:
-  # imagePullSecrets: &imagePullSecrets
-  #   - my-registry-secret
+    # List of image pull secrets for accessing private container registries.
+    # Example:
+    # imagePullSecrets: &imagePullSecrets
+    #   - my-registry-secret
 
   cloudProvider: ""
 
@@ -58,6 +58,21 @@ global:
   service:
     labels: {}
     annotations: {}
+
+  # Global nodeSelector and tolerations applied to all deployments/pods
+  # This allows scheduling all components on specific nodes (e.g., GPU nodes)
+  nodeSelector: {}
+  # Example:
+  # nodeSelector:
+  #   kubernetes.io/hostname: gpusrv15
+
+  tolerations: []
+  # Example:
+  # tolerations:
+  # - effect: NoSchedule
+  #   key: dedicated
+  #   operator: Equal
+  #   value: gpu
 
   extraEnvFrom: {}
   extraEnv: {}
@@ -311,6 +326,7 @@ api:
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   initContainers:
@@ -485,6 +501,7 @@ app:
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   service:
     enabled: true
@@ -771,6 +788,7 @@ console:
 executor:
   install: false
   deploymentPostfix: "bc"
+  workerConcurrency: 10
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -788,7 +806,11 @@ executor:
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+  env:
+    GORILLA_TASK_QUEUE:
+      value: '{{ include "wandb.executor.taskQueue" . }}'
   containers:
     executor:
       args: ["executor"]
@@ -799,6 +821,8 @@ executor:
     tag: latest
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
+  strategy:
+    type: Recreate
   size: ""
   sizing:
     small:
@@ -885,12 +909,17 @@ filemeta:
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   containers:
     filemeta:
       args: ["filemeta"]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       env: {}
       envFrom: {}
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -1043,6 +1072,7 @@ filestream:
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   env:
     GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
@@ -1186,8 +1216,8 @@ flat-run-fields-updater:
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 3
-          minReplicas: 1
+          maxReplicas: 6
+          minReplicas: 3
     large:
       resources:
         limits:
@@ -1199,34 +1229,34 @@ flat-run-fields-updater:
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 4
-          minReplicas: 1
+          maxReplicas: 6
+          minReplicas: 3
     xlarge:
       resources:
         limits:
           cpu: "2"
-          memory: 4Gi
+          memory: 8Gi
         requests:
           cpu: "1"
-          memory: 3Gi
+          memory: 6Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 5
-          minReplicas: 1
+          maxReplicas: 12
+          minReplicas: 9
     xxlarge:
       resources:
         limits:
           cpu: "2"
-          memory: 4Gi
+          memory: 8Gi
         requests:
           cpu: "1"
-          memory: 3Gi
+          memory: 6Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 6
-          minReplicas: 1
+          maxReplicas: 12
+          minReplicas: 9
 
 frontend:
   install: false
@@ -1355,6 +1385,7 @@ glue:
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   initContainers:
     init-db:
@@ -1406,6 +1437,8 @@ glue:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
+  strategy:
+    type: Recreate
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""
@@ -1485,6 +1518,7 @@ metric-observer:
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   containers:
     metric-observer:
@@ -1571,6 +1605,7 @@ parquet:
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   podAnnotationsTpls:
     - '{{ include "wandb.gcsFuseAnnotations" . }}'
@@ -1604,6 +1639,7 @@ parquet:
         - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
   cronJobs:
     parquet-backfill:
+      enabled: false
       containers:
         backfill-job:
           args: ["glue"]
@@ -1612,13 +1648,19 @@ parquet:
             GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
           envFrom:
             "{{ .Release.Name }}-glue-configmap": "configMapRef"
+          resources:
+            requests:
+              cpu: 1
+              memory: 1Gi
+            limits:
+              cpu: 1
+              memory: 1Gi
           volumeMountsTpls:
             - '{{ include "wandb.caCertsVolumeMounts" . }}'
       concurrencyPolicy: Forbid
       schedule: "* * * * *"
       volumesTpls:
         - '{{ include "wandb.caCertsVolumes" . }}'
-
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
     - '{{ include "wandb.gcsFuseVolumes" . }}'
@@ -1653,24 +1695,25 @@ parquet:
     large:
       resources:
         limits:
-          cpu: "4"
-          memory: 32Gi
+          cpu: "8"
+          memory: 64Gi
         requests:
-          cpu: "3"
-          memory: 24Gi
+          cpu: "6"
+          memory: 48Gi
       autoscaling:
         horizontal:
           enabled: true
           maxReplicas: 4
           minReplicas: 2
+    # At larger t-shirt sizes, reserve an entire node for parquet.
     xlarge:
       resources:
         limits:
-          cpu: "4"
-          memory: 32Gi
+          cpu: "15"
+          memory: 96Gi
         requests:
-          cpu: "3"
-          memory: 24Gi
+          cpu: "12"
+          memory: 72Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -1679,11 +1722,11 @@ parquet:
     xxlarge:
       resources:
         limits:
-          cpu: "4"
-          memory: 64Gi
+          cpu: "15"
+          memory: 96Gi
         requests:
-          cpu: "3"
-          memory: 48Gi
+          cpu: "12"
+          memory: 72Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -1723,6 +1766,7 @@ settingsMigrationJob:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
   envTpls:
     - '{{ include "wandb.bucket.cwIdentity" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
   kind: Job
   jobs:
@@ -1781,6 +1825,8 @@ weave:
       volumeMounts:
         - name: cache
           mountPath: /vol/weave/cache
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
     weave-cache-clear:
       command:
         - python
@@ -1800,6 +1846,8 @@ weave:
       emptyDir:
         sizeLimit: "{{ .Values.cache.size }}"
         medium: "{{ .Values.cache.medium }}"
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -2136,6 +2184,8 @@ yace:
 
 redis:
   install: true
+  image:
+    repository: bitnamilegacy/redis
   nameOverride: "redis"
   architecture: standalone
   auth:
@@ -2149,6 +2199,10 @@ redis:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9121"
         prometheus.io/path: "/metrics"
+  # Apply global nodeSelector and tolerations to Redis
+  master:
+    nodeSelector: {}
+    tolerations: []
 
 prometheus:
   install: true
@@ -2218,6 +2272,13 @@ kafka:
   controller:
     persistence:
       size: 30Gi
+    # Apply global nodeSelector and tolerations to Kafka controllers
+    nodeSelector: {}
+    tolerations: []
+  # Apply global nodeSelector and tolerations to Kafka brokers
+  broker:
+    nodeSelector: {}
+    tolerations: []
   sasl:
     interbroker:
       password: "inter-broker"
@@ -2255,6 +2316,9 @@ etcd:
       enabled: false
   metrics:
     useSeparateEndpoint: true
+  # Apply global nodeSelector and tolerations to etcd
+  nodeSelector: {}
+  tolerations: []
   customLivenessProbe:
     httpGet:
       port: 9090
@@ -2321,6 +2385,10 @@ clickhouse:
   shards: 1
   replicaCount: 1
 
+  # Apply global nodeSelector and tolerations to ClickHouse
+  nodeSelector: {}
+  tolerations: []
+
   persistentVolumeClaimRetentionPolicy:
     enabled: true
     whenScaled: Retain
@@ -2331,6 +2399,9 @@ clickhouse:
     storageClass: ""
 
   keeper:
+    # Apply global nodeSelector and tolerations to ClickHouse Keeper
+    nodeSelector: {}
+    tolerations: []
     persistentVolumeClaimRetentionPolicy:
       enabled: true
       whenScaled: Retain
