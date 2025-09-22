@@ -2,7 +2,7 @@ We make use of Github actions and [chart-testing](https://github.com/helm/chart-
 
 ## Releasing
 
-```shell
+```sh
 git checkout -b feature/bump_version
 # update versions in charts/wandb/Chart.yaml
 git push origin feature/bump_version
@@ -15,31 +15,31 @@ From the project root directory...
 
 ### Setup the dev cluster
 
-```
+```sh
 ./setup-dev-cluster.sh
 ```
 
 ### Build the Helm Charts
 
-```
+```sh
 ./snapshots.sh build
 ```
 
 ### See if tests generate expected values
 
-The `test-configs/operator-wandb/__snapshots__` directory contains the **expected** outputs
-from running values against the helm charts. This test is run by:
+The `test-configs/operator-wandb/__snapshots__` directory contains the __expected__ outputs
+after running supplied values against the helm charts. This test is run by:
 
-```
+```sh
 ./snapshots.sh run
 ```
 
 ### Updated the expected test outputs
 
-If you are **sure** that generated values by the charts are correct and that the `__snapshots__` 
+If you are __sure__ that generated values by the charts are correct and that the `__snapshots__`
 values need updating then run:
 
-```
+```sh
 ./snapshots.sh update
 ```
 
@@ -47,6 +47,6 @@ values need updating then run:
 
 Tear down what you built with:
 
-```
+```sh
 ./teardown-dev-cluster.sh
 ```
