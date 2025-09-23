@@ -43,15 +43,14 @@ jobs:
       fail-fast: false
       matrix:
         k8s-version: ["v1.32.2", "v1.31.6", "v1.30.10"]
-        configuration:
-          [
+        configuration: [
             env-values-example
             env-precedence-container
             env-precedence-sizing
             env-precedence-chart-env
             env-precedence-chart-legacy
             env-precedence-global-env
-            env-precedence-global-legacy
+            env-precedence-global-legacy,
           ]
     runs-on: ubuntu-latest
     environment: Helm Charts
@@ -84,18 +83,34 @@ jobs:
             echo "::set-output name=changed::true"
           fi
 
+      - name: Determine Kind Cluster Name
+        id: cluster
+        run: |
+          MATRIX_STRING="${{ matrix.k8s-version }}-${{ matrix.configuration }}"
+
+          HASH=$(python3 -c "
+          import zlib
+          data = '$MATRIX_STRING'.encode('utf-8')
+          crc = zlib.crc32(data) & 0xffffffff
+          print(f'{crc:08x}')
+          ")
+
+          export NAME="ct-${HASH}"
+          echo "::set-output name=name::${NAME}"
+          echo "Matrix: $MATRIX_STRING -> Hash: $HASH -> Name: $NAME"
+
       - name: Create kind cluster
         uses: helm/kind-action@v1.12.0
         with:
           version: v0.27.0
-          cluster_name: chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }}
+          cluster_name: ${{ steps.cluster.outputs.name }}
           node_image: kindest/node:${{ matrix.k8s-version }}
         if: env.ACT || steps.list-changed.outputs.changed == 'true'
 
       - name: Apply user defined secrets
         run: |
           if [[ -d test-configs/additional-resources/${{matrix.configuration}} ]]; then
-            kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} apply -f test-configs/additional-resources/${{matrix.configuration}}
+            kubectl --context kind-${{ steps.cluster.outputs.name }} apply -f test-configs/additional-resources/${{matrix.configuration}}
           else
             echo "No additional resources to be applied for ${{matrix.configuration}}"
           fi
@@ -107,5 +122,5 @@ jobs:
           ct install --namespace default \
           --charts ./charts/wandb-base \
           --config ct.yaml \
-          --helm-extra-args '--kube-context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} --timeout 600s' \
+          --helm-extra-args '--kube-context kind-${{ steps.cluster.outputs.name }} --timeout 600s' \
           --helm-extra-set-args '--values test-configs/wandb-base/${{ matrix.configuration }}.yaml'
