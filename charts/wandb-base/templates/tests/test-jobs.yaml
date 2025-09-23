@@ -1,12 +1,13 @@
 {{- if and .Values.test.enabled (eq .Values.kind "Job") }}
   {{- range $jobName, $job := .Values.jobs }}
     {{- $job := mergeOverwrite (dict "enabled" true) $job}}
+    {{- $fullname := include "wandb-base.fullname" $ }}
     {{- if $job.enabled }}
 ---
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "{{ include "wandb-base.fullname" $ }}-test-job-{{ $jobName }}"
+  name: "{{ $fullname }}-test-job-{{ $jobName }}"
   labels:
     {{- include "wandb-base.labels" $ | nindent 4 }}
   annotations:
@@ -21,30 +22,34 @@ spec:
         - -c
         - |
           set -e
-          echo "Testing job: {{ printf "%s-%s" $.Release.Name $jobName }}"
-          
-          # Wait for the job to exist
+          echo "Testing job: {{ printf "%s-%s" $fullname $jobName }}"
+
           echo "Waiting for job to be created..."
-          kubectl wait --for=condition=Ready job/{{ printf "%s-%s" $.Release.Name $jobName }} --timeout=300s || true
-          
-          # Wait for the job to complete successfully
+          i=0
+          until kubectl get job/{{ printf "%s-%s" $fullname $jobName }} >/dev/null 2>&1; do
+            i=$((i+1))
+            if [ "$i" -ge 60 ]; then
+              echo "Timed out waiting for job creation."
+              exit 1
+            fi
+            sleep 5
+          done
+
           echo "Waiting for job to complete successfully..."
-          kubectl wait --for=condition=complete job/{{ printf "%s-%s" $.Release.Name $jobName }} --timeout=600s
-          
-          # Verify the job completed successfully (not failed)
+          kubectl wait --for=condition=complete job/{{ printf "%s-%s" $fullname $jobName }} --timeout=600s
+
           echo "Verifying job completed successfully..."
-          JOB_STATUS=$(kubectl get job {{ printf "%s-%s" $.Release.Name $jobName }} -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')
+          JOB_STATUS=$(kubectl get job {{ printf "%s-%s" $fullname $jobName }} -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')
           if [ "$JOB_STATUS" != "True" ]; then
             echo "Job did not complete successfully. Current status:"
-            kubectl describe job {{ printf "%s-%s" $.Release.Name $jobName }}
+            kubectl describe job {{ printf "%s-%s" $fullname $jobName }}
             exit 1
           fi
-          
-          echo "Job {{ printf "%s-%s" $.Release.Name $jobName }} completed successfully!"
-          
-          # Optional: Show job logs for debugging
+
+          echo "Job {{ printf "%s-%s" $fullname $jobName }} completed successfully!"
+
           echo "Job logs:"
-          kubectl logs job/{{ printf "%s-%s" $.Release.Name $jobName }} --tail=50 || echo "No logs available"
+          kubectl logs job/{{ printf "%s-%s" $fullname $jobName }} --tail=50 || echo "No logs available"
   restartPolicy: Never
     {{- end }}
   {{- end }}
