@@ -43,15 +43,15 @@ function main() {
   for chart in "${charts[@]}"; do
     case "$func" in
       build)
-        echo "Building operator-wandb"
+        echo "Building $chart"
         helm cascade build "./charts/$chart"
         ;;
       update)
-        echo "Updating operator-wandb snapshots"
+        echo "Updating $chart snapshots"
         helm chartsnap -c "./charts/$chart" -u -f "./$values_dir/$chart"
         ;;
       run)
-        echo "Checking snapshot tests"
+        echo "Checking $chart snapshot tests"
         helm chartsnap -c "./charts/$chart" -f "./$values_dir/$chart"
         ;;
       *)
