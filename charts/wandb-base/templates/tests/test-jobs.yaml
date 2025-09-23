@@ -1,0 +1,40 @@
+{{- if eq .Values.kind "Job" }}
+  {{- range $jobName, $job := .Values.jobs }}
+    {{- $job := mergeOverwrite (dict "enabled" true) $job}}
+    {{- $fullname := include "wandb-base.fullname" $ }}
+    {{- if $job.enabled }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ $fullname }}-test-job-{{ $jobName }}"
+  labels:
+    {{- include "wandb-base.labels" $ | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "1"
+spec:
+  containers:
+    - name: job-test
+      image: bitnami/kubectl:latest
+      command: ['/bin/sh']
+      args:
+        - -c
+        - |
+          set -e
+          echo "Testing job: {{ printf "%s-%s" $fullname $jobName }}"
+
+          i=0
+          until kubectl logs job/{{ printf "%s-%s" $fullname $jobName }} >/dev/null 2>&1; do
+            i=$((i+1))
+            if [ "$i" -ge 60 ]; then
+              echo "Timed out waiting for job logs."
+              exit 1
+            fi
+            sleep 5
+          done
+
+  restartPolicy: Never
+    {{- end }}
+  {{- end }}
+{{- end }}
