@@ -70,6 +70,13 @@ spec:
             fi
             sleep 5
           done
+          if ! kubectl wait --for=condition=complete job/{{ printf "%s-%s" $fullname $jobName }} --timeout=600s; then
+            echo "Job {{ printf "%s-%s" $fullname $jobName }} did not complete successfully."
+            kubectl describe job/{{ printf "%s-%s" $fullname $jobName }} || true
+            kubectl logs job/{{ printf "%s-%s" $fullname $jobName }} --tail=200 || true
+            exit 1
+          fi
+          echo "Job {{ printf "%s-%s" $fullname $jobName }} completed successfully."
 
   restartPolicy: Never
     {{- end }}
