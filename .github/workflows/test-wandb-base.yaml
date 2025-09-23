@@ -1,0 +1,126 @@
+name: Test wandb-base Chart
+
+on:
+  pull_request:
+    paths:
+      - charts/operator-wandb/**
+      - test-configs/wandb-base/**
+
+jobs:
+  snapshots:
+    name: Snapshot testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.2.0
+        with:
+          version: v3.17.0
+      - name: Helm snapshot build and test
+        run: |
+          pushd ./charts/operator-wandb/
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add stakater https://stakater.github.io/stakater-charts
+          helm repo add prometheus https://prometheus-community.github.io/helm-charts
+          popd
+          helm plugin install https://github.com/origranot/helm-cascade
+          helm plugin install https://github.com/jlandowner/helm-chartsnap
+          ./snapshots.sh build
+          ./snapshots.sh run
+      # currently this action always tries to install helm, so dont use it for now
+      - name: Chart Snapshots
+        if: ${{ !always() }}
+        uses: jlandowner/helm-chartsnap-action@v1
+        id: chartsnap
+        with:
+          chart: charts/wandb-base/
+          values: test-configs/wandb-base/
+
+  test:
+    name: Test Chart
+    strategy:
+      fail-fast: false
+      matrix:
+        k8s-version: ["v1.32.2", "v1.31.6", "v1.30.10"]
+        configuration: [
+            env-values-example
+            env-precedence-container
+            env-precedence-sizing
+            env-precedence-chart-env
+            env-precedence-chart-legacy
+            env-precedence-global-env
+            env-precedence-global-legacy,
+          ]
+    runs-on: ubuntu-latest
+    environment: Helm Charts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.2.0
+        with:
+          version: v3.17.0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.7.0
+        with:
+          version: v3.12.0
+
+      - name: Run chart-testing (list-changed)
+        id: list-changed
+        run: |
+          changed=$(ct list-changed --config ct.yaml)
+          if [[ -n "$changed" ]]; then
+            echo "::set-output name=changed::true"
+          fi
+
+      - name: Determine Kind Cluster Name
+        id: cluster
+        run: |
+          MATRIX_STRING="${{ matrix.k8s-version }}-${{ matrix.configuration }}"
+
+          HASH=$(python3 -c "
+          import zlib
+          data = '$MATRIX_STRING'.encode('utf-8')
+          crc = zlib.crc32(data) & 0xffffffff
+          print(f'{crc:08x}')
+          ")
+
+          export NAME="ct-${HASH}"
+          echo "::set-output name=name::${NAME}"
+          echo "Matrix: $MATRIX_STRING -> Hash: $HASH -> Name: $NAME"
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.12.0
+        with:
+          version: v0.27.0
+          cluster_name: ${{ steps.cluster.outputs.name }}
+          node_image: kindest/node:${{ matrix.k8s-version }}
+        if: env.ACT || steps.list-changed.outputs.changed == 'true'
+
+      - name: Apply user defined secrets
+        run: |
+          if [[ -d test-configs/additional-resources/${{matrix.configuration}} ]]; then
+            kubectl --context kind-${{ steps.cluster.outputs.name }} apply -f test-configs/additional-resources/${{matrix.configuration}}
+          else
+            echo "No additional resources to be applied for ${{matrix.configuration}}"
+          fi
+        if: env.ACT || steps.list-changed.outputs.changed == 'true'
+
+      - name: Run chart-testing (install)
+        if: env.ACT || steps.list-changed.outputs.changed == 'true'
+        run: |
+          ct install --namespace default \
+          --charts ./charts/wandb-base \
+          --config ct.yaml \
+          --helm-extra-args '--kube-context kind-${{ steps.cluster.outputs.name }} --timeout 600s' \
+          --helm-extra-set-args '--values test-configs/wandb-base/${{ matrix.configuration }}.yaml'

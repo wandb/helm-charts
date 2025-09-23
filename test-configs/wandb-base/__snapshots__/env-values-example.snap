@@ -1,0 +1,146 @@
+# chartsnap: snapshot_version=v3
+---
+# Source: wandb-base/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: wandb-base
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
+# Source: wandb-base/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: wandb-base/templates/job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chartsnap-test
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: wandb-base-0.11.0
+        app.kubernetes.io/name: wandb-base
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: example
+        command:
+        - /bin/bash
+        args:
+        - -c
+        - |
+          if [ "$USED_NAMESPACE" = "default" ]; then
+            echo "fieldRef test"
+          else
+            echo "fieldRef test failed"
+            exit 1
+          fi
+          if [ "$MEM_LIMIT" = "1073741824" ]; then
+            echo "resourceFieldRef test"
+          else
+            echo "resourceFieldRef test failed"
+            exit 1
+          fi
+          if [ "$BASIC" = "$BASIC_ALT" ]; then
+            echo "Basic test"
+          else
+            echo "Basic test failed"
+            exit 1
+          fi
+          if [ "$EXAMPLE_FROM_CONFIGMAP" = "$EXAMPLE_FROM_SECRET" ]; then
+            echo "configmap/secret test"
+          else
+            echo "configmap/secret test failed"
+            exit 1
+          fi
+          exit 0
+        envFrom:
+        env:
+        - name: BASIC
+          value: "600"
+        - name: BASIC_ALT
+          value: "600"
+        - name: EXAMPLE_FROM_CONFIGMAP
+          valueFrom:
+            configMapKeyRef:
+              key: configmap-key
+              name: my-configmap
+        - name: EXAMPLE_FROM_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: secret-key
+              name: my-secret
+        - name: MEM_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: USED_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "debian:12-slim"
+        imagePullPolicy:
+        resources:
+          limits:
+            memory: 1Gi
+      restartPolicy: Never
+      serviceAccountName: chartsnap-wandb-base
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway

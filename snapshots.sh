@@ -30,7 +30,7 @@ EOF
 }
 
 function main() {
-  local chart="operator-wandb"
+  local charts=("wandb-base" "operator-wandb")
   local values_dir="test-configs"
 
   if [ $# -eq 0 ]; then
@@ -39,24 +39,27 @@ function main() {
   fi
 
   local func="$1"
-  case "$func" in
-    build)
-      echo "Building operator-wandb"
-      helm cascade build "./charts/$chart"
-      ;;
-    update)
-      echo "Updating operator-wandb snapshots"
-      helm chartsnap -c "./charts/$chart" -u -f "./$values_dir/$chart"
-      ;;
-    run)
-      echo "Checking snapshot tests"
-      helm chartsnap -c "./charts/$chart" -f "./$values_dir/$chart"
-      ;;
-    *)
-      usage
-      exit 1
-      ;;
-  esac
+
+  for chart in "${charts[@]}"; do
+    case "$func" in
+      build)
+        echo "Building operator-wandb"
+        helm cascade build "./charts/$chart"
+        ;;
+      update)
+        echo "Updating operator-wandb snapshots"
+        helm chartsnap -c "./charts/$chart" -u -f "./$values_dir/$chart"
+        ;;
+      run)
+        echo "Checking snapshot tests"
+        helm chartsnap -c "./charts/$chart" -f "./$values_dir/$chart"
+        ;;
+      *)
+        usage
+        exit 1
+        ;;
+    esac
+  done
 }
 
 main "$@"
