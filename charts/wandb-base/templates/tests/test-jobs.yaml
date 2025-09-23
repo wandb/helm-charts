@@ -1,0 +1,64 @@
+{{- if and .Values.test.enabled (eq .Values.kind "Job") }}
+  {{- range $jobName, $job := .Values.jobs }}
+    {{- $job := mergeOverwrite (dict "enabled" true) $job}}
+    {{- $fullname := include "wandb-base.fullname" $ }}
+    {{- if $job.enabled }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ $fullname }}-test-job-{{ $jobName }}"
+  labels:
+    {{- include "wandb-base.labels" $ | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "1"
+spec:
+  containers:
+    - name: job-test
+      image: bitnami/kubectl:latest
+      command: ['/bin/sh']
+      args:
+        - -c
+        - |
+          set -e
+          echo "Testing job: {{ printf "%s-%s" $fullname $jobName }}"
+
+          echo "Waiting for job to be created..."
+          i=0
+          until kubectl get job/{{ printf "%s-%s" $fullname $jobName }} >/dev/null 2>&1; do
+            i=$((i+1))
+            if [ "$i" -ge 60 ]; then
+              echo "Timed out waiting for job creation."
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo "Waiting for job pod to be ready..."
+          kubectl wait --for=condition=Ready pod -l job-name={{ printf "%s-%s" $fullname $jobName }} --timeout=300s || {
+            echo "Job pod failed to become ready. Checking pod status:"
+            kubectl get pods -l job-name={{ printf "%s-%s" $fullname $jobName }}
+            kubectl describe pod -l job-name={{ printf "%s-%s" $fullname $jobName }}
+            exit 1
+          }
+
+          echo "Waiting for job to complete successfully..."
+          kubectl wait --for=condition=complete job/{{ printf "%s-%s" $fullname $jobName }} --timeout=600s
+
+          echo "Verifying job completed successfully..."
+          JOB_STATUS=$(kubectl get job {{ printf "%s-%s" $fullname $jobName }} -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')
+          if [ "$JOB_STATUS" != "True" ]; then
+            echo "Job did not complete successfully. Current status:"
+            kubectl describe job {{ printf "%s-%s" $fullname $jobName }}
+            exit 1
+          fi
+
+          echo "Job {{ printf "%s-%s" $fullname $jobName }} completed successfully!"
+
+          echo "Job logs:"
+          kubectl logs job/{{ printf "%s-%s" $fullname $jobName }} --tail=50 || echo "No logs available"
+  restartPolicy: Never
+    {{- end }}
+  {{- end }}
+{{- end }}
