@@ -35,6 +35,14 @@ spec:
             sleep 5
           done
 
+          echo "Waiting for job pod to be ready..."
+          kubectl wait --for=condition=Ready pod -l job-name={{ printf "%s-%s" $fullname $jobName }} --timeout=300s || {
+            echo "Job pod failed to become ready. Checking pod status:"
+            kubectl get pods -l job-name={{ printf "%s-%s" $fullname $jobName }}
+            kubectl describe pod -l job-name={{ printf "%s-%s" $fullname $jobName }}
+            exit 1
+          }
+
           echo "Waiting for job to complete successfully..."
           kubectl wait --for=condition=complete job/{{ printf "%s-%s" $fullname $jobName }} --timeout=600s
 
