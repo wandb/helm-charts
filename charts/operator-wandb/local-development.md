@@ -43,15 +43,16 @@ The repository includes a script to create a local kind cluster with a local Doc
 
 ```bash
 # Run the script to create a kind cluster with default settings
-./dev-kind-cluster.sh
+./setup-dev-cluster.sh
 
 # Or customize the cluster with various options
-./dev-kind-cluster.sh --name my-cluster --ingress --http-port 8080
+./setup-dev-cluster.sh --name my-cluster --ingress --http-port 8080
 ```
 
 By default, this script:
+
 - Creates a local Docker registry container on port 5001
-- Creates a kind cluster named "kind" with one control-plane node and one worker node
+- Creates a kind cluster named "wandb-helm-charts" with one control-plane node and one worker node
 - Configures the cluster to use the local registry
 - Creates a ConfigMap to document the local registry
 
@@ -59,7 +60,7 @@ The script now supports several configuration options:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-n, --name NAME` | Set the cluster name | `kind` |
+| `-n, --name NAME` | Set the cluster name | `wandb-helm-charts` |
 | `-r, --no-registry` | Don't create a local registry | Registry is created |
 | `-i, --ingress` | Install and configure nginx-ingress controller | Not installed |
 | `--http-port PORT` | Set HTTP port for ingress | `80` |
@@ -67,18 +68,19 @@ The script now supports several configuration options:
 | `-h, --help` | Display help message | |
 
 Examples:
+
 ```bash
 # Create a cluster named 'dev-cluster'
-./dev-kind-cluster.sh --name dev-cluster
+./setup-dev-cluster.sh --name dev-cluster
 
 # Create a cluster without a local registry
-./dev-kind-cluster.sh --no-registry
+./setup-dev-cluster.sh --no-registry
 
 # Create a cluster with nginx-ingress controller
-./dev-kind-cluster.sh --ingress
+./setup-dev-cluster.sh --ingress
 
 # Create a cluster with custom ingress ports
-./dev-kind-cluster.sh --ingress --http-port 8080 --https-port 8443
+./setup-dev-cluster.sh --ingress --http-port 8080 --https-port 8443
 ```
 
 ### 2. Configure Tilt
@@ -91,6 +93,7 @@ cp tilt-settings.sample.json tilt-settings.json
 ```
 
 The `tilt-settings.json` file allows you to configure:
+
 - Allowed Kubernetes contexts (should include "kind-kind" for kind clusters)
 - Whether to install Minio (recommended for local development)
 - Whether to install Ingress
@@ -98,6 +101,7 @@ The `tilt-settings.json` file allows you to configure:
 - Additional values to override
 
 Example `tilt-settings.json`:
+
 ```json
 {
   "allowedContexts": ["kind-kind"],
@@ -118,6 +122,7 @@ tilt up --context=kind-kind
 ```
 
 Tilt will:
+
 - Deploy Minio (if enabled in your settings)
 - Deploy Ingress (if enabled in your settings)
 - Deploy the operator-wandb chart with the specified test configuration
@@ -150,6 +155,7 @@ tilt up --context=kind-kind
 ### 5. Accessing the Deployed Services
 
 Tilt automatically sets up port forwarding for the deployed services. By default:
+
 - App service: http://localhost:8080
 - Console service: http://localhost:8082
 - Weave-trace service (if enabled): http://localhost:8722
@@ -244,11 +250,12 @@ helm diff revision wandb 109 107
 After completing your development work:
 
 1. Ensure to increment the version in `Chart.yaml` of your Helm chart, e.g., `0.10.43`.
+
 2. Scale the `wandb-controller-manager` deployment back up:
 
-   ```bash
-   kubectl scale --replicas=1 deployment -n wandb wandb-controller-manager
-   ```
+```bash
+kubectl scale --replicas=1 deployment -n wandb wandb-controller-manager
+```
 
 ## Contributing
 
