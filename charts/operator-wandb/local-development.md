@@ -52,7 +52,7 @@ The repository includes a script to create a local kind cluster with a local Doc
 By default, this script:
 
 - Creates a local Docker registry container on port 5001
-- Creates a kind cluster named "kind" with one control-plane node and one worker node
+- Creates a kind cluster named "wandb-helm-charts" with one control-plane node and one worker node
 - Configures the cluster to use the local registry
 - Creates a ConfigMap to document the local registry
 
@@ -60,7 +60,7 @@ The script now supports several configuration options:
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-n, --name NAME` | Set the cluster name | `kind` |
+| `-n, --name NAME` | Set the cluster name | `wandb-helm-charts` |
 | `-r, --no-registry` | Don't create a local registry | Registry is created |
 | `-i, --ingress` | Install and configure nginx-ingress controller | Not installed |
 | `--http-port PORT` | Set HTTP port for ingress | `80` |

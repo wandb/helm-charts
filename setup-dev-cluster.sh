@@ -19,7 +19,7 @@ usage() {
   echo ""
   echo "Options:"
   echo "  -h, --help                 Display this help message"
-  echo "  -n, --name NAME            Set the cluster name (default: kind)"
+  echo "  -n, --name NAME            Set the cluster name (default: wandb-helm-charts)"
   echo "  -r, --no-registry          Don't create a local registry"
   echo "  -i, --ingress              Install and configure nginx-ingress controller"
   echo "  --http-port PORT           Set HTTP port for ingress (default: 80)"

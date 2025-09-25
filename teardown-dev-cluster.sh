@@ -1,5 +1,5 @@
-#!/bin/sh
-set -o errexit
+#!/usr/bin/env bash
+set -euo pipefail
 
 # Default configuration
 cluster_name="wandb-helm-charts"
@@ -11,7 +11,7 @@ usage() {
   echo ""
   echo "Options:"
   echo "  -h, --help                 Display this help message"
-  echo "  -n, --name NAME            Set the cluster name (default: kind)"
+  echo "  -n, --name NAME            Set the cluster name (default: wandb-helm-charts)"
   echo ""
   echo "Examples:"
   echo "  $0 --name my-cluster       Create a cluster named 'my-cluster'"
@@ -25,10 +25,10 @@ while [ "$#" -gt 0 ]; do
       usage
       ;;
     -n|--name)
-      if [ -z "$2" ] || [ "${2:0:1}" = "-" ]; then
+      case "${2-}" in ""|-*)
         echo "Error: Missing or invalid cluster name after --name flag"
         exit 1
-      fi
+      esac
       cluster_name="$2"
       shift 2
       ;;
@@ -40,8 +40,12 @@ while [ "$#" -gt 0 ]; do
 done
 
 echo "Tearing down kind cluster:"
-echo "  Cluster name: $cluster_name"
+echo "  Cluster name: ${cluster_name}"
 echo ""
 
-kind delete cluster --name $cluster_name
-
+if kind get clusters | grep -qx "${cluster_name}"; then
+  kind delete cluster --name "${cluster_name}"
+  echo "Cluster '${cluster_name}' deleted successfully."
+else
+  echo "Cluster '${cluster_name}' not found."
+fi
