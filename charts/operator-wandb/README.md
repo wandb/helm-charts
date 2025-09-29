@@ -100,11 +100,14 @@ global:
   # Global nodeSelector and tolerations applied to all deployments/pods
   nodeSelector: {}
   tolerations: []
+  
+  # Global priority class applied to all deployments/pods
+  priorityClassName: ""
 ```
 
 ### Global Pod Scheduling
 
-The chart supports global `nodeSelector` and `tolerations` configuration that applies to **ALL components** (W&B services, databases, monitoring, etc.). This provides centralized control over pod scheduling across your entire W&B deployment.
+The chart supports global `nodeSelector`, `tolerations`, and `priorityClassName` configuration that applies to **ALL components** (W&B services, databases, monitoring, etc.). This provides centralized control over pod scheduling and priority across your entire W&B deployment.
 
 #### Fallback Configuration Logic:
 
@@ -119,7 +122,7 @@ The scheduling configuration uses **fallback behavior** (not cumulative):
 
 #### Universal Scheduling (Recommended for Production Deployments)
 
-Use `global.nodeSelector` and `global.tolerations` for scheduling constraints that should apply to **everything**:
+Use `global.nodeSelector`, `global.tolerations`, and `global.priorityClassName` for scheduling constraints that should apply to **everything**:
 
 ```yaml
 # Global fallback - used when components don't have their own config
@@ -131,6 +134,7 @@ global:
     key: dedicated
     operator: Equal
     value: production
+  priorityClassName: "wandb-high-priority"
 ```
 
 #### Component-Specific Overrides
@@ -147,6 +151,7 @@ global:
     key: dedicated
     operator: Equal
     value: production
+  priorityClassName: "wandb-high-priority"
 
 # Component-specific config - completely replaces global config for this component
 console:
@@ -159,6 +164,8 @@ console:
     operator: Equal
     value: "true"
     # This completely replaces global.tolerations for console
+  priorityClassName: "wandb-management-priority"
+    # This completely replaces global.priorityClassName for console
 
 # Redis-specific scheduling (for third-party charts)
 redis:
@@ -173,9 +180,9 @@ redis:
 ```
 
 **Result**: 
-- Console uses its own scheduling config: `node-type: management` with management-only tolerations
+- Console uses its own scheduling config: `node-type: management` with management-only tolerations and `wandb-management-priority` priority class
 - Redis master uses its own scheduling config: `node-type: database`  
-- All other W&B components use the global production scheduling fallback
+- All other W&B components use the global production scheduling fallback including the `wandb-high-priority` priority class
 - No configuration merging occurs - each component uses only its most specific available config
 
 ### Component-Specific Configuration
