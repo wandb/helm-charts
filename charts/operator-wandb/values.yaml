@@ -13,6 +13,7 @@ global:
   # This should be the fqdn of where your users will be accessing the instance.
   host: "http://localhost:8080"
   license: ""
+  licenseCertPath: "/jwks.json"
 
   licenseSecret:
     name: ""
@@ -26,8 +27,7 @@ global:
 
   storageClass: ""
 
-  banners:
-    {}
+  banners: {}
     # banner1:
     #   type: warning | error | info
     #   message: "This is a warning message"
@@ -73,6 +73,12 @@ global:
   #   key: dedicated
   #   operator: Equal
   #   value: gpu
+
+  # Global priority class applied to all deployments/pods
+  # This allows setting pod priority for preemption and scheduling
+  priorityClassName: ""
+  # Example:
+  # priorityClassName: "high-priority"
 
   extraEnvFrom: {}
   extraEnv: {}
@@ -396,8 +402,8 @@ api:
           cpu: "4"
           memory: 8Gi
         requests:
-          cpu: "4"
-          memory: 8Gi
+          cpu: "1"
+          memory: 2Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -589,8 +595,8 @@ app:
           cpu: "2"
           memory: 4Gi
         requests:
-          cpu: "2"
-          memory: 4Gi
+          cpu: "1"
+          memory: 2Gi
     medium:
       resources:
         limits:
@@ -844,8 +850,8 @@ executor:
           cpu: "6"
           memory: 32Gi
         requests:
-          cpu: "4"
-          memory: 24Gi
+          cpu: "6"
+          memory: 32Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -857,8 +863,8 @@ executor:
           cpu: "6"
           memory: 32Gi
         requests:
-          cpu: "4"
-          memory: 24Gi
+          cpu: "6"
+          memory: 32Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -867,11 +873,11 @@ executor:
     xlarge:
       resources:
         limits:
-          cpu: "6"
-          memory: 32Gi
+          cpu: "10"
+          memory: 80Gi
         requests:
-          cpu: "4"
-          memory: 24Gi
+          cpu: "10"
+          memory: 80Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -880,11 +886,11 @@ executor:
     xxlarge:
       resources:
         limits:
-          cpu: "6"
-          memory: 64Gi
+          cpu: "10"
+          memory: 96Gi
         requests:
-          cpu: "4"
-          memory: 48Gi
+          cpu: "10"
+          memory: 96Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -1669,11 +1675,11 @@ parquet:
     small:
       resources:
         limits:
-          cpu: "7"
-          memory: 32Gi
+          cpu: "4"
+          memory: 16Gi
         requests:
-          cpu: "7"
-          memory: 32Gi
+          cpu: "1"
+          memory: 8Gi
       autoscaling:
         horizontal:
           enabled: true
@@ -2300,6 +2306,11 @@ kafka:
       enabled: true
 
 etcd:
+  image:
+    repository: bitnamilegacy/etcd
+  global:
+    security:
+      allowInsecureImages: true
   replicaCount: 3
   persistence:
     enabled: true
@@ -2341,6 +2352,11 @@ etcd:
 
 bufstream:
   install: false
+  image:
+    repository: bitnamilegacy/bufsteam
+  global:
+    security:
+      allowInsecureImages: true
   storage:
     use: '{{ (include "wandb.bucket" . | fromYaml).provider }}'
     gcs:
@@ -2378,6 +2394,11 @@ reloader:
 
 clickhouse:
   install: false
+  image:
+    repository: bitnamilegacy/clickhouse
+  global:
+    security:
+      allowInsecureImages: true
   auth:
     existingSecret: '{{ include "wandb.clickhouse.passwordSecret" . }}'
     existingSecretKey: "{{- .Values.global.clickhouse.passwordSecret.passwordKey -}}"

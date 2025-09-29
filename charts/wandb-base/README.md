@@ -313,7 +313,7 @@ deployment:
 
 ### Global Pod Scheduling
 
-The chart supports global `nodeSelector` and `tolerations` configuration that applies to **ALL pods** (deployments, jobs, cronjobs, etc.). This provides centralized control over pod scheduling constraints while allowing for component-specific overrides.
+The chart supports global `nodeSelector`, `tolerations`, and `priorityClassName` configuration that applies to **ALL pods** (deployments, jobs, cronjobs, etc.). This provides centralized control over pod scheduling constraints and priority while allowing for component-specific overrides.
 
 #### Fallback Configuration Logic:
 
@@ -328,7 +328,7 @@ The scheduling configuration uses **fallback behavior** (not cumulative):
 
 #### Universal Scheduling (Recommended for Production/Dedicated Nodes)
 
-Use `global.nodeSelector` and `global.tolerations` for scheduling constraints that should apply to **all pods**:
+Use `global.nodeSelector`, `global.tolerations`, and `global.priorityClassName` for scheduling constraints that should apply to **all pods**:
 
 ```yaml
 # Global configuration - applies to all pods that don't have more specific config
@@ -340,12 +340,15 @@ global:
     key: dedicated
     operator: Equal
     value: production
+  priorityClassName: "high-priority"
 
 # Chart-level configuration - overrides global for this chart only
 nodeSelector:
   workload-type: api-server
   # This completely replaces the global nodeSelector
   # (no merging with global.nodeSelector)
+priorityClassName: "api-priority"
+  # This completely replaces the global priorityClassName
 ```
 
 #### Component-Specific Overrides
@@ -362,11 +365,14 @@ global:
     key: dedicated
     operator: Equal
     value: production
+  priorityClassName: "high-priority"
 
 # Chart-level settings - completely override global settings
 nodeSelector:
   workload-type: backend
   # The global nodeSelector is ignored for this chart
+priorityClassName: "backend-priority"
+  # The global priorityClassName is ignored for this chart
 
 # Pod-specific overrides - completely override chart-level and global settings
 jobs:
@@ -380,6 +386,8 @@ jobs:
       operator: Equal
       value: "true"
       # All global and chart-level tolerations are ignored for this job
+    priorityClassName: "maintenance-priority"
+      # All global and chart-level priorityClassName is ignored for this job
 ```
 
 #### Complete Example
@@ -395,23 +403,26 @@ global:
     key: dedicated
     operator: Equal
     value: production
+  priorityClassName: "production-priority"
 
 # Chart-level config - completely replaces global config for this chart
 nodeSelector:
   component: api-server
+priorityClassName: "api-server-priority"
 
 # Pod-specific config - completely replaces chart-level and global config
 jobs:
   backup:
     nodeSelector:
       workload-type: maintenance
+    priorityClassName: "maintenance-priority"
     # No tolerations defined, so no tolerations are applied (not even global ones)
 ```
 
 **Result**: 
-- Most pods in this chart use `nodeSelector: {component: api-server}` (chart-level config)
-- The backup job uses `nodeSelector: {workload-type: maintenance}` and no tolerations
-- Other charts without their own nodeSelector would use the global production configuration
+- Most pods in this chart use `nodeSelector: {component: api-server}` and `priorityClassName: "api-server-priority"` (chart-level config)
+- The backup job uses `nodeSelector: {workload-type: maintenance}`, `priorityClassName: "maintenance-priority"`, and no tolerations
+- Other charts without their own configuration would use the global production configuration
 
 ## Common Configuration Options
 
@@ -437,6 +448,7 @@ jobs:
 | `securityContext`           | Default security context for containers | See values.yaml |
 | `nodeSelector`              | Node selector for pods                  | `{}`            |
 | `tolerations`               | Tolerations for pods                    | `[]`            |
+| `priorityClassName`         | Priority class for pods                 | `""`            |
 | `affinity`                  | Affinity rules for pods                 | `{}`            |
 | `topologySpreadConstraints` | Topology spread constraints for pods    | See values.yaml |
 
