@@ -51,6 +51,10 @@ spec:
   {{- if .podData.restartPolicy }}
   restartPolicy: {{ .podData.restartPolicy }}
   {{- end }}
+  {{- $priorityClassName := coalesce .podData.priorityClassName $.root.Values.priorityClassName $.root.Values.global.priorityClassName -}}
+  {{- if $priorityClassName }}
+  priorityClassName: {{ tpl $priorityClassName $.root }}
+  {{- end }}
   serviceAccountName: {{ include "wandb-base.serviceAccountName" $.root }}
   securityContext:
    {{- tpl (toYaml (merge (default dict .podData.podSecurityContext) $.root.Values.podSecurityContext) | nindent 4) $.root }}
