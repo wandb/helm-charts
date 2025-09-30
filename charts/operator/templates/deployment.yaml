@@ -17,8 +17,12 @@ spec:
         control-plane: controller-manager
     spec:
       securityContext:
+        {{- if .Values.podSecurityContext }}
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        {{- else }}
         seccompProfile:
           type: RuntimeDefault
+        {{- end }}
       imagePullSecrets:
         {{- range .Values.image.pullSecrets }}
       - name: {{ . }}
@@ -33,7 +37,13 @@ spec:
         {{- if .Values.namespaceIsolation.enabled }}
         - --isolation-namespaces={{ include "operator.isolatedNamespaces" . }}
         {{- end }}
+        {{- if .Values.image.digest }}
+        image: {{ .Values.image.repository }}@{{ .Values.image.digest }}
+        {{- else if .Values.image.tag }}
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        {{- else }}
+        image: {{ .Values.image.repository }}:latest
+        {{- end }}
         {{- if .Values.image.pullPolicy }}
         imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
         {{- end }}
@@ -68,6 +78,10 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.resources | nindent 10 }}
+        {{- if .Values.securityContext }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        {{- end }}
         {{- if or .Values.airgapped .Values.customCACerts .Values.caCertsConfigMap }}
         volumeMounts:
           {{- if or .Values.airgapped }}
