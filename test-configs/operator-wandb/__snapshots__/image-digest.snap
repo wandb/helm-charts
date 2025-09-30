@@ -141,7 +141,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: filestream
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "filestreamtag"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -162,7 +162,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: flat-run-fields-updater
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "flatrunfieldsupdatertag"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -192,27 +192,6 @@ spec:
       operator: DoesNotExist
     matchLabels:
       app.kubernetes.io/name: glue
-      app.kubernetes.io/instance: chartsnap
-  maxUnavailable: 1
----
-# Source: operator-wandb/charts/metric-observer/templates/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: chartsnap-metric-observer
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: metric-observer
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  selector:
-    matchExpressions:
-    - key: batch.kubernetes.io/job-name
-      operator: DoesNotExist
-    matchLabels:
-      app.kubernetes.io/name: metric-observer
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
@@ -332,7 +311,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: filestream
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "filestreamtag"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -345,7 +324,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: flat-run-fields-updater
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "flatrunfieldsupdatertag"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -357,19 +336,6 @@ metadata:
   labels:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: glue
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
-# Source: operator-wandb/charts/metric-observer/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-metric-observer
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: metric-observer
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
@@ -429,23 +395,6 @@ metadata:
     app.kubernetes.io/name: redis
     app.kubernetes.io/version: 7.2.4
     helm.sh/chart: '###CHART_VERSION###'
----
-# Source: operator-wandb/charts/reloader/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  annotations:
-    meta.helm.sh/release-namespace: "default"
-    meta.helm.sh/release-name: "chartsnap"
-  labels:
-    app: chartsnap-reloader
-    chart: "reloader-1.3.0"
-    release: "chartsnap"
-    heritage: "Helm"
-    app.kubernetes.io/managed-by: "Helm"
-    helm.sh/chart: '###CHART_VERSION###'
-  name: chartsnap-reloader
-  namespace: default
 ---
 # Source: operator-wandb/charts/weave/templates/serviceaccount.yaml
 apiVersion: v1
@@ -559,32 +508,6 @@ data:
   # Set $gorillaSessionKey to existing secret data or generate a random one when not exists
   GORILLA_SESSION_KEY: "###DYNAMIC_FIELD###"
   GORILLA_AUTH_JWK_URL: "aHR0cDovL2NoYXJ0c25hcC1hcHA6ODA4My9hcGkvandrcy5qc29u"
----
-# Source: operator-wandb/charts/mysql/templates/configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-mysql-initdb
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: mysql
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.16.0"
-    wandb.com/app-name: mysql-0.1.0
-    app.kubernetes.io/managed-by: Helm
-data:
-  my.cnf: |
-    [mysqld]
-    binlog_format = 'ROW'
-    innodb_online_alter_log_max_size = 268435456
-    sync_binlog = 1
-    innodb_flush_log_at_trx_commit = 1
-    binlog_row_image = 'MINIMAL'
-    local-infile = 1
-    sort_buffer_size = 33554432
-  # We need RELOAD, SELECT, and LOCK TABLES for making backups
-  initdb.sql: |
-    GRANT SESSION_VARIABLES_ADMIN,RELOAD,SELECT,LOCK TABLES ON *.* TO `wandb`@`%`;
 ---
 # Source: operator-wandb/charts/otel/charts/daemonset/templates/configmap.yaml
 apiVersion: v1
@@ -1603,10 +1526,9 @@ metadata:
   labels:
 data:
   # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
-  GORILLA_LICENSE_CERT_PATH: /jwks.json
   GORILLA_STATSD_PORT: "8125"
   # T-shirt size for deployment
-  GORILLA_TSHIRT_SIZE: "testing"
+  GORILLA_TSHIRT_SIZE: "small"
   GORILLA_ONPREM: "true"
   ONPREM: "true"
 ---
@@ -1756,25 +1678,6 @@ data:
   WEAVE_SERVER_URL: "http://127.0.0.1:9994"
   WEAVE_LOCAL_ARTIFACT_DIR: "/vol/weave/cache"
   WEAVE_CACHE_CLEAR_INTERVAL: "24"
----
-# Source: operator-wandb/charts/mysql/templates/pvc.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: chartsnap-mysql-data
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: mysql
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.16.0"
-    wandb.com/app-name: mysql-0.1.0
-    app.kubernetes.io/managed-by: Helm
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: "20Gi"
 ---
 # Source: operator-wandb/charts/prometheus/charts/instance/templates/pvc.yaml
 apiVersion: v1
@@ -2099,92 +2002,6 @@ rules:
   verbs:
   - get
 ---
-# Source: operator-wandb/charts/metric-observer/templates/role.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: chartsnap-metric-observer
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: metric-observer
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - get
-- apiGroups:
-  - ""
-  resources:
-  - namespaces
-  verbs:
-  - get
----
-# Source: operator-wandb/charts/reloader/templates/role.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  annotations:
-    meta.helm.sh/release-namespace: "default"
-    meta.helm.sh/release-name: "chartsnap"
-  labels:
-    app: chartsnap-reloader
-    chart: "reloader-1.3.0"
-    release: "chartsnap"
-    heritage: "Helm"
-    app.kubernetes.io/managed-by: "Helm"
-    helm.sh/chart: '###CHART_VERSION###'
-  name: chartsnap-reloader-role
-  namespace: default
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  - configmaps
-  verbs:
-  - list
-  - get
-  - watch
-- apiGroups:
-  - "apps"
-  resources:
-  - deployments
-  - daemonsets
-  - statefulsets
-  verbs:
-  - list
-  - get
-  - update
-  - patch
-- apiGroups:
-  - "batch"
-  resources:
-  - cronjobs
-  verbs:
-  - list
-  - get
-- apiGroups:
-  - "batch"
-  resources:
-  - jobs
-  verbs:
-  - create
-  - delete
-  - list
-  - get
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
----
 # Source: operator-wandb/charts/api/templates/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -2244,51 +2061,6 @@ roleRef:
   kind: Role
   name: chartsnap-glue
   apiGroup: rbac.authorization.k8s.io
----
-# Source: operator-wandb/charts/metric-observer/templates/rolebinding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: chartsnap-metric-observer
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: metric-observer
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-subjects:
-- kind: ServiceAccount
-  name: chartsnap-metric-observer
-  namespace: default
-roleRef:
-  kind: Role
-  name: chartsnap-metric-observer
-  apiGroup: rbac.authorization.k8s.io
----
-# Source: operator-wandb/charts/reloader/templates/rolebinding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  annotations:
-    meta.helm.sh/release-namespace: "default"
-    meta.helm.sh/release-name: "chartsnap"
-  labels:
-    app: chartsnap-reloader
-    chart: "reloader-1.3.0"
-    release: "chartsnap"
-    heritage: "Helm"
-    app.kubernetes.io/managed-by: "Helm"
-    helm.sh/chart: '###CHART_VERSION###'
-  name: chartsnap-reloader-role-binding
-  namespace: default
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: chartsnap-reloader-role
-subjects:
-- kind: ServiceAccount
-  name: chartsnap-reloader
-  namespace: default
 ---
 # Source: operator-wandb/charts/anaconda2/templates/service.yaml
 apiVersion: v1
@@ -2384,32 +2156,6 @@ spec:
   selector:
     app.kubernetes.io/name: console
     app.kubernetes.io/instance: chartsnap
----
-# Source: operator-wandb/charts/mysql/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-mysql
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: mysql
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.16.0"
-    wandb.com/app-name: mysql-0.1.0
-    app.kubernetes.io/managed-by: Helm
-spec:
-  type: ClusterIP
-  ports:
-  - port: 3306
-    protocol: TCP
-    targetPort: mysql
-  selector:
-    helm.sh/chart: mysql-0.1.0
-    app.kubernetes.io/name: mysql
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.16.0"
-    wandb.com/app-name: mysql-0.1.0
-    app.kubernetes.io/managed-by: Helm
 ---
 # Source: operator-wandb/charts/otel/charts/daemonset/templates/service.yaml
 apiVersion: v1
@@ -2797,7 +2543,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.11.2
+        helm.sh/chart: anaconda2-0.11.1
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -2809,8 +2555,6 @@ spec:
         - configMapRef:
             name: chartsnap-anaconda2-configmap
         env:
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
         - name: DD_AGENT_HOST
           valueFrom:
             fieldRef:
@@ -2819,30 +2563,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.hostIP
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -2873,8 +2593,8 @@ spec:
             cpu: "1"
             memory: 1Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: "1"
+            memory: 1Gi
       serviceAccountName: chartsnap-anaconda2
       securityContext:
         fsGroup: 0
@@ -2928,7 +2648,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: api-0.11.2
+        helm.sh/chart: api-0.11.1
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3087,38 +2807,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
               key: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
               name: gorilla-coreweave-observability
               optional: true
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -3149,9 +2843,12 @@ spec:
           periodSeconds: 5
           successThreshold: 1
         resources:
+          limits:
+            cpu: "4"
+            memory: 8Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: "1"
+            memory: 2Gi
         volumeMounts:
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
@@ -3315,38 +3012,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
               key: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
               name: gorilla-coreweave-observability
               optional: true
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -3510,38 +3181,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
               key: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
               name: gorilla-coreweave-observability
               optional: true
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -3619,7 +3264,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.11.2
+        helm.sh/chart: app-0.11.1
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3709,6 +3354,8 @@ spec:
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
         - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
+        - name: GORILLA_STORAGE_BUCKET
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -3782,52 +3429,24 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
         - name: BUCKET_QUEUE
           value: "internal://"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
               key: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
               name: gorilla-coreweave-observability
               optional: true
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
         - name: GORILLA_GLUE_CONTAINER_PORT
           value: "8083"
         - name: GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE
           value: "/usr/local/bin/view-spec-updater-linux"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
         - name: GORILLA_LICENSE_CERT_PATH
           value: "/var/app/jwks.json"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: GORILLA_STORAGE_BUCKET
-          value: "s3://local-files"
         - name: GORILLA_TASK_CONFIG_PATH
           value: "/etc/service/gorilla-glue/glue_tasks_local.yaml"
         - name: GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE
           value: "/usr/local/bin/view-spec-updater-linux"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -3877,9 +3496,12 @@ spec:
               - sleep
               - "25"
         resources:
+          limits:
+            cpu: "2"
+            memory: 4Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: "1"
+            memory: 2Gi
         volumeMounts:
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
@@ -3976,6 +3598,8 @@ spec:
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
         - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
+        - name: GORILLA_STORAGE_BUCKET
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4049,52 +3673,24 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
         - name: BUCKET_QUEUE
           value: "internal://"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
               key: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
               name: gorilla-coreweave-observability
               optional: true
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
         - name: GORILLA_GLUE_CONTAINER_PORT
           value: "8083"
         - name: GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE
           value: "/usr/local/bin/view-spec-updater-linux"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
         - name: GORILLA_LICENSE_CERT_PATH
           value: "/var/app/jwks.json"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: GORILLA_STORAGE_BUCKET
-          value: "s3://local-files"
         - name: GORILLA_TASK_CONFIG_PATH
           value: "/etc/service/gorilla-glue/glue_tasks_local.yaml"
         - name: GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE
           value: "/usr/local/bin/view-spec-updater-linux"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -4172,7 +3768,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.11.2
+        helm.sh/chart: console-0.11.1
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4184,32 +3780,6 @@ spec:
         - configMapRef:
             name: chartsnap-console-configmap
         env:
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -4297,7 +3867,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: executor-0.11.2
+        helm.sh/chart: executor-0.11.1
         app.kubernetes.io/name: executor
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4452,34 +4022,8 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
         - name: GORILLA_TASK_QUEUE
           value: 'redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)&concurrency=10'
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -4487,12 +4031,15 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "wandb/megabinary@sha256:executordigest"
         imagePullPolicy: IfNotPresent
         resources:
+          limits:
+            cpu: "4"
+            memory: 16Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: "1"
+            memory: 8Gi
         volumeMounts:
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
@@ -4551,7 +4098,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: filestream
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "filestreamtag"
     app.kubernetes.io/managed-by: Helm
   annotations:
     reloader.stakater.com/auto: "true"
@@ -4569,10 +4116,10 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: filestream-0.11.2
+        helm.sh/chart: filestream-0.11.1
         app.kubernetes.io/name: filestream
         app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/version: "filestreamtag"
         app.kubernetes.io/managed-by: Helm
     spec:
       containers:
@@ -4726,34 +4273,8 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
         - name: GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS
           value: 'pubsub:/playground-111/filestream/filestream-gorilla'
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -4761,12 +4282,15 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "wandb/megabinary@sha256:filestreamdigest"
         imagePullPolicy: IfNotPresent
         resources:
+          limits:
+            cpu: "2"
+            memory: 4Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: "1"
+            memory: 2Gi
         volumeMounts:
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
@@ -4825,7 +4349,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: flat-run-fields-updater
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "flatrunfieldsupdatertag"
     app.kubernetes.io/managed-by: Helm
   annotations:
     reloader.stakater.com/auto: "true"
@@ -4843,10 +4367,10 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: flat-run-fields-updater-0.11.2
+        helm.sh/chart: flat-run-fields-updater-0.11.1
         app.kubernetes.io/name: flat-run-fields-updater
         app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/version: "flatrunfieldsupdatertag"
         app.kubernetes.io/managed-by: Helm
     spec:
       containers:
@@ -4982,34 +4506,8 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
         - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER
           value: 'pubsub:/playground-111/run-updates-shadow/flat-run-fields-updater'
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -5017,12 +4515,15 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "wandb/megabinary:flatrunfieldsupdatertag"
         imagePullPolicy: IfNotPresent
         resources:
+          limits:
+            cpu: "2"
+            memory: 4Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: "1"
+            memory: 2Gi
         volumeMounts:
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
@@ -5096,7 +4597,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: glue-0.11.2
+        helm.sh/chart: glue-0.11.1
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5253,32 +4754,6 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -5302,9 +4777,12 @@ spec:
           successThreshold: 1
           timeoutSeconds: 1
         resources:
+          limits:
+            cpu: "2"
+            memory: 6Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: "1"
+            memory: 2Gi
         volumeMounts:
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
@@ -5466,32 +4944,6 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -5653,32 +5105,6 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -5729,285 +5155,6 @@ spec:
             path: redis_ca.pem
           optional: true
 ---
-# Source: operator-wandb/charts/metric-observer/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chartsnap-metric-observer
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: metric-observer
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    reloader.stakater.com/auto: "true"
-spec:
-  replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: metric-observer
-      app.kubernetes.io/instance: chartsnap
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: metric-observer-0.11.2
-        app.kubernetes.io/name: metric-observer
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      containers:
-      - name: metric-observer
-        args:
-        - metric-observer
-        envFrom:
-        - configMapRef:
-            name: chartsnap-bucket-configmap
-        - configMapRef:
-            name: chartsnap-flat-run-fields-updater-configmap
-        - configMapRef:
-            name: chartsnap-global-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-kafka-configmap
-        - configMapRef:
-            name: chartsnap-mysql-configmap
-        - configMapRef:
-            name: chartsnap-redis-configmap
-        env:
-        - name: G_HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        - name: GOMEMLIMIT
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.memory
-        - name: GOMAXPROCS
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.cpu
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
-          valueFrom:
-            secretKeyRef:
-              key: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
-              name: gorilla-coreweave-caios
-              optional: true
-        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              key: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
-              name: gorilla-coreweave-caios
-              optional: true
-        - name: AZURE_STORAGE_KEY
-          valueFrom:
-            secretKeyRef:
-              key: ACCESS_KEY
-              name: chartsnap-bucket
-              optional: true
-        - name: BUCKET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              key: ACCESS_KEY
-              name: chartsnap-bucket
-              optional: true
-        - name: BUCKET_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              key: SECRET_KEY
-              name: chartsnap-bucket
-              optional: true
-        - name: BUCKET
-          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
-        - name: GORILLA_FILE_STORE
-          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
-        - name: GORILLA_STORAGE_BUCKET
-          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: MYSQL_PASSWORD
-              name: chartsnap-mysql
-        - name: MYSQL
-          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-        - name: GORILLA_ANALYTICS_SINK
-          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-        - name: GORILLA_METADATA_STORE
-          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-        - name: GORILLA_RUN_STORE
-          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-        - name: GORILLA_USAGE_STORE
-          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: REDIS_PASSWORD
-              name: chartsnap-redis-secret
-              optional: true
-        - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_TASK_QUEUE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: KAFKA_CLIENT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: KAFKA_CLIENT_PASSWORD
-              name: chartsnap-kafka
-              optional: true
-        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-          value: pubsub:/playground-111/filestream
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
-          value: pubsub:/playground-111/run-updates-shadow
-        - name: GORILLA_HISTORY_STORE
-          value: http://chartsnap-parquet:8087/_goRPC_,bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
-        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-          value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
-        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
-          value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
-        - name: GORILLA_STATSIG_KEY
-          valueFrom:
-            secretKeyRef:
-              key: GORILLA_STATSIG_KEY
-              name: gorilla-statsig
-              optional: true
-        - name: LICENSE
-          valueFrom:
-            secretKeyRef:
-              key: license
-              name: chartsnap-license
-        - name: GORILLA_LICENSE
-          valueFrom:
-            secretKeyRef:
-              key: license
-              name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_METRIC_OBSERVER_STORE
-          value: 'redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)'
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_METRIC_OBSERVER
-          value: 'pubsub:/playground-111/run-updates-shadow/metric-observer'
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
-        imagePullPolicy: IfNotPresent
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 1Gi
-          requests:
-            cpu: 250m
-            memory: 256Mi
-        volumeMounts:
-        - mountPath: /usr/local/share/ca-certificates/inline
-          name: wandb-ca-certs
-        - mountPath: /usr/local/share/ca-certificates/configmap
-          name: wandb-ca-certs-user
-        - mountPath: /etc/ssl/certs/redis_ca.pem
-          name: redis-ca
-          subPath: redis_ca.pem
-      serviceAccountName: chartsnap-metric-observer
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
-      topologySpreadConstraints:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: metric-observer
-        maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfiable: ScheduleAnyway
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: metric-observer
-        maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-      volumes:
-      - configMap:
-          name: 'chartsnap-ca-certs'
-        name: wandb-ca-certs
-      - configMap:
-          name: 'noCertProvided'
-          optional: true
-        name: wandb-ca-certs-user
-      - name: redis-ca
-        secret:
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
-          secretName: 'chartsnap-redis-secret'
----
 # Source: operator-wandb/charts/parquet/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -6036,7 +5183,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.11.2
+        helm.sh/chart: parquet-0.11.1
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6193,32 +5340,6 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -6251,9 +5372,12 @@ spec:
           successThreshold: 1
           timeoutSeconds: 30
         resources:
+          limits:
+            cpu: "4"
+            memory: 16Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: "1"
+            memory: 8Gi
         volumeMounts:
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
@@ -6407,95 +5531,6 @@ spec:
         persistentVolumeClaim:
           claimName: chartsnap-prometheus-server
 ---
-# Source: operator-wandb/charts/reloader/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  annotations:
-    meta.helm.sh/release-namespace: "default"
-    meta.helm.sh/release-name: "chartsnap"
-  labels:
-    app: chartsnap-reloader
-    chart: "reloader-1.3.0"
-    release: "chartsnap"
-    heritage: "Helm"
-    app.kubernetes.io/managed-by: "Helm"
-    group: com.stakater.platform
-    provider: stakater
-    version: v1.3.0
-    helm.sh/chart: '###CHART_VERSION###'
-  name: chartsnap-reloader
-  namespace: default
-spec:
-  replicas: 1
-  revisionHistoryLimit: 2
-  selector:
-    matchLabels:
-      app: chartsnap-reloader
-      release: "chartsnap"
-  template:
-    metadata:
-      labels:
-        app: chartsnap-reloader
-        chart: "reloader-1.3.0"
-        release: "chartsnap"
-        heritage: "Helm"
-        app.kubernetes.io/managed-by: "Helm"
-        group: com.stakater.platform
-        provider: stakater
-        version: v1.3.0
-    spec:
-      containers:
-      - image: "ghcr.io/stakater/reloader:v1.3.0"
-        imagePullPolicy: IfNotPresent
-        name: chartsnap-reloader
-        env:
-        - name: GOMAXPROCS
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.cpu
-              divisor: '1'
-        - name: GOMEMLIMIT
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.memory
-              divisor: '1'
-        - name: KUBERNETES_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        ports:
-        - name: http
-          containerPort: 9090
-        livenessProbe:
-          httpGet:
-            path: /live
-            port: http
-          timeoutSeconds: 5
-          failureThreshold: 5
-          periodSeconds: 10
-          successThreshold: 1
-          initialDelaySeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /metrics
-            port: http
-          timeoutSeconds: 5
-          failureThreshold: 5
-          periodSeconds: 10
-          successThreshold: 1
-          initialDelaySeconds: 10
-        securityContext: {}
-        args:
-        - "--log-level=info"
-        - "--reload-on-create=true"
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-        seccompProfile:
-          type: RuntimeDefault
-      serviceAccountName: chartsnap-reloader
----
 # Source: operator-wandb/charts/weave/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -6523,7 +5558,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.11.2
+        helm.sh/chart: weave-0.11.1
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6535,32 +5570,6 @@ spec:
         - configMapRef:
             name: chartsnap-weave-configmap
         env:
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -6589,9 +5598,12 @@ spec:
             port: http
           periodSeconds: 10
         resources:
+          limits:
+            cpu: "4"
+            memory: 16Gi
           requests:
-            cpu: 100m
-            memory: 128Mi
+            cpu: "1"
+            memory: 8Gi
         volumeMounts:
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
@@ -6610,32 +5622,6 @@ spec:
         - configMapRef:
             name: chartsnap-weave-configmap
         env:
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -6700,14 +5686,14 @@ spec:
           sizeLimit: '20Gi'
         name: cache
 ---
-# Source: operator-wandb/charts/metric-observer/templates/hpa.yaml
+# Source: operator-wandb/charts/anaconda2/templates/hpa.yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: chartsnap-metric-observer
+  name: chartsnap-anaconda2
   labels:
     helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: metric-observer
+    app.kubernetes.io/name: anaconda2
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
@@ -6715,8 +5701,8 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: chartsnap-metric-observer
-  minReplicas: 1
+    name: chartsnap-anaconda2
+  minReplicas: 2
   maxReplicas: 3
   metrics:
   - type: Resource
@@ -6732,109 +5718,197 @@ spec:
         type: Utilization
         averageUtilization: 80
 ---
-# Source: operator-wandb/charts/mysql/templates/statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
+# Source: operator-wandb/charts/api/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
 metadata:
-  name: chartsnap-mysql
+  name: chartsnap-api
   labels:
     helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: mysql
+    app.kubernetes.io/name: api
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.16.0"
-    wandb.com/app-name: mysql-0.1.0
+    app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: mysql
-      app.kubernetes.io/instance: chartsnap
-      helm.sh/chart: mysql-0.1.0
-      app.kubernetes.io/name: mysql
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/version: "1.16.0"
-      wandb.com/app-name: mysql-0.1.0
-      app.kubernetes.io/managed-by: Helm
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: mysql-0.1.0
-        app.kubernetes.io/name: mysql
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "1.16.0"
-        wandb.com/app-name: mysql-0.1.0
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      securityContext:
-        runAsUser: 999
-        runAsGroup: 0
-        fsGroup: 999
-        fsGroupChangePolicy: OnRootMismatch
-        runAsNonRoot: true
-      containers:
-      - name: mysql
-        image: "mysql:latest"
-        securityContext:
-          allowPrivilegeEscalation: false
-        ports:
-        - name: mysql
-          containerPort: 3306
-          protocol: TCP
-        env:
-        - name: MYSQL_PORT
-          value: "3306"
-        - name: MYSQL_HOST
-          value: "chartsnap-mysql"
-        - name: MYSQL_DATABASE
-          value: "wandb_local"
-        - name: MYSQL_USER
-          value: "wandb"
-        - name: MYSQL_ROOT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-mysql
-              key: MYSQL_ROOT_PASSWORD
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-mysql
-              key: MYSQL_PASSWORD
-        livenessProbe:
-          tcpSocket:
-            port: 3306
-        readinessProbe:
-          tcpSocket:
-            port: 3306
-        startupProbe:
-          initialDelaySeconds: 20
-          periodSeconds: 5
-          failureThreshold: 60
-          tcpSocket:
-            port: 3306
-        volumeMounts:
-        - name: data
-          mountPath: /var/lib/mysql
-        - name: initdb
-          mountPath: /docker-entrypoint-initdb.d/initdb.sql
-          subPath: initdb.sql
-        - name: initdb
-          mountPath: /etc/mysql/my.cnf
-          subPath: my.cnf
-        resources:
-          limits:
-            cpu: 4000m
-            memory: 8Gi
-          requests:
-            cpu: 40m
-            memory: 64Mi
-      volumes:
-      - name: initdb
-        configMap:
-          name: chartsnap-mysql-initdb
-      - name: data
-        persistentVolumeClaim:
-          claimName: chartsnap-mysql-data
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: chartsnap-api
+  minReplicas: 2
+  maxReplicas: 2
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# Source: operator-wandb/charts/executor/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: chartsnap-executor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: executor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: chartsnap-executor-bc
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# Source: operator-wandb/charts/filestream/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: chartsnap-filestream
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: filestream
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "filestreamtag"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: chartsnap-filestream-bc
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# Source: operator-wandb/charts/flat-run-fields-updater/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: chartsnap-flat-run-fields-updater
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: flat-run-fields-updater
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "flatrunfieldsupdatertag"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: chartsnap-flat-run-fields-updater-bc
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# Source: operator-wandb/charts/parquet/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: chartsnap-parquet
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: chartsnap-parquet-bc
+  minReplicas: 2
+  maxReplicas: 2
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# Source: operator-wandb/charts/weave/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: chartsnap-weave
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: weave
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: chartsnap-weave-bc
+  minReplicas: 2
+  maxReplicas: 2
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
 ---
 # Source: operator-wandb/charts/redis/templates/master/application.yaml
 apiVersion: apps/v1
@@ -7018,7 +6092,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.11.2
+            helm.sh/chart: parquet-0.11.1
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -7177,36 +6251,10 @@ spec:
                 secretKeyRef:
                   key: license
                   name: chartsnap-license
-            - name: BIGTABLE_EMULATOR_HOST
-              value: "bigtable-wandb-base:8086"
-            - name: GLOBAL_ADMIN_API_KEY
-              value: "local-123456789-123456789-123456789-1234"
-            - name: GORILLA_DEV
-              value: "true"
-            - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-              value: "true"
             - name: GORILLA_GLUE_EXECUTE
               value: "true"
             - name: GORILLA_GLUE_EXECUTE_TASK_NAME
               value: "EXPORTHISTORYTOPARQUET"
-            - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-              value: "true"
-            - name: GORILLA_PUBSUB_INSECURE
-              value: "true"
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-              value: "true"
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-              value: "true"
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-              value: "false"
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-              value: "true"
-            - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-              value: "true"
-            - name: PUBSUB_EMULATOR_HOST
-              value: "pubsub-wandb-base:8085"
-            - name: PUBSUB_PROJECT_ID
-              value: "playground-111"
             securityContext:
               allowPrivilegeEscalation: false
               capabilities:
@@ -7271,6 +6319,55 @@ spec:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
               optional: true
+---
+# Source: operator-wandb/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chartsnap
+  labels:
+spec:
+  ingressClassName:
+  tls: []
+  rules:
+  - host: localhost:8080
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: chartsnap-app
+            port:
+              number: 8080
+      - pathType: Prefix
+        path: /api
+        backend:
+          service:
+            name: chartsnap-api
+            port:
+              number: 8081
+      - pathType: Prefix
+        path: /graphql
+        backend:
+          service:
+            name: chartsnap-api
+            port:
+              number: 8081
+      - pathType: Prefix
+        path: /graphql2
+        backend:
+          service:
+            name: chartsnap-api
+            port:
+              number: 8081
+      - pathType: Prefix
+        path: /console
+        backend:
+          service:
+            name: chartsnap-console
+            port:
+              number: 8082
 ---
 # Source: operator-wandb/charts/appRenamePostHook/templates/serviceaccount.yaml
 apiVersion: v1
@@ -7511,7 +6608,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: '###CHART_VERSION###'
+        helm.sh/chart: appRenamePostHook-0.11.1
         app.kubernetes.io/name: appRenamePostHook
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "1.31.12"
@@ -7525,32 +6622,6 @@ spec:
         - /cleanup-scripts/post_upgrade.sh
         envFrom:
         env:
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -7560,10 +6631,6 @@ spec:
           readOnlyRootFilesystem: false
         image: "alpine/k8s:1.31.12"
         imagePullPolicy: IfNotPresent
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
         volumeMounts:
         - mountPath: /cleanup-scripts
           name: app-rename-cleanup
@@ -7617,7 +6684,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: '###CHART_VERSION###'
+        helm.sh/chart: appRenamePreHook-0.11.1
         app.kubernetes.io/name: appRenamePreHook
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "1.31.12"
@@ -7631,32 +6698,6 @@ spec:
         - /cleanup-scripts/pre_upgrade.sh
         envFrom:
         env:
-        - name: BIGTABLE_EMULATOR_HOST
-          value: "bigtable-wandb-base:8086"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
-        - name: GORILLA_DEV
-          value: "true"
-        - name: GORILLA_ENABLE_RUN_AUTOMATIONS
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: GORILLA_PUBSUB_INSECURE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_STORE
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_CREATE_RUN_TABLES
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS
-          value: "false"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR
-          value: "true"
-        - name: GORILLA_RUN_STORE_ONPREM_MIGRATE_SHADOW_RUN_UPDATES
-          value: "true"
-        - name: PUBSUB_EMULATOR_HOST
-          value: "pubsub-wandb-base:8085"
-        - name: PUBSUB_PROJECT_ID
-          value: "playground-111"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -7666,10 +6707,6 @@ spec:
           readOnlyRootFilesystem: false
         image: "alpine/k8s:1.31.12"
         imagePullPolicy: IfNotPresent
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
         volumeMounts:
         - mountPath: /cleanup-scripts
           name: app-rename-cleanup
