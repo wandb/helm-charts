@@ -71,7 +71,13 @@
   securityContext:
     {{- toYaml .securityContext | nindent 4 }}
   {{- end }}
+  {{- if .image.digest }}
+  image: "{{ .image.repository }}@{{ .image.digest }}"
+  {{- else if .image.tag }}
   image: "{{ .image.repository }}:{{ .image.tag }}"
+  {{- else }}
+  image: "{{ .image.repository }}:latest"
+  {{- end }}
   imagePullPolicy: {{ .image.pullPolicy }}
   {{- with .ports }}
   ports:
