@@ -82,8 +82,9 @@ spec:
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
         {{- end }}
-        {{- if or .Values.airgapped .Values.customCACerts .Values.caCertsConfigMap }}
         volumeMounts:
+          - name: helm-cache
+            mountPath: /helm
           {{- if or .Values.airgapped }}
           - name: {{ include "name" . }}-charts
             mountPath: /charts
@@ -92,9 +93,9 @@ spec:
           - name: wandb-ca-certs
             mountPath: /certs/
           {{- end }}
-        {{- end }}
-      {{- if or .Values.airgapped .Values.customCACerts .Values.caCertsConfigMap }}
       volumes:
+        - name: helm-cache
+          emptyDir: {}
         {{- if .Values.airgapped }}
         - name: {{ include "name" . }}-charts
           configMap:
@@ -112,7 +113,6 @@ spec:
               - configMap:
                   name: {{ include "operator.fullname" . }}-ca-certs
           {{- end }}
-      {{- end }}
       serviceAccountName: {{ include "manager.serviceAccount.name" . }}
       {{- if .Values.nodeSelector }}
       nodeSelector:
