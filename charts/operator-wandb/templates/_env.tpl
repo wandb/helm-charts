@@ -146,7 +146,7 @@ Global values will override any chart-specific values.
 */ -}}
 
 {{- if kindIs "map" .Values.global.mysql.password -}}
-- name: MYSQL_PASSORD
+- name: MYSQL_PASSWORD
 {{- toYaml .Values.global.mysql.password | nindent 2 }}
 {{- else }}
 - name: MYSQL_PASSWORD
