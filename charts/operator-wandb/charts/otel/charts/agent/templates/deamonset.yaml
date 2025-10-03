@@ -69,19 +69,48 @@ spec:
               protocol: TCP
               hostPort: 8125
           env:
-            - name: MYSQL_PORT
-              value: "{{ include "wandb.mysql.port" . }}"
-            - name: MYSQL_HOST
-              value: "{{ include "wandb.mysql.host" . }}"
-            - name: MYSQL_DATABASE
-              value: "{{ include "wandb.mysql.database" . }}"
-            - name: MYSQL_USER
-              value: "{{ include "wandb.mysql.user" . }}"
+            {{- if kindIs "map" .Values.global.mysql.password -}}
+            - name: MYSQL_PASSORD
+            {{- toYaml .Values.global.mysql.password | nindent 14 }}
+            {{- else }}
             - name: MYSQL_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "wandb.mysql.passwordSecret" . }}
-                  key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
+                  name: {{ include "wandb.mysql.passwordSecret" . | quote}}
+                  key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+            {{- end }}
+
+            {{- if kindIs "map" .Values.global.mysql.port -}}
+            - name: MYSQL_PORT
+            {{ toYaml .Values.global.mysql.port | nindent 14 }}
+            {{- else }}
+            - name: MYSQL_PORT
+              value: "{{ include "wandb.mysql.port" . }}"
+            {{- end }}
+
+            {{- if kindIs "map" .Values.global.mysql.host -}}
+            - name: MYSQL_HOST
+            {{- toYaml .Values.global.mysql.host | nindent 14 }}
+            {{- else }}
+            - name: MYSQL_HOST
+              value: "{{ include "wandb.mysql.host" . }}"
+            {{- end }}
+
+            {{- if kindIs "map" .Values.global.mysql.database -}}
+            - name: MYSQL_DATABASE
+            {{- toYaml .Values.global.mysql.database | nindent 14 }}
+            {{- else }}
+            - name: MYSQL_DATABASE
+              value: "{{ include "wandb.mysql.database" . }}"
+            {{- end }}
+
+            {{- if kindIs "map" .Values.global.mysql.user -}}
+            - name: MYSQL_USER
+            {{- toYaml .Values.global.mysql.user | nindent 14 }}
+            {{- else }}
+            - name: MYSQL_USER
+              value: "{{ include "wandb.mysql.user" . }}"
+            {{- end -}}
             - name: K8S_NODE_NAME
               valueFrom:
                 fieldRef:

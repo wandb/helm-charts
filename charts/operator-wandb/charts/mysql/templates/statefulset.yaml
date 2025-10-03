@@ -39,24 +39,54 @@ spec:
             containerPort: 3306
             protocol: TCP
           env:
+            {{- if kindIs "map" .Values.global.mysql.password -}}
+            - name: MYSQL_PASSORD
+            {{- toYaml .Values.global.mysql.password | nindent 14 }}
+            {{- else }}
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wandb.mysql.passwordSecret" . | quote}}
+                  key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+            {{- end }}
+
+            {{- if kindIs "map" .Values.global.mysql.port -}}
+            - name: MYSQL_PORT
+            {{ toYaml .Values.global.mysql.port | nindent 14 }}
+            {{- else }}
             - name: MYSQL_PORT
               value: "{{ include "wandb.mysql.port" . }}"
+            {{- end }}
+
+            {{- if kindIs "map" .Values.global.mysql.host -}}
+            - name: MYSQL_HOST
+            {{- toYaml .Values.global.mysql.host | nindent 14 }}
+            {{- else }}
             - name: MYSQL_HOST
               value: "{{ include "wandb.mysql.host" . }}"
+            {{- end }}
+
+            {{- if kindIs "map" .Values.global.mysql.database -}}
+            - name: MYSQL_DATABASE
+            {{- toYaml .Values.global.mysql.database | nindent 14 }}
+            {{- else }}
             - name: MYSQL_DATABASE
               value: "{{ include "wandb.mysql.database" . }}"
+            {{- end }}
+
+            {{- if kindIs "map" .Values.global.mysql.user -}}
+            - name: MYSQL_USER
+            {{- toYaml .Values.global.mysql.user | nindent 14 }}
+            {{- else }}
             - name: MYSQL_USER
               value: "{{ include "wandb.mysql.user" . }}"
+            {{- end -}}
+
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key: {{ .Values.global.mysql.passwordSecret.rootPasswordKey }}
-            - name: MYSQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "wandb.mysql.passwordSecret" . }}
-                  key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             {{- include "mysql.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           livenessProbe:
