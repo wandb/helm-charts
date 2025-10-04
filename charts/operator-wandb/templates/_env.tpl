@@ -107,7 +107,7 @@ Global values will override any chart-specific values.
 {{- end }}
 {{- end -}}
 
-{{- define "wandb.mysqlEnvs" -}}
+{{- define "wandb.mysqlConfigEnvs" -}}
 {{- /*
   ATTENTION!
   
@@ -145,7 +145,7 @@ Global values will override any chart-specific values.
         ...
 */ -}}
 
-{{- if kindIs "map" .Values.global.mysql.password -}}
+{{- if kindIs "map" .Values.global.mysql.password }}
 - name: MYSQL_PASSWORD
 {{- toYaml .Values.global.mysql.password | nindent 2 }}
 {{- else }}
@@ -156,7 +156,7 @@ Global values will override any chart-specific values.
       key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
 {{- end }}
 
-{{- if kindIs "map" .Values.global.mysql.port -}}
+{{- if kindIs "map" .Values.global.mysql.port }}
 - name: MYSQL_PORT
 {{- toYaml .Values.global.mysql.port | nindent 2 }}
 {{- else }}
@@ -164,7 +164,7 @@ Global values will override any chart-specific values.
   value: "{{ include "wandb.mysql.port" . }}"
 {{- end }}
 
-{{- if kindIs "map" .Values.global.mysql.host -}}
+{{- if kindIs "map" .Values.global.mysql.host }}
 - name: MYSQL_HOST
 {{- toYaml .Values.global.mysql.host | nindent 2 }}
 {{- else }}
@@ -172,7 +172,7 @@ Global values will override any chart-specific values.
   value: "{{ include "wandb.mysql.host" . }}"
 {{- end }}
 
-{{- if kindIs "map" .Values.global.mysql.database -}}
+{{- if kindIs "map" .Values.global.mysql.database }}
 - name: MYSQL_DATABASE
 {{- toYaml .Values.global.mysql.database | nindent 2 }}
 {{- else }}
@@ -180,14 +180,17 @@ Global values will override any chart-specific values.
   value: "{{ include "wandb.mysql.database" . }}"
 {{- end }}
 
-{{- if kindIs "map" .Values.global.mysql.user -}}
+{{- if kindIs "map" .Values.global.mysql.user }}
 - name: MYSQL_USER
 {{- toYaml .Values.global.mysql.user | nindent 2 }}
 {{- else }}
 - name: MYSQL_USER
   value: "{{ include "wandb.mysql.user" . }}"
 {{- end -}}
+{{- end -}}
 
+{{- define "wandb.mysqlEnvs" -}}
+{{ include "wandb.mysqlConfigEnvs" . }}
 - name: MYSQL
   value: {{ include "wandb.mysql" . | trim | quote }}
 - name: GORILLA_ANALYTICS_SINK
