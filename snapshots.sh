@@ -59,7 +59,7 @@ function main() {
     exit 1
   fi
 
-  if [ -n "$2"  ]; then
+  if [ $# -gte 2 ] && [ -n "$2" ]; then
     charts=("$2")
   fi
 
