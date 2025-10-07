@@ -94,7 +94,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: wandb-base-0.11.0
+        helm.sh/chart: wandb-base-0.11.2
         app.kubernetes.io/name: wandb-base
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/managed-by: Helm
@@ -188,4 +188,11 @@ spec:
         fi
         sleep 5
       done
+      if ! kubectl wait --for=condition=complete job/chartsnap-wandb-base-test --timeout=600s; then
+        echo "Job chartsnap-wandb-base-test did not complete successfully."
+        kubectl describe job/chartsnap-wandb-base-test || true
+        kubectl logs job/chartsnap-wandb-base-test --tail=200 || true
+        exit 1
+      fi
+      echo "Job chartsnap-wandb-base-test completed successfully."
   restartPolicy: Never

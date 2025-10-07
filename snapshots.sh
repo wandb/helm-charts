@@ -50,14 +50,14 @@ function run_chart() {
 }
 
 function main() {
-  local func="$1"
-  local charts=("wandb-base" "operator-wandb")
-  local values_dir="test-configs"
-
   if [ $# -eq 0 ]; then
     usage
     exit 1
   fi
+
+  local func="$1"
+  local charts=("wandb-base" "operator-wandb")
+  local values_dir="test-configs"
 
   if [ $# -gte 2 ] && [ -n "$2" ]; then
     charts=("$2")
