@@ -1,0 +1,198 @@
+# chartsnap: snapshot_version=v3
+---
+# Source: wandb-base/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: wandb-base
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
+# Source: wandb-base/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: wandb-base/templates/tests/test-jobs.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "chartsnap-wandb-base-test-job-test-sa"
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: wandb-base/templates/tests/test-jobs.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "chartsnap-wandb-base-test-job-test-role"
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+---
+# Source: wandb-base/templates/tests/test-jobs.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: "chartsnap-wandb-base-test-job-test-binding"
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: "chartsnap-wandb-base-test-job-test-role"
+subjects:
+- kind: ServiceAccount
+  name: "chartsnap-wandb-base-test-job-test-sa"
+  namespace: default
+---
+# Source: wandb-base/templates/job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chartsnap-test
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: wandb-base-0.11.3
+        app.kubernetes.io/name: wandb-base
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: example
+        command:
+        - /bin/bash
+        args:
+        - -c
+        - |
+          echo "EXAMPLE=$EXAMPLE"
+          EXPECTED="400"
+          if [ "$EXAMPLE" = "$EXPECTED" ]; then
+            echo "Value is $EXPECTED"
+            exit 0
+          else
+            echo "Value is NOT $EXPECTED"
+            exit 1
+          fi
+        envFrom:
+        env:
+        - name: EXAMPLE
+          value: "400"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "debian:12-slim"
+        imagePullPolicy:
+      restartPolicy: Never
+      serviceAccountName: chartsnap-wandb-base
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+---
+# Source: wandb-base/templates/tests/test-jobs.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "chartsnap-wandb-base-test-job-test"
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "1"
+spec:
+  serviceAccountName: "chartsnap-wandb-base-test-job-test-sa"
+  containers:
+  - name: job-test
+    image: bitnami/kubectl:latest
+    command: ['/bin/sh']
+    args:
+    - -c
+    - |
+      set -e
+      echo "Testing job: chartsnap-wandb-base-test"
+
+      i=0
+      until kubectl logs job/chartsnap-wandb-base-test; do
+        i=$((i+1))
+        if [ "$i" -ge 60 ]; then
+          echo "Timed out waiting for job logs."
+          exit 1
+        fi
+        sleep 5
+      done
+      if ! kubectl wait --for=condition=complete job/chartsnap-wandb-base-test --timeout=600s; then
+        echo "Job chartsnap-wandb-base-test did not complete successfully."
+        kubectl describe job/chartsnap-wandb-base-test || true
+        kubectl logs job/chartsnap-wandb-base-test --tail=200 || true
+        exit 1
+      fi
+      echo "Job chartsnap-wandb-base-test completed successfully."
+  restartPolicy: Never
