@@ -20,7 +20,7 @@ function usage() {
   cat <<EOF
 A helper script for the helm-chartsnap plugin https://github.com/jlandowner/helm-chartsnap
 
-Usage: $0 [COMMAND]
+Usage: $0 [COMMAND] [optional: CHART (ex: operator-wandb)]
 
 Commands:
   build,    build the operator-wandb chart
@@ -29,34 +29,57 @@ Commands:
 EOF
 }
 
-function main() {
-  local chart="operator-wandb"
-  local values_dir="test-configs"
+function build_chart() {
+  local chart="$1"
+  echo "Building $chart"
+  helm cascade build "./charts/$chart"
+}
 
+function update_chart() {
+  local chart="$1"
+  local values_file="$2"
+  echo "updating $chart snapshots"
+  helm chartsnap -c "./charts/$chart" -u -f "$values_file"
+}
+
+function run_chart() {
+  local chart="$1"
+  local values_file="$2"
+  echo "Checking $chart snapshot tests"
+  helm chartsnap -c "./charts/$chart" -f "$values_file"
+}
+
+function main() {
   if [ $# -eq 0 ]; then
     usage
     exit 1
   fi
 
   local func="$1"
-  case "$func" in
-    build)
-      echo "Building operator-wandb"
-      helm cascade build "./charts/$chart"
-      ;;
-    update)
-      echo "Updating operator-wandb snapshots"
-      helm chartsnap -c "./charts/$chart" -u -f "./$values_dir/$chart"
-      ;;
-    run)
-      echo "Checking snapshot tests"
-      helm chartsnap -c "./charts/$chart" -f "./$values_dir/$chart"
-      ;;
-    *)
-      usage
-      exit 1
-      ;;
-  esac
+  local charts=("wandb-base" "operator-wandb")
+  local values_dir="test-configs"
+
+  if [ $# -gte 2 ] && [ -n "$2" ]; then
+    charts=("$2")
+  fi
+
+  for chart in "${charts[@]}"; do
+    case "$func" in
+      build)
+        build_chart "$chart"
+        ;;
+      update)
+        update_chart "$chart" "./$values_dir/$chart"
+        ;;
+      run)
+        run_chart "$chart" "./$values_dir/$chart"
+        ;;
+      *)
+        usage
+        exit 1
+        ;;
+    esac
+  done
 }
 
 main "$@"

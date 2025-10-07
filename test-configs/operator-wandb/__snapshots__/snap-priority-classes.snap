@@ -148,6 +148,28 @@ metadata:
   name: chartsnap-app
 ---
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: appRenamePostHook
+    app.kubernetes.io/version: 1.31.12
+    helm.sh/chart: appRenamePostHook-0.11.2
+  name: chartsnap-app-rename-post-hook-test-job-app-rename-post-hook-sa
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: appRenamePreHook
+    app.kubernetes.io/version: 1.31.12
+    helm.sh/chart: appRenamePreHook-0.11.2
+  name: chartsnap-app-rename-pre-hook-test-job-app-rename-pre-hook-sa
+---
+apiVersion: v1
 automountServiceAccountToken: true
 kind: ServiceAccount
 metadata:
@@ -1113,7 +1135,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/version: 1.0.0
-    helm.sh/chart: operator-wandb-0.35.9
+    helm.sh/chart: operator-wandb-0.35.10
   name: chartsnap-anaconda2-configmap
 ---
 apiVersion: v1
@@ -1158,7 +1180,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/version: 1.0.0
-    helm.sh/chart: operator-wandb-0.35.9
+    helm.sh/chart: operator-wandb-0.35.10
   name: chartsnap-app-configmap
 ---
 apiVersion: v1
@@ -1182,7 +1204,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/version: 1.0.0
-    helm.sh/chart: operator-wandb-0.35.9
+    helm.sh/chart: operator-wandb-0.35.10
   name: chartsnap-ca-certs
 ---
 apiVersion: v1
@@ -1220,7 +1242,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/version: 1.0.0
-    helm.sh/chart: operator-wandb-0.35.9
+    helm.sh/chart: operator-wandb-0.35.10
   name: chartsnap-executor-configmap
 ---
 apiVersion: v1
@@ -1232,7 +1254,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/version: 1.0.0
-    helm.sh/chart: operator-wandb-0.35.9
+    helm.sh/chart: operator-wandb-0.35.10
   name: chartsnap-filestream-configmap
 ---
 apiVersion: v1
@@ -1412,7 +1434,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/version: 1.0.0
-    helm.sh/chart: operator-wandb-0.35.9
+    helm.sh/chart: operator-wandb-0.35.10
   name: chartsnap-local-configmap
 ---
 apiVersion: v1
@@ -1828,6 +1850,64 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  labels:
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: appRenamePostHook
+    app.kubernetes.io/version: 1.31.12
+    helm.sh/chart: appRenamePostHook-0.11.2
+  name: chartsnap-app-rename-post-hook-test-job-app-rename-post-hook-role
+rules:
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/log
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: appRenamePreHook
+    app.kubernetes.io/version: 1.31.12
+    helm.sh/chart: appRenamePreHook-0.11.2
+  name: chartsnap-app-rename-pre-hook-test-job-app-rename-pre-hook-role
+rules:
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/log
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
   annotations:
     meta.helm.sh/release-name: chartsnap
     meta.helm.sh/release-namespace: default
@@ -1901,6 +1981,44 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: chartsnap-app
+    namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: appRenamePostHook
+    app.kubernetes.io/version: 1.31.12
+    helm.sh/chart: appRenamePostHook-0.11.2
+  name: chartsnap-app-rename-post-hook-test-job-app-rename-post-hook-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chartsnap-app-rename-post-hook-test-job-app-rename-post-hook-role
+subjects:
+  - kind: ServiceAccount
+    name: chartsnap-app-rename-post-hook-test-job-app-rename-post-hook-sa
+    namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: appRenamePreHook
+    app.kubernetes.io/version: 1.31.12
+    helm.sh/chart: appRenamePreHook-0.11.2
+  name: chartsnap-app-rename-pre-hook-test-job-app-rename-pre-hook-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chartsnap-app-rename-pre-hook-test-job-app-rename-pre-hook-role
+subjects:
+  - kind: ServiceAccount
+    name: chartsnap-app-rename-pre-hook-test-job-app-rename-pre-hook-sa
     namespace: default
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -4432,12 +4550,100 @@ kind: Pod
 metadata:
   annotations:
     helm.sh/hook: test
+    helm.sh/hook-weight: "1"
+  labels:
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: appRenamePostHook
+    app.kubernetes.io/version: 1.31.12
+    helm.sh/chart: appRenamePostHook-0.11.2
+  name: chartsnap-app-rename-post-hook-test-job-app-rename-post-hook
+spec:
+  containers:
+    - args:
+        - -c
+        - |
+          set -e
+          echo "Testing job: chartsnap-app-rename-post-hook-app-rename-post-hook"
+
+          i=0
+          until kubectl logs job/chartsnap-app-rename-post-hook-app-rename-post-hook; do
+            i=$((i+1))
+            if [ "$i" -ge 60 ]; then
+              echo "Timed out waiting for job logs."
+              exit 1
+            fi
+            sleep 5
+          done
+          if ! kubectl wait --for=condition=complete job/chartsnap-app-rename-post-hook-app-rename-post-hook --timeout=600s; then
+            echo "Job chartsnap-app-rename-post-hook-app-rename-post-hook did not complete successfully."
+            kubectl describe job/chartsnap-app-rename-post-hook-app-rename-post-hook || true
+            kubectl logs job/chartsnap-app-rename-post-hook-app-rename-post-hook --tail=200 || true
+            exit 1
+          fi
+          echo "Job chartsnap-app-rename-post-hook-app-rename-post-hook completed successfully."
+      command:
+        - /bin/sh
+      image: bitnami/kubectl:latest
+      name: job-test
+  restartPolicy: Never
+  serviceAccountName: chartsnap-app-rename-post-hook-test-job-app-rename-post-hook-sa
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-weight: "1"
+  labels:
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: appRenamePreHook
+    app.kubernetes.io/version: 1.31.12
+    helm.sh/chart: appRenamePreHook-0.11.2
+  name: chartsnap-app-rename-pre-hook-test-job-app-rename-pre-hook
+spec:
+  containers:
+    - args:
+        - -c
+        - |
+          set -e
+          echo "Testing job: chartsnap-app-rename-pre-hook-app-rename-pre-hook"
+
+          i=0
+          until kubectl logs job/chartsnap-app-rename-pre-hook-app-rename-pre-hook; do
+            i=$((i+1))
+            if [ "$i" -ge 60 ]; then
+              echo "Timed out waiting for job logs."
+              exit 1
+            fi
+            sleep 5
+          done
+          if ! kubectl wait --for=condition=complete job/chartsnap-app-rename-pre-hook-app-rename-pre-hook --timeout=600s; then
+            echo "Job chartsnap-app-rename-pre-hook-app-rename-pre-hook did not complete successfully."
+            kubectl describe job/chartsnap-app-rename-pre-hook-app-rename-pre-hook || true
+            kubectl logs job/chartsnap-app-rename-pre-hook-app-rename-pre-hook --tail=200 || true
+            exit 1
+          fi
+          echo "Job chartsnap-app-rename-pre-hook-app-rename-pre-hook completed successfully."
+      command:
+        - /bin/sh
+      image: bitnami/kubectl:latest
+      name: job-test
+  restartPolicy: Never
+  serviceAccountName: chartsnap-app-rename-pre-hook-test-job-app-rename-pre-hook-sa
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    helm.sh/hook: test
   labels:
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/version: 1.0.0
-    helm.sh/chart: operator-wandb-0.35.9
+    helm.sh/chart: operator-wandb-0.35.10
   name: chartsnap-operator-wandb-test-connection
 spec:
   containers:
