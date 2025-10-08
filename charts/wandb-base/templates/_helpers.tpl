@@ -42,7 +42,10 @@ Common labels
 {{- define "wandb-base.labels" -}}
 helm.sh/chart: {{ include "wandb-base.chart" . }}
 {{ include "wandb-base.selectorLabels" . }}
-{{- if .Values.image.tag }}
+{{- if .Values.image.digest }}
+{{/* spec won't allow ':' and recommended practice is to truncate to 12 chars */}}
+app.kubernetes.io/version: {{ .Values.image.digest | trimPrefix "sha256:" | trunc 12 | quote }}
+{{- else if .Values.image.tag }}
 app.kubernetes.io/version: {{ .Values.image.tag | trunc 63 | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
