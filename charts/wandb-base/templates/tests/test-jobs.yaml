@@ -1,0 +1,84 @@
+{{- if eq .Values.kind "Job" }}
+  {{- range $jobName, $job := .Values.jobs }}
+    {{- $job := mergeOverwrite (dict "enabled" true) $job}}
+    {{- $fullname := include "wandb-base.fullname" $ }}
+    {{- if $job.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "{{ $fullname }}-test-job-{{ $jobName }}-sa"
+  labels:
+    {{- include "wandb-base.labels" $ | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "{{ $fullname }}-test-job-{{ $jobName }}-role"
+  labels:
+    {{- include "wandb-base.labels" $ | nindent 4 }}
+rules:
+- apiGroups: ["batch"]
+  resources: ["jobs"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: "{{ $fullname }}-test-job-{{ $jobName }}-binding"
+  labels:
+    {{- include "wandb-base.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: "{{ $fullname }}-test-job-{{ $jobName }}-role"
+subjects:
+- kind: ServiceAccount
+  name: "{{ $fullname }}-test-job-{{ $jobName }}-sa"
+  namespace: {{ $.Release.Namespace }}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ $fullname }}-test-job-{{ $jobName }}"
+  labels:
+    {{- include "wandb-base.labels" $ | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-weight": "1"
+spec:
+  serviceAccountName: "{{ $fullname }}-test-job-{{ $jobName }}-sa"
+  containers:
+    - name: job-test
+      image: bitnami/kubectl:latest
+      command: ['/bin/sh']
+      args:
+        - -c
+        - |
+          set -e
+          echo "Testing job: {{ printf "%s-%s" $fullname $jobName }}"
+
+          i=0
+          until kubectl logs job/{{ printf "%s-%s" $fullname $jobName }}; do
+            i=$((i+1))
+            if [ "$i" -ge 60 ]; then
+              echo "Timed out waiting for job logs."
+              exit 1
+            fi
+            sleep 5
+          done
+          if ! kubectl wait --for=condition=complete job/{{ printf "%s-%s" $fullname $jobName }} --timeout=600s; then
+            echo "Job {{ printf "%s-%s" $fullname $jobName }} did not complete successfully."
+            kubectl describe job/{{ printf "%s-%s" $fullname $jobName }} || true
+            kubectl logs job/{{ printf "%s-%s" $fullname $jobName }} --tail=200 || true
+            exit 1
+          fi
+          echo "Job {{ printf "%s-%s" $fullname $jobName }} completed successfully."
+
+  restartPolicy: Never
+    {{- end }}
+  {{- end }}
+{{- end }}

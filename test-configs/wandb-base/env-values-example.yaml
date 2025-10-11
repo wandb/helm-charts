@@ -1,0 +1,77 @@
+global:
+  env:
+    USED_NAMESPACE:
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+
+
+env:
+  EXAMPLE_FROM_CONFIGMAP:
+    valueFrom:
+      configMapKeyRef:
+        name: "my-configmap"
+        key: "configmap-key"
+  EXAMPLE_FROM_SECRET:
+    valueFrom:
+      secretKeyRef:
+        name: "my-secret"
+        key: "secret-key"
+
+size: "small"
+
+sizing:
+  small:
+    resources:
+      limits:
+        memory: 1Gi
+    env:
+      MEM_LIMIT:
+        valueFrom:
+          resourceFieldRef:
+            resource: limits.memory
+
+kind: Job
+jobs:
+  test:
+    containers:
+      example:
+        image:
+          repository: debian
+          tag: 12-slim
+        command:
+          - /bin/bash
+        args:
+          - -c
+          - |
+            if [ "$USED_NAMESPACE" = "default" ]; then
+              echo "fieldRef test"
+            else
+              echo "fieldRef test failed"
+              exit 1
+            fi
+            if [ "$MEM_LIMIT" = "1073741824" ]; then
+              echo "resourceFieldRef test"
+            else
+              echo "resourceFieldRef test failed"
+              exit 1
+            fi
+            if [ "$BASIC" = "$BASIC_ALT" ]; then
+              echo "Basic test"
+            else
+              echo "Basic test failed"
+              exit 1
+            fi
+            if [ "$EXAMPLE_FROM_CONFIGMAP" = "$EXAMPLE_FROM_SECRET" ]; then
+              echo "configmap/secret test"
+            else
+              echo "configmap/secret test failed"
+              exit 1
+            fi
+            exit 0
+
+        env:
+          BASIC: "600"
+          BASIC_ALT:
+            value: "600"
+
