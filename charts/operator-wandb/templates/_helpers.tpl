@@ -1,4 +1,13 @@
 {{/*
+  Next Section purposely causes helm failures  to prevent known invalid configs.
+*/}}
+
+{{- if and eq .Values.mysql.install (or (kindIs "map" .Values.global.mysql.user) (not eq .Values.global.mysql.user "wandb")) -}}
+{{- fail "Custom configuration of the mysql use is not possible when using the internal mysql chart" -}}
+{{- end -}}
+
+
+{{/*
 Expand the name of the chart.
 */}}
 {{- define "wandb.name" -}}
