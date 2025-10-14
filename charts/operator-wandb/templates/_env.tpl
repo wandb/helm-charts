@@ -107,12 +107,90 @@ Global values will override any chart-specific values.
 {{- end }}
 {{- end -}}
 
-{{- define "wandb.mysqlEnvs" -}}
+{{- define "wandb.mysqlConfigEnvs" -}}
+{{- /*
+  ATTENTION!
+  
+  MYSQL_PASSWORD, MYSQL_PORT, MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER
+
+  Are all set in the the values.yaml under global.mysql.(host,port,database,user,password)
+
+  The following blocks are to enable values to be provided in one of two ways:
+
+  AS STANDARD:
+    mysql:
+      host: "mysql.com"
+      port: 3306
+      database: "wandb_local"
+      user: "wandb"
+      password: "supersafe"
+
+  AS K8s REFS:
+    mysql:
+      host:
+       valueFrom:
+        secretKeyRef:
+          name: "mysql-settings-secret"
+          key: "endpoint"
+      port:
+       valueFrom:
+        secretKeyRef:
+          name: "mysql-settings-secret"
+          key: "port"
+      database:
+        ...
+      user:
+        ...
+      password:
+        ...
+*/ -}}
+
+{{- if kindIs "map" .Values.global.mysql.password }}
+- name: MYSQL_PASSWORD
+{{- toYaml .Values.global.mysql.password | nindent 2 }}
+{{- else }}
 - name: MYSQL_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.mysql.passwordSecret" . | quote}}
       key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.mysql.port }}
+- name: MYSQL_PORT
+{{- toYaml .Values.global.mysql.port | nindent 2 }}
+{{- else }}
+- name: MYSQL_PORT
+  value: "{{ include "wandb.mysql.port" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.mysql.host }}
+- name: MYSQL_HOST
+{{- toYaml .Values.global.mysql.host | nindent 2 }}
+{{- else }}
+- name: MYSQL_HOST
+  value: "{{ include "wandb.mysql.host" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.mysql.database }}
+- name: MYSQL_DATABASE
+{{- toYaml .Values.global.mysql.database | nindent 2 }}
+{{- else }}
+- name: MYSQL_DATABASE
+  value: "{{ include "wandb.mysql.database" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.mysql.user }}
+- name: MYSQL_USER
+{{- toYaml .Values.global.mysql.user | nindent 2 }}
+{{- else }}
+- name: MYSQL_USER
+  value: "{{ include "wandb.mysql.user" . }}"
+{{- end -}}
+{{- end -}}
+
+{{- define "wandb.mysqlEnvs" -}}
+{{ include "wandb.mysqlConfigEnvs" . }}
 - name: MYSQL
   value: {{ include "wandb.mysql" . | trim | quote }}
 - name: GORILLA_ANALYTICS_SINK
