@@ -44,7 +44,7 @@ secretKey: {{ $secretKey }}
 accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
 secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}
-{{- if eq $path "" -}}
+{{- if not $path -}}
 
 {{- if eq $provider "cw" -}}
   {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
