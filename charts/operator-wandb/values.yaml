@@ -2551,3 +2551,31 @@ clickhouse:
       enabled: true
       size: 8Gi
       storageClass: ""
+
+# Secrets Store CSI Driver configuration for syncing secrets from cloud providers
+# This enables mounting secrets from AWS Secrets Manager, GCP Secret Manager, or Azure Key Vault
+# as Kubernetes Secrets, making them available to application pods without SDK dependencies.
+secretsStore:
+  # Set to true to enable secrets syncing from cloud provider secret stores
+  enabled: false
+
+  # Cloud provider: aws, gcp, or azure
+  provider: aws
+
+  # List of secrets to sync from the cloud provider
+  # Each secret will be mounted and synced to a Kubernetes Secret
+  secrets:
+    - name: weave-worker-auth  # Used as objectAlias/path in SecretProviderClass
+      cloudSecretName: ""  # Name of the secret in the cloud provider (e.g., from Terraform output: weave_worker_auth_secret_name)
+      k8sSecretName: weave-worker-auth  # Name of the Kubernetes Secret to create
+      k8sSecretKey: key  # Key within the Kubernetes Secret
+    # Add more secrets as needed for other internal services
+    # - name: another-service-auth
+    #   cloudSecretName: ""
+    #   k8sSecretName: another-service-auth
+    #   k8sSecretKey: key
+
+  # Azure-specific provider configuration (only needed when provider: azure)
+  azure:
+    keyVaultName: ""  # Name of the Azure Key Vault
+    tenantId: ""  # Azure tenant ID
