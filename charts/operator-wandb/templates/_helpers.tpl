@@ -98,7 +98,7 @@ This template conditionally adds volumeMounts for the Secrets Store CSI Driver
 when secretsStore.enabled is true
 */}}
 {{- define "wandb.weaveWorkerSecretStoreVolumeMounts" -}}
-{{- if .Values.secretsStore.enabled }}
+{{- if and (hasKey .Values "secretsStore") .Values.secretsStore.enabled }}
 - name: secrets-store
   mountPath: /mnt/secrets-store
   readOnly: true
@@ -111,7 +111,7 @@ This template conditionally adds volumes for the Secrets Store CSI Driver
 when secretsStore.enabled is true
 */}}
 {{- define "wandb.weaveWorkerSecretStoreVolumes" -}}
-{{- if .Values.secretsStore.enabled }}
+{{- if and (hasKey .Values "secretsStore") .Values.secretsStore.enabled }}
 - name: secrets-store
   csi:
     driver: secrets-store.csi.k8s.io
