@@ -2098,6 +2098,8 @@ weave-trace-worker:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+    WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME:
+      value: weave-worker-auth
   containers:
     weave-trace-worker:
       command:
@@ -2109,6 +2111,10 @@ weave-trace-worker:
         - name: http
           containerPort: 8080
           protocol: TCP
+      volumeMounts:
+        - name: secrets-store
+          mountPath: /mnt/secrets-store
+          readOnly: true
   service:
     ports:
       - name: http
@@ -2181,6 +2187,15 @@ weave-trace-worker:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+  volumes:
+{{- if .Values.secretsStore.enabled }}
+    - name: secrets-store
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: weave-worker-auth
+{{- end }}
 
 weave-evaluate-model-worker:
   install: false
@@ -2205,6 +2220,8 @@ weave-evaluate-model-worker:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+    WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME:
+      value: weave-worker-auth
   containers:
     weave-evaluate-model-worker:
       command:
@@ -2216,6 +2233,10 @@ weave-evaluate-model-worker:
         - name: http
           containerPort: 8080
           protocol: TCP
+      volumeMounts:
+        - name: secrets-store
+          mountPath: /mnt/secrets-store
+          readOnly: true
   service:
     ports:
       - name: http
@@ -2288,6 +2309,15 @@ weave-evaluate-model-worker:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+  volumes:
+{{- if .Values.secretsStore.enabled }}
+    - name: secrets-store
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: weave-worker-auth
+{{- end }}
 
 nginx:
   install: false
@@ -2564,16 +2594,12 @@ secretsStore:
 
   # List of secrets to sync from the cloud provider
   # Each secret will be mounted and synced to a Kubernetes Secret
+  # Each entry creates a separate SecretProviderClass with the same name as the 'name' field
   secrets:
-    - name: weave-worker-auth  # Used as objectAlias/path in SecretProviderClass
+    - name: weave-worker-auth  # Used as SecretProviderClass name and objectAlias/path
       cloudSecretName: ""  # Name of the secret in the cloud provider (e.g., from Terraform output: weave_worker_auth_secret_name)
       k8sSecretName: weave-worker-auth  # Name of the Kubernetes Secret to create
       k8sSecretKey: key  # Key within the Kubernetes Secret
-    # Add more secrets as needed for other internal services
-    # - name: another-service-auth
-    #   cloudSecretName: ""
-    #   k8sSecretName: another-service-auth
-    #   k8sSecretKey: key
 
   # Azure-specific provider configuration (only needed when provider: azure)
   azure:
