@@ -30,7 +30,7 @@ Environment variables can be defined at multiple levels, with the following prec
 5. Global environment variables (`global.env`)
 6. Legacy global environment variables (`global.extraEnv`)
 
-Example:
+#### Examples Of `env` at different levels
 
 ```yaml
 # Global environment variables (lowest precedence)
@@ -51,6 +51,71 @@ containers:
 ```
 
 In this example, the `LOG_LEVEL` for the `app` container would be set to `trace`.
+
+#### Examples of different `env` values:
+At any of the difference env levels shown above the following patterns are allowed.
+
+[k8s ref envvar](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#envvar-v1-core)
+[k8s ref valueFrom](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#envvarsource-v1-core)
+
+Basic Key/Value
+```yaml
+env:
+  EXAMPLE: "100"
+```
+
+```yaml
+env:
+  EXAMPLE_ALT:
+    value: "200"
+```
+
+Reference a configmap
+```yaml
+env:
+  EXAMPLE_FROM_CONFIGMAP:
+    valueFrom:
+      configMapKeyRef:
+        name: "my-configmap"
+        key: "configmap-key"
+```
+
+Reference a secret
+```yaml
+env:
+  EXAMPLE_FROM_SECRET:
+    valueFrom:
+      secretKeyRef:
+        name: "my-secret"
+        key: "secret-key"
+```
+
+Reference k8s data (fieldRef)
+Selects a field of the pod: supports `metadata.name`, `metadata.namespace`, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`, `spec.nodeName`, `spec.serviceAccountName`, `status.hostIP`, `status.podIP`, `status.podIPs`
+```yaml
+env:
+  EXAMPLE_FROM_FIELD_REF:
+    valueFrom:
+      fieldRef:
+        fieldPath: metadata.namespace
+  # practical example
+  DD_AGENT_HOST:
+    valueFrom:
+      fieldRef:
+        fieldPath: status.hostIP
+```
+
+Reference k8s data (resourceFieldRef)
+Selects a resource of the container: only resources limits and requests (`limits.cpu`, `limits.memory`, `limits.ephemeral-storage`, `requests.cpu`, `requests.memory` and `requests.ephemeral-storage`) are currently supported.
+```yaml
+env:
+  EXAMPLE_FROM_RESOURCE_FIELD_REF:
+    valueFrom:
+      resourceFieldRef:
+        resource: limits.memory
+```
+
+#### Examples of `envFrom` to set groups of env vars at once
 
 Additionally, environment variables can be sourced from ConfigMaps and Secrets using the `envFrom` field:
 
