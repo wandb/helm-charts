@@ -96,7 +96,94 @@ global:
   
   # Deployment size (small, medium, large)
   size: "small"
+  
+  # Global nodeSelector and tolerations applied to all deployments/pods
+  nodeSelector: {}
+  tolerations: []
+  
+  # Global priority class applied to all deployments/pods
+  priorityClassName: ""
 ```
+
+### Global Pod Scheduling
+
+The chart supports global `nodeSelector`, `tolerations`, and `priorityClassName` configuration that applies to **ALL components** (W&B services, databases, monitoring, etc.). This provides centralized control over pod scheduling and priority across your entire W&B deployment.
+
+#### Fallback Configuration Logic:
+
+The scheduling configuration uses **fallback behavior** (not cumulative):
+
+1. **First, check if component-specific config exists** → use that configuration
+2. **If not, check if chart-level config exists** → use that configuration  
+3. **If neither exists, check if global config exists** → use that configuration
+4. **If none exist** → no scheduling constraints are applied
+
+**Important**: Configurations are **NOT merged** - only the highest priority non-empty configuration is used.
+
+#### Universal Scheduling (Recommended for Production Deployments)
+
+Use `global.nodeSelector`, `global.tolerations`, and `global.priorityClassName` for scheduling constraints that should apply to **everything**:
+
+```yaml
+# Global fallback - used when components don't have their own config
+global:
+  nodeSelector:
+    environment: production
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: production
+  priorityClassName: "wandb-high-priority"
+```
+
+#### Component-Specific Overrides
+
+For component-specific scheduling requirements:
+
+```yaml
+# Global fallback - used when components don't have their own config
+global:
+  nodeSelector:
+    environment: production
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: production
+  priorityClassName: "wandb-high-priority"
+
+# Component-specific config - completely replaces global config for this component
+console:
+  nodeSelector:
+    node-type: management
+    # This completely replaces global.nodeSelector for console
+  tolerations:
+  - effect: NoSchedule
+    key: management-only
+    operator: Equal
+    value: "true"
+    # This completely replaces global.tolerations for console
+  priorityClassName: "wandb-management-priority"
+    # This completely replaces global.priorityClassName for console
+
+# Redis-specific scheduling (for third-party charts)
+redis:
+  master:
+    nodeSelector:
+      node-type: database
+    tolerations:
+    - effect: NoSchedule
+      key: database
+      operator: Equal
+      value: "true"
+```
+
+**Result**: 
+- Console uses its own scheduling config: `node-type: management` with management-only tolerations and `wandb-management-priority` priority class
+- Redis master uses its own scheduling config: `node-type: database`  
+- All other W&B components use the global production scheduling fallback including the `wandb-high-priority` priority class
+- No configuration merging occurs - each component uses only its most specific available config
 
 ### Component-Specific Configuration
 

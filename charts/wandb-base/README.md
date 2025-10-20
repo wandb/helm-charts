@@ -165,8 +165,11 @@ Container images can be defined at multiple levels, with the following precedenc
 
 The image configuration at each level includes:
 - `repository`: The image repository
-- `tag`: The image tag
+- `tag`: The image tag (optional)
+- `digest`: The image digest for immutable image references (optional)
 - `pullPolicy`: The image pull policy
+
+**Image Reference Precedence:** When both `digest` and `tag` are provided, `digest` takes precedence for enhanced security and immutability. If neither is provided, the image defaults to `:latest`.
 
 When a container doesn't specify its own image configuration, it inherits the chart-level image configuration. This allows you to set a default image for all containers while still being able to override it for specific containers.
 
@@ -182,20 +185,35 @@ image:
 # Container-specific image configurations
 containers:
   app:
-    # This container uses its own image configuration
+    # This container uses digest for immutable reference (most secure)
     image:
       repository: myapp
-      tag: "v1.0.0"
+      digest: "sha256:abc123def456..."  # digest takes precedence over tag
+      tag: "v1.0.0"                    # ignored when digest is provided
       pullPolicy: Always
+  worker:
+    # This container uses a specific tag
+    image:
+      repository: worker
+      tag: "v2.1.0"
+      pullPolicy: IfNotPresent
   sidecar:
     # This container doesn't specify an image, so it will use the chart-level image
     env:
       SIDECAR_MODE: "true"
+  monitor:
+    # This container has empty tag/digest, so it defaults to :latest
+    image:
+      repository: monitor
+      # tag: ""    # empty - will default to :latest
+      # digest: "" # empty - will default to :latest
 ```
 
 In this example:
-- The `app` container will use the image `myapp:v1.0.0` with pull policy `Always`
+- The `app` container will use the digest `myapp@sha256:abc123def456...` (digest takes precedence)
+- The `worker` container will use the tag `worker:v2.1.0`
 - The `sidecar` container will use the chart-level image `nginx:1.21.6` with pull policy `IfNotPresent`
+- The `monitor` container will default to `monitor:latest` (fallback when both tag and digest are empty)
 
 ### Global Common Labels and Annotations
 
@@ -293,6 +311,119 @@ deployment:
 
 **Result**: Every resource gets the common labels/annotations, plus any resource-specific ones, with proper precedence handling.
 
+### Global Pod Scheduling
+
+The chart supports global `nodeSelector`, `tolerations`, and `priorityClassName` configuration that applies to **ALL pods** (deployments, jobs, cronjobs, etc.). This provides centralized control over pod scheduling constraints and priority while allowing for component-specific overrides.
+
+#### Fallback Configuration Logic:
+
+The scheduling configuration uses **fallback behavior** (not cumulative):
+
+1. **First, check if pod-specific config exists** → use that configuration
+2. **If not, check if chart-level config exists** → use that configuration  
+3. **If neither exists, check if global config exists** → use that configuration
+4. **If none exist** → no scheduling constraints are applied
+
+**Important**: Configurations are **NOT merged** - only the highest priority non-empty configuration is used.
+
+#### Universal Scheduling (Recommended for Production/Dedicated Nodes)
+
+Use `global.nodeSelector`, `global.tolerations`, and `global.priorityClassName` for scheduling constraints that should apply to **all pods**:
+
+```yaml
+# Global configuration - applies to all pods that don't have more specific config
+global:
+  nodeSelector:
+    environment: production
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: production
+  priorityClassName: "high-priority"
+
+# Chart-level configuration - overrides global for this chart only
+nodeSelector:
+  workload-type: api-server
+  # This completely replaces the global nodeSelector
+  # (no merging with global.nodeSelector)
+priorityClassName: "api-priority"
+  # This completely replaces the global priorityClassName
+```
+
+#### Component-Specific Overrides
+
+For pod-specific scheduling requirements:
+
+```yaml
+# Global settings - used as fallback when no more specific config exists
+global:
+  nodeSelector:
+    environment: production
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: production
+  priorityClassName: "high-priority"
+
+# Chart-level settings - completely override global settings
+nodeSelector:
+  workload-type: backend
+  # The global nodeSelector is ignored for this chart
+priorityClassName: "backend-priority"
+  # The global priorityClassName is ignored for this chart
+
+# Pod-specific overrides - completely override chart-level and global settings
+jobs:
+  migration:
+    nodeSelector:
+      workload-type: database-maintenance
+      # All global and chart-level nodeSelector config is ignored for this job
+    tolerations:
+    - effect: NoSchedule
+      key: maintenance
+      operator: Equal
+      value: "true"
+      # All global and chart-level tolerations are ignored for this job
+    priorityClassName: "maintenance-priority"
+      # All global and chart-level priorityClassName is ignored for this job
+```
+
+#### Complete Example
+
+```yaml
+# Global fallback - used when no more specific config exists
+global:
+  nodeSelector:
+    environment: production
+    kubernetes.io/arch: amd64
+  tolerations:
+  - effect: NoSchedule
+    key: dedicated
+    operator: Equal
+    value: production
+  priorityClassName: "production-priority"
+
+# Chart-level config - completely replaces global config for this chart
+nodeSelector:
+  component: api-server
+priorityClassName: "api-server-priority"
+
+# Pod-specific config - completely replaces chart-level and global config
+jobs:
+  backup:
+    nodeSelector:
+      workload-type: maintenance
+    priorityClassName: "maintenance-priority"
+    # No tolerations defined, so no tolerations are applied (not even global ones)
+```
+
+**Result**: 
+- Most pods in this chart use `nodeSelector: {component: api-server}` and `priorityClassName: "api-server-priority"` (chart-level config)
+- The backup job uses `nodeSelector: {workload-type: maintenance}`, `priorityClassName: "maintenance-priority"`, and no tolerations
+- Other charts without their own configuration would use the global production configuration
+
 ## Common Configuration Options
 
 ### Basic Chart Configuration
@@ -317,6 +448,7 @@ deployment:
 | `securityContext`           | Default security context for containers | See values.yaml |
 | `nodeSelector`              | Node selector for pods                  | `{}`            |
 | `tolerations`               | Tolerations for pods                    | `[]`            |
+| `priorityClassName`         | Priority class for pods                 | `""`            |
 | `affinity`                  | Affinity rules for pods                 | `{}`            |
 | `topologySpreadConstraints` | Topology spread constraints for pods    | See values.yaml |
 
