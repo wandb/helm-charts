@@ -1592,6 +1592,45 @@ data:
   MYSQL_DATABASE: "wandb_local"
   MYSQL_USER: "wandb"
 ---
+# Source: operator-wandb/templates/nginx.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-nginx-configmap
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: operator-wandb
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  nginx.conf: |
+    worker_processes  auto;
+
+    error_log  /var/log/nginx/error.log notice;
+    pid        /tmp/nginx.pid;
+
+
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+      server {
+        listen 8080;
+        proxy_set_header Host $host:8080;
+        location / {
+          proxy_pass http://chartsnap-app:8080;
+        }
+        location /oidc {
+          proxy_pass http://chartsnap-app:8080;
+        }
+        location /console {
+          proxy_pass http://chartsnap-console:8082;
+        }
+      }
+    }
+---
 # Source: operator-wandb/templates/parquet.yaml
 apiVersion: v1
 kind: ConfigMap

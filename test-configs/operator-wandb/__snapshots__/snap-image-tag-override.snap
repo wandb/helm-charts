@@ -36,7 +36,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: anaconda2
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "anacdigest12"
+    app.kubernetes.io/version: "anacondatag"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -120,7 +120,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: executor
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "execdigest12"
+    app.kubernetes.io/version: "executortag"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -141,7 +141,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: filestream
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "filestream12"
+    app.kubernetes.io/version: "filestreamtag"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -162,7 +162,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: flat-run-fields-updater
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "frfudigest12"
+    app.kubernetes.io/version: "flatrunfieldsupdatertag"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -246,7 +246,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: anaconda2
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "anacdigest12"
+    app.kubernetes.io/version: "anacondatag"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -298,7 +298,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: executor
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "execdigest12"
+    app.kubernetes.io/version: "executortag"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -311,7 +311,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: filestream
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "filestream12"
+    app.kubernetes.io/version: "filestreamtag"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -324,7 +324,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: flat-run-fields-updater
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "frfudigest12"
+    app.kubernetes.io/version: "flatrunfieldsupdatertag"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -1617,6 +1617,45 @@ data:
   MYSQL_DATABASE: "wandb_local"
   MYSQL_USER: "wandb"
 ---
+# Source: operator-wandb/templates/nginx.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-nginx-configmap
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: operator-wandb
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  nginx.conf: |
+    worker_processes  auto;
+
+    error_log  /var/log/nginx/error.log notice;
+    pid        /tmp/nginx.pid;
+
+
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+      server {
+        listen 8080;
+        proxy_set_header Host $host:8080;
+        location / {
+          proxy_pass http://chartsnap-app:8080;
+        }
+        location /oidc {
+          proxy_pass http://chartsnap-app:8080;
+        }
+        location /console {
+          proxy_pass http://chartsnap-console:8082;
+        }
+      }
+    }
+---
 # Source: operator-wandb/templates/parquet.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -2074,7 +2113,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: anaconda2
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "anacdigest12"
+    app.kubernetes.io/version: "anacondatag"
     app.kubernetes.io/managed-by: Helm
 spec:
   type: ClusterIP
@@ -2528,7 +2567,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: anaconda2
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "anacdigest12"
+    app.kubernetes.io/version: "anacondatag"
     app.kubernetes.io/managed-by: Helm
   annotations:
     reloader.stakater.com/auto: "true"
@@ -2549,7 +2588,7 @@ spec:
         helm.sh/chart: anaconda2-0.11.3
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "anacdigest12"
+        app.kubernetes.io/version: "anacondatag"
         app.kubernetes.io/managed-by: Helm
     spec:
       containers:
@@ -2573,7 +2612,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/anaconda2@sha256:anacdigest12excludefromlabel"
+        image: "wandb/anaconda2:anacondatag"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
@@ -3855,7 +3894,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: executor
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "execdigest12"
+    app.kubernetes.io/version: "executortag"
     app.kubernetes.io/managed-by: Helm
   annotations:
     reloader.stakater.com/auto: "true"
@@ -3873,7 +3912,7 @@ spec:
         helm.sh/chart: executor-0.11.3
         app.kubernetes.io/name: executor
         app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "execdigest12"
+        app.kubernetes.io/version: "executortag"
         app.kubernetes.io/managed-by: Helm
     spec:
       containers:
@@ -4034,7 +4073,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary@sha256:execdigest12excludefromlabel"
+        image: "wandb/megabinary:executortag"
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -4101,7 +4140,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: filestream
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "filestream12"
+    app.kubernetes.io/version: "filestreamtag"
     app.kubernetes.io/managed-by: Helm
   annotations:
     reloader.stakater.com/auto: "true"
@@ -4122,7 +4161,7 @@ spec:
         helm.sh/chart: filestream-0.11.3
         app.kubernetes.io/name: filestream
         app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "filestream12"
+        app.kubernetes.io/version: "filestreamtag"
         app.kubernetes.io/managed-by: Helm
     spec:
       containers:
@@ -4285,7 +4324,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary@sha256:filestream12excludefromlabel"
+        image: "wandb/megabinary:filestreamtag"
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -4352,7 +4391,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: flat-run-fields-updater
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "frfudigest12"
+    app.kubernetes.io/version: "flatrunfieldsupdatertag"
     app.kubernetes.io/managed-by: Helm
   annotations:
     reloader.stakater.com/auto: "true"
@@ -4373,7 +4412,7 @@ spec:
         helm.sh/chart: flat-run-fields-updater-0.11.3
         app.kubernetes.io/name: flat-run-fields-updater
         app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "frfudigest12"
+        app.kubernetes.io/version: "flatrunfieldsupdatertag"
         app.kubernetes.io/managed-by: Helm
     spec:
       containers:
@@ -4518,7 +4557,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary@sha256:frfudigest12excludefromlabel"
+        image: "wandb/megabinary:flatrunfieldsupdatertag"
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -5704,7 +5743,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: anaconda2
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "anacdigest12"
+    app.kubernetes.io/version: "anacondatag"
     app.kubernetes.io/managed-by: Helm
 spec:
   scaleTargetRef:
@@ -5768,7 +5807,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: executor
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "execdigest12"
+    app.kubernetes.io/version: "executortag"
     app.kubernetes.io/managed-by: Helm
 spec:
   scaleTargetRef:
@@ -5800,7 +5839,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: filestream
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "filestream12"
+    app.kubernetes.io/version: "filestreamtag"
     app.kubernetes.io/managed-by: Helm
 spec:
   scaleTargetRef:
@@ -5832,7 +5871,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: flat-run-fields-updater
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "frfudigest12"
+    app.kubernetes.io/version: "flatrunfieldsupdatertag"
     app.kubernetes.io/managed-by: Helm
 spec:
   scaleTargetRef:
