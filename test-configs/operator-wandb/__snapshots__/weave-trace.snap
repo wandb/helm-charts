@@ -1875,6 +1875,7 @@ data:
       server {
         listen 8080;
         proxy_set_header Host $host:8080;
+        client_max_body_size 0;
         location / {
           proxy_pass http://chartsnap-app:8080;
         }
@@ -1886,6 +1887,10 @@ data:
         }
         location /traces {
           proxy_pass http://chartsnap-weave-trace:8722;
+        }
+        location /bucket {
+          proxy_set_header Host minio.minio.svc.cluster.local:9000;
+          proxy_pass http://minio.minio.svc.cluster.local:9000;
         }
       }
     }
@@ -7234,7 +7239,7 @@ spec:
     image: python:3.10
     env:
     - name: WANDB_BASE_URL
-      value: "http://chartsnap-app:8080"
+      value: "http://chartsnap-nginx:8080"
     - name: WANDB_API_KEY
       value: "local-123456789-123456789-123456789-1234"
     command:
@@ -7262,9 +7267,7 @@ spec:
     image: python:3.10
     env:
     - name: WANDB_BASE_URL
-      value: "http://chartsnap-app:8080"
-    - name: WF_TRACE_SERVER_URL
-      value: "http://chartsnap-weave-trace:8722/traces"
+      value: "http://chartsnap-nginx:8080"
     - name: WANDB_API_KEY
       value: "local-123456789-123456789-123456789-1234"
     command:

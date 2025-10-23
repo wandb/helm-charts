@@ -102,6 +102,8 @@ if settings.get("installIngress"):
         ]
     )
 
+k8s_yaml('./test-configs/keycloak/default.yaml')
+
 if current_values.get('global', {}).get('pubSub', {}).get('enabled', False):
     k8s_yaml(helm('./charts/wandb-base', 'pubsub', values=['./test-configs/pubsub/values.yaml']))
 
