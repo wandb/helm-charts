@@ -2083,6 +2083,8 @@ weave-trace-worker:
     tag: latest
   datadog:
     enabled: false
+  secretsStore:
+    enabled: false
   envFrom:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
@@ -2098,6 +2100,8 @@ weave-trace-worker:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+    WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME:
+      value: weave-worker-auth
   containers:
     weave-trace-worker:
       command:
@@ -2109,10 +2113,129 @@ weave-trace-worker:
         - name: http
           containerPort: 8080
           protocol: TCP
+      volumeMountsTpls:
+        - '{{ include "wandb.weaveWorkerSecretStoreVolumeMounts" . }}'
+  volumesTpls:
+    - '{{ include "wandb.weaveWorkerSecretStoreVolumes" . }}'
   service:
     ports:
       - name: http
         port: 8722
+        protocol: TCP
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
+    medium:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+
+weave-evaluate-model-worker:
+  install: false
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/weave-trace
+    tag: latest
+  datadog:
+    enabled: false
+  secretsStore:
+    enabled: false
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
+  env:
+    WF_CLICKHOUSE_PASS:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
+          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+    WANDB_INTERNAL_SERVICE_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: weave-worker-auth
+          key: key
+    WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME:
+      value: weave-worker-auth
+  containers:
+    weave-evaluate-model-worker:
+      command:
+        - python
+      args:
+        - "-m"
+        - "src.workers.evaluate_model_worker.evaluate_model_worker"
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+      volumeMountsTpls:
+        - '{{ include "wandb.weaveWorkerSecretStoreVolumeMounts" . }}'
+  volumesTpls:
+    - '{{ include "wandb.weaveWorkerSecretStoreVolumes" . }}'
+  service:
+    ports:
+      - name: http
+        port: 8723
         protocol: TCP
   size: ""
   sizing:
@@ -2366,7 +2489,7 @@ etcd:
 bufstream:
   install: false
   image:
-    repository: bitnamilegacy/bufsteam
+    repository: bitnamilegacy/bufstream
   global:
     security:
       allowInsecureImages: true
@@ -2444,3 +2567,30 @@ clickhouse:
       enabled: true
       size: 8Gi
       storageClass: ""
+
+# Secrets Store CSI Driver configuration for syncing secrets from cloud providers
+# This enables mounting secrets from AWS Secrets Manager, GCP Secret Manager, or Azure Key Vault
+# as Kubernetes Secrets, making them available to application pods without SDK dependencies.
+secretsStore:
+  # Set to true to enable secrets syncing from cloud provider secret stores
+  enabled: false
+
+  # Supported providers: aws, gcp, azure
+  provider: ""
+
+  # List of secrets to sync from the cloud provider
+  # Each secret will be mounted and synced to a Kubernetes Secret
+  # Each entry creates a separate SecretProviderClass with the same name as the 'name' field
+  secrets: []
+    # - name: weave-worker-auth  # Used as SecretProviderClass name and objectAlias/path
+    #   cloudSecretName: "projects/123/secrets/weave-worker-key"  # GCP format
+    #   # cloudSecretName: "arn:aws:secretsmanager:region:account:secret:name"  # AWS format
+    #   # cloudSecretName: "weave-worker-key"  # Azure format
+    #   k8sSecretName: weave-worker-auth  # Name of the Kubernetes Secret to create
+    #   k8sSecretKey: key  # Key within the Kubernetes Secret
+
+  # Azure Key Vault configuration (required when provider is 'azure')
+  azure:
+    keyVaultName: ""  # Name of the Azure Key Vault
+    clientID: ""  # Azure workload identity client ID
+    tenantId: ""  # Azure tenant ID
