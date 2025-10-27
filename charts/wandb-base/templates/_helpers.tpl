@@ -135,7 +135,7 @@ type: OnDelete
     {{- $desiredReplicas = $hpaSizing.replicaCount }}
   {{- end }}
   {{- $hpa := lookup "autoscaling/v2" "HorizontalPodAutoscaler" .Release.Namespace (include "wandb-base.fullname" . | trimAll "") }}
-    {{- if and $hpa (gt $hpa.status.currentReplicas 0) }}
+    {{- if and $hpa $hpa.status (hasKey $hpa.status "currentReplicas") (gt $hpa.status.currentReplicas 0) }}
       {{- $desiredReplicas = $hpa.status.currentReplicas }}
     {{- end }}
 {{- end }}
