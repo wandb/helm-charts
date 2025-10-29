@@ -151,3 +151,28 @@ Common annotations - merges global and local common annotations
 {{- toYaml $commonAnnotations }}
 {{- end }}
 {{- end }}
+
+{{/*
+CSI driver volume mount for secrets store
+*/}}
+{{- define "wandb-base.secretsStoreVolumeMount" -}}
+{{- if and (hasKey .Values "secretsStore") .Values.secretsStore.enabled }}
+- name: secrets-store
+  mountPath: /mnt/secrets-store
+  readOnly: true
+{{- end }}
+{{- end }}
+
+{{/*
+CSI driver volume for secrets store
+*/}}
+{{- define "wandb-base.secretsStoreVolume" -}}
+{{- if and (hasKey .Values "secretsStore") .Values.secretsStore.enabled }}
+- name: secrets-store
+  csi:
+    driver: secrets-store.csi.k8s.io
+    readOnly: true
+    volumeAttributes:
+      secretProviderClass: "{{ .Values.secretsStore.secretProviderClassName | default "weave-worker-auth" }}"
+{{- end }}
+{{- end }}
