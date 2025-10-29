@@ -135,7 +135,7 @@ type: OnDelete
     {{- $desiredReplicas = $hpaSizing.replicaCount }}
   {{- end }}
   {{- $hpa := lookup "autoscaling/v2" "HorizontalPodAutoscaler" .Release.Namespace (include "wandb-base.fullname" . | trimAll "") }}
-    {{- if and $hpa (gt $hpa.status.currentReplicas 0) }}
+    {{- if and $hpa $hpa.status (hasKey $hpa.status "currentReplicas") (gt $hpa.status.currentReplicas 0) }}
       {{- $desiredReplicas = $hpa.status.currentReplicas }}
     {{- end }}
 {{- end }}
@@ -149,5 +149,30 @@ Common annotations - merges global and local common annotations
 {{- $commonAnnotations := merge (default (dict) .Values.common.annotations) (default (dict) .Values.global.common.annotations) }}
 {{- if $commonAnnotations }}
 {{- toYaml $commonAnnotations }}
+{{- end }}
+{{- end }}
+
+{{/*
+CSI driver volume mount for secrets store
+*/}}
+{{- define "wandb-base.secretsStoreVolumeMount" -}}
+{{- if and (hasKey .Values "secretsStore") .Values.secretsStore.enabled }}
+- name: secrets-store
+  mountPath: /mnt/secrets-store
+  readOnly: true
+{{- end }}
+{{- end }}
+
+{{/*
+CSI driver volume for secrets store
+*/}}
+{{- define "wandb-base.secretsStoreVolume" -}}
+{{- if and (hasKey .Values "secretsStore") .Values.secretsStore.enabled }}
+- name: secrets-store
+  csi:
+    driver: secrets-store.csi.k8s.io
+    readOnly: true
+    volumeAttributes:
+      secretProviderClass: "{{ .Values.secretsStore.secretProviderClassName | default "weave-worker-auth" }}"
 {{- end }}
 {{- end }}
