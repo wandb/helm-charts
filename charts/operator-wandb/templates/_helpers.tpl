@@ -93,6 +93,7 @@ https://api.wandb.ai/email/dispatch
 {{- end -}}
 
 {{/*
+CSI Driver Secrets Store volumeMounts for weave workers
 This template conditionally adds volumeMounts for the Secrets Store CSI Driver
 when secretsStore.enabled is true
 */}}
@@ -102,9 +103,10 @@ when secretsStore.enabled is true
   mountPath: /mnt/secrets-store
   readOnly: true
 {{- end }}
-{{- end }}
+{{- end -}}
 
 {{/*
+CSI Driver Secrets Store volumes for weave workers
 This template conditionally adds volumes for the Secrets Store CSI Driver
 when secretsStore.enabled is true
 */}}
@@ -115,6 +117,6 @@ when secretsStore.enabled is true
     driver: secrets-store.csi.k8s.io
     readOnly: true
     volumeAttributes:
-      secretProviderClass: "weave-worker-auth"
+      secretProviderClass: weave-worker-auth
 {{- end }}
-{{- end }}
+{{- end -}}
