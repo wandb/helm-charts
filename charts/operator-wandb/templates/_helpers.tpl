@@ -91,3 +91,32 @@ smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.passwor
 https://api.wandb.ai/email/dispatch
 {{- end -}}
 {{- end -}}
+
+{{/*
+CSI Driver Secrets Store volumeMounts for weave workers
+This template conditionally adds volumeMounts for the Secrets Store CSI Driver
+when secretsStore.enabled is true
+*/}}
+{{- define "wandb.weaveWorkerSecretStoreVolumeMounts" -}}
+{{- if and (hasKey .Values "secretsStore") .Values.secretsStore.enabled }}
+- name: secrets-store
+  mountPath: /mnt/secrets-store
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{/*
+CSI Driver Secrets Store volumes for weave workers
+This template conditionally adds volumes for the Secrets Store CSI Driver
+when secretsStore.enabled is true
+*/}}
+{{- define "wandb.weaveWorkerSecretStoreVolumes" -}}
+{{- if and (hasKey .Values "secretsStore") .Values.secretsStore.enabled }}
+- name: secrets-store
+  csi:
+    driver: secrets-store.csi.k8s.io
+    readOnly: true
+    volumeAttributes:
+      secretProviderClass: weave-worker-auth
+{{- end }}
+{{- end -}}
