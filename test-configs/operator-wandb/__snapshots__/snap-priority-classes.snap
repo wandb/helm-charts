@@ -1159,6 +1159,7 @@ metadata:
   labels:
 data:
   GORILLA_PORT: "8081"
+  GORILLA_FILE_HOST: "http://localhost:8080"
   GORILLA_FRONTEND_HOST: "http://localhost:8080"
   GORILLA_LICENSE_CERT_PATH: "/jwks.json"
   GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL: "true"
@@ -1167,6 +1168,7 @@ data:
   GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
   GORILLA_LIMITER: "noop://"
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
+  GORILLA_ONPREM_API_KEY_PREFIX: "local"
   GORILLA_SCHEMA_FILE: "/schema.graphql"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_PORT: "8087"
@@ -1205,7 +1207,7 @@ metadata:
   name: chartsnap-bucket-configmap
   labels:
 data:
-  BUCKET_NAME: "minio.minio.svc.cluster.local:9000/bucket"
+  BUCKET_NAME: "minio:9000/bucket"
   BUCKET_PATH: ""
   AWS_REGION: "us-east-1"
   AWS_S3_KMS_ID: ""
@@ -1299,6 +1301,10 @@ metadata:
   name: chartsnap-frontend-configmap
   labels:
 data:
+  FRONTEND_APP_BACKEND: "chartsnap-app:8080"
+  FRONTEND_AUTH_BACKEND: "chartsnap-app:8080"
+  FRONTEND_WEAVE_BACKEND: "chartsnap-weave:9994"
+  FRONTEND_LOCAL_BACKEND: "chartsnap-app:8083"
   REACT_APP_GIT_TAG: "HEAD"
   REACT_APP_HOST: "http://localhost:8080"
   REACT_APP_ENVIRONMENT_NAME: "local"
@@ -1400,8 +1406,9 @@ metadata:
   labels:
 data:
   # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
+  GORILLA_STATSD_HOST: ""
+  GORILLA_STATSD_PORT: "0"
   GORILLA_LICENSE_CERT_PATH: /jwks.json
-  GORILLA_STATSD_PORT: "8125"
   # T-shirt size for deployment
   GORILLA_TSHIRT_SIZE: "testing"
   GORILLA_ONPREM: "true"
@@ -1519,9 +1526,6 @@ data:
         proxy_set_header Host $host:8080;
         client_max_body_size 0;
         location / {
-          proxy_pass http://chartsnap-app:8080;
-        }
-        location /oidc {
           proxy_pass http://chartsnap-app:8080;
         }
         location /console {
@@ -4535,7 +4539,7 @@ metadata:
 spec:
   containers:
   - name: wandb-verify
-    image: python:3.10
+    image: python:3.12
     env:
     - name: WANDB_BASE_URL
       value: "http://chartsnap-nginx:8080"
@@ -4544,7 +4548,7 @@ spec:
     command:
     - sh
     - -c
-    - "pip install wandb==0.21.1 && wandb verify"
+    - "pip install wandb && wandb verify"
   restartPolicy: Never
 ---
 # Source: operator-wandb/charts/appRenamePostHook/templates/job.yaml

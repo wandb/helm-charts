@@ -1,7 +1,7 @@
 global:
   bucket:
     provider: "s3"
-    name: "minio.minio.svc.cluster.local:9000/bucket"
+    name: "minio:9000/bucket"
     region: "us-east-1"
     accessKey: "minio"
     secretKey: "testpassword"
@@ -47,8 +47,15 @@ global:
 app:
   env:
     GORILLA_STORAGE_BUCKET: "s3://local-files"
+    GORILLA_FILEMETA_ENABLED: "false"
 
 executor:
+  install: true
+
+filemeta:
+  install: true
+
+frontend:
   install: true
 
 flat-run-fields-updater:
@@ -70,9 +77,13 @@ nginx:
   install: true
   additionalServices:
     bucket:
-      host: "http://minio.minio.svc.cluster.local:9000"
+      host: "http://minio:9000"
       headers:
-        Host: "minio.minio.svc.cluster.local:9000"
+        Host: "minio:9000"
+    bucket-admin:
+      host: "http://minio:9090"
+      headers:
+        Host: "minio:9090"
 
 ingress:
   install: false
@@ -80,6 +91,8 @@ ingress:
 
 mysql:
   install: true
+  image:
+    tag: "8.4"
   resources:
     requests:
       cpu: "40m"
