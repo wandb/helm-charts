@@ -1,18 +1,17 @@
+load('ext://namespace', 'namespace_create')
 #default values
 settings = {
     "allowedContexts": [
         "docker-desktop",
         "minikube",
         "kind-kind",
+        "kind-wandb-helm-charts",
+        "orbstack",
     ],
     "forwardedPorts": {
-        "app": 8080,
-        "console": 8082,
-        "weave-trace": 8722,
-        "anaconda2": "8084:8082",
+        "nginx": 8080,
     },
     "installMinio": True,
-    "installIngress": False,
     "values": "default",
     "defaultValues": {
         "global.mysql.password": "password",
@@ -51,65 +50,23 @@ for key, value in local_values.items():
     else:
         current_values[key] = value
 
+current_namespace = k8s_namespace()
+namespace_create(current_namespace)
+
 if settings.get("installMinio"):
     k8s_yaml('./test-configs/minio/default.yaml')
     k8s_resource(
         'minio',
         'Minio',
         objects=[
-            'minio:service',
-            'minio:namespace'
+            'minio:service'
         ],
         port_forwards="9090:9090"
     )
 
-if settings.get("installIngress"):
-    k8s_yaml('./test-configs/ingress/default.yaml')
-    k8s_resource(
-        new_name='ingress-nginx',
-        objects=[
-            'ingress-nginx:namespace',
-            'ingress-nginx:serviceaccount',
-            'ingress-nginx:role',
-            'ingress-nginx-admission:role',
-            'ingress-nginx:clusterrole',
-            'ingress-nginx-admission:clusterrole',
-            'ingress-nginx:rolebinding',
-            'ingress-nginx-admission:rolebinding',
-            'ingress-nginx:clusterrolebinding',
-            'ingress-nginx-admission:clusterrolebinding',
-            'ingress-nginx-admission:serviceaccount',
-            'ingress-nginx-controller:configmap',
-        ]
-    )
-    k8s_resource(
-        'ingress-nginx-admission-create',
-        resource_deps=[
-            'ingress-nginx'
-        ]
-    )
-    k8s_resource(
-        'ingress-nginx-admission-patch',
-        resource_deps=[
-            'ingress-nginx'
-        ]
-    )
-    k8s_resource(
-        'ingress-nginx-controller',
-        objects=[
-            'nginx:ingressclass',
-            'ingress-nginx-admission:validatingwebhookconfiguration'
-        ],
-        resource_deps=[
-            'ingress-nginx', 'ingress-nginx-admission-create'
-        ]
-    )
-
-if current_values.get('global', {}).get('pubSub', {}).get('enabled', False):
-    k8s_yaml(helm('./charts/wandb-base', 'pubsub', values=['./test-configs/pubsub/values.yaml']))
-
-if current_values.get('global', {}).get('bigtable', {}).get('v2', {}).get('enabled', False):
-    k8s_yaml(helm('./charts/wandb-base', 'bigtable', values=['./test-configs/bigtable/values.yaml']))
+k8s_yaml('./test-configs/keycloak/default.yaml')
+k8s_yaml(helm('./charts/wandb-base', 'pubsub', namespace=current_namespace, values=['./test-configs/pubsub/values.yaml']))
+k8s_yaml(helm('./charts/wandb-base', 'bigtable', namespace=current_namespace, values=['./test-configs/bigtable/values.yaml']))
 
 helmSetValues = []
 for key, value in settings["defaultValues"].items():
@@ -122,62 +79,63 @@ if current_values.get('anaconda2', {}).get('install', False):
     helmSetValues.append('app.env.ANACONDA_ENABLED=false')
     helmSetValues.append('global.anaconda2.enabled=true')
 
-k8s_yaml(helm('./charts/operator-wandb', 'wandb', values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")], set=helmSetValues))
+k8s_yaml(helm('./charts/operator-wandb', 'wandb', namespace=current_namespace, values=['./charts/operator-wandb/values.yaml', settings.get("operator-wandb-values")], set=helmSetValues))
 app_names = {}
 for app in ['app', 'console', 'executor', 'parquet', 'weave', 'weave-trace']:
     app_names[app] = 'wandb-' + app
     postfix = current_values.get(app, {}).get('deploymentPostfix', "")
     if postfix != "":
         app_names[app] += '-' + postfix
-k8s_resource(app_names['app'], port_forwards=settings["forwardedPorts"]["app"], objects=['wandb-app:ServiceAccount:default'])
-k8s_resource(app_names['console'], port_forwards=settings["forwardedPorts"]["console"], objects=['wandb-console:ServiceAccount:default'])
+k8s_resource(app_names['app'], objects=['wandb-app:ServiceAccount:' + current_namespace])
+k8s_resource(app_names['console'])
+k8s_resource("wandb-nginx", port_forwards=settings["forwardedPorts"]["nginx"], objects=['wandb-console:ServiceAccount:' + current_namespace])
 if current_values.get('anaconda2', {}).get('install', False):
-    k8s_resource('wandb-anaconda2', port_forwards=settings["forwardedPorts"]["anaconda2"], objects=['wandb-anaconda2:ServiceAccount:default'])
+    k8s_resource('wandb-anaconda2', objects=['wandb-anaconda2:ServiceAccount:' + current_namespace])
 if current_values.get('executor', {}).get('install', False):
-    k8s_resource(app_names['executor'],objects=['wandb-executor:ServiceAccount:default'])
+    k8s_resource(app_names['executor'],objects=['wandb-executor:ServiceAccount:' + current_namespace])
 k8s_resource('wandb-mysql', trigger_mode=TRIGGER_MODE_MANUAL)
-k8s_resource('wandb-otel-daemonset',objects=['wandb-otel-daemonset:ServiceAccount:default', 'wandb-otel-daemonset:clusterrole:default', 'wandb-otel-daemonset:clusterrolebinding:default'])
-k8s_resource(app_names['parquet'],objects=['wandb-parquet:ServiceAccount:default'])
-k8s_resource('wandb-prometheus-server',objects=['wandb-prometheus-server:ServiceAccount:default', 'wandb-prometheus-server:clusterrole:default', 'wandb-prometheus-server:clusterrolebinding:default'])
-k8s_resource('wandb-redis-master',objects=['wandb-redis-master:ServiceAccount:default'])
+k8s_resource('wandb-otel-daemonset',objects=['wandb-otel-daemonset:ServiceAccount:' + current_namespace, 'wandb-otel-daemonset:clusterrole:' + current_namespace, 'wandb-otel-daemonset:clusterrolebinding:' + current_namespace])
+k8s_resource(app_names['parquet'],objects=['wandb-parquet:ServiceAccount:' + current_namespace])
+k8s_resource('wandb-prometheus-server',objects=['wandb-prometheus-server:ServiceAccount:' + current_namespace, 'wandb-prometheus-server:clusterrole:' + current_namespace, 'wandb-prometheus-server:clusterrolebinding:' + current_namespace])
+k8s_resource('wandb-redis-master',objects=['wandb-redis-master:ServiceAccount:' + current_namespace])
 if current_values.get('reloader', {}).get('install', False):
-    k8s_resource('wandb-reloader',objects=['wandb-reloader:ServiceAccount:default'])
-k8s_resource(app_names['weave'],objects=['wandb-weave:ServiceAccount:default'])
-if current_values.get('weave-trace', {}).get('install', False):
-    k8s_resource(app_names['weave-trace'], port_forwards=settings["forwardedPorts"]["weave-trace"])
+    k8s_resource('wandb-reloader',objects=['wandb-reloader:ServiceAccount:' + current_namespace])
+k8s_resource(app_names['weave'],objects=['wandb-weave:ServiceAccount:' + current_namespace])
+# if current_values.get('weave-trace', {}).get('install', False):
+#     k8s_resource(app_names['weave-trace'])
 
 configObjects = [
-    'wandb-api-configmap:configmap:default',
-    'wandb-app-configmap:configmap:default',
-    'wandb-bucket-configmap:configmap:default',
-    'wandb-bucket:secret:default',
-    'wandb-ca-certs:configmap:default',
-    'wandb-clickhouse-configmap:configmap:default',
-    'wandb-console-configmap:configmap:default',
-    'wandb-executor-configmap:configmap:default',
-    'wandb-flat-run-fields-updater-configmap:configmap:default',
-    'wandb-frontend-configmap:configmap:default',
-    'wandb-local-configmap:configmap:default',
-    'wandb-parquet-configmap:configmap:default',
-    'wandb-weave-trace-configmap:configmap:default',
-    'wandb-weave-configmap:configmap:default',
-    'wandb-filestream-configmap:configmap:default',
-    'wandb-global-secret:secret:default',
-    'wandb-glue-configmap:configmap:default',
-    'wandb-kafka-configmap:configmap:default',
-    'wandb-kafka:secret:default',
-    'wandb-mysql-configmap:configmap:default',
-    'wandb-redis-configmap:configmap:default',
-    'wandb-redis-secret:secret:default',
-    'wandb-gorilla-session-key:secret:default',
+    'wandb-api-configmap:configmap:' + current_namespace,
+    'wandb-app-configmap:configmap:' + current_namespace,
+    'wandb-bucket-configmap:configmap:' + current_namespace,
+    'wandb-bucket:secret:' + current_namespace,
+    'wandb-ca-certs:configmap:' + current_namespace,
+    'wandb-clickhouse-configmap:configmap:' + current_namespace,
+    'wandb-console-configmap:configmap:' + current_namespace,
+    'wandb-executor-configmap:configmap:' + current_namespace,
+    'wandb-flat-run-fields-updater-configmap:configmap:' + current_namespace,
+    'wandb-frontend-configmap:configmap:' + current_namespace,
+    'wandb-local-configmap:configmap:' + current_namespace,
+    'wandb-parquet-configmap:configmap:' + current_namespace,
+    'wandb-weave-trace-configmap:configmap:' + current_namespace,
+    'wandb-weave-configmap:configmap:' + current_namespace,
+    'wandb-filestream-configmap:configmap:' + current_namespace,
+    'wandb-global-secret:secret:' + current_namespace,
+    'wandb-glue-configmap:configmap:' + current_namespace,
+    'wandb-kafka-configmap:configmap:' + current_namespace,
+    'wandb-kafka:secret:' + current_namespace,
+    'wandb-mysql-configmap:configmap:' + current_namespace,
+    'wandb-redis-configmap:configmap:' + current_namespace,
+    'wandb-redis-secret:secret:' + current_namespace,
+    'wandb-gorilla-session-key:secret:' + current_namespace,
 ]
 
 # if current_values.get('weave-trace', {}).get('install', False):
-#     configObjects.append('wandb-clickhouse-configmap:configmap:default')
+#     configObjects.append('wandb-clickhouse-configmap:configmap:' + current_namespace)
 
 k8s_resource(
     new_name='wandb-configs',
     objects=configObjects
 )
-k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:default', 'wandb-clickhouse:secret:default'], trigger_mode=TRIGGER_MODE_MANUAL)
-k8s_resource(new_name='PVCs', objects=['wandb-mysql-data:PersistentVolumeClaim:default', 'wandb-prometheus-server:PersistentVolumeClaim:default'], trigger_mode=TRIGGER_MODE_MANUAL)
+k8s_resource(new_name='DO NOT REFRESH THESE', objects=['wandb-mysql:secret:' + current_namespace, 'wandb-clickhouse:secret:' + current_namespace], trigger_mode=TRIGGER_MODE_MANUAL)
+k8s_resource(new_name='PVCs', objects=['wandb-mysql-data:PersistentVolumeClaim:' + current_namespace, 'wandb-prometheus-server:PersistentVolumeClaim:' + current_namespace], trigger_mode=TRIGGER_MODE_MANUAL)
