@@ -48,6 +48,7 @@ jobs:
             "default",
             "executor-enabled",
             "fmb",
+            "oidc-enabled",
             # "runs-v2-bufstream", # TODO(dpanzella, zacharyb): Uncomment this when there is a fix for bufstream
             "separate-pods",
             "separate-pods-filemeta",
@@ -99,8 +100,20 @@ jobs:
         run: kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} apply -f test-configs/minio/default.yaml
         if: env.ACT || steps.list-changed.outputs.changed == 'true'
 
+      - name: Install Keycloak
+        run: kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} apply -f test-configs/keycloak/default.yaml
+        if: env.ACT || steps.list-changed.outputs.changed == 'true'
+
       - name: Wait for Minio to be Ready
         run: kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} -n minio wait --for=condition=Ready pod/minio --timeout=300s
+        if: env.ACT || steps.list-changed.outputs.changed == 'true'
+
+      - name: Install Keycloak
+        run: kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} apply -f test-configs/keycloak/default.yaml
+        if: env.ACT || steps.list-changed.outputs.changed == 'true'
+
+      - name: Wait for Keycloak to be Ready
+        run: kubectl --context kind-chart-testing-${{ matrix.k8s-version }}-${{ matrix.configuration }} wait --for=condition=Ready pod/keycloak-0 --timeout=300s
         if: env.ACT || steps.list-changed.outputs.changed == 'true'
 
       - name: Install pubsub and bigtable emulators
