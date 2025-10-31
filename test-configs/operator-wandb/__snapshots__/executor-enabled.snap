@@ -111,6 +111,27 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
+# Source: operator-wandb/charts/nginx/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-nginx
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: nginx
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
 # Source: operator-wandb/charts/parquet/templates/pdb.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -200,6 +221,19 @@ metadata:
   labels:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: executor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: operator-wandb/charts/nginx/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-nginx
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: nginx
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
@@ -1193,6 +1227,7 @@ metadata:
   labels:
 data:
   GORILLA_PORT: "8081"
+  GORILLA_FILE_HOST: "http://localhost:8080"
   GORILLA_FRONTEND_HOST: "http://localhost:8080"
   GORILLA_LICENSE_CERT_PATH: "/jwks.json"
   GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL: "true"
@@ -1201,6 +1236,7 @@ data:
   GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
   GORILLA_LIMITER: "noop://"
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
+  GORILLA_ONPREM_API_KEY_PREFIX: "local"
   GORILLA_SCHEMA_FILE: "/schema.graphql"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_PORT: "8087"
@@ -1239,7 +1275,7 @@ metadata:
   name: chartsnap-bucket-configmap
   labels:
 data:
-  BUCKET_NAME: "minio.minio.svc.cluster.local:9000/bucket"
+  BUCKET_NAME: "minio:9000/bucket"
   BUCKET_PATH: ""
   AWS_REGION: "us-east-1"
   AWS_S3_KMS_ID: ""
@@ -1434,8 +1470,9 @@ metadata:
   labels:
 data:
   # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
+  GORILLA_STATSD_HOST: ""
+  GORILLA_STATSD_PORT: "0"
   GORILLA_LICENSE_CERT_PATH: /jwks.json
-  GORILLA_STATSD_PORT: "8125"
   # T-shirt size for deployment
   GORILLA_TSHIRT_SIZE: "testing"
   GORILLA_ONPREM: "true"
@@ -1523,6 +1560,47 @@ data:
   MYSQL_HOST: "chartsnap-mysql"
   MYSQL_DATABASE: "wandb_local"
   MYSQL_USER: "wandb"
+---
+# Source: operator-wandb/templates/nginx.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-nginx-configmap
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: operator-wandb
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  nginx.conf: |
+    worker_processes  auto;
+
+    error_log  /var/log/nginx/error.log notice;
+    pid        /tmp/nginx.pid;
+
+
+    events {
+        worker_connections  1024;
+    }
+
+    http {
+      server {
+        listen 8080;
+        proxy_set_header Host $host:8080;
+        client_max_body_size 0;
+        location / {
+          proxy_pass http://chartsnap-app:8080;
+        }
+        location /console {
+          proxy_pass http://chartsnap-console:8082;
+        }
+        location /bucket {
+          proxy_set_header Host minio:9000;
+          proxy_pass http://minio:9000;
+        }
+      }
+    }
 ---
 # Source: operator-wandb/templates/parquet.yaml
 apiVersion: v1
@@ -2080,6 +2158,27 @@ spec:
     wandb.com/app-name: mysql-0.1.0
     app.kubernetes.io/managed-by: Helm
 ---
+# Source: operator-wandb/charts/nginx/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-nginx
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8080
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/instance: chartsnap
+---
 # Source: operator-wandb/charts/otel/charts/daemonset/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -2478,6 +2577,8 @@ spec:
         - configMapRef:
             name: chartsnap-anaconda2-configmap
         env:
+        - name: BUCKET_PROXY
+          value: "true"
         - name: DD_AGENT_HOST
           valueFrom:
             fieldRef:
@@ -2488,6 +2589,10 @@ spec:
               fieldPath: status.hostIP
         - name: GLOBAL_ADMIN_API_KEY
           value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -2738,6 +2843,8 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: BUCKET_PROXY
+          value: "true"
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
@@ -2748,8 +2855,12 @@ spec:
               key: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
               name: gorilla-coreweave-observability
               optional: true
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_GLUE_CONTAINER_PORT
           value: "8083"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE
           value: "/usr/local/bin/view-spec-updater-linux"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
@@ -2985,6 +3096,8 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: BUCKET_PROXY
+          value: "true"
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
@@ -2995,8 +3108,12 @@ spec:
               key: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
               name: gorilla-coreweave-observability
               optional: true
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_GLUE_CONTAINER_PORT
           value: "8083"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_GLUE_VIEW_SPEC_UPDATER_EXECUTABLE
           value: "/usr/local/bin/view-spec-updater-linux"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
@@ -3100,8 +3217,14 @@ spec:
         - configMapRef:
             name: chartsnap-console-configmap
         env:
+        - name: BUCKET_PROXY
+          value: "true"
         - name: GLOBAL_ADMIN_API_KEY
           value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -3346,8 +3469,14 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: BUCKET_PROXY
+          value: "true"
         - name: GLOBAL_ADMIN_API_KEY
           value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         - name: GORILLA_TASK_QUEUE
@@ -3417,6 +3546,104 @@ spec:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
           optional: true
+---
+# Source: operator-wandb/charts/nginx/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-nginx
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nginx
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: nginx-0.11.3
+        app.kubernetes.io/name: nginx
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: nginx
+        envFrom:
+        env:
+        - name: BUCKET_PROXY
+          value: "true"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "nginxinc/nginx-unprivileged:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - mountPath: /etc/nginx/nginx.conf
+          name: nginx-config
+          subPath: nginx.conf
+      serviceAccountName: chartsnap-nginx
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: nginx
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: nginx
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - configMap:
+          name: 'chartsnap-nginx-configmap'
+        name: nginx-config
 ---
 # Source: operator-wandb/charts/parquet/templates/deployment.yaml
 apiVersion: apps/v1
@@ -3603,8 +3830,14 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: BUCKET_PROXY
+          value: "true"
         - name: GLOBAL_ADMIN_API_KEY
           value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -3927,8 +4160,14 @@ spec:
         - configMapRef:
             name: chartsnap-weave-configmap
         env:
+        - name: BUCKET_PROXY
+          value: "true"
         - name: GLOBAL_ADMIN_API_KEY
           value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -3984,8 +4223,14 @@ spec:
         - configMapRef:
             name: chartsnap-weave-configmap
         env:
+        - name: BUCKET_PROXY
+          value: "true"
         - name: GLOBAL_ADMIN_API_KEY
           value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -4503,12 +4748,18 @@ spec:
                 secretKeyRef:
                   key: license
                   name: chartsnap-license
+            - name: BUCKET_PROXY
+              value: "true"
             - name: GLOBAL_ADMIN_API_KEY
               value: "local-123456789-123456789-123456789-1234"
+            - name: GORILLA_FILE_STORE_IS_PROXIED
+              value: "true"
             - name: GORILLA_GLUE_EXECUTE
               value: "true"
             - name: GORILLA_GLUE_EXECUTE_TASK_NAME
               value: "EXPORTHISTORYTOPARQUET"
+            - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+              value: "true"
             - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
               value: "true"
             securityContext:
@@ -4791,7 +5042,7 @@ spec:
     image: python:3.10
     env:
     - name: WANDB_BASE_URL
-      value: "http://chartsnap-app:8080"
+      value: "http://chartsnap-nginx:8080"
     - name: WANDB_API_KEY
       value: "local-123456789-123456789-123456789-1234"
     command:
@@ -4833,8 +5084,14 @@ spec:
         - /cleanup-scripts/post_upgrade.sh
         envFrom:
         env:
+        - name: BUCKET_PROXY
+          value: "true"
         - name: GLOBAL_ADMIN_API_KEY
           value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -4917,8 +5174,14 @@ spec:
         - /cleanup-scripts/pre_upgrade.sh
         envFrom:
         env:
+        - name: BUCKET_PROXY
+          value: "true"
         - name: GLOBAL_ADMIN_API_KEY
           value: "local-123456789-123456789-123456789-1234"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
