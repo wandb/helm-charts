@@ -1,4 +1,6 @@
 {{- define "wandb.caCertsVolumeMounts" -}}
+- name: wandb-ca-certs-root
+  mountPath: /usr/local/share/ca-certificates/
 - name: wandb-ca-certs
   mountPath: /usr/local/share/ca-certificates/inline
 - name: wandb-ca-certs-user
@@ -9,6 +11,8 @@
 {{- end -}}
 
 {{- define "wandb.caCertsVolumes" -}}
+- name: wandb-ca-certs-root
+  emptyDir: {}
 - name: wandb-ca-certs
   configMap:
     name: "{{ .Release.Name }}-ca-certs"
