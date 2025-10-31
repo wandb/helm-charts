@@ -38,7 +38,11 @@ Return the db database
 Return the db user
 */}}
 {{- define "wandb.mysql.user" -}}
-{{- print $.Values.global.mysql.user -}}
+  {{- if kindIs "map" $.Values.global.mysql.user -}}
+    {{- print "wandb" -}}
+  {{- else -}}
+    {{- print $.Values.global.mysql.user -}}
+  {{- end -}}
 {{- end -}}
 
 {{/*
