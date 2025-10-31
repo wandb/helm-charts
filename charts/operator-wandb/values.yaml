@@ -1492,11 +1492,6 @@ glue:
 
 metric-observer:
   install: false
-  autoscaling:
-    horizontal:
-      enabled: true
-      maxReplicas: 3
-      minReplicas: 1
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1531,13 +1526,6 @@ metric-observer:
       args: ["metric-observer"]
       env: {}
       envFrom: {}
-      resources:
-        limits:
-          cpu: 1000m
-          memory: 1Gi
-        requests:
-          cpu: 250m
-          memory: 256Mi
       volumeMounts:
         - name: wandb-ca-certs
           mountPath: /usr/local/share/ca-certificates/inline
@@ -1570,7 +1558,20 @@ metric-observer:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
         optional: true
-
+  sizing:
+    default:
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+      resources:
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+        requests:
+          cpu: 250m
+          memory: 256Mi
 parquet:
   install: true
   deploymentPostfix: "bc"
@@ -2184,7 +2185,47 @@ weave-trace-worker:
 
 nginx:
   install: false
-
+  additionalServices: {}
+#    keycloak:
+#      host: http://keycloak:8080/keycloak
+#      headers:
+#        Host: http://keycloak:8080/keycloak
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: latest
+  service:
+    enabled: true
+    ports:
+      - name: http
+        port: 8080
+        protocol: TCP
+  containers:
+    nginx:
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+      volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+  volumes:
+    - name: nginx-config
+      configMap:
+        name: '{{ .Release.Name }}-nginx-configmap'
+  sizing:
+    default:
+      autoscaling:
+        enabled: true
+        minReplicas: 2
+        maxReplicas: 4
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
 mysql:
   install: false
   persistence:
