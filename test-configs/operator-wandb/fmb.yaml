@@ -1,7 +1,7 @@
 global:
   bucket:
     provider: "s3"
-    name: "minio.minio.svc.cluster.local:9000/bucket"
+    name: "minio:9000/bucket"
     region: "us-east-1"
     accessKey: "minio"
     secretKey: "testpassword"
@@ -39,13 +39,23 @@ global:
     GORILLA_RUN_STORE_ONPREM_MIGRATE_DISABLE_READS: "false"
     GORILLA_RUN_STORE_ONPREM_MIGRATE_FLAT_RUNS_MIGRATOR: "true"
     GORILLA_ENABLE_RUN_AUTOMATIONS: "true"
+    BUCKET_PROXY: "true"
+    GORILLA_GLUE_FILE_STORE_IS_PROXIED: "true"
+    GORILLA_FILE_STORE_IS_PROXIED: "true"
   size: "testing"
 
 app:
   env:
     GORILLA_STORAGE_BUCKET: "s3://local-files"
+    GORILLA_FILEMETA_ENABLED: "false"
 
 executor:
+  install: true
+
+filemeta:
+  install: true
+
+frontend:
   install: true
 
 flat-run-fields-updater:
@@ -63,12 +73,26 @@ metric-observer:
   pubSub:
     subscription: "metric-observer"
 
+nginx:
+  install: true
+  additionalServices:
+    bucket:
+      host: "http://minio:9000"
+      headers:
+        Host: "minio:9000"
+    bucket-admin:
+      host: "http://minio:9090"
+      headers:
+        Host: "minio:9090"
+
 ingress:
   install: false
   create: false
 
 mysql:
   install: true
+  image:
+    tag: "8.4"
   resources:
     requests:
       cpu: "40m"
