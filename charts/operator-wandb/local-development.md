@@ -44,9 +44,6 @@ The repository includes a script to create a local kind cluster with a local Doc
 ```bash
 # Run the script to create a kind cluster with default settings
 ./setup-dev-cluster.sh
-
-# Or customize the cluster with various options
-./setup-dev-cluster.sh --name my-cluster --ingress --http-port 8080
 ```
 
 By default, this script:
@@ -94,9 +91,8 @@ cp tilt-settings.sample.json tilt-settings.json
 
 The `tilt-settings.json` file allows you to configure:
 
-- Allowed Kubernetes contexts (should include "kind-kind" for kind clusters)
+- Allowed Kubernetes contexts (should include "kind-wandb-helm-charts" if using the default settings)
 - Whether to install Minio (recommended for local development)
-- Whether to install Ingress
 - Which test configuration to use (e.g., "default", "weave-trace", "separate-pods")
 - Additional values to override
 
@@ -106,7 +102,6 @@ Example `tilt-settings.json`:
 {
   "allowedContexts": ["kind-kind"],
   "installMinio": true,
-  "installIngress": false,
   "values": "default",
   "additionalValues": {}
 }
@@ -118,13 +113,12 @@ Once your kind cluster is running and Tilt is configured, you can start Tilt:
 
 ```bash
 # Start Tilt with explicit context
-tilt up --context=kind-kind
+tilt up --context=kind-wandb-helm-charts
 ```
 
 Tilt will:
 
 - Deploy Minio (if enabled in your settings)
-- Deploy Ingress (if enabled in your settings)
 - Deploy the operator-wandb chart with the specified test configuration
 - Set up port forwarding for various services
 - Watch for changes and automatically redeploy when files change
@@ -149,18 +143,12 @@ To deploy a different test configuration, update the `values` field in your `til
 # "values": "weave-trace"
 
 # Restart Tilt with explicit context
-tilt up --context=kind-kind
+tilt up --context=kind-wandb-helm-charts
 ```
 
 ### 5. Accessing the Deployed Services
 
-Tilt automatically sets up port forwarding for the deployed services. By default:
-
-- App service: http://localhost:8080
-- Console service: http://localhost:8082
-- Weave-trace service (if enabled): http://localhost:8722
-
-You can customize these ports in your `tilt-settings.json` file.
+Tilt automatically sets up port forwarding to the services via an nginx proxy at http://localhost:8080.
 
 ## Testing with an existing Operator Managed Cluster
 
