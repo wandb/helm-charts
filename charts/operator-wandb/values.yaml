@@ -158,6 +158,8 @@ global:
       accessKeyName: "ACCESS_KEY"
       secretKeyName: "SECRET_KEY"
 
+  # The top level redis is the default that will be used when no more specific redis is specified.
+  # Most caches can be overridden at the application level, except settings cache, metadata cache, and task queue.
   redis:
     host: ""
     port: 6379
@@ -167,6 +169,49 @@ global:
     parameters: {}
     params: {}
     caCert: ""
+    certPath: "redis_ca.pem"
+    secret:
+      secretName: ""
+      secretKey: "REDIS_PASSWORD"
+
+  # (Optional) These (settingsCache, metadataCache, or taskQueue) almost never need to be set, do not set these unless you understand the risks.
+  # Settings cache and metadata cache allow specifying a non-default redis instance for these caches.  Defaults to global.redis if not specified.
+  settingsCache:
+    host: ""
+    port: 6379
+    password: ""
+    # external should remain false; it is for W&B internal use only.
+    external: false
+    parameters: {}
+    params: {}
+    caCert: ""
+    certPath: "redis_settings_cache_ca.pem"
+    secret:
+      secretName: ""
+      secretKey: "REDIS_PASSWORD"
+  metadataCache:
+    host: ""
+    port: 6379
+    password: ""
+    # external should remain false; it is for W&B internal use only.
+    external: false
+    parameters: {}
+    params: {}
+    caCert: ""
+    certPath: "redis_metadata_cache_ca.pem"
+    secret:
+      secretName: ""
+      secretKey: "REDIS_PASSWORD"
+  taskQueue:
+    host: ""
+    port: 6379
+    password: ""
+    # external should remain false; it is for W&B internal use only.
+    external: false
+    parameters: {}
+    params: {}
+    caCert: ""
+    certPath: "redis_task_queue_ca.pem"
     secret:
       secretName: ""
       secretKey: "REDIS_PASSWORD"
@@ -1526,14 +1571,8 @@ metric-observer:
       args: ["metric-observer"]
       env: {}
       envFrom: {}
-      volumeMounts:
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   role:
     create: true
     rules:
@@ -1543,21 +1582,8 @@ metric-observer:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
-  volumes:
-    - name: wandb-ca-certs
-      configMap:
-        name: "{{ .Release.Name }}-ca-certs"
-    - name: wandb-ca-certs-user
-      configMap:
-        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
-        optional: true
-    - name: redis-ca
-      secret:
-        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
-        items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-        optional: true
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   sizing:
     default:
       autoscaling:
@@ -2250,7 +2276,7 @@ redis:
   architecture: standalone
   auth:
     enabled: false
-    existingSecret: '{{ include "wandb.redis.passwordSecret" . }}'
+    existingSecret: '{{ include "wandb.redis.passwordSecret" .) }}'
     existingSecretPasswordKey: "{{ .Values.global.redis.secret.secretKey }}"
   metrics:
     enabled: false
