@@ -1,9 +1,24 @@
+{{- define "wandb.redis.getRedisConfig" -}}
+{{- $redisName := default "redis" .redisName }}
+{{- $localConfig := dig $redisName (dict) .Values.AsMap }}
+{{- $globalConfig := dig $redisName (dict) .Values.global }}
+{{- $defaultConfig := .Values.global.redis }}
+{{- if $localConfig.host }}
+{{ $localConfig | toYaml }}
+{{- else if $globalConfig.host }}
+{{ $globalConfig | toYaml }}
+{{- else }}
+{{ $defaultConfig | toYaml }}
+{{- end }}
+{{- end -}}
+
 {{/*
 Return name of secret where redis information is stored
 */}}
 {{- define "wandb.redis.passwordSecret" -}}
-{{- if .Values.global.redis.secret.secretName -}}
-  {{ .Values.global.redis.secret.secretName }}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
+{{- if $redisConfig.secret.secretName -}}
+  {{ $redisConfig.secret.secretName }}
 {{- else -}}
   {{- print .Release.Name "-redis-secret" -}}
 {{- end -}}
@@ -13,7 +28,8 @@ Return name of secret where redis information is stored
 Return the redis port, if it contains a query string, only return the port
 */}}
 {{- define "wandb.redis.port" -}}
-{{- $port := $.Values.global.redis.port | toString -}}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
+{{- $port := $redisConfig.port | toString -}}
 {{- if contains "?" $port -}}
 {{- $port = splitList "?" $port | first -}}
 {{- end -}}
@@ -24,10 +40,11 @@ Return the redis port, if it contains a query string, only return the port
 Return the redis host, defaulting to the release name prefix if available.
 */}}
 {{- define "wandb.redis.host" -}}
-{{- if eq .Values.global.redis.host "" -}}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
+{{- if eq $redisConfig.host "" -}}
 {{ printf "%s-%s" .Release.Name "redis-master" }}
 {{- else -}}
-{{ .Values.global.redis.host }}
+{{ $redisConfig.host }}
 {{- end -}}
 {{- end -}}
 
@@ -35,12 +52,14 @@ Return the redis host, defaulting to the release name prefix if available.
 Return the redis password
 */}}
 {{- define "wandb.redis.password" -}}
-{{- print $.Values.global.redis.password -}}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
+{{- print $redisConfig.password -}}
 {{- end -}}
 
 
 {{- define "_portParams" }}
-    {{- $rawPortVal := $.Values.global.redis.port | toString }}
+    {{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
+    {{- $rawPortVal := $redisConfig.port | toString }}
     {{- $queryParams := dict }}
     {{- if contains "?" $rawPortVal }}
         {{- $queryString := splitList "?" $rawPortVal | last }}
@@ -57,10 +76,11 @@ Return the redis password
 if a caCert is present, hardcode the caCertPath!
 */}}
 {{- define "_caParams" }}
+    {{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
     {{- $ca := include "wandb.redis.caCert" . }}
     {{- $result := dict }}
     {{- if $ca }}
-        {{- $result = merge $result (dict "caCertPath" "/etc/ssl/certs/redis_ca.pem") }}
+        {{- $result = merge $result (dict "caCertPath" ( printf "/etc/ssl/certs/%s" $redisConfig.certPath)) }}
     {{- end }}
     {{- $result | toJson -}}
 {{- end }}
@@ -110,39 +130,67 @@ The precedence order (highest to lowest) in which the query parameters are chose
     {{- end }}
 {{- end }}
 
+{{/*
+Return the redis caCert
+*/}}
+{{- define "wandb.redis.caCert" -}}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
+{{- print (default "" $redisConfig.caCert) -}}
+{{- end -}}
+
+
+{{- define "wandb.redis.certPath" -}}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
+{{- print (default "" $redisConfig.certPath) -}}
+{{- end -}}
 
 {{/*
 This redis connection string adheres to what redis exepcts and does not
 include the proprietary query parameters used by WandB.
 */}}
 {{- define "wandb.redis.connectionString" -}}
-{{- $password := include "wandb.redis.password" . }}
-{{- if or $password .Values.global.redis.secret.secretName -}}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
+{{- if or $redisConfig.password $redisConfig.secret.secretName -}}
 redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
 {{- else -}}
 redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
 {{- end }}
 {{- end }}
 
-{{/*
-Return the redis caCert
-*/}}
-{{- define "wandb.redis.caCert" -}}
-{{- print $.Values.global.redis.caCert -}}
-{{- end -}}
+{{- define "wandb.redis.settingsCache.connectionString" -}}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" (dict "Values" .Values "Release" .Release "redisName" "settingsCache")) -}}
+{{- if or $redisConfig.password $redisConfig.secret.secretName -}}
+redis://:$(REDIS_SETTINGS_CACHE_PASSWORD)@$(REDIS_SETTINGS_CACHE_HOST):$(REDIS_SETTINGS_CACHE_PORT)$(REDIS_SETTINGS_CACHE_PARAMS)
+{{- else -}}
+redis://$(REDIS_SETTINGS_CACHE_HOST):$(REDIS_SETTINGS_CACHE_PORT)$(REDIS_SETTINGS_CACHE_PARAMS)
+{{- end }}
+{{- end }}
 
+{{- define "wandb.redis.metadataCache.connectionString" -}}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" (dict "Values" .Values "Release" .Release "redisName" "metadataCache")) -}}
+{{- if or $redisConfig.password $redisConfig.secret.secretName -}}
+redis://:$(REDIS_METADATA_CACHE_PASSWORD)@$(REDIS_METADATA_CACHE_HOST):$(REDIS_METADATA_CACHE_PORT)$(REDIS_METADATA_CACHE_PARAMS)
+{{- else -}}
+redis://$(REDIS_METADATA_CACHE_HOST):$(REDIS_METADATA_CACHE_PORT)$(REDIS_METADATA_CACHE_PARAMS)
+{{- end }}
+{{- end }}
 
 {{- define "wandb.redis.taskQueue" -}}
 {{- if .Values.global.executor.enabled }}
-{{- include "wandb.redis.connectionString" .}}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" (dict "Values" .Values "Release" .Release "redisName" "taskQueue")) -}}
+{{- if or $redisConfig.password $redisConfig.secret.secretName -}}
+redis://:$(REDIS_TASK_QUEUE_PASSWORD)@$(REDIS_TASK_QUEUE_HOST):$(REDIS_TASK_QUEUE_PORT)$(REDIS_TASK_QUEUE_PARAMS)
+{{- else -}}
+redis://$(REDIS_TASK_QUEUE_HOST):$(REDIS_TASK_QUEUE_PORT)$(REDIS_TASK_QUEUE_PARAMS)
+{{- end }}
 {{- else }}
 {{- "noop://" }}
 {{- end }}
 {{- end }}
 
 {{- define "wandb.executor.taskQueue" -}}
-{{- $cs := include "wandb.redis.connectionString" . }}
-{{- $params := include "wandb.redis.parametersQuery" . }}
+{{- $cs := include "wandb.redis.taskQueue" . }}
+{{- $params := include "wandb.redis.parametersQuery" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") }}
 {{- $concur := .Values.workerConcurrency }}
 {{- if $concur -}}
   {{- if $params }}
