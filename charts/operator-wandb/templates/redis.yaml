@@ -2,12 +2,24 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: "{{ include "wandb.redis.passwordSecret" . }}"
+  name: "{{ include "wandb.redis.passwordSecret" (dict "Values" .Values "Release" .Release "redisName" "redis") }}"
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
-  REDIS_PASSWORD: {{ include "wandb.redis.password" . | b64enc }}
-  REDIS_CA_CERT: {{ include "wandb.redis.caCert" . | b64enc }}
+  REDIS_PASSWORD: {{ include "wandb.redis.password" (dict "Values" .Values "Release" .Release "redisName" "redis") | b64enc }}
+  REDIS_CA_CERT: {{ include "wandb.redis.caCert" (dict "Values" .Values "Release" .Release "redisName" "redis") | b64enc }}
+  {{ if .Values.global.taskQueue.host }}
+  REDIS_TASK_QUEUE_CACHE_PASSWORD: {{ include "wandb.redis.password" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") | b64enc }}
+  REDIS_TASK_QUEUE_CACHE_CA_CERT: {{ include "wandb.redis.caCert" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") | b64enc }}
+  {{- end }}
+  {{ if .Values.global.metadataCache.host }}
+  REDIS_METADATA_CACHE_PASSWORD: {{ include "wandb.redis.password" (dict "Values" .Values "Release" .Release "redisName" "metadataCache") | b64enc }}
+  REDIS_METADATA_CACHE_CA_CERT: {{ include "wandb.redis.caCert" (dict "Values" .Values "Release" .Release "redisName" "metadataCache") | b64enc }}
+  {{- end }}
+  {{ if .Values.global.settingsCache.host }}
+  REDIS_SETTINGS_CACHE_PASSWORD: {{ include "wandb.redis.password" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") | b64enc }}
+  REDIS_SETTINGS_CACHE_CA_CERT: {{ include "wandb.redis.caCert" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") | b64enc }}
+  {{- end }}
 {{- end }}
 ---
 apiVersion: v1
@@ -16,7 +28,5 @@ metadata:
   name: {{ .Release.Name }}-redis-configmap
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-data:
-  REDIS_PORT: "{{ include "wandb.redis.port" . }}"
-  REDIS_HOST: "{{ include "wandb.redis.host" . }}"
-  REDIS_PARAMS: "{{ include "wandb.redis.parametersQuery" . | trim }}"
+data: {}
+
