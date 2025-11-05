@@ -1,15 +1,16 @@
 {{- define "wandb.redis.getRedisConfig" -}}
-{{- $redisName := default "redis" .redisName }}
-{{- $localConfig := dig $redisName (dict) .Values.AsMap }}
-{{- $globalConfig := dig $redisName (dict) .Values.global }}
-{{- $defaultConfig := .Values.global.redis }}
-{{- if $localConfig.host }}
-{{ $localConfig | toYaml }}
-{{- else if $globalConfig.host }}
-{{ $globalConfig | toYaml }}
-{{- else }}
-{{ $defaultConfig | toYaml }}
-{{- end }}
+  {{- $redisName := default "redis" .redisName }}
+  {{- $localConfig := dig $redisName (dict) .Values.AsMap }}
+  {{- $globalConfig := dig $redisName (dict) .Values.global }}
+  {{- $defaultConfig := .Values.global.redis }}
+
+  {{- if $localConfig.host }}
+    {{- $localConfig | toYaml }}
+  {{- else if $globalConfig.host }}
+    {{- $globalConfig | toYaml }}
+  {{- else }}
+    {{- $defaultConfig | toYaml }}
+  {{- end }}
 {{- end -}}
 
 {{/*
@@ -18,9 +19,21 @@ Return name of secret where redis information is stored
 {{- define "wandb.redis.passwordSecret" -}}
 {{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
 {{- if $redisConfig.secret.secretName -}}
-  {{ $redisConfig.secret.secretName }}
+  {{- $redisConfig.secret.secretName }}
 {{- else -}}
   {{- print .Release.Name "-redis-secret" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return name of secret where redis information is stored
+*/}}
+{{- define "wandb.redis.passwordSecretKey" -}}
+{{- $redisConfig := fromYaml (include "wandb.redis.getRedisConfig" .) -}}
+{{- if $redisConfig.secret.secretKey -}}
+  {{- $redisConfig.secret.secretKey }}
+{{- else -}}
+  {{- print "REDIS_PASSWORD" -}}
 {{- end -}}
 {{- end -}}
 

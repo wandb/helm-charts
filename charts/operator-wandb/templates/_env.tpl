@@ -28,7 +28,7 @@ Global values will override any chart-specific values.
   valueFrom:
     secretKeyRef:
       name: "{{ include "wandb.redis.passwordSecret" . }}"
-      key: "{{ .Values.global.redis.secret.secretKey }}"
+      key: "{{ include "wandb.redis.passwordSecretKey" . }}"
       optional: true
 - name: REDIS_PORT
   value: {{ include "wandb.redis.port" . | quote }}
@@ -41,7 +41,7 @@ Global values will override any chart-specific values.
   valueFrom:
     secretKeyRef:
       name: "{{ include "wandb.redis.passwordSecret" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") }}"
-      key: "{{ .Values.global.redis.secret.secretKey }}"
+      key: "{{ include "wandb.redis.passwordSecretKey" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") }}"
       optional: true
 - name: REDIS_TASK_QUEUE_PORT
   value: {{ include "wandb.redis.port" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") | quote }}
@@ -54,7 +54,7 @@ Global values will override any chart-specific values.
   valueFrom:
     secretKeyRef:
       name: "{{ include "wandb.redis.passwordSecret" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") }}"
-      key: "{{ .Values.global.settingsCache.secret.secretKey }}"
+      key: "{{ include "wandb.redis.passwordSecretKey" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") }}"
       optional: true
 - name: REDIS_SETTINGS_CACHE_PORT
   value: {{ include "wandb.redis.port" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") | quote }}
@@ -67,7 +67,7 @@ Global values will override any chart-specific values.
   valueFrom:
     secretKeyRef:
       name: "{{ include "wandb.redis.passwordSecret" (dict "Values" .Values "Release" .Release "redisName" "metadataCache") }}"
-      key: "{{ .Values.global.metadataCache.secret.secretKey }}"
+      key: "{{ include "wandb.redis.passwordSecretKey" (dict "Values" .Values "Release" .Release "redisName" "metadataCache") }}"
       optional: true
 - name: REDIS_METADATA_CACHE_PORT
   value: {{ include "wandb.redis.port" (dict "Values" .Values "Release" .Release "redisName" "metadataCache") | quote }}
