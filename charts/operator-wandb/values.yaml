@@ -189,6 +189,8 @@ global:
       accessKeyName: "ACCESS_KEY"
       secretKeyName: "SECRET_KEY"
 
+  # The top level redis is the default that will be used when no more specific redis is specified.
+  # Most caches can be overridden at the application level, except settings cache, metadata cache, and task queue.
   redis:
     host: ""
     port: 6379
@@ -198,9 +200,16 @@ global:
     parameters: {}
     params: {}
     caCert: ""
+    certPath: "redis_ca.pem"
     secret:
       secretName: ""
       secretKey: "REDIS_PASSWORD"
+
+  # (Optional) These (settingsCache, metadataCache, or taskQueue) almost never need to be set, do not set these unless you understand the risks.
+  # Settings cache and metadata cache allow specifying a non-default redis instance for these caches.  Defaults to global.redis if not specified.
+  settingsCache: {}
+  metadataCache: {}
+  taskQueue: {}
 
   bigtable:
     v3:
@@ -491,6 +500,19 @@ api:
           enabled: true
           maxReplicas: 2
           minReplicas: 2
+    fmb:
+      resources:
+        limits:
+          cpu: "6"
+          memory: 16Gi
+        requests:
+          cpu: "6"
+          memory: 16Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
 
 app:
   install: true
@@ -658,6 +680,14 @@ app:
         requests:
           cpu: "4"
           memory: 8Gi
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "4"
+          memory: 8Gi
 
 appRenamePreHook:
   install: true
@@ -771,13 +801,6 @@ console:
         initialDelaySeconds: 20
         periodSeconds: 5
         failureThreshold: 120
-      resources:
-        requests:
-          cpu: "1"
-          memory: "1Gi"
-        limits:
-          cpu: "2"
-          memory: "2Gi"
   role:
     create: true
     type: ClusterRole
@@ -819,6 +842,15 @@ console:
       - apiGroups: ["apps.wandb.com"]
         resources: ["weightsandbiases"]
         verbs: ["get"]
+  sizing:
+    default:
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"
 
 executor:
   install: false
@@ -924,6 +956,19 @@ executor:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+    fmb:
+      resources:
+        limits:
+          cpu: "10"
+          memory: 96Gi
+        requests:
+          cpu: "10"
+          memory: 96Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
 
 filemeta:
   install: false
@@ -1008,6 +1053,19 @@ filemeta:
           maxReplicas: 2
           minReplicas: 1
     xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    fmb:
       resources:
         limits:
           cpu: "2"
@@ -1186,6 +1244,19 @@ filestream:
           enabled: true
           maxReplicas: 6
           minReplicas: 1
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 1
 
 flat-run-fields-updater:
   install: false
@@ -1276,6 +1347,19 @@ flat-run-fields-updater:
           maxReplicas: 20
           minReplicas: 9
     xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 30
+          minReplicas: 9
+    fmb:
       resources:
         limits:
           cpu: "2"
@@ -1385,6 +1469,19 @@ frontend:
           maxReplicas: 5
           minReplicas: 2
     xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+    fmb:
       resources:
         limits:
           cpu: "2"
@@ -1513,6 +1610,14 @@ glue:
         requests:
           cpu: "3"
           memory: 6Gi
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
 
 metric-observer:
   install: false
@@ -1549,14 +1654,8 @@ metric-observer:
       args: ["metric-observer"]
       env: {}
       envFrom: {}
-      volumeMounts:
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   role:
     create: true
     rules:
@@ -1566,21 +1665,8 @@ metric-observer:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
-  volumes:
-    - name: wandb-ca-certs
-      configMap:
-        name: "{{ .Release.Name }}-ca-certs"
-    - name: wandb-ca-certs-user
-      configMap:
-        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
-        optional: true
-    - name: redis-ca
-      secret:
-        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
-        items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-        optional: true
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   sizing:
     default:
       autoscaling:
@@ -1749,6 +1835,19 @@ parquet:
           maxReplicas: 3
           minReplicas: 2
     xxlarge:
+      resources:
+        limits:
+          cpu: "15"
+          memory: 64Gi
+        requests:
+          cpu: "15"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    fmb:
       resources:
         limits:
           cpu: "15"
@@ -1950,6 +2049,19 @@ weave:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 64Gi
+        requests:
+          cpu: "3"
+          memory: 48Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
 
 weave-trace:
   install: false
@@ -2097,6 +2209,19 @@ weave-trace:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
 
 weave-trace-worker:
   install: false
@@ -2204,6 +2329,19 @@ weave-trace-worker:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
 
 nginx:
   install: false
@@ -2273,7 +2411,7 @@ redis:
   auth:
     enabled: false
     existingSecret: '{{ include "wandb.redis.passwordSecret" . }}'
-    existingSecretPasswordKey: "{{ .Values.global.redis.secret.secretKey }}"
+    existingSecretPasswordKey: '{{ include "wandb.redis.passwordSecretKey" . }}'
   metrics:
     enabled: false
     service:

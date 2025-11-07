@@ -28,10 +28,56 @@ Global values will override any chart-specific values.
   valueFrom:
     secretKeyRef:
       name: "{{ include "wandb.redis.passwordSecret" . }}"
-      key: "{{ .Values.global.redis.secret.secretKey }}"
+      key: "{{ include "wandb.redis.passwordSecretKey" . }}"
       optional: true
+- name: REDIS_PORT
+  value: {{ include "wandb.redis.port" . | quote }}
+- name: REDIS_HOST
+  value: {{ include "wandb.redis.host" . | quote }}
+- name: REDIS_PARAMS
+  value: {{ include "wandb.redis.parametersQuery" . | trim | quote }}
+
+- name: REDIS_TASK_QUEUE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: "{{ include "wandb.redis.passwordSecret" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") }}"
+      key: "{{ include "wandb.redis.passwordSecretKey" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") }}"
+      optional: true
+- name: REDIS_TASK_QUEUE_PORT
+  value: {{ include "wandb.redis.port" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") | quote }}
+- name: REDIS_TASK_QUEUE_HOST
+  value: {{ include "wandb.redis.host" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") | quote }}
+- name: REDIS_TASK_QUEUE_PARAMS
+  value: {{ include "wandb.redis.parametersQuery" (dict "Values" .Values "Release" .Release "redisName" "taskQueue") | trim | quote }}
+
+- name: REDIS_SETTINGS_CACHE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: "{{ include "wandb.redis.passwordSecret" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") }}"
+      key: "{{ include "wandb.redis.passwordSecretKey" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") }}"
+      optional: true
+- name: REDIS_SETTINGS_CACHE_PORT
+  value: {{ include "wandb.redis.port" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") | quote }}
+- name: REDIS_SETTINGS_CACHE_HOST
+  value: {{ include "wandb.redis.host" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") | quote }}
+- name: REDIS_SETTINGS_CACHE_PARAMS
+  value: {{ include "wandb.redis.parametersQuery" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") | trim | quote }}
+
+- name: REDIS_METADATA_CACHE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: "{{ include "wandb.redis.passwordSecret" (dict "Values" .Values "Release" .Release "redisName" "metadataCache") }}"
+      key: "{{ include "wandb.redis.passwordSecretKey" (dict "Values" .Values "Release" .Release "redisName" "metadataCache") }}"
+      optional: true
+- name: REDIS_METADATA_CACHE_PORT
+  value: {{ include "wandb.redis.port" (dict "Values" .Values "Release" .Release "redisName" "metadataCache") | quote }}
+- name: REDIS_METADATA_CACHE_HOST
+  value: {{ include "wandb.redis.host" (dict "Values" .Values "Release" .Release "redisName" "metadataCache") | quote }}
+- name: REDIS_METADATA_CACHE_PARAMS
+  value: {{ include "wandb.redis.parametersQuery" (dict "Values" .Values "Release" .Release "redisName" "metadataCache") | trim | quote }}
+
 - name: REDIS
-  value: "{{ include "wandb.redis.connectionString" . | trim }}"
+  value: {{ include "wandb.redis.connectionString" . | trim | quote }}
 - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
   value: {{ include "wandb.redis.connectionString" . | trim | quote }}
 - name: GORILLA_AUDITOR_CACHE
@@ -43,9 +89,9 @@ Global values will override any chart-specific values.
 - name: GORILLA_LOCKER
   value: {{ include "wandb.redis.connectionString" . | trim | quote }}
 - name: GORILLA_METADATA_CACHE
-  value: {{ include "wandb.redis.connectionString" . | trim | quote }}
+  value: {{ include "wandb.redis.metadataCache.connectionString" . | trim | quote }}
 - name: GORILLA_SETTINGS_CACHE
-  value: {{ include "wandb.redis.connectionString" . | trim | quote }}
+  value: {{ include "wandb.redis.settingsCache.connectionString" . | trim | quote }}
 - name: GORILLA_USAGE_METRICS_CACHE
   value: {{ include "wandb.redis.connectionString" . | trim | quote }}
 - name: GORILLA_TASK_QUEUE
