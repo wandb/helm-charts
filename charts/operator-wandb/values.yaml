@@ -1191,7 +1191,11 @@ flat-run-fields-updater:
   install: false
   deploymentPostfix: "bc"
   pubsub:
+    # pubsub subscription comes from terraform
     subscriptions: ""
+  kafka:
+    # flat-run-field-updater and metric-observer use different consumer id on same topic
+    consumerGroupId: "flat-run-fields-updater"
   env:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
@@ -1521,6 +1525,9 @@ metric-observer:
     tag: latest
   pubsub:
     subscription: ""
+  kafka:
+    # metric-observer and flat-run-field-updater use different consumer group id on same topic
+    consumerGroupId: "metric-observer"
   env:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_METRIC_OBSERVER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
@@ -1581,6 +1588,7 @@ metric-observer:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
         optional: true
+  size: ""
   sizing:
     default:
       autoscaling:
@@ -1595,6 +1603,75 @@ metric-observer:
         requests:
           cpu: 250m
           memory: 256Mi
+    # Base on flat-run-fields-updater sizing with less replicas.
+    # minReplicas increase by 2 instead of 3
+    # maxReplicas increase by 4 instead of 5.
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 8
+          minReplicas: 2
+    large:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 12
+          minReplicas: 4
+    xlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 16
+          minReplicas: 6
+    xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 20
+          minReplicas: 8
+
 parquet:
   install: true
   deploymentPostfix: "bc"
