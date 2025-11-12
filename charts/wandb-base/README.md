@@ -488,7 +488,14 @@ containers:
 
 ### Autoscaling Configuration
 
-The chart supports both Horizontal Pod Autoscaling (HPA) and Vertical Pod Autoscaling (VPA):
+The chart supports three types of autoscaling:
+1. **Horizontal Pod Autoscaling (HPA)** - Standard CPU/memory-based scaling
+2. **Vertical Pod Autoscaling (VPA)** - Automatic resource request/limit adjustment
+3. **KEDA** - Event-driven autoscaling based on external metrics
+
+#### Horizontal Pod Autoscaler (HPA)
+
+Standard Kubernetes HPA for CPU and memory-based autoscaling:
 
 ```yaml
 autoscaling:
@@ -497,6 +504,15 @@ autoscaling:
     minReplicas: 2
     maxReplicas: 10
     targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+```
+
+#### Vertical Pod Autoscaler (VPA)
+
+Automatically adjusts resource requests and limits:
+
+```yaml
+autoscaling:
   vertical:
     enabled: true
     updateMode: "Auto"
@@ -506,6 +522,175 @@ autoscaling:
           - memory
           - cpu
 ```
+
+#### KEDA (Event-Driven Autoscaling)
+
+**Important:** KEDA and HPA are mutually exclusive. When KEDA is enabled, it manages its own HPA internally and the chart will not create a separate HPA resource.
+
+KEDA enables autoscaling based on external metrics and events such as:
+- Message queue depth (Kafka, RabbitMQ, SQS, etc.)
+- Database query results (PostgreSQL, MySQL, etc.)
+- Custom metrics (Prometheus, Datadog, etc.)
+- Cloud provider metrics (AWS CloudWatch, Azure Monitor, GCP Pub/Sub, etc.)
+- HTTP requests, cron schedules, and many more
+
+**Basic KEDA Configuration:**
+
+```yaml
+autoscaling:
+  keda:
+    enabled: true
+    minReplicaCount: 1
+    maxReplicaCount: 10
+    pollingInterval: 30        # How often to check triggers (seconds)
+    cooldownPeriod: 300        # Wait time before scaling to zero (seconds)
+    triggers:
+      - type: prometheus
+        metadata:
+          serverAddress: http://prometheus:9090
+          metricName: http_requests_total
+          threshold: "100"
+          query: sum(rate(http_requests_total[2m]))
+```
+
+**Example: Kafka-Based Autoscaling**
+
+Scale a consumer based on Kafka lag:
+
+```yaml
+autoscaling:
+  keda:
+    enabled: true
+    minReplicaCount: 2
+    maxReplicaCount: 20
+    pollingInterval: 15
+    triggers:
+      - type: kafka
+        metadata:
+          bootstrapServers: kafka.default.svc.cluster.local:9092
+          consumerGroup: my-consumer-group
+          topic: my-topic
+          lagThreshold: "10"
+          offsetResetPolicy: latest
+```
+
+**Example: Redis Queue Autoscaling**
+
+Scale based on Redis list length:
+
+```yaml
+autoscaling:
+  keda:
+    enabled: true
+    minReplicaCount: 1
+    maxReplicaCount: 15
+    idleReplicaCount: 0        # Scale to zero when no items
+    cooldownPeriod: 300
+    triggers:
+      - type: redis
+        metadata:
+          address: redis.default.svc.cluster.local:6379
+          listName: task-queue
+          listLength: "5"       # Scale up when more than 5 items
+          databaseIndex: "0"
+```
+
+**Example: Multiple Triggers**
+
+Scale based on multiple conditions:
+
+```yaml
+autoscaling:
+  keda:
+    enabled: true
+    minReplicaCount: 2
+    maxReplicaCount: 30
+    triggers:
+      # Scale on Kafka lag
+      - type: kafka
+        metadata:
+          bootstrapServers: kafka:9092
+          consumerGroup: my-group
+          topic: events
+          lagThreshold: "50"
+      # Also scale on CPU when Kafka is caught up
+      - type: cpu
+        metricType: Utilization
+        metadata:
+          value: "80"
+```
+
+**Advanced KEDA Configuration:**
+
+```yaml
+autoscaling:
+  keda:
+    enabled: true
+    minReplicaCount: 2
+    maxReplicaCount: 50
+    pollingInterval: 30
+    cooldownPeriod: 300
+    # Fallback configuration if scaler fails
+    fallback:
+      failureThreshold: 3
+      replicas: 10
+    # Advanced HPA behavior customization
+    advanced:
+      horizontalPodAutoscalerConfig:
+        behavior:
+          scaleDown:
+            stabilizationWindowSeconds: 300
+            policies:
+              - type: Percent
+                value: 50
+                periodSeconds: 60
+          scaleUp:
+            stabilizationWindowSeconds: 0
+            policies:
+              - type: Percent
+                value: 100
+                periodSeconds: 30
+              - type: Pods
+                value: 4
+                periodSeconds: 30
+            selectPolicy: Max
+    triggers:
+      - type: prometheus
+        metadata:
+          serverAddress: http://prometheus:9090
+          query: sum(rate(worker_tasks_total[2m]))
+          threshold: "100"
+```
+
+**KEDA in Sizing Configuration:**
+
+KEDA configuration can be included in sizing definitions for environment-specific autoscaling:
+
+```yaml
+size: "production"
+
+sizing:
+  production:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+    autoscaling:
+      keda:
+        enabled: true
+        minReplicaCount: 5
+        maxReplicaCount: 50
+        pollingInterval: 15
+        triggers:
+          - type: kafka
+            metadata:
+              bootstrapServers: kafka.prod.svc.cluster.local:9092
+              consumerGroup: prod-workers
+              topic: production-events
+              lagThreshold: "100"
+```
+
+For more information on KEDA triggers and configuration options, see the [KEDA documentation](https://keda.sh/docs/latest/scalers/).
 
 ### Sizing Configuration
 
@@ -605,3 +790,4 @@ For more information on Kubernetes concepts used in this chart:
 - [Resource Management](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
 - [Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
 - [Vertical Pod Autoscaling](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)
+- [KEDA (Kubernetes Event Driven Autoscaling)](https://keda.sh/)
