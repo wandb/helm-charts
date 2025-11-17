@@ -2282,6 +2282,113 @@ weave-trace-worker:
           maxReplicas: 6
           minReplicas: 2
 
+weave-evaluate-model-worker:
+  install: false
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/weave-trace
+    tag: latest
+  datadog:
+    enabled: false
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
+  env:
+    WF_CLICKHOUSE_PASS:
+      valueFrom:
+        secretKeyRef:
+          name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
+          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+    WANDB_INTERNAL_SERVICE_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: weave-worker-auth
+          key: key
+  containers:
+    weave-evaluate-model-worker:
+      command:
+        - python
+      args:
+        - "-m"
+        - "src.workers.evaluate_model_worker.evaluate_model_worker"
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+  service:
+    ports:
+      - name: http
+        port: 8723
+        protocol: TCP
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
+    medium:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+
 nginx:
   install: false
   additionalServices: {}
@@ -2506,7 +2613,7 @@ etcd:
 bufstream:
   install: false
   image:
-    repository: bitnamilegacy/bufsteam
+    repository: bitnamilegacy/bufstream
   global:
     security:
       allowInsecureImages: true
