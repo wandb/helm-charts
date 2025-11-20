@@ -1,5 +1,9 @@
 {{- if .Values.enabled }}
-{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
+{{- $image := $.Values.image -}}
+
+{{- if .Values.global.repositoryPrefix }}
+{{- $_ := set $image "repository" (printf "%s/%s" .Values.global.repositoryPrefix $image.repository) }}
+{{- end }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -32,7 +36,7 @@ spec:
       {{- end }}
       containers:
         - name: mysql
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ $image.repository }}:{{ $image.tag }}"
           {{- include "wandb.podSecurityContext" .Values.container.securityContext | nindent 10 }}
           ports:
           - name: mysql
