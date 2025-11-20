@@ -2057,6 +2057,8 @@ weave-trace:
         secretKeyRef:
           name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
           key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   initContainers:
     weave-trace-migrate:
       command: ["python", "migrator.py"]
@@ -2100,6 +2102,8 @@ weave-trace:
           mountPath: /tmp/
         - name: weave-trace-internal-jwt
           mountPath: /tmp/weave-trace/internal-jwt
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   service:
     enabled: true
     ports:
@@ -2208,6 +2212,8 @@ weave-trace-worker:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   containers:
     weave-trace-worker:
       command:
@@ -2215,6 +2221,8 @@ weave-trace-worker:
       args:
         - "-m"
         - "src.workers.scoring_worker"
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       ports:
         - name: http
           containerPort: 8080
@@ -2315,6 +2323,8 @@ weave-evaluate-model-worker:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   containers:
     weave-evaluate-model-worker:
       command:
@@ -2322,6 +2332,8 @@ weave-evaluate-model-worker:
       args:
         - "-m"
         - "src.workers.evaluate_model_worker.evaluate_model_worker"
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       ports:
         - name: http
           containerPort: 8080
