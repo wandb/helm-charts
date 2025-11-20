@@ -2054,6 +2054,22 @@ weave-trace:
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  initContainers:
+    ca-certs-setup:
+      image:
+        repository: alpine
+        tag: latest
+      command: ["/scripts/setup-ca-certs.sh"]
+      volumeMounts:
+        - name: ca-certs-setup-script
+          mountPath: /scripts
+          readOnly: true
+        - name: processed-certs
+          mountPath: /processed-certs
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     weave-trace:
       command:
@@ -2086,11 +2102,18 @@ weave-trace:
         - name: http
           containerPort: 8080
           protocol: TCP
+      env:
+        SSL_CERT_FILE: /processed-certs/ca-bundle.crt
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
         - name: weave-trace-internal-jwt
           mountPath: /tmp/weave-trace/internal-jwt
+        - name: processed-certs
+          mountPath: /processed-certs
+          readOnly: true
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   service:
     enabled: true
     ports:
@@ -2101,6 +2124,12 @@ weave-trace:
   volumes:
     - name: temp-dir
       emptyDir: {}
+    - name: processed-certs
+      emptyDir: {}
+    - name: ca-certs-setup-script
+      configMap:
+        name: '{{ .Release.Name }}-ca-certs-setup'
+        defaultMode: 0755
     - name: weave-trace-internal-jwt
       projected:
         sources:
@@ -2199,6 +2228,22 @@ weave-trace-worker:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  initContainers:
+    ca-certs-setup:
+      image:
+        repository: alpine
+        tag: latest
+      command: ["/scripts/setup-ca-certs.sh"]
+      volumeMounts:
+        - name: ca-certs-setup-script
+          mountPath: /scripts
+          readOnly: true
+        - name: processed-certs
+          mountPath: /processed-certs
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     weave-trace-worker:
       command:
@@ -2206,10 +2251,25 @@ weave-trace-worker:
       args:
         - "-m"
         - "src.workers.scoring_worker"
+      env:
+        SSL_CERT_FILE: /processed-certs/ca-bundle.crt
+      volumeMounts:
+        - name: processed-certs
+          mountPath: /processed-certs
+          readOnly: true
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       ports:
         - name: http
           containerPort: 8080
           protocol: TCP
+  volumes:
+    - name: processed-certs
+      emptyDir: {}
+    - name: ca-certs-setup-script
+      configMap:
+        name: '{{ .Release.Name }}-ca-certs-setup'
+        defaultMode: 0755
   service:
     ports:
       - name: http
