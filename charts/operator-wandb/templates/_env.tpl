@@ -210,6 +210,8 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.liveHistoryStore" . | quote }}
 - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
   value: {{ include "wandb.fileStreamWorkerStore" . | quote }}
+- name: GORILLA_HISTORY_STORE_SERVICE
+  value: {{ include "wandb.historyStoreService" . | quote }}
 {{- end -}}
 
 {{- define "wandb.queueEnvs" -}}

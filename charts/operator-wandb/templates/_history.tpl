@@ -17,6 +17,12 @@
     {{- join "," $stores -}}
 {{- end -}}
 
+{{- define "wandb.historyStoreService" -}}
+    {{- $stores := list -}}
+    {{- $stores = append $stores (printf "http://%s-parquet:8087/_goRPC_" .Release.Name) -}}
+    {{- join "," $stores -}}
+{{- end -}}
+
 {{- define "wandb.liveHistoryStore" -}}
 {{- $historyStore := include "wandb.mysql" . -}}
 {{- if or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled -}}
