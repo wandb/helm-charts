@@ -176,6 +176,9 @@ global:
       secret: ""
       authMethod: ""
       issuer: ""
+      oidcSecret:
+        name: ""
+        secretKey: "OIDC_SECRET"
 
   # Storage bucket that will be used by the application by default but can be overridden by the user in the wandb-console.
   defaultBucket:
@@ -368,6 +371,7 @@ api:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   initContainers:
     init-db:
@@ -542,6 +546,7 @@ app:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.oidcEnvs" . }}'
   service:
     enabled: true
     ports:
@@ -2397,10 +2402,10 @@ weave-evaluate-model-worker:
 nginx:
   install: false
   additionalServices: {}
-#    keycloak:
-#      host: http://keycloak:8080/keycloak
-#      headers:
-#        Host: http://keycloak:8080/keycloak
+  #    keycloak:
+  #      host: http://keycloak:8080/keycloak
+  #      headers:
+  #        Host: http://keycloak:8080/keycloak
   image:
     repository: nginxinc/nginx-unprivileged
     tag: latest
@@ -2423,7 +2428,7 @@ nginx:
   volumes:
     - name: nginx-config
       configMap:
-        name: '{{ .Release.Name }}-nginx-configmap'
+        name: "{{ .Release.Name }}-nginx-configmap"
   sizing:
     default:
       autoscaling:
