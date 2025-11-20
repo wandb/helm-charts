@@ -2054,11 +2054,30 @@ weave-trace:
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  initContainers:
+    ca-certs-setup:
+      image:
+        repository: alpine
+        tag: latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          mkdir -p /processed-certs
+          if [ -d "/usr/local/share/ca-certificates" ] && [ "$(ls -A /usr/local/share/ca-certificates 2>/dev/null)" ]; then
+            find /usr/local/share/ca-certificates -name "*.crt" -exec cat {} \; > /processed-certs/ca-bundle.crt
+          fi
+      volumeMounts:
+        - name: processed-certs
+          mountPath: /processed-certs
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     weave-trace:
-      command:
-        - uvicorn
       args:
+        - uvicorn
         - "src.trace_server:app"
         - "--host"
         - "0.0.0.0"
@@ -2086,11 +2105,18 @@ weave-trace:
         - name: http
           containerPort: 8080
           protocol: TCP
+      env:
+        SSL_CERT_FILE: /processed-certs/ca-bundle.crt
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
         - name: weave-trace-internal-jwt
           mountPath: /tmp/weave-trace/internal-jwt
+        - name: processed-certs
+          mountPath: /processed-certs
+          readOnly: true
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   service:
     enabled: true
     ports:
@@ -2100,6 +2126,8 @@ weave-trace:
         protocol: TCP
   volumes:
     - name: temp-dir
+      emptyDir: {}
+    - name: processed-certs
       emptyDir: {}
     - name: weave-trace-internal-jwt
       projected:
@@ -2199,17 +2227,47 @@ weave-trace-worker:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  initContainers:
+    ca-certs-setup:
+      image:
+        repository: alpine
+        tag: latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          mkdir -p /processed-certs
+          if [ -d "/usr/local/share/ca-certificates" ] && [ "$(ls -A /usr/local/share/ca-certificates 2>/dev/null)" ]; then
+            find /usr/local/share/ca-certificates -name "*.crt" -exec cat {} \; > /processed-certs/ca-bundle.crt
+          fi
+      volumeMounts:
+        - name: processed-certs
+          mountPath: /processed-certs
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     weave-trace-worker:
-      command:
-        - python
       args:
+        - python
         - "-m"
         - "src.workers.scoring_worker"
+      env:
+        SSL_CERT_FILE: /processed-certs/ca-bundle.crt
+      volumeMounts:
+        - name: processed-certs
+          mountPath: /processed-certs
+          readOnly: true
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       ports:
         - name: http
           containerPort: 8080
           protocol: TCP
+  volumes:
+    - name: processed-certs
+      emptyDir: {}
   service:
     ports:
       - name: http
