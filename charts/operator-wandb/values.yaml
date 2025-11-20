@@ -2056,6 +2056,29 @@ weave-trace:
           mountPath: /tmp/
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
+  initContainers:
+    ca-certs-setup:
+      image: alpine:latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Setting up CA certificates..."
+          # Copy all certificates to processed certs directory
+          mkdir -p /processed-certs
+          if [ -d "/usr/local/share/ca-certificates" ] && [ "$(ls -A /usr/local/share/ca-certificates 2>/dev/null)" ]; then
+            echo "Found custom CA certificates"
+            find /usr/local/share/ca-certificates -name "*.crt" -exec cat {} \; > /processed-certs/ca-bundle.crt
+            echo "CA certificates bundled successfully"
+            ls -lh /processed-certs/
+          else
+            echo "No custom CA certificates found"
+          fi
+      volumeMounts:
+        - name: processed-certs
+          mountPath: /processed-certs
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     weave-trace:
       args:
@@ -2087,11 +2110,17 @@ weave-trace:
         - name: http
           containerPort: 8080
           protocol: TCP
+      env:
+        - name: SSL_CERT_FILE
+          value: /processed-certs/ca-bundle.crt
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
         - name: weave-trace-internal-jwt
           mountPath: /tmp/weave-trace/internal-jwt
+        - name: processed-certs
+          mountPath: /processed-certs
+          readOnly: true
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
   service:
@@ -2103,6 +2132,8 @@ weave-trace:
         protocol: TCP
   volumes:
     - name: temp-dir
+      emptyDir: {}
+    - name: processed-certs
       emptyDir: {}
     - name: weave-trace-internal-jwt
       projected:
@@ -2202,16 +2233,53 @@ weave-trace-worker:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  initContainers:
+    ca-certs-setup:
+      image: alpine:latest
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "Setting up CA certificates..."
+          # Copy all certificates to processed certs directory
+          mkdir -p /processed-certs
+          if [ -d "/usr/local/share/ca-certificates" ] && [ "$(ls -A /usr/local/share/ca-certificates 2>/dev/null)" ]; then
+            echo "Found custom CA certificates"
+            find /usr/local/share/ca-certificates -name "*.crt" -exec cat {} \; > /processed-certs/ca-bundle.crt
+            echo "CA certificates bundled successfully"
+            ls -lh /processed-certs/
+          else
+            echo "No custom CA certificates found"
+          fi
+      volumeMounts:
+        - name: processed-certs
+          mountPath: /processed-certs
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     weave-trace-worker:
       args:
         - python
         - "-m"
         - "src.workers.scoring_worker"
+      env:
+        - name: SSL_CERT_FILE
+          value: /processed-certs/ca-bundle.crt
+      volumeMounts:
+        - name: processed-certs
+          mountPath: /processed-certs
+          readOnly: true
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       ports:
         - name: http
           containerPort: 8080
           protocol: TCP
+  volumes:
+    - name: processed-certs
+      emptyDir: {}
   service:
     ports:
       - name: http
