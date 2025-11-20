@@ -17,6 +17,21 @@
     {{- join "," $stores -}}
 {{- end -}}
 
+{{- define "wandb.historyStoreNoMySQL" -}}
+    {{- $stores := list -}}
+    {{- $stores = append $stores (printf "http://%s-parquet:8087/_goRPC_" .Release.Name) -}}
+
+    {{- if .Values.global.bigtable.v3.enabled -}}
+        {{- $stores = append $stores (printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
+    {{- end -}}
+
+    {{- if .Values.global.bigtable.v2.enabled -}}
+        {{- $stores = append $stores (printf "bigtablev2://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
+    {{- end -}}
+
+    {{- join "," $stores -}}
+{{- end -}}
+
 {{- define "wandb.liveHistoryStore" -}}
 {{- $historyStore := include "wandb.mysql" . -}}
 {{- if or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled -}}
