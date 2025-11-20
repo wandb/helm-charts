@@ -210,15 +210,8 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.liveHistoryStore" . | quote }}
 - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
   value: {{ include "wandb.fileStreamWorkerStore" . | quote }}
-{{- end -}}
-
-{{- define "wandb.historyStoreEnvsNoMySQL" -}}
-- name: GORILLA_HISTORY_STORE
-  value: {{ include "wandb.historyStoreNoMySQL" . | quote }}
-- name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-  value: {{ include "wandb.liveHistoryStore" . | quote }}
-- name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
-  value: {{ include "wandb.fileStreamWorkerStore" . | quote }}
+- name: GORILLA_HISTORY_STORE_SERVICE
+  value: {{ include "wandb.historyStoreService" . | quote }}
 {{- end -}}
 
 {{- define "wandb.queueEnvs" -}}

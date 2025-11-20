@@ -17,7 +17,7 @@
     {{- join "," $stores -}}
 {{- end -}}
 
-{{- define "wandb.historyStoreNoMySQL" -}}
+{{- define "wandb.historyStoreService" -}}
     {{- $stores := list -}}
     {{- $stores = append $stores (printf "http://%s-parquet:8087/_goRPC_" .Release.Name) -}}
 
