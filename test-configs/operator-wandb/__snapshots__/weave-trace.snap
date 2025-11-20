@@ -1681,6 +1681,27 @@ data:
   AWS_S3_KMS_ID: ""
   GORILLA_DEFAULT_REGION: "minio-local"
 ---
+# Source: operator-wandb/templates/ca_certs_setup.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-ca-certs-setup
+  labels:
+data:
+  setup-ca-certs.sh: |
+    #!/bin/sh
+    set -e
+
+    mkdir -p /processed-certs
+
+    # Bundle all CA certificates if any exist
+    if [ -d "/usr/local/share/ca-certificates" ] && [ "$(ls -A /usr/local/share/ca-certificates 2>/dev/null)" ]; then
+      find /usr/local/share/ca-certificates -name "*.crt" -exec cat {} \; > /processed-certs/ca-bundle.crt
+      echo "CA certificates bundled: $(wc -l < /processed-certs/ca-bundle.crt) lines"
+    else
+      echo "No custom CA certificates found"
+    fi
+---
 # Source: operator-wandb/templates/certs.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -6623,6 +6644,8 @@ spec:
           value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
+        - name: SSL_CERT_FILE
+          value: "/processed-certs/ca-bundle.crt"
         - name: WF_CLICKHOUSE_PASS
           valueFrom:
             secretKeyRef:
@@ -6664,15 +6687,26 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /tmp/
           name: temp-dir
         - mountPath: /tmp/weave-trace/internal-jwt
           name: weave-trace-internal-jwt
+        - mountPath: /processed-certs
+          name: processed-certs
+          readOnly: true
       initContainers:
-      - name: weave-trace-migrate
+      - name: ca-certs-setup
         command:
-        - python
-        - migrator.py
+        - /scripts/setup-ca-certs.sh
         envFrom:
         - configMapRef:
             name: chartsnap-clickhouse-configmap
@@ -6705,11 +6739,23 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
-        imagePullPolicy: IfNotPresent
+        image: "us-docker.pkg.dev/wandb-production/public/alpine:latest"
+        imagePullPolicy:
         volumeMounts:
-        - mountPath: /tmp/
-          name: temp-dir
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+        - mountPath: /scripts
+          name: ca-certs-setup-script
+          readOnly: true
+        - mountPath: /processed-certs
+          name: processed-certs
       serviceAccountName: chartsnap-weave-trace
       securityContext:
         fsGroup: 0
@@ -6736,8 +6782,30 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - emptyDir: {}
         name: temp-dir
+      - emptyDir: {}
+        name: processed-certs
+      - configMap:
+          defaultMode: 493
+          name: 'chartsnap-ca-certs-setup'
+        name: ca-certs-setup-script
       - name: weave-trace-internal-jwt
         projected:
           sources:
