@@ -124,7 +124,6 @@ configObjects = [
     'wandb-glue-configmap:configmap:' + current_namespace,
     'wandb-kafka-configmap:configmap:' + current_namespace,
     'wandb-kafka:secret:' + current_namespace,
-    'wandb-mysql-configmap:configmap:' + current_namespace,
     'wandb-redis-configmap:configmap:' + current_namespace,
     'wandb-redis-secret:secret:' + current_namespace,
     'wandb-gorilla-session-key:secret:' + current_namespace,
