@@ -1425,6 +1425,27 @@ data:
   AWS_S3_KMS_ID: ""
   GORILLA_DEFAULT_REGION: "minio-local"
 ---
+# Source: operator-wandb/templates/ca_certs_setup.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-ca-certs-setup
+  labels:
+data:
+  setup-ca-certs.sh: |
+    #!/bin/sh
+    set -e
+
+    mkdir -p /processed-certs
+
+    # Bundle all CA certificates if any exist
+    if [ -d "/usr/local/share/ca-certificates" ] && [ "$(ls -A /usr/local/share/ca-certificates 2>/dev/null)" ]; then
+      find /usr/local/share/ca-certificates -name "*.crt" -exec cat {} \; > /processed-certs/ca-bundle.crt
+      echo "CA certificates bundled: $(wc -l < /processed-certs/ca-bundle.crt) lines"
+    else
+      echo "No custom CA certificates found"
+    fi
+---
 # Source: operator-wandb/templates/certs.yaml
 apiVersion: v1
 kind: ConfigMap
