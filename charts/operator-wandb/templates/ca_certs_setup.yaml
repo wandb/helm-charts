@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-ca-certs-setup
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  setup-ca-certs.sh: |
+    #!/bin/sh
+    set -e
+
+    mkdir -p /processed-certs
+
+    # Bundle all CA certificates if any exist
+    if [ -d "/usr/local/share/ca-certificates" ] && [ "$(ls -A /usr/local/share/ca-certificates 2>/dev/null)" ]; then
+      find /usr/local/share/ca-certificates -name "*.crt" -exec cat {} \; > /processed-certs/ca-bundle.crt
+      echo "CA certificates bundled: $(wc -l < /processed-certs/ca-bundle.crt) lines"
+    else
+      echo "No custom CA certificates found"
+    fi
