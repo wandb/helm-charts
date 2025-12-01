@@ -203,6 +203,98 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.mysql" . | trim | quote }}
 {{- end -}}
 
+{{- define "wandb.clickhouseConfigEnvs" -}}
+{{- /*
+  ATTENTION!
+  
+  WF_CLICKHOUSE_HOST, WF_CLICKHOUSE_PORT, WF_CLICKHOUSE_DATABASE, 
+  WF_CLICKHOUSE_USER, WF_CLICKHOUSE_REPLICATED, CLICKHOUSE_PASSWORD
+
+  Are all set in the values.yaml under global.clickhouse.(host,port,database,user,password,replicated)
+
+  The following blocks are to enable values to be provided in one of two ways:
+
+  AS STANDARD:
+    clickhouse:
+      host: "clickhouse.example.com"
+      port: 8443
+      database: "weave_trace_db"
+      user: "default"
+      password: "supersafe"
+      replicated: false
+
+  AS K8s REFS:
+    clickhouse:
+      host:
+        valueFrom:
+          secretKeyRef:
+            name: "clickhouse-settings-secret"
+            key: "endpoint"
+      port:
+        valueFrom:
+          secretKeyRef:
+            name: "clickhouse-settings-secret"
+            key: "port"
+      database:
+        ...
+      user:
+        ...
+      password:
+        ...
+*/ -}}
+
+{{- if kindIs "map" .Values.global.clickhouse.host }}
+- name: WF_CLICKHOUSE_HOST
+{{- toYaml .Values.global.clickhouse.host | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_HOST
+  value: "{{ include "wandb.clickhouse.host" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.clickhouse.port }}
+- name: WF_CLICKHOUSE_PORT
+{{- toYaml .Values.global.clickhouse.port | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_PORT
+  value: "{{ include "wandb.clickhouse.port" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.clickhouse.database }}
+- name: WF_CLICKHOUSE_DATABASE
+{{- toYaml .Values.global.clickhouse.database | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_DATABASE
+  value: "{{ include "wandb.clickhouse.database" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.clickhouse.user }}
+- name: WF_CLICKHOUSE_USER
+{{- toYaml .Values.global.clickhouse.user | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_USER
+  value: "{{ include "wandb.clickhouse.user" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.clickhouse.replicated }}
+- name: WF_CLICKHOUSE_REPLICATED
+{{- toYaml .Values.global.clickhouse.replicated | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_REPLICATED
+  value: "{{ .Values.global.clickhouse.replicated }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.clickhouse.password }}
+- name: CLICKHOUSE_PASSWORD
+{{- toYaml .Values.global.clickhouse.password | nindent 2 }}
+{{- else }}
+- name: CLICKHOUSE_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "wandb.clickhouse.passwordSecret" . | quote}}
+      key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+{{- end -}}
+{{- end -}}
+
 {{- define "wandb.historyStoreEnvs" -}}
 - name: GORILLA_HISTORY_STORE
   value: {{ include "wandb.historyStore" . | quote }}
