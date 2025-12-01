@@ -295,6 +295,10 @@ Global values will override any chart-specific values.
 {{- end -}}
 {{- end -}}
 
+{{- define "wandb.clickhouseEnvs" -}}
+{{ include "wandb.clickhouseConfigEnvs" . }}
+{{- end -}}
+
 {{- define "wandb.historyStoreEnvs" -}}
 - name: GORILLA_HISTORY_STORE
   value: {{ include "wandb.historyStore" . | quote }}
