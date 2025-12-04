@@ -31,7 +31,8 @@ global:
 
   storageClass: ""
 
-  banners: {}
+  banners:
+    {}
     # banner1:
     #   type: warning | error | info
     #   message: "This is a warning message"
@@ -149,7 +150,7 @@ global:
 
   clickhouse:
     host: "{{ .Release.Name }}-clickhouse-headless"
-    port: ""
+    port: "8443"
     password: ""
     passwordSecret:
       name: ""
@@ -159,6 +160,37 @@ global:
     # Required when using replicated services on self-managed ClickHouse (not ClickHouse Cloud).
     # Flag will substitute MergeTree() with ReplicatedMergeTree() and use `ON CLUSTER` on table creation.
     replicated: false
+  #
+  # FOR ADVANCED USERS:
+  # the following clickhouse config options can passed as maps/objects
+  # so that their values can be pulled by existing secrets populated by other systems
+  #
+  # clickhouse:
+  #   host:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "endpoint"
+  #   port:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "port"
+  #   database:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "database"
+  #   user:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "username"
+  #   password:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "password"
 
   email:
     smtp:
@@ -2050,7 +2082,8 @@ weave-trace:
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
-    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.clickhouseEnvs" . }}'
   env:
     WF_CLICKHOUSE_PASS:
       valueFrom:
@@ -2201,7 +2234,8 @@ weave-trace-worker:
   envFrom:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
-    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
   env:
     WF_CLICKHOUSE_PASS:
       valueFrom:
@@ -2311,7 +2345,8 @@ weave-evaluate-model-worker:
   envFrom:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
-    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
   env:
     WF_CLICKHOUSE_PASS:
       valueFrom:
