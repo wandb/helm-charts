@@ -5,7 +5,7 @@
 {{- $allExtraEnvFrom := mergeOverwrite $global $values $local -}}
 {{- range $key, $value := $allExtraEnvFrom }}
 - name: {{ $key }}
-  valueFrom: 
+  valueFrom:
 {{ toYaml $value | nindent 4 }}
 {{- end -}}
 {{- end -}}
@@ -110,7 +110,7 @@ Global values will override any chart-specific values.
 {{- define "wandb.mysqlConfigEnvs" -}}
 {{- /*
   ATTENTION!
-  
+
   MYSQL_PASSWORD, MYSQL_PORT, MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER
 
   Are all set in the the values.yaml under global.mysql.(host,port,database,user,password)
