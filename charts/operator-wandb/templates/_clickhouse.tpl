@@ -14,15 +14,7 @@ Return name of secret where clickhouse information is stored
 {{- end }}
 
 {{- define "wandb.clickhouse.port" -}}
-{{- if .Values.global.clickhouse.port }}
-  {{- .Values.global.clickhouse.port -}}
-{{- else -}}
-  {{- if .Values.clickhouse.install }}
-    {{- print "8123" -}}
-  {{- else -}}
-    {{- print "8443" -}}
-  {{- end -}}
-{{- end -}}
+{{- print $.Values.global.clickhouse.port -}}
 {{- end }}
 
 {{/*
