@@ -110,7 +110,7 @@ configObjects = [
     'wandb-bucket-configmap:configmap:' + current_namespace,
     'wandb-bucket:secret:' + current_namespace,
     'wandb-ca-certs:configmap:' + current_namespace,
-    'wandb-clickhouse-configmap:configmap:' + current_namespace,
+#    'wandb-clickhouse-configmap:configmap:' + current_namespace,
     'wandb-console-configmap:configmap:' + current_namespace,
     'wandb-executor-configmap:configmap:' + current_namespace,
     'wandb-flat-run-fields-updater-configmap:configmap:' + current_namespace,
