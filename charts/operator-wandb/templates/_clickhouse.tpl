@@ -18,7 +18,7 @@ Return name of secret where clickhouse information is stored
   {{- print $.Values.global.clickhouse.port -}}
 {{- else -}}
   {{- $host := (include "wandb.clickhouse.host" .) -}}
-  {{- if eq $host (print .Release.Name "clickhouse-headless") }}
+  {{- if eq $host (print .Release.Name "-clickhouse-headless") }}
     {{- print "8123" -}}
   {{- else -}}
     {{- print "8443" -}}
