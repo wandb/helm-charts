@@ -365,3 +365,10 @@ Global values will override any chart-specific values.
   value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
 {{- end }}
 {{- end -}}
+
+{{- define "wandb.sslCertEnvs" -}}
+- name: SSL_CERT_FILE
+  value: "/etc/ssl/certs/ca-certificates.crt"
+- name: REQUESTS_CA_BUNDLE
+  value: "/etc/ssl/certs/ca-certificates.crt"
+{{- end -}}
