@@ -75,6 +75,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+Create the name of the service to use
+*/}}
+{{- define "wandb-base.serviceName" -}}
+{{- default (include "wandb-base.fullname" .) .Values.service.name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "wandb-base.serviceAccountName" -}}
