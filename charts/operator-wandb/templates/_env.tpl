@@ -284,10 +284,10 @@ Global values will override any chart-specific values.
 {{- end }}
 
 {{- if kindIs "map" .Values.global.clickhouse.password }}
-- name: CLICKHOUSE_PASSWORD
+- name: WF_CLICKHOUSE_PASS
 {{- toYaml .Values.global.clickhouse.password | nindent 2 }}
 {{- else }}
-- name: CLICKHOUSE_PASSWORD
+- name: WF_CLICKHOUSE_PASS
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.clickhouse.passwordSecret" . | quote}}
