@@ -579,6 +579,9 @@ metadata:
   name: chartsnap-clickhouse
   annotations:
     "helm.sh/resource-policy": "keep"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
   labels:
 data:
   CLICKHOUSE_PASSWORD: '###DYNAMIC_FIELD###'
@@ -589,6 +592,10 @@ kind: Secret
 metadata:
   name: chartsnap-global-secret
   labels:
+  annotations:
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
 data:
   GORILLA_STATSIG_KEY:
   GORILLA_EMAIL_SINK: aHR0cHM6Ly9hcGkud2FuZGIuYWkvZW1haWwvZGlzcGF0Y2g=
@@ -1477,6 +1484,7 @@ data:
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
   GORILLA_ONPREM_API_KEY_PREFIX: "local"
   GORILLA_SCHEMA_FILE: "/schema.graphql"
+  GORILLA_COLLECT_AUDIT_LOGS: "true"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_PORT: "8087"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648"
@@ -1532,19 +1540,6 @@ metadata:
     app.kubernetes.io/version: "1.0.0"
     app.kubernetes.io/managed-by: Helm
 data:
----
-# Source: operator-wandb/templates/clickhouse.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-clickhouse-configmap
-  labels:
-data:
-  WF_CLICKHOUSE_PORT: "8443"
-  WF_CLICKHOUSE_HOST: "chartsnap-clickhouse-headless"
-  WF_CLICKHOUSE_DATABASE: "weave_trace_db"
-  WF_CLICKHOUSE_USER: "default"
-  WF_CLICKHOUSE_REPLICATED: "false"
 ---
 # Source: operator-wandb/templates/console.yaml
 apiVersion: v1
@@ -1711,6 +1706,10 @@ kind: ConfigMap
 metadata:
   name: chartsnap-global-configmap
   labels:
+  annotations:
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
 data:
   # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
   GORILLA_STATSD_HOST: ""
@@ -1883,6 +1882,10 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: chartsnap-weave-trace-configmap
+  annotations:
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-weave-trace"
   labels:
 data:
   PORT: "8080"
@@ -1892,6 +1895,7 @@ data:
   WF_TRACE_SERVER_URL: "http://localhost:8080/traces"
   WF_ENFORCE_PASSWORD_LENGTH: "false"
   WEAVE_ENABLE_ONLINE_EVAL: "false"
+  WEAVE_ENABLE_EVALUATE_MODEL_WORKER: "false"
   WEAVE_TRACE_SERVER_BASE_URL: "http://localhost:8080/traces"
   WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME: "weave-worker-auth"
   KAFKA_BROKER_HOST: "bufstream.bufstream.svc.cluster.local"
@@ -2171,6 +2175,21 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: chartsnap-prometheus-server
+---
+# Source: operator-wandb/templates/oidc.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chartsnap-oidc-reviewer
+  labels:
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:service-account-issuer-discovery
+subjects:
+- kind: Group
+  name: system:unauthenticated
+  apiGroup: rbac.authorization.k8s.io
 ---
 # Source: operator-wandb/charts/api/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -2875,7 +2894,7 @@ spec:
         runAsNonRoot: true
       containers:
       - name: daemonset
-        image: "otel/opentelemetry-collector-contrib:0.97.0"
+        image: "us-docker.pkg.dev/wandb-production/public/otel/opentelemetry-collector-contrib:0.97.0"
         securityContext:
           capabilities:
           allowPrivilegeEscalation: false
@@ -2997,7 +3016,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.11.4
+        helm.sh/chart: anaconda2-0.11.6
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3022,7 +3041,7 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -3056,7 +3075,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/anaconda2:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/anaconda2:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
@@ -3134,7 +3153,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: api-0.11.4
+        helm.sh/chart: api-0.11.6
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3304,7 +3323,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -3344,7 +3363,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8081
@@ -3546,7 +3565,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -3586,7 +3605,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
         imagePullPolicy:
       - name: migrate-db
         command:
@@ -3753,7 +3772,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -3793,7 +3812,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
       serviceAccountName: chartsnap-api
       securityContext:
@@ -3865,7 +3884,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.11.4
+        helm.sh/chart: app-0.11.6
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4041,7 +4060,7 @@ spec:
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -4095,7 +4114,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -4324,7 +4343,7 @@ spec:
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -4378,7 +4397,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
         imagePullPolicy:
       serviceAccountName: chartsnap-app
       securityContext:
@@ -4450,7 +4469,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.11.4
+        helm.sh/chart: console-0.11.6
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4467,7 +4486,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -4501,7 +4520,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/console:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/console:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
@@ -4581,7 +4600,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: executor-0.11.4
+        helm.sh/chart: executor-0.11.6
         app.kubernetes.io/name: executor
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4747,7 +4766,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -4783,7 +4802,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -4869,7 +4888,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: filemeta-0.11.4
+        helm.sh/chart: filemeta-0.11.6
         app.kubernetes.io/name: filemeta
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5017,7 +5036,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -5051,7 +5070,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -5137,7 +5156,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: filestream-0.11.4
+        helm.sh/chart: filestream-0.11.6
         app.kubernetes.io/name: filestream
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5305,7 +5324,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -5341,7 +5360,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -5427,7 +5446,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: flat-run-fields-updater-0.11.4
+        helm.sh/chart: flat-run-fields-updater-0.11.6
         app.kubernetes.io/name: flat-run-fields-updater
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5562,6 +5581,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5577,7 +5602,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -5613,7 +5638,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -5699,7 +5724,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: frontend-0.11.4
+        helm.sh/chart: frontend-0.11.6
         app.kubernetes.io/name: frontend
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5720,7 +5745,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -5754,7 +5779,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/frontend-nginx:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/frontend-nginx:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -5826,7 +5851,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: glue-0.11.4
+        helm.sh/chart: glue-0.11.6
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5994,7 +6019,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -6028,7 +6053,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -6221,7 +6246,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -6255,7 +6280,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
         imagePullPolicy:
       - name: migrate-db
         command:
@@ -6420,7 +6445,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -6454,7 +6479,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
       serviceAccountName: chartsnap-glue
       securityContext:
@@ -6526,7 +6551,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: metric-observer-0.11.4
+        helm.sh/chart: metric-observer-0.11.6
         app.kubernetes.io/name: metric-observer
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6694,7 +6719,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -6732,7 +6757,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -6817,7 +6842,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: nginx-0.11.4
+        helm.sh/chart: nginx-0.11.6
         app.kubernetes.io/name: nginx
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6832,7 +6857,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -6866,7 +6891,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "nginxinc/nginx-unprivileged:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/nginxinc/nginx-unprivileged:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -6941,7 +6966,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.11.4
+        helm.sh/chart: parquet-0.11.6
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -7109,7 +7134,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -7143,7 +7168,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8087
@@ -7367,7 +7392,7 @@ spec:
         version: v1.3.0
     spec:
       containers:
-      - image: "ghcr.io/stakater/reloader:v1.3.0"
+      - image: "us-docker.pkg.dev/wandb-production/public/stakater/reloader:v1.3.0"
         imagePullPolicy: IfNotPresent
         name: chartsnap-reloader
         env:
@@ -7444,7 +7469,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.11.4
+        helm.sh/chart: weave-0.11.6
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -7461,7 +7486,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -7495,7 +7520,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/weave-python:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-python:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9994
@@ -7546,7 +7571,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -7580,7 +7605,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/weave-python:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-python:latest"
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -7685,7 +7710,7 @@ spec:
         runAsNonRoot: true
       containers:
       - name: mysql
-        image: "mysql:8.4"
+        image: "us-docker.pkg.dev/wandb-production/public/mysql:8.4"
         securityContext:
           allowPrivilegeEscalation: false
         ports:
@@ -7809,7 +7834,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: redis
-        image: docker.io/bitnamilegacy/redis:7.2.4-debian-12-r9
+        image: us-docker.pkg.dev/wandb-production/public/bitnamilegacy/redis:7.2.4-debian-12-r9
         imagePullPolicy: "IfNotPresent"
         securityContext:
           allowPrivilegeEscalation: false
@@ -7929,7 +7954,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.11.4
+            helm.sh/chart: parquet-0.11.6
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -8099,7 +8124,7 @@ spec:
             - name: BUCKET_PROXY
               value: "true"
             - name: GLOBAL_ADMIN_API_KEY
-              value: "local-123456789-123456789-123456789-1234"
+              value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
             - name: GORILLA_DEV
               value: "true"
             - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -8137,7 +8162,7 @@ spec:
                 drop: []
               privileged: false
               readOnlyRootFilesystem: false
-            image: "wandb/megabinary:latest"
+            image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
             imagePullPolicy: IfNotPresent
             resources:
               limits:
@@ -8412,7 +8437,7 @@ spec:
     - name: WANDB_BASE_URL
       value: "http://chartsnap-nginx:8080"
     - name: WANDB_API_KEY
-      value: "local-123456789-123456789-123456789-1234"
+      value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
     command:
     - sh
     - -c
@@ -8457,7 +8482,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -8491,7 +8516,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "alpine/k8s:1.31.12"
+        image: "us-docker.pkg.dev/wandb-production/public/alpine/k8s:1.31.12"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -8569,7 +8594,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_DEV
           value: "true"
         - name: GORILLA_ENABLE_RUN_AUTOMATIONS
@@ -8603,7 +8628,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "alpine/k8s:1.31.12"
+        image: "us-docker.pkg.dev/wandb-production/public/alpine/k8s:1.31.12"
         imagePullPolicy: IfNotPresent
         resources:
           requests:

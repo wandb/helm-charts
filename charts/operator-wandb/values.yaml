@@ -12,6 +12,10 @@
 global:
   # This should be the fqdn of where your users will be accessing the instance.
   host: "http://localhost:8080"
+
+  repositoryPrefix: ""
+  imageRegistry: ""
+
   license: ""
   licenseCertPath: "/jwks.json"
 
@@ -27,7 +31,8 @@ global:
 
   storageClass: ""
 
-  banners: {}
+  banners:
+    {}
     # banner1:
     #   type: warning | error | info
     #   message: "This is a warning message"
@@ -155,6 +160,37 @@ global:
     # Required when using replicated services on self-managed ClickHouse (not ClickHouse Cloud).
     # Flag will substitute MergeTree() with ReplicatedMergeTree() and use `ON CLUSTER` on table creation.
     replicated: false
+  #
+  # FOR ADVANCED USERS:
+  # the following clickhouse config options can passed as maps/objects
+  # so that their values can be pulled by existing secrets populated by other systems
+  #
+  # clickhouse:
+  #   host:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "endpoint"
+  #   port:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "port"
+  #   database:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "database"
+  #   user:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "username"
+  #   password:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "password"
 
   email:
     smtp:
@@ -172,6 +208,9 @@ global:
       secret: ""
       authMethod: ""
       issuer: ""
+      oidcSecret:
+        name: ""
+        secretKey: "OIDC_SECRET"
 
   # Storage bucket that will be used by the application by default but can be overridden by the user in the wandb-console.
   defaultBucket:
@@ -364,6 +403,7 @@ api:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   initContainers:
     init-db:
@@ -538,6 +578,7 @@ app:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.oidcEnvs" . }}'
   service:
     enabled: true
     ports:
@@ -1214,6 +1255,7 @@ flat-run-fields-updater:
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
   containers:
     flat-run-fields-updater:
@@ -2040,24 +2082,22 @@ weave-trace:
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
-    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
-  env:
-    WF_CLICKHOUSE_PASS:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+  envTpls:
+    - '{{ include "wandb.clickhouseEnvs" . }}'
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   initContainers:
     weave-trace-migrate:
-      command: ["python", "migrator.py"]
+      args: ["python", "migrator.py"]
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     weave-trace:
-      command:
-        - uvicorn
       args:
+        - "uvicorn"
         - "src.trace_server:app"
         - "--host"
         - "0.0.0.0"
@@ -2090,6 +2130,8 @@ weave-trace:
           mountPath: /tmp/
         - name: weave-trace-internal-jwt
           mountPath: /tmp/weave-trace/internal-jwt
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   service:
     enabled: true
     ports:
@@ -2186,25 +2228,24 @@ weave-trace-worker:
   envFrom:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
-    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
   env:
-    WF_CLICKHOUSE_PASS:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
     WANDB_INTERNAL_SERVICE_TOKEN:
       valueFrom:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   containers:
     weave-trace-worker:
-      command:
-        - python
       args:
+        - "python"
         - "-m"
         - "src.workers.scoring_worker"
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       ports:
         - name: http
           containerPort: 8080
@@ -2228,7 +2269,113 @@ weave-trace-worker:
         horizontal:
           enabled: true
           maxReplicas: 2
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
           minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+
+weave-evaluate-model-worker:
+  install: false
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/weave-trace
+    tag: latest
+  datadog:
+    enabled: false
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+  env:
+    WANDB_INTERNAL_SERVICE_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: weave-worker-auth
+          key: key
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  containers:
+    weave-evaluate-model-worker:
+      args:
+        - "python"
+        - "-m"
+        - "src.workers.evaluate_model_worker.evaluate_model_worker"
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+  service:
+    ports:
+      - name: http
+        port: 8723
+        protocol: TCP
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
     medium:
       resources:
         limits:
@@ -2285,10 +2432,10 @@ weave-trace-worker:
 nginx:
   install: false
   additionalServices: {}
-#    keycloak:
-#      host: http://keycloak:8080/keycloak
-#      headers:
-#        Host: http://keycloak:8080/keycloak
+  #    keycloak:
+  #      host: http://keycloak:8080/keycloak
+  #      headers:
+  #        Host: http://keycloak:8080/keycloak
   image:
     repository: nginxinc/nginx-unprivileged
     tag: latest
@@ -2311,7 +2458,7 @@ nginx:
   volumes:
     - name: nginx-config
       configMap:
-        name: '{{ .Release.Name }}-nginx-configmap'
+        name: "{{ .Release.Name }}-nginx-configmap"
   sizing:
     default:
       autoscaling:
@@ -2506,7 +2653,7 @@ etcd:
 bufstream:
   install: false
   image:
-    repository: bitnamilegacy/bufsteam
+    repository: bitnamilegacy/bufstream
   global:
     security:
       allowInsecureImages: true

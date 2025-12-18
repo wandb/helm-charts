@@ -426,6 +426,9 @@ metadata:
   name: chartsnap-clickhouse
   annotations:
     "helm.sh/resource-policy": "keep"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
   labels:
 data:
   CLICKHOUSE_PASSWORD: '###DYNAMIC_FIELD###'
@@ -436,6 +439,10 @@ kind: Secret
 metadata:
   name: chartsnap-global-secret
   labels:
+  annotations:
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
 data:
   GORILLA_STATSIG_KEY:
   GORILLA_EMAIL_SINK: aHR0cHM6Ly9hcGkud2FuZGIuYWkvZW1haWwvZGlzcGF0Y2g=
@@ -1298,6 +1305,7 @@ data:
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
   GORILLA_ONPREM_API_KEY_PREFIX: "local"
   GORILLA_SCHEMA_FILE: "/schema.graphql"
+  GORILLA_COLLECT_AUDIT_LOGS: "true"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_PORT: "8087"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648"
@@ -1353,19 +1361,6 @@ metadata:
     app.kubernetes.io/version: "1.0.0"
     app.kubernetes.io/managed-by: Helm
 data:
----
-# Source: operator-wandb/templates/clickhouse.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-clickhouse-configmap
-  labels:
-data:
-  WF_CLICKHOUSE_PORT: "8443"
-  WF_CLICKHOUSE_HOST: "chartsnap-clickhouse-headless"
-  WF_CLICKHOUSE_DATABASE: "weave_trace_db"
-  WF_CLICKHOUSE_USER: "default"
-  WF_CLICKHOUSE_REPLICATED: "false"
 ---
 # Source: operator-wandb/templates/console.yaml
 apiVersion: v1
@@ -1532,6 +1527,10 @@ kind: ConfigMap
 metadata:
   name: chartsnap-global-configmap
   labels:
+  annotations:
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
 data:
   # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
   GORILLA_STATSD_HOST: ""
@@ -1696,6 +1695,10 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: chartsnap-weave-trace-configmap
+  annotations:
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-weave-trace"
   labels:
 data:
   PORT: "8080"
@@ -1705,6 +1708,7 @@ data:
   WF_TRACE_SERVER_URL: "http://localhost:8080/traces"
   WF_ENFORCE_PASSWORD_LENGTH: "false"
   WEAVE_ENABLE_ONLINE_EVAL: "false"
+  WEAVE_ENABLE_EVALUATE_MODEL_WORKER: "false"
   WEAVE_TRACE_SERVER_BASE_URL: "http://localhost:8080/traces"
   WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME: "weave-worker-auth"
   KAFKA_BROKER_HOST: "bufstream.bufstream.svc.cluster.local"
@@ -1965,6 +1969,21 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: chartsnap-prometheus-server
+---
+# Source: operator-wandb/templates/oidc.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chartsnap-oidc-reviewer
+  labels:
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:service-account-issuer-discovery
+subjects:
+- kind: Group
+  name: system:unauthenticated
+  apiGroup: rbac.authorization.k8s.io
 ---
 # Source: operator-wandb/charts/api/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -2591,7 +2610,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.11.4
+        helm.sh/chart: anaconda2-0.11.6
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "anacondatag"
@@ -2696,7 +2715,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: api-0.11.4
+        helm.sh/chart: api-0.11.6
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3334,7 +3353,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.11.4
+        helm.sh/chart: app-0.11.6
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3854,7 +3873,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.11.4
+        helm.sh/chart: console-0.11.6
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3953,7 +3972,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: executor-0.11.4
+        helm.sh/chart: executor-0.11.6
         app.kubernetes.io/name: executor
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "executortag"
@@ -4212,7 +4231,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: filestream-0.11.4
+        helm.sh/chart: filestream-0.11.6
         app.kubernetes.io/name: filestream
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "filestreamtag"
@@ -4473,7 +4492,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: flat-run-fields-updater-0.11.4
+        helm.sh/chart: flat-run-fields-updater-0.11.6
         app.kubernetes.io/name: flat-run-fields-updater
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "flatrunfieldsupdatertag"
@@ -4608,6 +4627,12 @@ spec:
           value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
         - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
           value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -4713,7 +4738,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: glue-0.11.4
+        helm.sh/chart: glue-0.11.6
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5321,7 +5346,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.11.4
+        helm.sh/chart: parquet-0.11.6
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5706,7 +5731,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.11.4
+        helm.sh/chart: weave-0.11.6
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6250,7 +6275,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.11.4
+            helm.sh/chart: parquet-0.11.6
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -6750,7 +6775,7 @@ spec:
     - name: WANDB_BASE_URL
       value: "http://chartsnap-nginx:8080"
     - name: WANDB_API_KEY
-      value: "local-123456789-123456789-123456789-1234"
+      value: ""
     command:
     - sh
     - -c
