@@ -322,13 +322,52 @@ autoscaling:
   #    targetCPUUtilizationPercentage: 80
   #    targetMemoryUtilizationPercentage: 80
   vertical: {}
+  #    enabled: false
+  #    updateMode: "Auto"
+  #    containerPolicies:
+  #      - containerName: "*"
+  #        controlledResources:
+  #          - memory
+  #          - cpu
+  # KEDA-based event-driven autoscaling
+  # More information: https://keda.sh/docs/latest/concepts/scaling-deployments/
+  # NOTE: KEDA and HPA are mutually exclusive. When KEDA is enabled, it manages its own HPA.
+  keda: {}
 #    enabled: false
-#    updateMode: "Auto"
-#    containerPolicies:
-#      - containerName: "*"
-#        controlledResources:
-#          - memory
-#          - cpu
+#    pollingInterval: 30  # Optional: Interval to check each trigger (seconds)
+#    cooldownPeriod: 300  # Optional: Period to wait after last trigger before scaling to 0 (seconds)
+#    idleReplicaCount: 0  # Optional: Number of replicas to scale to when no activity
+#    minReplicaCount: 1   # Optional: Minimum replicas (overrides HPA minReplicas)
+#    maxReplicaCount: 10  # Optional: Maximum replicas (overrides HPA maxReplicas)
+#    fallback:            # Optional: Fallback configuration if scaler fails
+#      failureThreshold: 3
+#      replicas: 6
+#    advanced:            # Optional: Advanced HPA configuration
+#      horizontalPodAutoscalerConfig:
+#        behavior:
+#          scaleDown:
+#            stabilizationWindowSeconds: 300
+#    triggers: []
+#      # Example: Kafka trigger
+#      # - type: kafka
+#      #   metadata:
+#      #     bootstrapServers: kafka:9092
+#      #     consumerGroup: my-group
+#      #     topic: my-topic
+#      #     lagThreshold: "10"
+#      # Example: Redis Lists trigger
+#      # - type: redis
+#      #   metadata:
+#      #     address: redis:6379
+#      #     listName: mylist
+#      #     listLength: "5"
+#      # Example: Prometheus trigger
+#      # - type: prometheus
+#      #   metadata:
+#      #     serverAddress: http://prometheus:9090
+#      #     metricName: http_requests_total
+#      #     threshold: "100"
+#      #     query: sum(rate(http_requests_total[2m]))
 
 # This section is for setting up a Pod Disruption Budget (PDB) more information can be found here: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
 podDisruptionBudget:
@@ -406,6 +445,8 @@ sizing:
             controlledResources:
               - memory
               - cpu
+      keda:
+        enabled: false
   testing:
     resources:
       requests:
@@ -444,6 +485,17 @@ sizing:
 #            controlledResources:
 #              - memory
 #              - cpu
+#      keda:
+#        enabled: false
+#        minReplicaCount: 1
+#        maxReplicaCount: 10
+#        triggers:
+#          - type: prometheus
+#            metadata:
+#              serverAddress: http://prometheus:9090
+#              metricName: http_requests_total
+#              threshold: "100"
+#              query: sum(rate(http_requests_total[2m]))
 
 # DEPRECATED - All below values added for backwards compatibility with previous charts
 pod:
