@@ -12,6 +12,62 @@ ingress_https_port=443
 reg_name='kind-registry'
 reg_port='5001'
 
+# Check for required dependencies
+check_dependencies() {
+  local missing_deps=()
+  
+  # Check for kind
+  if ! command -v kind >/dev/null 2>&1; then
+    missing_deps+=("kind")
+  fi
+  
+  # Check for docker
+  if ! command -v docker >/dev/null 2>&1; then
+    missing_deps+=("docker")
+  fi
+  
+  # Check for kubectl
+  if ! command -v kubectl >/dev/null 2>&1; then
+    missing_deps+=("kubectl")
+  fi
+  
+  # If any dependencies are missing, print error and exit
+  if [ ${#missing_deps[@]} -ne 0 ]; then
+    echo "Error: Missing required dependencies: ${missing_deps[*]}"
+    echo ""
+    echo "Please install the missing tools:"
+    for dep in "${missing_deps[@]}"; do
+      case "$dep" in
+        kind)
+          echo "  - kind: https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
+          echo "    macOS: brew install kind"
+          echo "    Linux: curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/"
+          ;;
+        docker)
+          echo "  - docker: https://docs.docker.com/get-docker/"
+          echo "    macOS: brew install --cask docker"
+          echo "    Ensure Docker Desktop is running after installation"
+          ;;
+        kubectl)
+          echo "  - kubectl: https://kubernetes.io/docs/tasks/tools/"
+          echo "    macOS: brew install kubectl"
+          echo "    Linux: curl -LO \"https://dl.k8s.io/release/\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl\" && sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl"
+          ;;
+      esac
+    done
+    exit 1
+  fi
+  
+  # Check if Docker is running
+  if ! docker info >/dev/null 2>&1; then
+    echo "Error: Docker is installed but not running."
+    echo "Please start Docker and try again."
+    echo "  macOS: Open Docker Desktop from Applications"
+    echo "  Linux: sudo systemctl start docker"
+    exit 1
+  fi
+}
+
 # Display usage information
 usage() {
   echo "Usage: $0 [OPTIONS]"
@@ -76,6 +132,9 @@ while [ "$#" -gt 0 ]; do
       ;;
   esac
 done
+
+# Check that all required tools are installed
+check_dependencies
 
 echo "Creating kind cluster with the following configuration:"
 echo "  Cluster name: $cluster_name"
