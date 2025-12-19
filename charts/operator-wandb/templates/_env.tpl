@@ -284,10 +284,10 @@ Global values will override any chart-specific values.
 {{- end }}
 
 {{- if kindIs "map" .Values.global.clickhouse.password }}
-- name: CLICKHOUSE_PASSWORD
+- name: WF_CLICKHOUSE_PASS
 {{- toYaml .Values.global.clickhouse.password | nindent 2 }}
 {{- else }}
-- name: CLICKHOUSE_PASSWORD
+- name: WF_CLICKHOUSE_PASS
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.clickhouse.passwordSecret" . | quote}}
@@ -371,4 +371,40 @@ Global values will override any chart-specific values.
   value: "/etc/ssl/certs/ca-certificates.crt"
 - name: REQUESTS_CA_BUNDLE
   value: "/etc/ssl/certs/ca-certificates.crt"
+{{- end -}}
+
+{{- /*
+  ATTENTION!
+  the `wandb.rateLimitEnvs` is dependent on interpolated envs for redis
+  to form the connection string and must appear after the redis envs
+  in a pod's env section to work porperly.
+
+  Using the wandb-base chart that means that:
+    `{{ include "wandb.ratelimitEnvs" . }}`
+  MUST appear after:
+    `{{ include "wandb.redisEnvs" . }}`
+  in the `envTpls` section.
+*/ -}}
+{{- define "wandb.rateLimitEnvs" -}}
+{{- if and .Values.global.api.enabled .Values.global.api.rateLimits.enabled}}
+- name: GORILLA_LIMITER
+  value: "{{ include "wandb.redis.connectionString" . | trim }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+  value: "{{ .Values.global.api.rateLimits.filestreamCount }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+  value: "{{ .Values.global.api.rateLimits.filestreamSize }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+  value: "{{ .Values.global.api.rateLimits.fileStreamPerRunCount }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+  value: "{{ .Values.global.api.rateLimits.runUpdateCount }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+  value: "{{ .Values.global.api.rateLimits.sdkGraphqlQuerySeconds }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+  value: "{{ .Values.global.api.rateLimits.createArtifacts }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+  value: "{{ .Values.global.api.rateLimits.createArtifactsTimeWindow }}"
+{{- else }}
+- name: GORILLA_LIMITER
+  value: "noop://"
+{{- end }}
 {{- end -}}

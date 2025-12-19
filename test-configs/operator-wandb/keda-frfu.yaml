@@ -1,0 +1,27 @@
+# Example: Using KEDA to auto-scale the executor based on Kafka lag
+# The executor processes tasks from Kafka queues, so scaling based on
+# consumer lag provides efficient resource utilization.
+flat-run-fields-updater:
+  install: true
+  size: "large"
+  sizing:
+    large:
+      autoscaling:
+        horizontal:
+          enabled: false
+        # Enable KEDA for event-driven autoscaling
+        keda:
+          enabled: true
+          minReplicaCount: 0
+          maxReplicaCount: 3
+          pollingInterval: 15
+          cooldownPeriod: 30
+          triggers:
+            - type: kafka
+              metadata:
+                bootstrapServers: bufstream.bufstream.svc.cluster.local:9092
+                consumerGroup: flat-run-fields-updater
+                topic: wandb-run-updates-shadow
+                lagThreshold: "10"       # Scale up if lag > 10 per replica
+                limitToPartitionsWithLag: "true"
+
