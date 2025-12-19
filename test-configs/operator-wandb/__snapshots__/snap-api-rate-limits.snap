@@ -1,14 +1,5 @@
 # chartsnap: snapshot_version=v3
 ---
-apiVersion: helm-chartsnap.jlandowner.dev/v1alpha1
-kind: Unknown
-metadata:
-  name: helm-output
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-raw: |-
-  ###DYNAMIC_FIELD###
----
 # Source: operator-wandb/charts/redis/templates/networkpolicy.yaml
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
@@ -469,6 +460,16 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
+# Source: operator-wandb/templates/bucket.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chartsnap-bucket
+  labels:
+data:
+  ACCESS_KEY: bWluaW8=
+  SECRET_KEY: dGVzdHBhc3N3b3Jk
+---
 # Source: operator-wandb/templates/clickhouse.yaml
 apiVersion: v1
 kind: Secret
@@ -521,6 +522,18 @@ metadata:
 data:
   license: ""
 ---
+# Source: operator-wandb/templates/mysql.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chartsnap-mysql
+  annotations:
+    "helm.sh/resource-policy": "keep"
+  labels:
+data:
+  MYSQL_ROOT_PASSWORD: '###DYNAMIC_FIELD###'
+  MYSQL_PASSWORD: '###DYNAMIC_FIELD###'
+---
 # Source: operator-wandb/templates/parquet.yaml
 apiVersion: v1
 kind: Secret
@@ -528,6 +541,16 @@ metadata:
   name: chartsnap-parquet-secret
   labels:
 data: {}
+---
+# Source: operator-wandb/templates/redis.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "chartsnap-redis-secret"
+  labels:
+data:
+  REDIS_PASSWORD: cmVkaXMxMjM=
+  REDIS_CA_CERT:
 ---
 # Source: operator-wandb/templates/session-key.yaml
 apiVersion: v1
@@ -2749,8 +2772,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: "wandb-mysql-password-secret-user-defined"
-              key: "PASSWORD"
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -2758,10 +2781,7 @@ spec:
         - name: MYSQL_DATABASE
           value: "wandb_local"
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: "wandb"
         - name: K8S_NODE_NAME
           valueFrom:
             fieldRef:
@@ -3020,20 +3040,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -3046,8 +3066,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -3055,10 +3075,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -3072,8 +3089,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -3128,7 +3145,21 @@ spec:
               key: license
               name: chartsnap-license
         - name: GORILLA_LIMITER
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+          value: "40"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+          value: "1"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+          value: "4"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+          value: "833"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+          value: "120"
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -3245,20 +3276,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -3271,8 +3302,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -3280,10 +3311,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -3297,8 +3325,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -3353,7 +3381,21 @@ spec:
               key: license
               name: chartsnap-license
         - name: GORILLA_LIMITER
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+          value: "40"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+          value: "1"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+          value: "4"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+          value: "833"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+          value: "120"
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -3435,20 +3477,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -3461,8 +3503,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -3470,10 +3512,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -3487,8 +3526,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -3543,7 +3582,21 @@ spec:
               key: license
               name: chartsnap-license
         - name: GORILLA_LIMITER
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+          value: "40"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+          value: "1"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+          value: "4"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+          value: "833"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+          value: "120"
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -3606,7 +3659,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -3706,20 +3759,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -3730,8 +3783,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -3739,10 +3792,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -3756,8 +3806,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -3970,20 +4020,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -3994,8 +4044,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -4003,10 +4053,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -4020,8 +4067,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -4153,7 +4200,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -4243,8 +4290,8 @@ spec:
             cpu: "2"
             memory: 2Gi
           requests:
-            cpu: 50m
-            memory: 64Mi
+            cpu: "1"
+            memory: 1Gi
       serviceAccountName: chartsnap-console
       securityContext:
         fsGroup: 0
@@ -4354,20 +4401,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -4380,8 +4427,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -4389,10 +4436,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -4406,8 +4450,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -4531,7 +4575,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -4619,20 +4663,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -4645,8 +4689,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -4654,10 +4698,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -4671,8 +4712,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -4780,7 +4821,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -4977,20 +5018,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -5003,8 +5044,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -5012,10 +5053,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -5029,8 +5067,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -5185,20 +5223,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -5211,8 +5249,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -5220,10 +5258,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -5237,8 +5272,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -5365,20 +5400,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -5391,8 +5426,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -5400,10 +5435,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -5417,8 +5449,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -5528,7 +5560,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -5722,20 +5754,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -5748,8 +5780,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -5757,10 +5789,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -5774,8 +5803,8 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
           value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -5921,7 +5950,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -6290,7 +6319,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -6355,8 +6384,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: "wandb-mysql-password-secret-user-defined"
-              key: "PASSWORD"
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -6364,15 +6393,12 @@ spec:
         - name: MYSQL_DATABASE
           value: "wandb_local"
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: "wandb"
         - name: MYSQL_ROOT_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: wandb-mysql-password-secret-user-defined
-              key: ROOT_PASSWORD
+              name: chartsnap-mysql
+              key: MYSQL_ROOT_PASSWORD
         livenessProbe:
           tcpSocket:
             port: 3306
@@ -6652,20 +6678,20 @@ spec:
             - name: AZURE_STORAGE_KEY
               valueFrom:
                 secretKeyRef:
-                  key: KEY_ID
-                  name: wandb-bucket-secret-user-defined
+                  key: ACCESS_KEY
+                  name: chartsnap-bucket
                   optional: true
             - name: BUCKET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  key: KEY_ID
-                  name: wandb-bucket-secret-user-defined
+                  key: ACCESS_KEY
+                  name: chartsnap-bucket
                   optional: true
             - name: BUCKET_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  key: ACCESS_KEY
-                  name: wandb-bucket-secret-user-defined
+                  key: SECRET_KEY
+                  name: chartsnap-bucket
                   optional: true
             - name: BUCKET
               value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -6678,8 +6704,8 @@ spec:
             - name: MYSQL_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  key: PASSWORD
-                  name: wandb-mysql-password-secret-user-defined
+                  key: MYSQL_PASSWORD
+                  name: chartsnap-mysql
             - name: MYSQL_PORT
               value: "3306"
             - name: MYSQL_HOST
@@ -6687,10 +6713,7 @@ spec:
             - name: MYSQL_DATABASE
               value: wandb_local
             - name: MYSQL_USER
-              valueFrom:
-                secretKeyRef:
-                  key: USER
-                  name: wandb-mysql-password-secret-user-defined
+              value: wandb
             - name: MYSQL
               value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
             - name: GORILLA_ANALYTICS_SINK
@@ -6704,8 +6727,8 @@ spec:
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  key: PASSWORD
-                  name: wandb-redis-password-secret-user-defined
+                  key: REDIS_PASSWORD
+                  name: chartsnap-redis-secret
                   optional: true
             - name: REDIS
               value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
@@ -6836,7 +6859,7 @@ spec:
               optional: true
           - name: redis-ca
             secret:
-              secretName: 'wandb-redis-password-secret-user-defined'
+              secretName: 'chartsnap-redis-secret'
               items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
