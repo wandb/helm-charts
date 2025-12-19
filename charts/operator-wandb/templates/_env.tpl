@@ -366,6 +366,13 @@ Global values will override any chart-specific values.
 {{- end }}
 {{- end -}}
 
+{{- define "wandb.sslCertEnvs" -}}
+- name: SSL_CERT_FILE
+  value: "/etc/ssl/certs/ca-certificates.crt"
+- name: REQUESTS_CA_BUNDLE
+  value: "/etc/ssl/certs/ca-certificates.crt"
+{{- end -}}
+
 {{- /*
   ATTENTION!
   the `wandb.rateLimitEnvs` is dependent on interpolated envs for redis
@@ -401,4 +408,3 @@ Global values will override any chart-specific values.
   value: "noop://"
 {{- end }}
 {{- end -}}
-
