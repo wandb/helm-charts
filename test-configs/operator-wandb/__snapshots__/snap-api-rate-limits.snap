@@ -1,100 +1,5 @@
 # chartsnap: snapshot_version=v3
 ---
-# Source: operator-wandb/charts/clickhouse/templates/keeper/networkpolicy.yaml
-kind: NetworkPolicy
-apiVersion: networking.k8s.io/v1
-metadata:
-  name: chartsnap-clickhouse-keeper
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/part-of: clickhouse
-    app.kubernetes.io/component: keeper
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/name: clickhouse
-      app.kubernetes.io/part-of: clickhouse
-      app.kubernetes.io/component: keeper
-  policyTypes:
-  - Ingress
-  - Egress
-  egress:
-  - {}
-  ingress:
-  - ports:
-    - port: 9181
-    - port: 9234
----
-# Source: operator-wandb/charts/clickhouse/templates/networkpolicy.yaml
-kind: NetworkPolicy
-apiVersion: networking.k8s.io/v1
-metadata:
-  name: chartsnap-clickhouse
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/part-of: clickhouse
-    app.kubernetes.io/component: clickhouse
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/name: clickhouse
-      app.kubernetes.io/part-of: clickhouse
-      app.kubernetes.io/component: clickhouse
-  policyTypes:
-  - Ingress
-  - Egress
-  egress:
-  - {}
-  ingress:
-  - ports:
-    - port: 8123
-    - port: 9000
-    - port: 9004
-    - port: 9005
-    - port: 9009
----
-# Source: operator-wandb/charts/etcd/templates/networkpolicy.yaml
-kind: NetworkPolicy
-apiVersion: networking.k8s.io/v1
-metadata:
-  name: chartsnap-etcd
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: etcd
-    app.kubernetes.io/version: 3.5.17
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: etcd
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/name: etcd
-      app.kubernetes.io/component: etcd
-  policyTypes:
-  - Ingress
-  - Egress
-  egress:
-  - {}
-  ingress:
-  # Allow inbound connections
-  - ports:
-    - port: 2379
-    - port: 2380
----
 # Source: operator-wandb/charts/redis/templates/networkpolicy.yaml
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
@@ -185,54 +90,6 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
-# Source: operator-wandb/charts/clickhouse/templates/keeper/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: chartsnap-clickhouse-keeper
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: keeper
-    app.kubernetes.io/part-of: clickhouse
-spec:
-  maxUnavailable: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/name: clickhouse
-      app.kubernetes.io/component: keeper
-      app.kubernetes.io/part-of: clickhouse
----
-# Source: operator-wandb/charts/clickhouse/templates/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: chartsnap-clickhouse-shard0
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: clickhouse
-    app.kubernetes.io/part-of: clickhouse
-    shard: "0"
-spec:
-  maxUnavailable: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/name: clickhouse
-      app.kubernetes.io/component: clickhouse
-      app.kubernetes.io/part-of: clickhouse
-      shard: "0"
----
 # Source: operator-wandb/charts/console/templates/pdb.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -253,27 +110,6 @@ spec:
       app.kubernetes.io/name: console
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
----
-# Source: operator-wandb/charts/etcd/templates/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: chartsnap-etcd
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: etcd
-    app.kubernetes.io/version: 3.5.17
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: etcd
-spec:
-  minAvailable: 51%
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/name: etcd
-      app.kubernetes.io/component: etcd
 ---
 # Source: operator-wandb/charts/executor/templates/pdb.yaml
 apiVersion: policy/v1
@@ -401,69 +237,6 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
-# Source: operator-wandb/charts/weave-evaluate-model-worker/templates/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: chartsnap-weave-evaluate-model-worker
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-evaluate-model-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  selector:
-    matchExpressions:
-    - key: batch.kubernetes.io/job-name
-      operator: DoesNotExist
-    matchLabels:
-      app.kubernetes.io/name: weave-evaluate-model-worker
-      app.kubernetes.io/instance: chartsnap
-  maxUnavailable: 1
----
-# Source: operator-wandb/charts/weave-trace-worker/templates/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: chartsnap-weave-trace-worker
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  selector:
-    matchExpressions:
-    - key: batch.kubernetes.io/job-name
-      operator: DoesNotExist
-    matchLabels:
-      app.kubernetes.io/name: weave-trace-worker
-      app.kubernetes.io/instance: chartsnap
-  maxUnavailable: 1
----
-# Source: operator-wandb/charts/weave-trace/templates/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: chartsnap-weave-trace
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  selector:
-    matchExpressions:
-    - key: batch.kubernetes.io/job-name
-      operator: DoesNotExist
-    matchLabels:
-      app.kubernetes.io/name: weave-trace
-      app.kubernetes.io/instance: chartsnap
-  maxUnavailable: 1
----
 # Source: operator-wandb/charts/weave/templates/pdb.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -524,34 +297,6 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
-# Source: operator-wandb/charts/bufstream/templates/service-account.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: bufstream-service-account
-  namespace: default
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app: bufstream
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: bufstream
-    app.kubernetes.io/managed-by: Helm
----
-# Source: operator-wandb/charts/clickhouse/templates/service-account.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-clickhouse
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: clickhouse
-automountServiceAccountToken: false
----
 # Source: operator-wandb/charts/console/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -564,20 +309,6 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
----
-# Source: operator-wandb/charts/etcd/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-automountServiceAccountToken: false
-metadata:
-  name: chartsnap-etcd
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: etcd
-    app.kubernetes.io/version: 3.5.17
-    helm.sh/chart: '###CHART_VERSION###'
 ---
 # Source: operator-wandb/charts/executor/templates/serviceaccount.yaml
 apiVersion: v1
@@ -716,45 +447,6 @@ metadata:
   name: chartsnap-reloader
   namespace: default
 ---
-# Source: operator-wandb/charts/weave-evaluate-model-worker/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-weave-evaluate-model-worker
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-evaluate-model-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
-# Source: operator-wandb/charts/weave-trace-worker/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-weave-trace-worker
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
-# Source: operator-wandb/charts/weave-trace/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-weave-trace
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
 # Source: operator-wandb/charts/weave/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -857,7 +549,7 @@ metadata:
   name: "chartsnap-redis-secret"
   labels:
 data:
-  REDIS_PASSWORD:
+  REDIS_PASSWORD: cmVkaXMxMjM=
   REDIS_CA_CERT:
 ---
 # Source: operator-wandb/templates/session-key.yaml
@@ -874,166 +566,6 @@ data:
   # Set $gorillaSessionKey to existing secret data or generate a random one when not exists
   GORILLA_SESSION_KEY: "###DYNAMIC_FIELD###"
   GORILLA_AUTH_JWK_URL: "aHR0cDovL2NoYXJ0c25hcC1hcHA6ODA4My9hcGkvandrcy5qc29u"
----
-# Source: operator-wandb/charts/bufstream/templates/config.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: bufstream-config
-  namespace: default
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app: bufstream
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: bufstream
-    app.kubernetes.io/managed-by: Helm
-data:
-  config.yaml: |2-
-
-    cluster: bufstream
-    connect_address:
-      host: 0.0.0.0
-      port: 8080
-    etcd:
-      addresses:
-      - host: chartsnap-etcd.default.svc.cluster.local
-        port: 2379
-    kafka:
-      address:
-        host: 0.0.0.0
-        port: 9092
-      exact_log_offsets: false
-      exact_log_sizes: true
-      fetch_eager: true
-      fetch_sync: true
-      group_consumer_session_timeout: 45s
-      group_consumer_session_timeout_max: 60s
-      group_consumer_session_timeout_min: 10s
-      idle_timeout: 0
-      num_partitions: 1
-      partition_balance_strategy: BALANCE_STRATEGY_PARTITION
-      produce_concurrent: true
-      public_address:
-        host: bufstream.default.svc.cluster.local
-        port: 9092
-      request_buffer_size: 5
-      zone_balance_strategy: BALANCE_STRATEGY_PARTITION
-    observability:
-      debug_address:
-        host: 0.0.0.0
-        port: 9090
-      log_git_version: true
-      log_level: INFO
-      metrics:
-        exporter_type: NONE
-      sensitive_information_redaction: NONE
-      traces:
-        exporter_type: NONE
-        trace_ratio: 0.1
-    storage:
-      access_key_id:
-        string: minio
-      bucket: bucket
-      endpoint: http://minio:9000
-      force_path_style: true
-      provider: S3
-      region: us-east-1
-      secret_access_key:
-        path: /config/secrets/storage/secret_access_key
-    zone: kind
----
-# Source: operator-wandb/charts/clickhouse/templates/configd-configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-clickhouse-configd
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: clickhouse
-    app.kubernetes.io/part-of: clickhouse
-data:
-  01-listen.xml: |
-    <yandex>
-        <listen_host>::</listen_host>
-        <listen_host>0.0.0.0</listen_host>
-        <listen_try>1</listen_try>
-    </yandex>
-  02-logger.xml: |
-    <yandex>
-        <logger>
-            <level>information</level>
-        </logger>
-    </yandex>
-  03-macros.xml: |
-    <yandex>
-        <macros>
-            <shard from_env="CLICKHOUSE_SHARD_ID"></shard>
-            <replica from_env="CLICKHOUSE_REPLICA_ID"></replica>
-            <layer>chartsnap-clickhouse</layer>
-        </macros>
-    </yandex>
-  05-zookeeper.xml: "<yandex>\n    <zookeeper>\n        <node>\n            <host>chartsnap-clickhouse-keeper-0.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</host>\n            <port>9181</port>\n        </node>\n        <node>\n            <host>chartsnap-clickhouse-keeper-1.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</host>\n            <port>9181</port>\n        </node>\n        <node>\n            <host>chartsnap-clickhouse-keeper-2.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</host>\n            <port>9181</port>\n        </node>\n    </zookeeper>    \n</yandex>\n"
-  08-sampling.xml: |
-    <yandex>
-        <asynchronous_insert_log remove="1"/>
-        <asynchronous_metric_log remove="1"/>
-        <error_log remove="1"/>
-        <event_log remove="1"/>
-        <latency_log remove="1"/>
-        <metric_log remove="1"/>
-        <query_log remove="1"/>
-        <query_metric_log remove="1"/>
-        <query_thread_log remove="1"/>
-        <query_views_log remove="1"/>
-        <part_log remove="1"/>
-        <text_log remove="1"/>
-        <trace_log remove="1"/>
-        <opentelemetry_span_log remove="1"/>
-        <processors_profile_log remove="1"/>
-    </yandex>
----
-# Source: operator-wandb/charts/clickhouse/templates/keeper/configd-configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-clickhouse-keeper-configd
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: keeper
-    app.kubernetes.io/part-of: clickhouse
-data:
-  raft_configuration.xml: |
-    <clickhouse>
-        <keeper_server>
-            <raft_configuration>
-                <server>
-                    <id>0</id>
-                    <hostname>chartsnap-clickhouse-keeper-0.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</hostname>
-                    <port>9234</port>
-                </server>
-                <server>
-                    <id>1</id>
-                    <hostname>chartsnap-clickhouse-keeper-1.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</hostname>
-                    <port>9234</port>
-                </server>
-                <server>
-                    <id>2</id>
-                    <hostname>chartsnap-clickhouse-keeper-2.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</hostname>
-                    <port>9234</port>
-                </server>
-            </raft_configuration>
-        </keeper_server>
-    </clickhouse>
 ---
 # Source: operator-wandb/charts/mysql/templates/configmap.yaml
 apiVersion: v1
@@ -1857,7 +1389,6 @@ data:
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
   GORILLA_AUTH_METHOD: implicit
-  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{"system:serviceaccount:default:chartsnap-weave-trace": "https://kubernetes.default.svc.cluster.local"}'
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
 ---
 # Source: operator-wandb/templates/app.yaml
@@ -1978,7 +1509,7 @@ data:
   REACT_APP_ENVIRONMENT_NAME: "local"
   REACT_APP_ENVIRONMENT_IS_PRIVATE: "true"
   REACT_APP_ANALYTICS_DISABLED: "true"
-  WEAVE_TRACES_ENABLED: 'true'
+  WEAVE_TRACES_ENABLED: 'false'
   SERVER_FLAG_WEAVE_1_PERCENTAGE: "100"
   WEAVE_ENABLED: "true"
   OPERATOR_ENABLED: "true"
@@ -2135,7 +1666,7 @@ metadata:
   name: chartsnap-kafka-configmap
   labels:
 data:
-  KAFKA_BROKER_HOST: "bufstream"
+  KAFKA_BROKER_HOST: ""
   KAFKA_BROKER_PORT: "9092"
   KAFKA_CLIENT_USER: ""
   KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE: "chartsnap-run-updates-shadow"
@@ -2203,9 +1734,6 @@ data:
         location /graphql2 {
           proxy_pass http://chartsnap-api:8081;
         }
-        location /traces {
-          proxy_pass http://chartsnap-weave-trace:8722;
-        }
         location /bucket {
           proxy_set_header Host minio:9000;
           proxy_pass http://minio:9000;
@@ -2259,8 +1787,8 @@ data:
   WANDB_BASE_URL: "http://chartsnap-api:8081/"
   WF_TRACE_SERVER_URL: "http://localhost:8080/traces"
   WF_ENFORCE_PASSWORD_LENGTH: "false"
-  WEAVE_ENABLE_ONLINE_EVAL: "true"
-  WEAVE_ENABLE_EVALUATE_MODEL_WORKER: "true"
+  WEAVE_ENABLE_ONLINE_EVAL: "false"
+  WEAVE_ENABLE_EVALUATE_MODEL_WORKER: "false"
   WEAVE_TRACE_SERVER_BASE_URL: "http://localhost:8080/traces"
   WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME: "weave-worker-auth"
   KAFKA_BROKER_HOST: "bufstream.bufstream.svc.cluster.local"
@@ -2860,193 +2388,6 @@ spec:
     app.kubernetes.io/name: app
     app.kubernetes.io/instance: chartsnap
 ---
-# Source: operator-wandb/charts/bufstream/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: bufstream
-  namespace: default
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app: bufstream
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: bufstream
-    app.kubernetes.io/managed-by: Helm
-spec:
-  type: ClusterIP
-  ports:
-  - port: 9089
-    name: admin
-  - port: 8080
-    name: connect
-  - port: 9092
-    name: kafka
-  selector:
-    app: bufstream
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: bufstream
----
-# Source: operator-wandb/charts/clickhouse/templates/headless-service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-clickhouse-headless
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: clickhouse
-    app.kubernetes.io/part-of: clickhouse
-spec:
-  type: ClusterIP
-  clusterIP: None
-  publishNotReadyAddresses: true
-  ports:
-  - name: http
-    targetPort: http
-    port: 8123
-    protocol: TCP
-  - name: tcp
-    targetPort: tcp
-    port: 9000
-    protocol: TCP
-  - name: tcp-mysql
-    targetPort: tcp-mysql
-    port: 9004
-    protocol: TCP
-  - name: tcp-postgresql
-    targetPort: tcp-postgresql
-    port: 9005
-    protocol: TCP
-  - name: http-intersrv
-    targetPort: http-intersrv
-    port: 9009
-    protocol: TCP
-  selector:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/component: clickhouse
-    app.kubernetes.io/part-of: clickhouse
----
-# Source: operator-wandb/charts/clickhouse/templates/keeper/headless-service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-clickhouse-keeper-headless
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: keeper
-    app.kubernetes.io/part-of: clickhouse
-spec:
-  type: ClusterIP
-  clusterIP: None
-  publishNotReadyAddresses: true
-  ports:
-  - name: tcp
-    port: 9181
-    protocol: TCP
-    targetPort: tcp
-  - name: tcp-raft
-    port: 9234
-    protocol: TCP
-    targetPort: raft
-  selector:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/component: keeper
-    app.kubernetes.io/part-of: clickhouse
----
-# Source: operator-wandb/charts/clickhouse/templates/keeper/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-clickhouse-keeper
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: keeper
-    app.kubernetes.io/part-of: clickhouse
-spec:
-  type: ClusterIP
-  sessionAffinity: None
-  ports:
-  - name: tcp
-    port: 9181
-    protocol: TCP
-    targetPort: tcp
-    nodePort: null
-  - name: tcp-raft
-    port: 9234
-    protocol: TCP
-    targetPort: raft
-    nodePort: null
-  selector:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/component: keeper
-    app.kubernetes.io/part-of: clickhouse
----
-# Source: operator-wandb/charts/clickhouse/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-clickhouse
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: clickhouse
-    app.kubernetes.io/part-of: clickhouse
-spec:
-  type: ClusterIP
-  sessionAffinity: None
-  ports:
-  - name: http
-    targetPort: http
-    port: 8123
-    protocol: TCP
-    nodePort: null
-  - name: tcp
-    targetPort: tcp
-    port: 9000
-    protocol: TCP
-    nodePort: null
-  - name: tcp-mysql
-    targetPort: tcp-mysql
-    port: 9004
-    protocol: TCP
-    nodePort: null
-  - name: tcp-postgresql
-    targetPort: tcp-postgresql
-    port: 9005
-    protocol: TCP
-    nodePort: null
-  - name: http-intersrv
-    targetPort: http-intersrv
-    port: 9009
-    protocol: TCP
-    nodePort: null
-  selector:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/component: clickhouse
-    app.kubernetes.io/part-of: clickhouse
----
 # Source: operator-wandb/charts/console/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -3067,74 +2408,6 @@ spec:
   selector:
     app.kubernetes.io/name: console
     app.kubernetes.io/instance: chartsnap
----
-# Source: operator-wandb/charts/etcd/templates/svc-headless.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-etcd-headless
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: etcd
-    app.kubernetes.io/version: 3.5.17
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: etcd
-  annotations:
-    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
-spec:
-  type: ClusterIP
-  clusterIP: None
-  publishNotReadyAddresses: true
-  ports:
-  - name: client
-    port: 2379
-    targetPort: client
-  - name: peer
-    port: 2380
-    targetPort: peer
-  - name: metrics
-    port: 9090
-    targetPort: metrics
-  selector:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: etcd
-    app.kubernetes.io/component: etcd
----
-# Source: operator-wandb/charts/etcd/templates/svc.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-etcd
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: etcd
-    app.kubernetes.io/version: 3.5.17
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: etcd
-spec:
-  type: ClusterIP
-  sessionAffinity: None
-  ports:
-  - name: "client"
-    port: 2379
-    targetPort: client
-    nodePort: null
-  - name: "peer"
-    port: 2380
-    targetPort: peer
-    nodePort: null
-  - name: "metrics"
-    port: 9090
-    targetPort: metrics
-    nodePort: null
-  selector:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: etcd
-    app.kubernetes.io/component: etcd
 ---
 # Source: operator-wandb/charts/frontend/templates/service.yaml
 apiVersion: v1
@@ -3401,28 +2674,6 @@ spec:
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/name: redis
     app.kubernetes.io/component: master
----
-# Source: operator-wandb/charts/weave-trace/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-weave-trace
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  type: ClusterIP
-  ports:
-  - name: http
-    port: 8722
-    protocol: TCP
-    targetPort: 8080
-  selector:
-    app.kubernetes.io/name: weave-trace
-    app.kubernetes.io/instance: chartsnap
 ---
 # Source: operator-wandb/charts/weave/templates/service.yaml
 apiVersion: v1
@@ -3842,25 +3093,25 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -3894,7 +3145,21 @@ spec:
               key: license
               name: chartsnap-license
         - name: GORILLA_LIMITER
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+          value: "40"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+          value: "1"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+          value: "4"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+          value: "833"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+          value: "120"
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -4064,25 +3329,25 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4116,7 +3381,21 @@ spec:
               key: license
               name: chartsnap-license
         - name: GORILLA_LIMITER
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+          value: "40"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+          value: "1"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+          value: "4"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+          value: "833"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+          value: "120"
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -4251,25 +3530,25 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4303,7 +3582,21 @@ spec:
               key: license
               name: chartsnap-license
         - name: GORILLA_LIMITER
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+          value: "40"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+          value: "1"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+          value: "4"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+          value: "833"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+          value: "120"
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -4517,25 +3810,25 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4569,7 +3862,21 @@ spec:
               key: license
               name: chartsnap-license
         - name: GORILLA_LIMITER
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+          value: "40"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+          value: "1"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+          value: "4"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+          value: "833"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+          value: "120"
         - name: BUCKET_PROXY
           value: "true"
         - name: BUCKET_QUEUE
@@ -4780,25 +4087,25 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4832,7 +4139,21 @@ spec:
               key: license
               name: chartsnap-license
         - name: GORILLA_LIMITER
-          value: noop://
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+          value: "40"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+          value: "1"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+          value: "20"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+          value: "4"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+          value: "833"
+        - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+          value: "120"
         - name: BUCKET_PROXY
           value: "true"
         - name: BUCKET_QUEUE
@@ -5001,8 +4322,8 @@ spec:
             cpu: "2"
             memory: 2Gi
           requests:
-            cpu: 40m
-            memory: 64Mi
+            cpu: "1"
+            memory: 1Gi
       serviceAccountName: chartsnap-console
       securityContext:
         fsGroup: 0
@@ -5165,23 +4486,23 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -5225,7 +4546,7 @@ spec:
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         - name: GORILLA_TASK_QUEUE
-          value: 'redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)&concurrency=10'
+          value: 'redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)&concurrency=10'
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -5427,25 +4748,25 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_STATSIG_KEY
           valueFrom:
             secretKeyRef:
@@ -5782,25 +5103,25 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -5987,25 +5308,25 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -6164,25 +5485,25 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -6518,25 +5839,25 @@ spec:
               name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -6860,531 +6181,6 @@ spec:
           type: RuntimeDefault
       serviceAccountName: chartsnap-reloader
 ---
-# Source: operator-wandb/charts/weave-evaluate-model-worker/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chartsnap-weave-evaluate-model-worker-bc
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-evaluate-model-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    reloader.stakater.com/auto: "true"
-spec:
-  replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: weave-evaluate-model-worker
-      app.kubernetes.io/instance: chartsnap
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: weave-evaluate-model-worker-0.11.6
-        app.kubernetes.io/name: weave-evaluate-model-worker
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      containers:
-      - name: weave-evaluate-model-worker
-        args:
-        - python
-        - -m
-        - src.workers.evaluate_model_worker.evaluate_model_worker
-        envFrom:
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-weave-trace-configmap
-        env:
-        - name: WF_CLICKHOUSE_HOST
-          value: chartsnap-clickhouse-headless
-        - name: WF_CLICKHOUSE_PORT
-          value: "8123"
-        - name: WF_CLICKHOUSE_DATABASE
-          value: weave_trace_db
-        - name: WF_CLICKHOUSE_USER
-          value: default
-        - name: WF_CLICKHOUSE_REPLICATED
-          value: "false"
-        - name: WF_CLICKHOUSE_PASS
-          valueFrom:
-            secretKeyRef:
-              key: CLICKHOUSE_PASSWORD
-              name: chartsnap-clickhouse
-        - name: BUCKET_PROXY
-          value: "true"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
-        - name: GORILLA_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: WANDB_INTERNAL_SERVICE_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: key
-              name: weave-worker-auth
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8080
-          name: http
-          protocol: TCP
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-        volumeMounts:
-        - name: wandb-ca-certs-root
-          mountPath: /usr/local/share/ca-certificates/
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
-      serviceAccountName: chartsnap-weave-evaluate-model-worker
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
-      topologySpreadConstraints:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: weave-evaluate-model-worker
-        maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfiable: ScheduleAnyway
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: weave-evaluate-model-worker
-        maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-      volumes:
-      - name: wandb-ca-certs-root
-        emptyDir: {}
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
----
-# Source: operator-wandb/charts/weave-trace-worker/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chartsnap-weave-trace-worker-bc
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    reloader.stakater.com/auto: "true"
-spec:
-  replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: weave-trace-worker
-      app.kubernetes.io/instance: chartsnap
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: weave-trace-worker-0.11.6
-        app.kubernetes.io/name: weave-trace-worker
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      containers:
-      - name: weave-trace-worker
-        args:
-        - python
-        - -m
-        - src.workers.scoring_worker
-        envFrom:
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-weave-trace-configmap
-        env:
-        - name: WF_CLICKHOUSE_HOST
-          value: chartsnap-clickhouse-headless
-        - name: WF_CLICKHOUSE_PORT
-          value: "8123"
-        - name: WF_CLICKHOUSE_DATABASE
-          value: weave_trace_db
-        - name: WF_CLICKHOUSE_USER
-          value: default
-        - name: WF_CLICKHOUSE_REPLICATED
-          value: "false"
-        - name: WF_CLICKHOUSE_PASS
-          valueFrom:
-            secretKeyRef:
-              key: CLICKHOUSE_PASSWORD
-              name: chartsnap-clickhouse
-        - name: BUCKET_PROXY
-          value: "true"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
-        - name: GORILLA_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: WANDB_INTERNAL_SERVICE_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: key
-              name: weave-worker-auth
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8080
-          name: http
-          protocol: TCP
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-        volumeMounts:
-        - name: wandb-ca-certs-root
-          mountPath: /usr/local/share/ca-certificates/
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
-      serviceAccountName: chartsnap-weave-trace-worker
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
-      topologySpreadConstraints:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: weave-trace-worker
-        maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfiable: ScheduleAnyway
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: weave-trace-worker
-        maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-      volumes:
-      - name: wandb-ca-certs-root
-        emptyDir: {}
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
----
-# Source: operator-wandb/charts/weave-trace/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chartsnap-weave-trace-bc
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    reloader.stakater.com/auto: "true"
-spec:
-  replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: weave-trace
-      app.kubernetes.io/instance: chartsnap
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: weave-trace-0.11.6
-        app.kubernetes.io/name: weave-trace
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      containers:
-      - name: weave-trace
-        args:
-        - uvicorn
-        - src.trace_server:app
-        - --host
-        - 0.0.0.0
-        - --port
-        - "8080"
-        envFrom:
-        - configMapRef:
-            name: chartsnap-global-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-weave-trace-configmap
-        env:
-        - name: WF_CLICKHOUSE_HOST
-          value: chartsnap-clickhouse-headless
-        - name: WF_CLICKHOUSE_PORT
-          value: "8123"
-        - name: WF_CLICKHOUSE_DATABASE
-          value: weave_trace_db
-        - name: WF_CLICKHOUSE_USER
-          value: default
-        - name: WF_CLICKHOUSE_REPLICATED
-          value: "false"
-        - name: WF_CLICKHOUSE_PASS
-          valueFrom:
-            secretKeyRef:
-              key: CLICKHOUSE_PASSWORD
-              name: chartsnap-clickhouse
-        - name: BUCKET_PROXY
-          value: "true"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
-        - name: GORILLA_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8080
-          name: http
-          protocol: TCP
-        livenessProbe:
-          failureThreshold: 5
-          httpGet:
-            path: /traces/health
-            port: http
-          timeoutSeconds: 2
-        readinessProbe:
-          failureThreshold: 5
-          httpGet:
-            path: /traces/health
-            port: http
-          timeoutSeconds: 2
-        startupProbe:
-          failureThreshold: 12
-          httpGet:
-            path: /traces/health
-            port: http
-          periodSeconds: 10
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-        volumeMounts:
-        - name: wandb-ca-certs-root
-          mountPath: /usr/local/share/ca-certificates/
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
-        - mountPath: /tmp/
-          name: temp-dir
-        - mountPath: /tmp/weave-trace/internal-jwt
-          name: weave-trace-internal-jwt
-      initContainers:
-      - name: weave-trace-migrate
-        args:
-        - python
-        - migrator.py
-        envFrom:
-        - configMapRef:
-            name: chartsnap-global-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-weave-trace-configmap
-        env:
-        - name: WF_CLICKHOUSE_HOST
-          value: chartsnap-clickhouse-headless
-        - name: WF_CLICKHOUSE_PORT
-          value: "8123"
-        - name: WF_CLICKHOUSE_DATABASE
-          value: weave_trace_db
-        - name: WF_CLICKHOUSE_USER
-          value: default
-        - name: WF_CLICKHOUSE_REPLICATED
-          value: "false"
-        - name: WF_CLICKHOUSE_PASS
-          valueFrom:
-            secretKeyRef:
-              key: CLICKHOUSE_PASSWORD
-              name: chartsnap-clickhouse
-        - name: BUCKET_PROXY
-          value: "true"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
-        - name: GORILLA_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
-        imagePullPolicy: IfNotPresent
-        volumeMounts:
-        - name: wandb-ca-certs-root
-          mountPath: /usr/local/share/ca-certificates/
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
-        - mountPath: /tmp/
-          name: temp-dir
-      serviceAccountName: chartsnap-weave-trace
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
-      topologySpreadConstraints:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: weave-trace
-        maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfiable: ScheduleAnyway
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: weave-trace
-        maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-      volumes:
-      - name: wandb-ca-certs-root
-        emptyDir: {}
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
-      - emptyDir: {}
-        name: temp-dir
-      - name: weave-trace-internal-jwt
-        projected:
-          sources:
-          - serviceAccountToken:
-              audience: internal-service
-              expirationSeconds: 600
-              path: token
----
 # Source: operator-wandb/charts/weave/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -7567,653 +6363,6 @@ spec:
           sizeLimit: '20Gi'
         name: cache
 ---
-# Source: operator-wandb/charts/bufstream/templates/deployment.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: bufstream
-  namespace: default
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app: bufstream
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/name: bufstream
-    app.kubernetes.io/managed-by: Helm
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: bufstream
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/name: bufstream
-  podManagementPolicy: Parallel
-  serviceName:
-  template:
-    metadata:
-      labels:
-        app: bufstream
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/name: bufstream
-        app.kubernetes.io/component: bufstream
-        bufstream.buf.build/cluster: "bufstream"
-      annotations:
-        # Force a new deployment when the config map value changes
-        checksum/config: c866a987553b22289659ab439e7067db4c1ce43a2f81830c68e0e3198eadb1fc
-    spec:
-      containers:
-      - name: bufstream
-        image: "us-docker.pkg.dev/buf-images-1/bufstream-public/images/bufstream:0.3.5"
-        imagePullPolicy: IfNotPresent
-        args:
-        - "--config"
-        - "/config/config.yaml"
-        env:
-        - name: BUFSTREAM_CONNECT_PUBLIC_HOST
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: BUFSTREAM_CONNECT_PUBLIC_PORT
-          value: "8080"
-        - name: GOMAXPROCS
-          valueFrom:
-            resourceFieldRef:
-              containerName: bufstream
-              resource: requests.cpu
-              divisor: 1 # Round up to whole cores, explicitly.
-        - name: BUFSTREAM_AVAILABLE_MEMORY
-          valueFrom:
-            resourceFieldRef:
-              containerName: bufstream
-              resource: requests.memory
-              divisor: 1 # bytes, explicitly.
-        resources:
-          requests:
-            cpu: 40m
-            memory: 64Mi
-          limits:
-            memory: 8Gi
-        ports:
-        - name: admin
-          containerPort: 9089
-        - name: connect
-          containerPort: 8080
-        - name: kafka
-          containerPort: 9092
-        - name: observability
-          containerPort: 9090
-        livenessProbe:
-          failureThreshold: 3
-          timeoutSeconds: 5
-          httpGet:
-            scheme: "HTTP"
-            path: /health
-            port: 9090
-          periodSeconds: 3
-        readinessProbe:
-          failureThreshold: 3
-          timeoutSeconds: 5
-          httpGet:
-            scheme: "HTTP"
-            path: /ready
-            port: 9090
-          periodSeconds: 3
-        startupProbe:
-          httpGet:
-            scheme: "HTTP"
-            path: /health
-            port: 9090
-          initialDelaySeconds: 1
-          periodSeconds: 5
-          failureThreshold: 3
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-        volumeMounts:
-        - mountPath: /config/config.yaml
-          name: config-volume
-          readOnly: true
-          subPath: config.yaml
-        - name: storage
-          mountPath: /config/secrets/storage
-          readOnly: true
-      serviceAccountName: bufstream-service-account
-      terminationGracePeriodSeconds: 420
-      volumes:
-      - name: config-volume
-        configMap:
-          items:
-          - key: config.yaml
-            path: config.yaml
-          name: bufstream-config
-      - name: storage
-        secret:
-          secretName: chartsnap-bucket
-          items:
-          - key: SECRET_KEY
-            path: secret_access_key
----
-# Source: operator-wandb/charts/clickhouse/templates/keeper/statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: chartsnap-clickhouse-keeper
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: keeper
-    app.kubernetes.io/part-of: clickhouse
-spec:
-  replicas: 3
-  podManagementPolicy: Parallel
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/name: clickhouse
-      app.kubernetes.io/component: keeper
-      app.kubernetes.io/part-of: clickhouse
-  serviceName: chartsnap-clickhouse-keeper-headless
-  updateStrategy:
-    rollingUpdate: {}
-    type: RollingUpdate
-  template:
-    metadata:
-      annotations:
-        checksum/configd-configuration: 5f569d0592da95d07811fb5cd5cafe2194fba2b2dee4564fb8b63e8fac891816
-      labels:
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: clickhouse
-        app.kubernetes.io/version: 25.3.2
-        helm.sh/chart: clickhouse-9.1.1
-        app.kubernetes.io/component: keeper
-        app.kubernetes.io/part-of: clickhouse
-    spec:
-      automountServiceAccountToken: false
-      serviceAccountName: chartsnap-clickhouse
-      affinity:
-        podAffinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - podAffinityTerm:
-              labelSelector:
-                matchLabels:
-                  app.kubernetes.io/instance: chartsnap
-                  app.kubernetes.io/name: clickhouse
-                  app.kubernetes.io/component: keeper
-              topologyKey: kubernetes.io/hostname
-            weight: 1
-        nodeAffinity:
-      securityContext:
-        fsGroup: 1001
-        fsGroupChangePolicy: Always
-        supplementalGroups: []
-        sysctls: []
-      initContainers:
-      containers:
-      - name: keeper
-        image: us-docker.pkg.dev/wandb-production/public/bitnamilegacy/clickhouse-keeper:25.3.2-debian-12-r7
-        imagePullPolicy: "IfNotPresent"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          privileged: false
-          readOnlyRootFilesystem: true
-          runAsGroup: 1001
-          runAsNonRoot: true
-          runAsUser: 1001
-          seLinuxOptions: {}
-          seccompProfile:
-            type: RuntimeDefault
-        env:
-        - name: BITNAMI_DEBUG
-          value: "false"
-        - name: CLICKHOUSE_KEEPER_SERVER_ID
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: CLICKHOUSE_KEEPER_TCP_PORT
-          value: "9181"
-        - name: CLICKHOUSE_KEEPER_RAFT_PORT
-          value: "9234"
-        ports:
-        - name: tcp
-          containerPort: 9181
-        - name: raft
-          containerPort: 9234
-        livenessProbe:
-          failureThreshold: 3
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
-          tcpSocket:
-            port: tcp
-        readinessProbe:
-          failureThreshold: 3
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
-          exec:
-            command:
-            - bash
-            - -ec
-            - |
-              OK=$(exec 3<>/dev/tcp/127.0.0.1/9181; printf 'ruok' >&3; IFS=; tee <&3; exec 3<&-;)
-              if [[ "${OK}" == "imok" ]]; then exit 0; else exit 1; fi
-        resources:
-          requests:
-            cpu: 40m
-            memory: 64Mi
-        volumeMounts:
-        - name: data
-          mountPath: /bitnami/clickhouse-keeper
-        - name: configd-configuration
-          mountPath: /bitnami/clickhouse-keeper/etc/keeper_config.d
-        - name: empty-dir
-          mountPath: /opt/bitnami/clickhouse-keeper/etc
-          subPath: app-conf-dir
-        - name: empty-dir
-          mountPath: /opt/bitnami/clickhouse-keeper/logs
-          subPath: app-logs-dir
-        - name: empty-dir
-          mountPath: /opt/bitnami/clickhouse-keeper/tmp
-          subPath: app-tmp-dir
-        - name: empty-dir
-          mountPath: /tmp
-          subPath: tmp-dir
-      volumes:
-      - name: empty-dir
-        emptyDir: {}
-      - name: configd-configuration
-        configMap:
-          name: chartsnap-clickhouse-keeper-configd
-  persistentVolumeClaimRetentionPolicy:
-    whenDeleted: Retain
-    whenScaled: Retain
-  volumeClaimTemplates:
-  - apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      name: data
-      labels:
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/name: clickhouse
-        app.kubernetes.io/component: keeper
-        app.kubernetes.io/part-of: clickhouse
-    spec:
-      accessModes:
-      - "ReadWriteOnce"
-      resources:
-        requests:
-          storage: "2Gi"
----
-# Source: operator-wandb/charts/clickhouse/templates/statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: chartsnap-clickhouse-shard0
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.3.2
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: clickhouse
-    app.kubernetes.io/part-of: clickhouse
-    shard: "0"
-spec:
-  replicas: 1
-  podManagementPolicy: "Parallel"
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/name: clickhouse
-      app.kubernetes.io/component: clickhouse
-      app.kubernetes.io/part-of: clickhouse
-      shard: "0"
-  serviceName: chartsnap-clickhouse-headless
-  updateStrategy:
-    rollingUpdate: {}
-    type: RollingUpdate
-  template:
-    metadata:
-      annotations:
-        checksum/configd-configuration: 7d1917a22d145bbb4001d01dce5951180e3ec90f57b2d9b04d3b60257958b55d
-      labels:
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: clickhouse
-        app.kubernetes.io/version: 25.3.2
-        helm.sh/chart: clickhouse-9.1.1
-        app.kubernetes.io/component: clickhouse
-        app.kubernetes.io/part-of: clickhouse
-        shard: "0"
-    spec:
-      automountServiceAccountToken: false
-      serviceAccountName: chartsnap-clickhouse
-      affinity:
-        podAffinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - podAffinityTerm:
-              labelSelector:
-                matchLabels:
-                  app.kubernetes.io/instance: chartsnap
-                  app.kubernetes.io/name: clickhouse
-                  app.kubernetes.io/component: clickhouse
-              topologyKey: kubernetes.io/hostname
-            weight: 1
-        nodeAffinity:
-      securityContext:
-        fsGroup: 1001
-        fsGroupChangePolicy: Always
-        supplementalGroups: []
-        sysctls: []
-      initContainers:
-      containers:
-      - name: clickhouse
-        image: us-docker.pkg.dev/wandb-production/public/bitnamilegacy/clickhouse:25.3.2-debian-12-r3
-        imagePullPolicy: IfNotPresent
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          privileged: false
-          readOnlyRootFilesystem: true
-          runAsGroup: 1001
-          runAsNonRoot: true
-          runAsUser: 1001
-          seLinuxOptions: {}
-          seccompProfile:
-            type: RuntimeDefault
-        env:
-        - name: BITNAMI_DEBUG
-          value: "false"
-        - name: CLICKHOUSE_HTTP_PORT
-          value: "8123"
-        - name: CLICKHOUSE_TCP_PORT
-          value: "9000"
-        - name: CLICKHOUSE_MYSQL_PORT
-          value: "9004"
-        - name: CLICKHOUSE_POSTGRESQL_PORT
-          value: "9005"
-        - name: CLICKHOUSE_INTERSERVER_HTTP_PORT
-          value: "9009"
-        - name: CLICKHOUSE_SHARD_ID
-          value: "shard0"
-        - name: CLICKHOUSE_REPLICA_ID
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: CLICKHOUSE_ADMIN_USER
-          value: "default"
-        - name: CLICKHOUSE_ADMIN_PASSWORD_FILE
-          value: /opt/bitnami/clickhouse/secrets/CLICKHOUSE_PASSWORD
-        resources:
-          requests:
-            cpu: 40m
-            memory: 64Mi
-        ports:
-        - name: http
-          containerPort: 8123
-        - name: tcp
-          containerPort: 9000
-        - name: tcp-postgresql
-          containerPort: 9005
-        - name: tcp-mysql
-          containerPort: 9004
-        - name: http-intersrv
-          containerPort: 9009
-        livenessProbe:
-          failureThreshold: 3
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
-          tcpSocket:
-            port: http
-        readinessProbe:
-          failureThreshold: 3
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
-          httpGet:
-            path: /ping
-            port: http
-        volumeMounts:
-        - name: data
-          mountPath: /bitnami/clickhouse
-        - name: configd-configuration
-          mountPath: /bitnami/clickhouse/etc/config.d
-        - name: secrets
-          mountPath: /opt/bitnami/clickhouse/secrets
-          readOnly: true
-        - name: empty-dir
-          mountPath: /opt/bitnami/clickhouse/etc
-          subPath: app-conf-dir
-        - name: empty-dir
-          mountPath: /opt/bitnami/clickhouse/logs
-          subPath: app-logs-dir
-        - name: empty-dir
-          mountPath: /opt/bitnami/clickhouse/tmp
-          subPath: app-tmp-dir
-        - name: empty-dir
-          mountPath: /tmp
-          subPath: tmp-dir
-      volumes:
-      - name: empty-dir
-        emptyDir: {}
-      - name: configd-configuration
-        configMap:
-          name: chartsnap-clickhouse-configd
-      - name: secrets
-        secret:
-          secretName: chartsnap-clickhouse
-          defaultMode: 256
-  persistentVolumeClaimRetentionPolicy:
-    whenDeleted: Retain
-    whenScaled: Retain
-  volumeClaimTemplates:
-  - apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      name: data
-      labels:
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/name: clickhouse
-        app.kubernetes.io/component: clickhouse
-    spec:
-      accessModes:
-      - "ReadWriteOnce"
-      resources:
-        requests:
-          storage: "2Gi"
----
-# Source: operator-wandb/charts/etcd/templates/statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: chartsnap-etcd
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: etcd
-    app.kubernetes.io/version: 3.5.17
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: etcd
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: chartsnap
-      app.kubernetes.io/name: etcd
-      app.kubernetes.io/component: etcd
-  serviceName: chartsnap-etcd-headless
-  podManagementPolicy: Parallel
-  updateStrategy:
-    type: RollingUpdate
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: etcd
-        app.kubernetes.io/version: 3.5.17
-        helm.sh/chart: etcd-10.7.3
-        app.kubernetes.io/component: etcd
-      annotations:
-    spec:
-      automountServiceAccountToken: false
-      affinity:
-        podAffinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-          - podAffinityTerm:
-              labelSelector:
-                matchLabels:
-                  app.kubernetes.io/instance: chartsnap
-                  app.kubernetes.io/name: etcd
-                  app.kubernetes.io/component: etcd
-              topologyKey: kubernetes.io/hostname
-            weight: 1
-        nodeAffinity:
-      securityContext:
-        fsGroup: 1001
-        fsGroupChangePolicy: Always
-        supplementalGroups: []
-        sysctls: []
-      serviceAccountName: "chartsnap-etcd"
-      containers:
-      - name: etcd
-        image: us-docker.pkg.dev/wandb-production/public/bitnamilegacy/etcd:3.5.17-debian-12-r3
-        imagePullPolicy: "IfNotPresent"
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          privileged: false
-          readOnlyRootFilesystem: true
-          runAsGroup: 1001
-          runAsNonRoot: true
-          runAsUser: 1001
-          seLinuxOptions: {}
-          seccompProfile:
-            type: RuntimeDefault
-        env:
-        - name: BITNAMI_DEBUG
-          value: "false"
-        - name: MY_POD_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: MY_POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: MY_STS_NAME
-          value: "chartsnap-etcd"
-        - name: ETCDCTL_API
-          value: "3"
-        - name: ETCD_ON_K8S
-          value: "yes"
-        - name: ETCD_START_FROM_SNAPSHOT
-          value: "no"
-        - name: ETCD_DISASTER_RECOVERY
-          value: "no"
-        - name: ETCD_NAME
-          value: "$(MY_POD_NAME)"
-        - name: ETCD_DATA_DIR
-          value: "/bitnami/etcd/data"
-        - name: ETCD_LOG_LEVEL
-          value: "info"
-        - name: ALLOW_NONE_AUTHENTICATION
-          value: "yes"
-        - name: ETCD_ADVERTISE_CLIENT_URLS
-          value: "http://$(MY_POD_NAME).chartsnap-etcd-headless.default.svc.cluster.local:2379,http://chartsnap-etcd.default.svc.cluster.local:2379"
-        - name: ETCD_LISTEN_CLIENT_URLS
-          value: "http://0.0.0.0:2379"
-        - name: ETCD_INITIAL_ADVERTISE_PEER_URLS
-          value: "http://$(MY_POD_NAME).chartsnap-etcd-headless.default.svc.cluster.local:2380"
-        - name: ETCD_LISTEN_PEER_URLS
-          value: "http://0.0.0.0:2380"
-        - name: ETCD_LISTEN_METRICS_URLS
-          value: "http://0.0.0.0:9090"
-        - name: ETCD_AUTO_COMPACTION_MODE
-          value: "periodic"
-        - name: ETCD_AUTO_COMPACTION_RETENTION
-          value: "30s"
-        - name: ETCD_INITIAL_CLUSTER_TOKEN
-          value: "etcd-cluster-k8s"
-        - name: ETCD_INITIAL_CLUSTER_STATE
-          value: "new"
-        - name: ETCD_INITIAL_CLUSTER
-          value: "chartsnap-etcd-0=http://chartsnap-etcd-0.chartsnap-etcd-headless.default.svc.cluster.local:2380,chartsnap-etcd-1=http://chartsnap-etcd-1.chartsnap-etcd-headless.default.svc.cluster.local:2380,chartsnap-etcd-2=http://chartsnap-etcd-2.chartsnap-etcd-headless.default.svc.cluster.local:2380"
-        - name: ETCD_CLUSTER_DOMAIN
-          value: "chartsnap-etcd-headless.default.svc.cluster.local"
-        - name: ETCD_LISTEN_CLIENT_HTTP_URLS
-          value: http://0.0.0.0:8080
-        envFrom:
-        ports:
-        - name: client
-          containerPort: 2379
-          protocol: TCP
-        - name: peer
-          containerPort: 2380
-          protocol: TCP
-        - name: metrics
-          containerPort: 9090
-          protocol: TCP
-        livenessProbe:
-          failureThreshold: 10
-          httpGet:
-            path: /livez
-            port: 9090
-            scheme: HTTP
-          initialDelaySeconds: 10
-          periodSeconds: 30
-          timeoutSeconds: 15
-        readinessProbe:
-          httpGet:
-            path: /readyz
-            port: 9090
-            scheme: HTTP
-          initialDelaySeconds: 20
-          timeoutSeconds: 10
-        volumeMounts:
-        - name: empty-dir
-          mountPath: /opt/bitnami/etcd/conf/
-          subPath: app-conf-dir
-        - name: empty-dir
-          mountPath: /tmp
-          subPath: tmp-dir
-        - name: data
-          mountPath: /bitnami/etcd
-      volumes:
-      - name: empty-dir
-        emptyDir: {}
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes:
-      - "ReadWriteOnce"
-      resources:
-        requests:
-          storage: "10Gi"
----
 # Source: operator-wandb/charts/mysql/templates/statefulset.yaml
 apiVersion: apps/v1
 kind: StatefulSet
@@ -8308,7 +6457,7 @@ spec:
             cpu: 4000m
             memory: 8Gi
           requests:
-            cpu: 40m
+            cpu: 50m
             memory: 64Mi
       volumes:
       - name: initdb
@@ -8614,25 +6763,25 @@ spec:
                   name: chartsnap-redis-secret
                   optional: true
             - name: REDIS
-              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_AUDITOR_CACHE
-              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_CACHE
-              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_FILE_METADATA_SOURCE
-              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_LOCKER
-              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_METADATA_CACHE
-              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_SETTINGS_CACHE
-              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_USAGE_METRICS_CACHE
-              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_TASK_QUEUE
-              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: KAFKA_CLIENT_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -8842,82 +6991,6 @@ data:
       fi
     done
 ---
-# Source: operator-wandb/templates/tests/test-weave.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: "chartsnap-operator-wandb-test-weave"
-  annotations:
-    "helm.sh/hook": test
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-data:
-  test.py: |
-    import weave
-    import json
-    from datetime import datetime
-
-    # Initialize weave
-    weave.init('mock-trace-example')
-
-    # Define a mock LLM call function
-    @weave.op()
-    def mock_llm_call(prompt: str) -> str:
-      # Instead of making an actual LLM call, we'll just return a mock response
-      mock_response = {
-        "id": "mock-llm-call-123",
-        "model": "gpt-4",
-        "created": datetime.now().isoformat(),
-        "choices": [{
-          "message": {
-            "role": "assistant",
-            "content": "This is a mock response to: " + prompt
-          }
-        }]
-      }
-
-      return json.dumps(mock_response)
-
-    # Create a mock trace
-    @weave.op()
-    def create_mock_trace():
-      # Call the mock LLM function
-      response = mock_llm_call("What is the capital of France?")
-
-      # Return the response
-      return {
-      "prompt": "What is the capital of France?",
-      "response": response,
-      "metadata": {
-        "model": "gpt-4",
-        "temperature": 0.7,
-        "max_tokens": 100
-      }
-    }
-
-    if __name__ == "__main__":
-      # Create and log the mock trace
-      result, call = create_mock_trace.call()
-
-      # Set a custom display name for the call
-      call.set_display_name("Mock LLM Call - Capital of France")
-
-      # Add feedback to the call using the correct method
-      call.feedback.add("rating", {"value": 5, "comment": "Great response! Very informative."})
-
-      # Get call information and convert datetime objects to ISO format strings
-      call_info = {
-      "id": call.id,
-      "trace_id": call.trace_id,
-      "started_at": call.started_at.isoformat() if call.started_at else None,
-      "ended_at": call.ended_at.isoformat() if call.ended_at else None,
-      "inputs": call.inputs,
-      "output": call.output
-    }
-
-    print("Mock trace created and logged successfully!")
-    print("Call information:", json.dumps(call_info, indent=2))
----
 # Source: operator-wandb/charts/appRenamePostHook/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -9042,42 +7115,6 @@ spec:
     - sh
     - -c
     - "pip install wandb && wandb verify"
-  restartPolicy: Never
----
-# Source: operator-wandb/templates/tests/test-weave.yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: "chartsnap-operator-wandb-test-weave"
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: operator-wandb
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.0.0"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": test
-spec:
-  containers:
-  - name: wandb-verify
-    image: python:3.12
-    env:
-    - name: WANDB_BASE_URL
-      value: "http://chartsnap-nginx:8080"
-    - name: WANDB_API_KEY
-      value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
-    command:
-    - sh
-    - -c
-    - "pip install weave && (timeout=240; start_time=$(date +%s); until python /tmp/test.py || [ $(($(date +%s) - start_time)) -gt $timeout ]; do echo 'weave verify failed, retrying...' && cat /tmp/debug-cli.root.log; sleep 10; done)"
-    volumeMounts:
-    - name: test-script
-      mountPath: /tmp/test.py
-      subPath: test.py
-  volumes:
-  - name: test-script
-    configMap:
-      name: "chartsnap-operator-wandb-test-weave"
   restartPolicy: Never
 ---
 # Source: operator-wandb/charts/appRenamePostHook/templates/job.yaml
