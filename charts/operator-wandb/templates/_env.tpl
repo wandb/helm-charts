@@ -187,6 +187,12 @@ Global values will override any chart-specific values.
 - name: MYSQL_USER
   value: "{{ include "wandb.mysql.user" . }}"
 {{- end -}}
+
+{{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") }}
+- name: MYSQL_CA_CERT_PATH
+  value: "/etc/ssl/certs/mysql_ca.pem"
+{{- end }}
+
 {{- end -}}
 
 {{- define "wandb.mysqlEnvs" -}}

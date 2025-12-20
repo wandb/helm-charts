@@ -9,6 +9,29 @@ Return the name of the secret where information is stored, considering if the cu
 {{- end -}}
 {{- end -}}
 
+
+{{/*
+  determine the name of the mysql cert.
+*/}}
+{{- define "wandb.mysql.certFileName" -}}
+{{- if kindIs "map" $.Values.global.mysql.caCert -}}
+  {{- if $.Values.global.mysql.caCert.valueFrom.secretKeyRef -}}
+    {{/* Passed a secret */}}
+    {{- print $.Values.global.mysql.caCert.valueFrom.secretKeyRef.key -}}
+  {{- else if $.Values.global.mysql.caCert.valueFrom.configMapKeyRef -}}
+    {{/* Passed a configmap */}}
+    {{- print $.Values.global.mysql.caCert.valueFrom.configMapKeyRef.key -}}
+  {{- else -}}
+    {{/* Invalid */}}
+    {{ fail "Invalid config for 'global.mysql.caCert'"
+  {{- end -}}
+{{- else -}}
+  {{/* Passed value directly */}}
+  {{- print "mysql_ca.pem" -}}
+{{- end -}}
+{{- end -}}
+
+
 {{/*
 Return the db port
 */}}
