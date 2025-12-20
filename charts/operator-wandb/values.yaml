@@ -97,6 +97,7 @@ global:
     database: "wandb_local"
     user: "wandb"
     password: ""
+    caCert: ""
     passwordSecret:
       name: ""
       rootPasswordKey: "MYSQL_ROOT_PASSWORD"
@@ -132,6 +133,11 @@ global:
   #       secretKeyRef:
   #         name: "mysql-settings-secret"
   #         key: "password"
+  #   caCert:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "mysql-ca-cert"
+  #         key: "mysql_ca.pem"
 
   size: "small"
 
@@ -424,8 +430,10 @@ api:
         [
           "bash",
           "-c",
-          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+          'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
         ]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
     migrate-db:
       command:
         [
