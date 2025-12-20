@@ -83,3 +83,58 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
 {{- end -}}
 
 
+{{/*
+  helper to extract logic for creating the caCert Volume
+*/}}
+{{- define "wandb.mysql.caCertVolume" -}}
+{{- $refName := (printf "%s-mysql-ca-cert" .Release.name) -}}
+{{- $key := "MYSQL_CA_CERT" -}}
+{{- $path := "mysql_ca.pem" -}}
+{{- if kindIs "map" .Values.global.mysql.caCert -}}
+  {{- if "secret" }}
+    {{- $refName = .Values.global.mysql.caCert.valueFrom.secretKeyRef.name -}}
+    {{- $key = .Values.global.mysql.caCert.valueFrom.secretKeyRef.key -}}
+    {{- $path = .Values.global.mysql.caCert.valueFrom.secretKeyRef.key  -}}
+- name: mysql-ca
+  secret:
+    secretName: "{{ $refName }}"
+    items:
+      - key: "{{ $key }}"
+        path: "{{ $path }}"
+  {{- else if "configmap" }}
+    {{- $refName = .Values.global.mysql.caCert.valueFrom.configMapKeyRef.name -}}
+    {{- $key = .Values.global.mysql.caCert.valueFrom.configMapKeyRef.key -}}
+    {{- $path = .Values.global.mysql.caCert.valueFrom.configMapKeyRef.key  -}}
+- name: mysql-ca
+  configMap:
+    name: "{{ $refName }}"
+    items:
+      - key: "{{ $key }}"
+        path: "{{ $path }}"
+  {{- else }}
+    {{ fail "Invaid caCert config" }}
+  {{- end }}
+{{- else }}
+  {{- if not eq .Values.global.mysql.caCert "" }}
+- name: mysql-ca
+  secret:
+    secretName: "{{ $refName }}"
+    items:
+      - key: "{{ $key }}"
+        path: "{{ $path }}"
+  {{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+  helper to extract logic for creating the caCert Volume Mount
+*/}}
+{{- define "wandb.mysql.caCertVolumeMount" -}}
+{{- if or (kindIs "map" .Values.global.mysql.caCert) (not eq .Values.global.mysql.caCert "") }}
+{{- $file := (include "wandb.mysql.certFileName" .) -}}
+- name: mysql-ca
+  mountPath: /etc/ssl/certs/{{ $file }}
+  subPath: {{ $file }}
+{{- end }}
+{{- end -}}
+
