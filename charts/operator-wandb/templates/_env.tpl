@@ -190,9 +190,8 @@ Global values will override any chart-specific values.
 
 {{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") }}
 - name: MYSQL_CA_CERT_PATH
-  value: "/etc/ssl/certs/mysql_ca.pem"
+  value: "/etc/ssl/certs/{{ include "wandb.mysql.certFileName" . }}"
 {{- end }}
-
 {{- end -}}
 
 {{- define "wandb.mysqlEnvs" -}}
