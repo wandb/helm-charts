@@ -299,13 +299,13 @@ global:
     enabled: false
     rateLimits:
       enabled: false
-      filestreamCount: 20  # number of request counts per second (project level)
-      filestreamSize: 40  # number of MB per second (project level)
-      fileStreamPerRunCount: 1  # number of request counts per run per second (project level)
-      runUpdateCount: 20  # number of run metadata update requests per second (project level)
-      sdkGraphqlQuerySeconds: 4  # request query seconds over DB per second (project level)
-      createArtifacts: 833  # number of create artifact requests per second (project level)
-      createArtifactsTimeWindow: 120  # 2 minutes - time window for create artifacts rate limit
+      filestreamCount: 20 # number of request counts per second (project level)
+      filestreamSize: 40 # number of MB per second (project level)
+      fileStreamPerRunCount: 1 # number of request counts per run per second (project level)
+      runUpdateCount: 20 # number of run metadata update requests per second (project level)
+      sdkGraphqlQuerySeconds: 4 # request query seconds over DB per second (project level)
+      createArtifacts: 833 # number of create artifact requests per second (project level)
+      createArtifactsTimeWindow: 120 # 2 minutes - time window for create artifacts rate limit
     additionalPaths:
       proxy: false
       files: false
@@ -1737,6 +1737,12 @@ parquet:
       - port: 8087
         protocol: TCP
         name: parquet
+  serviceAccount:
+    create: true
+    annotations:
+      {}
+      # For GCP Workload Identity, add:
+      # iam.gke.io/gcp-service-account: <your-gcp-service-account>@<project-id>.iam.gserviceaccount.com
   fuse:
     enabled: false
     resources:
@@ -1891,6 +1897,118 @@ parquet:
           enabled: true
           maxReplicas: 4
           minReplicas: 2
+
+parquet-metadata-cache:
+  install: true
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  service:
+    enabled: true
+    ports:
+      - port: 9091
+        protocol: TCP
+        name: grpc
+  serviceAccount:
+    create: true
+    annotations:
+      {}
+      # For GCP Workload Identity, add:
+      # iam.gke.io/gcp-service-account: <your-gcp-service-account>@<project-id>.iam.gserviceaccount.com
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-parquet-metadata-cache-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucket.cwIdentity" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+  containers:
+    parquet-metadata-cache:
+      args: ["parquet-metadata-cache"]
+      ports:
+        - name: grpc
+          containerPort: 9091
+          protocol: TCP
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "6"
+          memory: 16Gi
+        requests:
+          cpu: "4"
+          memory: 16Gi
+      autoscaling:
+        horizontal:
+          enabled: false
+          maxReplicas: 1
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          cpu: "15"
+          memory: 64Gi
+        requests:
+          cpu: "15"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          enabled: false
+          maxReplicas: 1
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          cpu: "15"
+          memory: 64Gi
+        requests:
+          cpu: "15"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          enabled: false
+          maxReplicas: 1
+          minReplicas: 1
+    # At larger t-shirt sizes, reserve an entire node for parquet.
+    xlarge:
+      resources:
+        limits:
+          cpu: "15"
+          memory: 64Gi
+        requests:
+          cpu: "15"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          enabled: false
+          maxReplicas: 1
+          minReplicas: 1
+    xxlarge:
+      resources:
+        limits:
+          cpu: "15"
+          memory: 64Gi
+        requests:
+          cpu: "15"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          enabled: false
+          maxReplicas: 1
+          minReplicas: 1
 
 settingsMigrationJob:
   install: false
