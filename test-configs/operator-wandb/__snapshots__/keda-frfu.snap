@@ -4213,8 +4213,34 @@ spec:
     kind: Deployment
     name: chartsnap-flat-run-fields-updater-bc
   pollingInterval: 15
-  cooldownPeriod: 30
+  cooldownPeriod: 300
   maxReplicaCount: 3
+  fallback:
+    failureThreshold: 5
+    replicas: 10
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          policies:
+          - periodSeconds: 60
+            type: Percent
+            value: 25
+          - periodSeconds: 60
+            type: Pods
+            value: 2
+          selectPolicy: Min
+          stabilizationWindowSeconds: 300
+        scaleUp:
+          policies:
+          - periodSeconds: 30
+            type: Percent
+            value: 100
+          - periodSeconds: 30
+            type: Pods
+            value: 4
+          selectPolicy: Max
+          stabilizationWindowSeconds: 0
   triggers:
   - metadata:
       bootstrapServers: bufstream.bufstream.svc.cluster.local:9092
@@ -4223,6 +4249,14 @@ spec:
       limitToPartitionsWithLag: "true"
       topic: wandb-run-updates-shadow
     type: kafka
+  - metadata:
+      value: "80"
+    metricType: Utilization
+    type: cpu
+  - metadata:
+      value: "80"
+    metricType: Utilization
+    type: memory
 ---
 # Source: operator-wandb/charts/appRenamePostHook/templates/serviceaccount.yaml
 apiVersion: v1
