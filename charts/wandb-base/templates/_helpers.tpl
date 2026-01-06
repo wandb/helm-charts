@@ -126,6 +126,13 @@ type: OnDelete
 {{- toYaml $hpaSizing }}
 {{- end }}
 
+{{- define "wandb-base.sizingInfoKeda" }}
+{{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
+{{- $kedaSizing := mergeOverwrite $sizingInfo.autoscaling.keda .Values.autoscaling.keda }}
+
+{{- toYaml $kedaSizing }}
+{{- end }}
+
 {{- define "wandb-base.topologySpreadConstraints" }}
 {{- $topologyConstraints := default (deepCopy .Values.topologySpreadConstraints) list }}
   {{- range $constraint := $topologyConstraints }}
@@ -136,8 +143,20 @@ type: OnDelete
 
 {{- define "wandb-base.replicaCount" }}
 {{- $desiredReplicas := .Values.replicaCount }}
+{{- $kedaSizing := fromYaml (include "wandb-base.sizingInfoKeda" .) }}
 {{- $hpaSizing := fromYaml (include "wandb-base.sizingInfoHorizontal" .) }}
-{{- if $hpaSizing.enabled }}
+{{- if $kedaSizing.enabled }}
+  {{- if $kedaSizing.minReplicaCount }}
+    {{- $desiredReplicas = $kedaSizing.minReplicaCount }}
+  {{- end }}
+  {{- $scaledObject := lookup "keda.sh/v1alpha1" "ScaledObject" .Release.Namespace (include "wandb-base.fullname" . | trimAll "") }}
+    {{- if and $scaledObject $scaledObject.status $scaledObject.status.hpaName }}
+      {{- $hpa := lookup "autoscaling/v2" "HorizontalPodAutoscaler" .Release.Namespace $scaledObject.status.hpaName }}
+      {{- if and $hpa (gt $hpa.status.currentReplicas 0) }}
+        {{- $desiredReplicas = $hpa.status.currentReplicas }}
+      {{- end }}
+    {{- end }}
+{{- else if $hpaSizing.enabled }}
   {{- if $hpaSizing.replicaCount }}
     {{- $desiredReplicas = $hpaSizing.replicaCount }}
   {{- end }}

@@ -301,6 +301,15 @@ global:
 
   api:
     enabled: false
+    rateLimits:
+      enabled: false
+      filestreamCount: 20  # number of request counts per second (project level)
+      filestreamSize: 40  # number of MB per second (project level)
+      fileStreamPerRunCount: 1  # number of request counts per run per second (project level)
+      runUpdateCount: 20  # number of run metadata update requests per second (project level)
+      sdkGraphqlQuerySeconds: 4  # request query seconds over DB per second (project level)
+      createArtifacts: 833  # number of create artifact requests per second (project level)
+      createArtifactsTimeWindow: 120  # 2 minutes - time window for create artifacts rate limit
     additionalPaths:
       proxy: false
       files: false
@@ -409,6 +418,7 @@ api:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.rateLimitEnvs" . }}'
   initContainers:
     init-db:
       image:
@@ -583,6 +593,7 @@ app:
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
+    - '{{ include "wandb.rateLimitEnvs" . }}'
   service:
     enabled: true
     ports:
@@ -1239,7 +1250,7 @@ flat-run-fields-updater:
     # pubsub subscription comes from terraform
     subscriptions: ""
   kafka:
-    # flat-run-field-updater and metric-observer use different consumer id on same topic
+    # flat-run-fields-updater and metric-observer use different consumer id on same topic
     consumerGroupId: "flat-run-fields-updater"
   env:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
@@ -1286,6 +1297,39 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 5
           minReplicas: 1
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 5
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 2
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 1
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
     medium:
       resources:
         limits:
@@ -1299,6 +1343,39 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 10
           minReplicas: 3
+        keda:
+          enabled: false
+          minReplicaCount: 3
+          maxReplicaCount: 10
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 5
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 3
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
     large:
       resources:
         limits:
@@ -1312,6 +1389,39 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 15
           minReplicas: 6
+        keda:
+          enabled: false
+          minReplicaCount: 6
+          maxReplicaCount: 15
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 10
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 4
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
     xlarge:
       resources:
         limits:
@@ -1325,6 +1435,39 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 20
           minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 20
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 15
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 5
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
     xxlarge:
       resources:
         limits:
@@ -1338,6 +1481,39 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 30
           minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 30
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 20
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 6
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
 
 frontend:
   install: false
@@ -1572,7 +1748,7 @@ metric-observer:
   pubsub:
     subscription: ""
   kafka:
-    # metric-observer and flat-run-field-updater use different consumer group id on same topic
+    # metric-observer and flat-run-fields-updater use different consumer group id on same topic
     consumerGroupId: "metric-observer"
   env:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_METRIC_OBSERVER:
@@ -2088,11 +2264,14 @@ weave-trace:
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
     - '{{ include "wandb.clickhouseEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
   initContainers:
     weave-trace-migrate:
       args: ["python", "migrator.py"]
+      envTpls:
+        - '{{ include "wandb.sslCertEnvs" . }}'
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
@@ -2234,6 +2413,7 @@ weave-trace-worker:
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
     - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     WANDB_INTERNAL_SERVICE_TOKEN:
       valueFrom:
@@ -2340,6 +2520,7 @@ weave-evaluate-model-worker:
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
     - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     WANDB_INTERNAL_SERVICE_TOKEN:
       valueFrom:
