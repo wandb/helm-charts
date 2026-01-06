@@ -8,6 +8,7 @@
 - name: redis-ca
   mountPath: /etc/ssl/certs/redis_ca.pem
   subPath: redis_ca.pem
+{{ include "wandb.mysql.caCertVolumeMount" . }}
 {{- end -}}
 
 {{- define "wandb.caCertsVolumes" -}}
@@ -27,6 +28,7 @@
       - key: REDIS_CA_CERT
         path: redis_ca.pem
     optional: true
+{{ include "wandb.mysql.caCertVolume" . }}
 {{- end -}}
 
 {{- define "wandb.gcsFuseVolumeMounts" }}
