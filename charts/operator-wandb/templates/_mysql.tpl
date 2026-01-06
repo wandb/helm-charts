@@ -23,7 +23,7 @@ Return the name of the secret where information is stored, considering if the cu
     {{- print $.Values.global.mysql.caCert.valueFrom.configMapKeyRef.key -}}
   {{- else -}}
     {{/* Invalid */}}
-    {{ fail "Invalid config for 'global.mysql.caCert'"
+    {{ fail "Invalid config for 'global.mysql.caCert'" }}
   {{- end -}}
 {{- else -}}
   {{/* Passed value directly */}}
@@ -115,7 +115,7 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
     {{ fail "Invaid caCert config" }}
   {{- end }}
 {{- else }}
-  {{- if not eq .Values.global.mysql.caCert "" }}
+  {{- if not (eq .Values.global.mysql.caCert "") }}
 - name: mysql-ca
   secret:
     secretName: "{{ $refName }}"
