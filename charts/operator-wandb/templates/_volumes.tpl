@@ -27,6 +27,7 @@
       - key: REDIS_CA_CERT
         path: redis_ca.pem
     optional: true
+{{ include "wandb.mysql.caCertVolume" . }}
 {{- end -}}
 
 {{- define "wandb.gcsFuseVolumeMounts" }}
