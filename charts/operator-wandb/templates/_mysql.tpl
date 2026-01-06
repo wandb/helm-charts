@@ -112,7 +112,7 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
       - key: "{{ $key }}"
         path: "{{ $path }}"
   {{- else }}
-    {{ fail "Invaid caCert config" }}
+    {{ fail "Invalid caCert config" }}
   {{- end }}
 {{- else }}
   {{- if not (eq .Values.global.mysql.caCert "") }}
