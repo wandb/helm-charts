@@ -15,7 +15,7 @@
             {{- $stores = append $stores (include "wandb.mysql" .) -}}
         {{- end -}}
     {{- end -}}
-    
+
     {{- join "," $stores -}}
 {{- end -}}
 
