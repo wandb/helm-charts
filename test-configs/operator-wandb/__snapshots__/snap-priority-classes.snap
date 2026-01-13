@@ -1174,10 +1174,10 @@ data:
   GORILLA_SESSION_LENGTH: "720h"
   GORILLA_SWEEP_PROVIDER: "http://chartsnap-anaconda2:8082"
   GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
-  GORILLA_LIMITER: "noop://"
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
   GORILLA_ONPREM_API_KEY_PREFIX: "local"
   GORILLA_SCHEMA_FILE: "/schema.graphql"
+  GORILLA_COLLECT_AUDIT_LOGS: "true"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_PORT: "8087"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648"
@@ -1233,23 +1233,6 @@ metadata:
     app.kubernetes.io/version: "1.0.0"
     app.kubernetes.io/managed-by: Helm
 data:
----
-# Source: operator-wandb/templates/clickhouse.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-clickhouse-configmap
-  labels:
-  annotations:
-    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
-    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
-    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
-data:
-  WF_CLICKHOUSE_PORT: "8443"
-  WF_CLICKHOUSE_HOST: "chartsnap-clickhouse-headless"
-  WF_CLICKHOUSE_DATABASE: "weave_trace_db"
-  WF_CLICKHOUSE_USER: "default"
-  WF_CLICKHOUSE_REPLICATED: "false"
 ---
 # Source: operator-wandb/templates/console.yaml
 apiVersion: v1
@@ -2501,7 +2484,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.11.3
+        helm.sh/chart: anaconda2-0.11.6
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -2522,7 +2505,7 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -2611,7 +2594,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.11.3
+        helm.sh/chart: app-0.11.6
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -2780,10 +2763,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -2871,7 +2856,7 @@ spec:
         command:
         - bash
         - -c
-        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
+        - until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
@@ -3033,10 +3018,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -3066,6 +3053,16 @@ spec:
           readOnlyRootFilesystem: false
         image: "wandb/local:latest"
         imagePullPolicy:
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       priorityClassName: wandb-global-priority
       serviceAccountName: chartsnap-app
       securityContext:
@@ -3137,7 +3134,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.11.3
+        helm.sh/chart: console-0.11.6
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3150,7 +3147,7 @@ spec:
             name: chartsnap-console-configmap
         env:
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -3245,7 +3242,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.11.3
+        helm.sh/chart: parquet-0.11.6
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3409,7 +3406,7 @@ spec:
               key: license
               name: chartsnap-license
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -3721,7 +3718,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.11.3
+        helm.sh/chart: weave-0.11.6
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3734,7 +3731,7 @@ spec:
             name: chartsnap-weave-configmap
         env:
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -3791,7 +3788,7 @@ spec:
             name: chartsnap-weave-configmap
         env:
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -4152,7 +4149,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.11.3
+            helm.sh/chart: parquet-0.11.6
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -4318,7 +4315,7 @@ spec:
                   key: license
                   name: chartsnap-license
             - name: GLOBAL_ADMIN_API_KEY
-              value: "local-123456789-123456789-123456789-1234"
+              value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
             - name: GORILLA_GLUE_EXECUTE
               value: "true"
             - name: GORILLA_GLUE_EXECUTE_TASK_NAME
@@ -4608,7 +4605,7 @@ spec:
     - name: WANDB_BASE_URL
       value: "http://chartsnap-nginx:8080"
     - name: WANDB_API_KEY
-      value: "local-123456789-123456789-123456789-1234"
+      value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
     command:
     - sh
     - -c
@@ -4649,7 +4646,7 @@ spec:
         envFrom:
         env:
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:
@@ -4734,7 +4731,7 @@ spec:
         envFrom:
         env:
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         securityContext:

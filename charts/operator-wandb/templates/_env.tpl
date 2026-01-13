@@ -187,6 +187,11 @@ Global values will override any chart-specific values.
 - name: MYSQL_USER
   value: "{{ include "wandb.mysql.user" . }}"
 {{- end -}}
+
+{{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") }}
+- name: MYSQL_CA_CERT_PATH
+  value: "/etc/ssl/certs/{{ include "wandb.mysql.certFileName" . }}"
+{{- end }}
 {{- end -}}
 
 {{- define "wandb.mysqlEnvs" -}}
@@ -201,6 +206,102 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.mysql" . | trim | quote }}
 - name: GORILLA_USAGE_STORE
   value: {{ include "wandb.mysql" . | trim | quote }}
+{{- end -}}
+
+{{- define "wandb.clickhouseConfigEnvs" -}}
+{{- /*
+  ATTENTION!
+  
+  WF_CLICKHOUSE_HOST, WF_CLICKHOUSE_PORT, WF_CLICKHOUSE_DATABASE, 
+  WF_CLICKHOUSE_USER, WF_CLICKHOUSE_REPLICATED, CLICKHOUSE_PASSWORD
+
+  Are all set in the values.yaml under global.clickhouse.(host,port,database,user,password,replicated)
+
+  The following blocks are to enable values to be provided in one of two ways:
+
+  AS STANDARD:
+    clickhouse:
+      host: "clickhouse.example.com"
+      port: 8443
+      database: "weave_trace_db"
+      user: "default"
+      password: "supersafe"
+      replicated: false
+
+  AS K8s REFS:
+    clickhouse:
+      host:
+        valueFrom:
+          secretKeyRef:
+            name: "clickhouse-settings-secret"
+            key: "endpoint"
+      port:
+        valueFrom:
+          secretKeyRef:
+            name: "clickhouse-settings-secret"
+            key: "port"
+      database:
+        ...
+      user:
+        ...
+      password:
+        ...
+*/ -}}
+
+{{- if kindIs "map" .Values.global.clickhouse.host }}
+- name: WF_CLICKHOUSE_HOST
+{{- toYaml .Values.global.clickhouse.host | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_HOST
+  value: "{{ include "wandb.clickhouse.host" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.clickhouse.port }}
+- name: WF_CLICKHOUSE_PORT
+{{- toYaml .Values.global.clickhouse.port | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_PORT
+  value: "{{ include "wandb.clickhouse.port" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.clickhouse.database }}
+- name: WF_CLICKHOUSE_DATABASE
+{{- toYaml .Values.global.clickhouse.database | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_DATABASE
+  value: "{{ include "wandb.clickhouse.database" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.clickhouse.user }}
+- name: WF_CLICKHOUSE_USER
+{{- toYaml .Values.global.clickhouse.user | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_USER
+  value: "{{ include "wandb.clickhouse.user" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.clickhouse.replicated }}
+- name: WF_CLICKHOUSE_REPLICATED
+{{- toYaml .Values.global.clickhouse.replicated | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_REPLICATED
+  value: "{{ .Values.global.clickhouse.replicated }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.clickhouse.password }}
+- name: WF_CLICKHOUSE_PASS
+{{- toYaml .Values.global.clickhouse.password | nindent 2 }}
+{{- else }}
+- name: WF_CLICKHOUSE_PASS
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "wandb.clickhouse.passwordSecret" . | quote}}
+      key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+{{- end -}}
+{{- end -}}
+
+{{- define "wandb.clickhouseEnvs" -}}
+{{ include "wandb.clickhouseConfigEnvs" . }}
 {{- end -}}
 
 {{- define "wandb.historyStoreEnvs" -}}
@@ -223,6 +324,21 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.fileStreamStoreProducer" . | quote }}
 - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
   value: {{ include "wandb.runUpdateShadowTopicProducer" . | quote }}
+{{- end -}}
+
+{{- define "wandb.oidcEnvs" -}}
+{{- if or .Values.global.auth.oidc.secret "" .Values.global.auth.oidc.oidcSecret.name }}
+- name: GORILLA_OIDC_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "wandb.oidc.secretSecret" . | quote }}
+      key: "{{ .Values.global.auth.oidc.oidcSecret.secretKey }}"
+- name: OIDC_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "wandb.oidc.secretSecret" . | quote }}
+      key: "{{ .Values.global.auth.oidc.oidcSecret.secretKey }}"
+{{- end }}
 {{- end -}}
 
 {{- define "wandb.downwardEnvs" -}}
@@ -252,5 +368,48 @@ Global values will override any chart-specific values.
 {{- if and .Values.traceRatio (ne .Values.traceRatio 0.0) }}
 - name: GORILLA_TRACER
   value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
+{{- end }}
+{{- end -}}
+
+{{- define "wandb.sslCertEnvs" -}}
+- name: SSL_CERT_FILE
+  value: "/etc/ssl/certs/ca-certificates.crt"
+- name: REQUESTS_CA_BUNDLE
+  value: "/etc/ssl/certs/ca-certificates.crt"
+{{- end -}}
+
+{{- /*
+  ATTENTION!
+  the `wandb.rateLimitEnvs` is dependent on interpolated envs for redis
+  to form the connection string and must appear after the redis envs
+  in a pod's env section to work porperly.
+
+  Using the wandb-base chart that means that:
+    `{{ include "wandb.ratelimitEnvs" . }}`
+  MUST appear after:
+    `{{ include "wandb.redisEnvs" . }}`
+  in the `envTpls` section.
+*/ -}}
+{{- define "wandb.rateLimitEnvs" -}}
+{{- if and .Values.global.api.enabled .Values.global.api.rateLimits.enabled}}
+- name: GORILLA_LIMITER
+  value: "{{ include "wandb.redis.connectionString" . | trim }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+  value: "{{ .Values.global.api.rateLimits.filestreamCount }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+  value: "{{ .Values.global.api.rateLimits.filestreamSize }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+  value: "{{ .Values.global.api.rateLimits.fileStreamPerRunCount }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+  value: "{{ .Values.global.api.rateLimits.runUpdateCount }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+  value: "{{ .Values.global.api.rateLimits.sdkGraphqlQuerySeconds }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+  value: "{{ .Values.global.api.rateLimits.createArtifacts }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+  value: "{{ .Values.global.api.rateLimits.createArtifactsTimeWindow }}"
+{{- else }}
+- name: GORILLA_LIMITER
+  value: "noop://"
 {{- end }}
 {{- end -}}

@@ -12,6 +12,10 @@
 global:
   # This should be the fqdn of where your users will be accessing the instance.
   host: "http://localhost:8080"
+
+  repositoryPrefix: ""
+  imageRegistry: ""
+
   license: ""
   licenseCertPath: "/jwks.json"
 
@@ -27,7 +31,8 @@ global:
 
   storageClass: ""
 
-  banners: {}
+  banners:
+    {}
     # banner1:
     #   type: warning | error | info
     #   message: "This is a warning message"
@@ -92,6 +97,7 @@ global:
     database: "wandb_local"
     user: "wandb"
     password: ""
+    caCert: ""
     passwordSecret:
       name: ""
       rootPasswordKey: "MYSQL_ROOT_PASSWORD"
@@ -127,6 +133,11 @@ global:
   #       secretKeyRef:
   #         name: "mysql-settings-secret"
   #         key: "password"
+  #   caCert:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "mysql-ca-cert"
+  #         key: "mysql_ca.pem"
 
   size: "small"
 
@@ -155,6 +166,37 @@ global:
     # Required when using replicated services on self-managed ClickHouse (not ClickHouse Cloud).
     # Flag will substitute MergeTree() with ReplicatedMergeTree() and use `ON CLUSTER` on table creation.
     replicated: false
+  #
+  # FOR ADVANCED USERS:
+  # the following clickhouse config options can passed as maps/objects
+  # so that their values can be pulled by existing secrets populated by other systems
+  #
+  # clickhouse:
+  #   host:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "endpoint"
+  #   port:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "port"
+  #   database:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "database"
+  #   user:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "username"
+  #   password:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: "clickhouse-settings-secret"
+  #         key: "password"
 
   email:
     smtp:
@@ -172,6 +214,9 @@ global:
       secret: ""
       authMethod: ""
       issuer: ""
+      oidcSecret:
+        name: ""
+        secretKey: "OIDC_SECRET"
 
   # Storage bucket that will be used by the application by default but can be overridden by the user in the wandb-console.
   defaultBucket:
@@ -211,6 +256,10 @@ global:
     host: ""
     project: ""
     instance: ""
+
+  # When enabled, historyStore will only use parquet pods (no mysql/bigtable fallback).
+  historyStore:
+    parquetOnly: false
 
   pubSub:
     enabled: false
@@ -258,6 +307,15 @@ global:
 
   api:
     enabled: false
+    rateLimits:
+      enabled: false
+      filestreamCount: 20  # number of request counts per second (project level)
+      filestreamSize: 40  # number of MB per second (project level)
+      fileStreamPerRunCount: 1  # number of request counts per run per second (project level)
+      runUpdateCount: 20  # number of run metadata update requests per second (project level)
+      sdkGraphqlQuerySeconds: 4  # request query seconds over DB per second (project level)
+      createArtifacts: 833  # number of create artifact requests per second (project level)
+      createArtifactsTimeWindow: 120  # 2 minutes - time window for create artifacts rate limit
     additionalPaths:
       proxy: false
       files: false
@@ -364,7 +422,9 @@ api:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.rateLimitEnvs" . }}'
   initContainers:
     init-db:
       image:
@@ -374,8 +434,10 @@ api:
         [
           "bash",
           "-c",
-          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+          'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
         ]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
     migrate-db:
       command:
         [
@@ -383,6 +445,8 @@ api:
           "-c",
           "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
         ]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     api:
       args: ["gorilla"]
@@ -538,6 +602,8 @@ app:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.oidcEnvs" . }}'
+    - '{{ include "wandb.rateLimitEnvs" . }}'
   service:
     enabled: true
     ports:
@@ -562,8 +628,10 @@ app:
         [
           "bash",
           "-c",
-          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+          'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
         ]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     app:
       ports:
@@ -1196,7 +1264,7 @@ flat-run-fields-updater:
     # pubsub subscription comes from terraform
     subscriptions: ""
   kafka:
-    # flat-run-field-updater and metric-observer use different consumer id on same topic
+    # flat-run-fields-updater and metric-observer use different consumer id on same topic
     consumerGroupId: "flat-run-fields-updater"
   env:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
@@ -1243,6 +1311,39 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 5
           minReplicas: 1
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 5
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 2
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 1
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
     medium:
       resources:
         limits:
@@ -1256,6 +1357,39 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 10
           minReplicas: 3
+        keda:
+          enabled: false
+          minReplicaCount: 3
+          maxReplicaCount: 10
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 5
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 3
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
     large:
       resources:
         limits:
@@ -1269,6 +1403,39 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 15
           minReplicas: 6
+        keda:
+          enabled: false
+          minReplicaCount: 6
+          maxReplicaCount: 15
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 10
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 4
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
     xlarge:
       resources:
         limits:
@@ -1282,6 +1449,39 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 20
           minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 20
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 15
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 5
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
     xxlarge:
       resources:
         limits:
@@ -1295,6 +1495,39 @@ flat-run-fields-updater:
           enabled: true
           maxReplicas: 30
           minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 30
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 20
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 6
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
 
 frontend:
   install: false
@@ -1433,8 +1666,10 @@ glue:
         [
           "bash",
           "-c",
-          'until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done',
+          'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
         ]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
     migrate-db:
       command:
         [
@@ -1442,6 +1677,8 @@ glue:
           "-c",
           "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
         ]
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     glue:
       args: ["glue"]
@@ -1529,7 +1766,7 @@ metric-observer:
   pubsub:
     subscription: ""
   kafka:
-    # metric-observer and flat-run-field-updater use different consumer group id on same topic
+    # metric-observer and flat-run-fields-updater use different consumer group id on same topic
     consumerGroupId: "metric-observer"
   env:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_METRIC_OBSERVER:
@@ -2043,24 +2280,25 @@ weave-trace:
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
-    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
-  env:
-    WF_CLICKHOUSE_PASS:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+  envTpls:
+    - '{{ include "wandb.clickhouseEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   initContainers:
     weave-trace-migrate:
-      command: ["python", "migrator.py"]
+      args: ["python", "migrator.py"]
+      envTpls:
+        - '{{ include "wandb.sslCertEnvs" . }}'
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     weave-trace:
-      command:
-        - uvicorn
       args:
+        - "uvicorn"
         - "src.trace_server:app"
         - "--host"
         - "0.0.0.0"
@@ -2093,6 +2331,8 @@ weave-trace:
           mountPath: /tmp/
         - name: weave-trace-internal-jwt
           mountPath: /tmp/weave-trace/internal-jwt
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   service:
     enabled: true
     ports:
@@ -2189,25 +2429,25 @@ weave-trace-worker:
   envFrom:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
-    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   env:
-    WF_CLICKHOUSE_PASS:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
     WANDB_INTERNAL_SERVICE_TOKEN:
       valueFrom:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   containers:
     weave-trace-worker:
-      command:
-        - python
       args:
+        - "python"
         - "-m"
         - "src.workers.scoring_worker"
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       ports:
         - name: http
           containerPort: 8080
@@ -2296,25 +2536,25 @@ weave-evaluate-model-worker:
   envFrom:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
-    "{{ .Release.Name }}-clickhouse-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   env:
-    WF_CLICKHOUSE_PASS:
-      valueFrom:
-        secretKeyRef:
-          name: '{{ include "wandb.clickhouse.passwordSecret" . }}'
-          key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
     WANDB_INTERNAL_SERVICE_TOKEN:
       valueFrom:
         secretKeyRef:
           name: weave-worker-auth
           key: key
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   containers:
     weave-evaluate-model-worker:
-      command:
-        - python
       args:
+        - "python"
         - "-m"
         - "src.workers.evaluate_model_worker.evaluate_model_worker"
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       ports:
         - name: http
           containerPort: 8080
@@ -2395,10 +2635,10 @@ weave-evaluate-model-worker:
 nginx:
   install: false
   additionalServices: {}
-#    keycloak:
-#      host: http://keycloak:8080/keycloak
-#      headers:
-#        Host: http://keycloak:8080/keycloak
+  #    keycloak:
+  #      host: http://keycloak:8080/keycloak
+  #      headers:
+  #        Host: http://keycloak:8080/keycloak
   image:
     repository: nginxinc/nginx-unprivileged
     tag: latest
@@ -2421,7 +2661,7 @@ nginx:
   volumes:
     - name: nginx-config
       configMap:
-        name: '{{ .Release.Name }}-nginx-configmap'
+        name: "{{ .Release.Name }}-nginx-configmap"
   sizing:
     default:
       autoscaling:

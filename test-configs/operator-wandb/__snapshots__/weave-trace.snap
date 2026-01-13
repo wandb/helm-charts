@@ -1633,10 +1633,10 @@ data:
   GORILLA_SESSION_LENGTH: "720h"
   GORILLA_SWEEP_PROVIDER: "http://chartsnap-anaconda2:8082"
   GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
-  GORILLA_LIMITER: "noop://"
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
   GORILLA_ONPREM_API_KEY_PREFIX: "local"
   GORILLA_SCHEMA_FILE: "/schema.graphql"
+  GORILLA_COLLECT_AUDIT_LOGS: "true"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_PORT: "8087"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648"
@@ -1693,23 +1693,6 @@ metadata:
     app.kubernetes.io/version: "1.0.0"
     app.kubernetes.io/managed-by: Helm
 data:
----
-# Source: operator-wandb/templates/clickhouse.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-clickhouse-configmap
-  labels:
-  annotations:
-    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
-    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
-    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
-data:
-  WF_CLICKHOUSE_PORT: "8123"
-  WF_CLICKHOUSE_HOST: "chartsnap-clickhouse-headless"
-  WF_CLICKHOUSE_DATABASE: "weave_trace_db"
-  WF_CLICKHOUSE_USER: "default"
-  WF_CLICKHOUSE_REPLICATED: "false"
 ---
 # Source: operator-wandb/templates/console.yaml
 apiVersion: v1
@@ -3201,7 +3184,7 @@ spec:
         runAsNonRoot: true
       containers:
       - name: daemonset
-        image: "otel/opentelemetry-collector-contrib:0.97.0"
+        image: "us-docker.pkg.dev/wandb-production/public/otel/opentelemetry-collector-contrib:0.97.0"
         securityContext:
           capabilities:
           allowPrivilegeEscalation: false
@@ -3323,7 +3306,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.11.3
+        helm.sh/chart: anaconda2-0.11.6
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3346,7 +3329,7 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -3360,7 +3343,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/anaconda2:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/anaconda2:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
@@ -3438,7 +3421,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: api-0.11.3
+        helm.sh/chart: api-0.11.6
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3603,10 +3586,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -3626,7 +3611,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8081
@@ -3667,7 +3652,7 @@ spec:
         command:
         - bash
         - -c
-        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
+        - until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
@@ -3823,10 +3808,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -3846,8 +3833,18 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
         imagePullPolicy:
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       - name: migrate-db
         command:
         - bash
@@ -4008,10 +4005,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -4031,8 +4030,18 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       serviceAccountName: chartsnap-api
       securityContext:
         fsGroup: 0
@@ -4103,7 +4112,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.11.3
+        helm.sh/chart: app-0.11.6
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4272,12 +4281,14 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
         - name: BUCKET_PROXY
           value: "true"
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -4311,7 +4322,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -4371,7 +4382,7 @@ spec:
         command:
         - bash
         - -c
-        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
+        - until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
@@ -4533,12 +4544,14 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
         - name: BUCKET_PROXY
           value: "true"
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -4572,8 +4585,18 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
         imagePullPolicy:
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       serviceAccountName: chartsnap-app
       securityContext:
         fsGroup: 0
@@ -4644,7 +4667,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.11.3
+        helm.sh/chart: console-0.11.6
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4659,7 +4682,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -4673,7 +4696,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/console:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/console:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
@@ -4753,7 +4776,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: executor-0.11.3
+        helm.sh/chart: executor-0.11.6
         app.kubernetes.io/name: executor
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4917,7 +4940,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -4933,7 +4956,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -5019,7 +5042,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: filemeta-0.11.3
+        helm.sh/chart: filemeta-0.11.6
         app.kubernetes.io/name: filemeta
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5165,7 +5188,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -5179,7 +5202,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -5265,7 +5288,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: frontend-0.11.3
+        helm.sh/chart: frontend-0.11.6
         app.kubernetes.io/name: frontend
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5284,7 +5307,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -5298,7 +5321,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/frontend-nginx:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/frontend-nginx:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -5370,7 +5393,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: glue-0.11.3
+        helm.sh/chart: glue-0.11.6
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5536,7 +5559,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -5550,7 +5573,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -5584,7 +5607,7 @@ spec:
         command:
         - bash
         - -c
-        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
+        - until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done
         envFrom:
         - configMapRef:
             name: chartsnap-bucket-configmap
@@ -5741,7 +5764,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -5755,8 +5778,18 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
         imagePullPolicy:
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       - name: migrate-db
         command:
         - bash
@@ -5918,7 +5951,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -5932,8 +5965,18 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       serviceAccountName: chartsnap-glue
       securityContext:
         fsGroup: 0
@@ -6004,7 +6047,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: nginx-0.11.3
+        helm.sh/chart: nginx-0.11.6
         app.kubernetes.io/name: nginx
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6017,7 +6060,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -6031,7 +6074,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "nginxinc/nginx-unprivileged:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/nginxinc/nginx-unprivileged:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -6106,7 +6149,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.11.3
+        helm.sh/chart: parquet-0.11.6
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6272,7 +6315,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -6286,7 +6329,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8087
@@ -6510,7 +6553,7 @@ spec:
         version: v1.3.0
     spec:
       containers:
-      - image: "ghcr.io/stakater/reloader:v1.3.0"
+      - image: "us-docker.pkg.dev/wandb-production/public/stakater/reloader:v1.3.0"
         imagePullPolicy: IfNotPresent
         name: chartsnap-reloader
         env:
@@ -6587,7 +6630,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-trace-0.11.3
+        helm.sh/chart: weave-trace-0.11.6
         app.kubernetes.io/name: weave-trace
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6595,9 +6638,8 @@ spec:
     spec:
       containers:
       - name: weave-trace
-        command:
-        - uvicorn
         args:
+        - uvicorn
         - src.trace_server:app
         - --host
         - 0.0.0.0
@@ -6605,29 +6647,41 @@ spec:
         - "8080"
         envFrom:
         - configMapRef:
-            name: chartsnap-clickhouse-configmap
-        - configMapRef:
             name: chartsnap-global-configmap
         - secretRef:
             name: chartsnap-global-secret
         - configMapRef:
             name: chartsnap-weave-trace-configmap
         env:
+        - name: WF_CLICKHOUSE_HOST
+          value: chartsnap-clickhouse-headless
+        - name: WF_CLICKHOUSE_PORT
+          value: "8123"
+        - name: WF_CLICKHOUSE_DATABASE
+          value: weave_trace_db
+        - name: WF_CLICKHOUSE_USER
+          value: default
+        - name: WF_CLICKHOUSE_REPLICATED
+          value: "false"
+        - name: WF_CLICKHOUSE_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CLICKHOUSE_PASSWORD
+              name: chartsnap-clickhouse
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
-        - name: WF_CLICKHOUSE_PASS
-          valueFrom:
-            secretKeyRef:
-              key: 'CLICKHOUSE_PASSWORD'
-              name: 'chartsnap-clickhouse'
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -6635,7 +6689,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/weave-trace:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -6664,18 +6718,25 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /tmp/
           name: temp-dir
         - mountPath: /tmp/weave-trace/internal-jwt
           name: weave-trace-internal-jwt
       initContainers:
       - name: weave-trace-migrate
-        command:
+        args:
         - python
         - migrator.py
         envFrom:
-        - configMapRef:
-            name: chartsnap-clickhouse-configmap
         - configMapRef:
             name: chartsnap-global-configmap
         - secretRef:
@@ -6683,21 +6744,35 @@ spec:
         - configMapRef:
             name: chartsnap-weave-trace-configmap
         env:
+        - name: WF_CLICKHOUSE_HOST
+          value: chartsnap-clickhouse-headless
+        - name: WF_CLICKHOUSE_PORT
+          value: "8123"
+        - name: WF_CLICKHOUSE_DATABASE
+          value: weave_trace_db
+        - name: WF_CLICKHOUSE_USER
+          value: default
+        - name: WF_CLICKHOUSE_REPLICATED
+          value: "false"
+        - name: WF_CLICKHOUSE_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CLICKHOUSE_PASSWORD
+              name: chartsnap-clickhouse
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
-        - name: WF_CLICKHOUSE_PASS
-          valueFrom:
-            secretKeyRef:
-              key: 'CLICKHOUSE_PASSWORD'
-              name: 'chartsnap-clickhouse'
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -6705,9 +6780,18 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/weave-trace:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
         imagePullPolicy: IfNotPresent
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /tmp/
           name: temp-dir
       serviceAccountName: chartsnap-weave-trace
@@ -6736,6 +6820,22 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - emptyDir: {}
         name: temp-dir
       - name: weave-trace-internal-jwt
@@ -6773,7 +6873,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.11.3
+        helm.sh/chart: weave-0.11.6
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6788,7 +6888,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -6802,7 +6902,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/weave-python:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-python:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9994
@@ -6851,7 +6951,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -6865,7 +6965,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/weave-python:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-python:latest"
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -6991,7 +7091,7 @@ spec:
       initContainers:
       containers:
       - name: keeper
-        image: docker.io/bitnamilegacy/clickhouse-keeper:25.3.2-debian-12-r7
+        image: us-docker.pkg.dev/wandb-production/public/bitnamilegacy/clickhouse-keeper:25.3.2-debian-12-r7
         imagePullPolicy: "IfNotPresent"
         securityContext:
           allowPrivilegeEscalation: false
@@ -7156,7 +7256,7 @@ spec:
       initContainers:
       containers:
       - name: clickhouse
-        image: docker.io/bitnamilegacy/clickhouse:25.3.2-debian-12-r3
+        image: us-docker.pkg.dev/wandb-production/public/bitnamilegacy/clickhouse:25.3.2-debian-12-r3
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
@@ -7317,7 +7417,7 @@ spec:
         runAsNonRoot: true
       containers:
       - name: mysql
-        image: "mysql:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/mysql:latest"
         securityContext:
           allowPrivilegeEscalation: false
         ports:
@@ -7441,7 +7541,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: redis
-        image: docker.io/bitnamilegacy/redis:7.2.4-debian-12-r9
+        image: us-docker.pkg.dev/wandb-production/public/bitnamilegacy/redis:7.2.4-debian-12-r9
         imagePullPolicy: "IfNotPresent"
         securityContext:
           allowPrivilegeEscalation: false
@@ -7561,7 +7661,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.11.3
+            helm.sh/chart: parquet-0.11.6
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -7729,7 +7829,7 @@ spec:
             - name: BUCKET_PROXY
               value: "true"
             - name: GLOBAL_ADMIN_API_KEY
-              value: "local-123456789-123456789-123456789-1234"
+              value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
             - name: GORILLA_FILE_STORE_IS_PROXIED
               value: "true"
             - name: GORILLA_GLUE_EXECUTE
@@ -7747,7 +7847,7 @@ spec:
                 drop: []
               privileged: false
               readOnlyRootFilesystem: false
-            image: "wandb/megabinary:latest"
+            image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
             imagePullPolicy: IfNotPresent
             resources:
               limits:
@@ -8098,7 +8198,7 @@ spec:
     - name: WANDB_BASE_URL
       value: "http://chartsnap-nginx:8080"
     - name: WANDB_API_KEY
-      value: "local-123456789-123456789-123456789-1234"
+      value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
     command:
     - sh
     - -c
@@ -8126,7 +8226,7 @@ spec:
     - name: WANDB_BASE_URL
       value: "http://chartsnap-nginx:8080"
     - name: WANDB_API_KEY
-      value: "local-123456789-123456789-123456789-1234"
+      value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
     command:
     - sh
     - -c
@@ -8177,7 +8277,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -8191,7 +8291,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "alpine/k8s:1.31.12"
+        image: "us-docker.pkg.dev/wandb-production/public/alpine/k8s:1.31.12"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -8267,7 +8367,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -8281,7 +8381,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "alpine/k8s:1.31.12"
+        image: "us-docker.pkg.dev/wandb-production/public/alpine/k8s:1.31.12"
         imagePullPolicy: IfNotPresent
         resources:
           requests:

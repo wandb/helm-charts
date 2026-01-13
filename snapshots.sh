@@ -46,11 +46,11 @@ function main() {
       ;;
     update)
       echo "Updating operator-wandb snapshots"
-      helm chartsnap -c "./charts/$chart" -u -f "./$values_dir/$chart"
+      helm chartsnap -c "./charts/$chart" -n default -u -f "./$values_dir/$chart"
       ;;
     run)
       echo "Checking snapshot tests"
-      helm chartsnap -c "./charts/$chart" -f "./$values_dir/$chart"
+      helm chartsnap -c "./charts/$chart" -n default -f "./$values_dir/$chart"
       ;;
     *)
       usage

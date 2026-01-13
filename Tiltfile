@@ -30,17 +30,17 @@ settings.update(read_json(
 settings["operator-wandb-values"] = "./test-configs/operator-wandb/" + settings['values'] + ".yaml"
 settings["additional-resource-directory"] = "./test-configs/additional-resources/" + settings['values'] + ""
 
-if os.path.exists(settings["additional-resource-directory"]):
-    for file in listdir(settings["additional-resource-directory"]):
-        if file.endswith(".yaml") or file.endswith(".yml"):
-            k8s_yaml(os.path.join(settings["additional-resource-directory"], file))
-
 if k8s_context() in settings.get("allowedContexts"):
     print("Context is allowed")
 else:
     fail("Selected context is not in allow list")
 
 allow_k8s_contexts(settings.get("allowed_k8s_contexts"))
+
+if os.path.exists(settings["additional-resource-directory"]):
+    for file in listdir(settings["additional-resource-directory"]):
+        if file.endswith(".yaml") or file.endswith(".yml"):
+            k8s_yaml(file)
 
 current_values = read_yaml('./charts/operator-wandb/values.yaml')
 local_values = read_yaml(settings["operator-wandb-values"])
@@ -110,7 +110,7 @@ configObjects = [
     'wandb-bucket-configmap:configmap:' + current_namespace,
     'wandb-bucket:secret:' + current_namespace,
     'wandb-ca-certs:configmap:' + current_namespace,
-    'wandb-clickhouse-configmap:configmap:' + current_namespace,
+#    'wandb-clickhouse-configmap:configmap:' + current_namespace,
     'wandb-console-configmap:configmap:' + current_namespace,
     'wandb-executor-configmap:configmap:' + current_namespace,
     'wandb-flat-run-fields-updater-configmap:configmap:' + current_namespace,
@@ -124,7 +124,6 @@ configObjects = [
     'wandb-glue-configmap:configmap:' + current_namespace,
     'wandb-kafka-configmap:configmap:' + current_namespace,
     'wandb-kafka:secret:' + current_namespace,
-    'wandb-mysql-configmap:configmap:' + current_namespace,
     'wandb-redis-configmap:configmap:' + current_namespace,
     'wandb-redis-secret:secret:' + current_namespace,
     'wandb-gorilla-session-key:secret:' + current_namespace,
