@@ -68,13 +68,15 @@ spec:
   {{- end }}
   topologySpreadConstraints:
     {{- include "wandb-base.topologySpreadConstraints" $.root | nindent 4 }}
-  {{- if or .podData.volumes .podData.volumesTpls  }}
+  {{- $volumesTpls := default (list) .podData.volumesTpls -}}
+  {{- $volumes := concat (default (list) $.root.Values.global.extraVolumes) (default (list) $.root.Values.extraVolumes) (default (list) .podData.volumes) -}}
+  {{- if or $volumes $volumesTpls }}
   volumes:
-    {{- range .podData.volumesTpls }}
+    {{- range $volumesTpls }}
     {{- tpl . $.root | nindent 4 }}
     {{- end }}
-    {{- if $.podData.volumes }}
-    {{- tpl (toYaml $.podData.volumes | nindent 4) $.root }}
+    {{- if $volumes }}
+    {{- tpl (toYaml $volumes | nindent 4) $.root }}
     {{- end }}
   {{- end }}
 {{ end }}
