@@ -11,6 +11,8 @@
     {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
     {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) }}
     {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $.root.Values.global.env $.root.Values.global.extraEnv) }}
+    {{- $volumeMounts := concat (default (list) $.root.Values.global.extraVolumeMounts) (default (list) $.root.Values.extraVolumeMounts) (default (list) $container.volumeMounts) }}
+    {{- $_ = set $container "volumeMounts" $volumeMounts }}
     {{- $_ = set $container "root" $.root }}
     {{- if eq $.source "containers" }}
       {{/* Merge in resources from .Values.resources to support legacy chart values */}}

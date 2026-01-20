@@ -9,7 +9,6 @@
   mountPath: /etc/ssl/certs/redis_ca.pem
   subPath: redis_ca.pem
 {{ include "wandb.mysql.caCertVolumeMount" . }}
-{{ include "wandb.datadogSocketVolumeMounts" . }}
 {{- end -}}
 
 {{- define "wandb.caCertsVolumes" -}}
@@ -30,29 +29,6 @@
         path: redis_ca.pem
     optional: true
 {{ include "wandb.mysql.caCertVolume" . }}
-{{ include "wandb.datadogSocketVolumes" . }}
-{{- end -}}
-
-{{- define "wandb.datadogSocketVolumeMounts" -}}
-{{- if dig "global" "datadog" "dogstatsd" "uds" "enabled" false .Values }}
-{{- $uds := dig "global" "datadog" "dogstatsd" "uds" (dict) .Values -}}
-{{- $hostPath := default "/var/run/datadog" $uds.hostPath -}}
-{{- $mountPath := default $hostPath $uds.mountPath -}}
-- name: datadog-socket
-  mountPath: {{ $mountPath | quote }}
-{{- end }}
-{{- end -}}
-
-{{- define "wandb.datadogSocketVolumes" -}}
-{{- if dig "global" "datadog" "dogstatsd" "uds" "enabled" false .Values }}
-{{- $uds := dig "global" "datadog" "dogstatsd" "uds" (dict) .Values -}}
-{{- $hostPath := default "/var/run/datadog" $uds.hostPath -}}
-{{- $hostPathType := default "DirectoryOrCreate" $uds.hostPathType -}}
-- name: datadog-socket
-  hostPath:
-    path: {{ $hostPath | quote }}
-    type: {{ $hostPathType | quote }}
-{{- end }}
 {{- end -}}
 
 {{- define "wandb.gcsFuseVolumeMounts" }}
