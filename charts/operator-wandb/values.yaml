@@ -154,6 +154,19 @@ global:
       # grpc, http
       proto: "grpc"
 
+  datadog:
+    dogstatsd:
+      uds:
+        # Enable DogStatsD over a Unix Domain Socket (UDS).
+        enabled: false
+        # Path to the DogStatsD socket inside the container.
+        socketPath: "/var/run/datadog/dsd.socket"
+        # Host path and mount path for the socket directory.
+        hostPath: "/var/run/datadog"
+        mountPath: "/var/run/datadog"
+        # hostPath type for the socket directory.
+        hostPathType: "DirectoryOrCreate"
+
   clickhouse:
     host: "{{ .Release.Name }}-clickhouse-headless"
     port: ""
@@ -1799,6 +1812,8 @@ metric-observer:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
+      volumeMountsTpls:
+        - '{{ include "wandb.datadogSocketVolumeMounts" . }}'
   role:
     create: true
     rules:
@@ -1823,6 +1838,8 @@ metric-observer:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
         optional: true
+  volumesTpls:
+    - '{{ include "wandb.datadogSocketVolumes" . }}'
   size: ""
   sizing:
     default:
