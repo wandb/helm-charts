@@ -68,13 +68,36 @@ spec:
   {{- end }}
   topologySpreadConstraints:
     {{- include "wandb-base.topologySpreadConstraints" $.root | nindent 4 }}
-  {{- if or .podData.volumes .podData.volumesTpls  }}
+  {{- $localVolumes := default list .podData.volumes }}
+  {{- $globalVolumes := default list $.root.Values.global.volumes }}
+  {{- $localVolumeTpls := default list .podData.volumesTpls }}
+  {{- $globalVolumeTpls := default list $.root.Values.global.volumesTpls }}
+  {{- $volumeNames := list }}
+  {{- $combinedVolumes := list }}
+  {{- range $volume := $localVolumes }}
+    {{- $combinedVolumes = append $combinedVolumes $volume }}
+    {{- if and (kindIs "map" $volume) (hasKey $volume "name") }}
+      {{- $volumeNames = append $volumeNames $volume.name }}
+    {{- end }}
+  {{- end }}
+  {{- range $volume := $globalVolumes }}
+    {{- if and (kindIs "map" $volume) (hasKey $volume "name") }}
+      {{- if not (has $volume.name $volumeNames) }}
+        {{- $combinedVolumes = append $combinedVolumes $volume }}
+        {{- $volumeNames = append $volumeNames $volume.name }}
+      {{- end }}
+    {{- else }}
+      {{- $combinedVolumes = append $combinedVolumes $volume }}
+    {{- end }}
+  {{- end }}
+  {{- $combinedVolumeTpls := concat $localVolumeTpls $globalVolumeTpls }}
+  {{- if or $combinedVolumes $combinedVolumeTpls }}
   volumes:
-    {{- range .podData.volumesTpls }}
+    {{- range $combinedVolumeTpls }}
     {{- tpl . $.root | nindent 4 }}
     {{- end }}
-    {{- if $.podData.volumes }}
-    {{- tpl (toYaml $.podData.volumes | nindent 4) $.root }}
+    {{- if $combinedVolumes }}
+    {{- tpl (toYaml $combinedVolumes | nindent 4) $.root }}
     {{- end }}
   {{- end }}
 {{ end }}
