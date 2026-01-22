@@ -108,13 +108,37 @@
   resources:
     {{- toYaml .resources | nindent 4 }}
   {{- end }}
-  {{- if or .volumeMounts .volumeMountsTpls }}
+
+  {{- $localVolumeMounts := default list .volumeMounts }}
+  {{- $globalVolumeMounts := default list $.root.Values.global.volumeMounts }}
+  {{- $localVolumeMountTpls := default list .volumeMountsTpls }}
+  {{- $globalVolumeMountTpls := default list $.root.Values.global.volumeMountsTpls }}
+  {{- $mountPaths := list }}
+  {{- $combinedVolumeMounts := list }}
+  {{- range $volumeMount := $localVolumeMounts }}
+    {{- $combinedVolumeMounts = append $combinedVolumeMounts $volumeMount }}
+    {{- if and (kindIs "map" $volumeMount) (hasKey $volumeMount "mountPath") }}
+      {{- $mountPaths = append $mountPaths $volumeMount.mountPath }}
+    {{- end }}
+  {{- end }}
+  {{- range $volumeMount := $globalVolumeMounts }}
+    {{- if and (kindIs "map" $volumeMount) (hasKey $volumeMount "mountPath") }}
+      {{- if not (has $volumeMount.mountPath $mountPaths) }}
+        {{- $combinedVolumeMounts = append $combinedVolumeMounts $volumeMount }}
+        {{- $mountPaths = append $mountPaths $volumeMount.mountPath }}
+      {{- end }}
+    {{- else }}
+      {{- $combinedVolumeMounts = append $combinedVolumeMounts $volumeMount }}
+    {{- end }}
+  {{- end }}
+  {{- $combinedVolumeMountTpls := concat $localVolumeMountTpls $globalVolumeMountTpls }}
+  {{- if or $combinedVolumeMounts $combinedVolumeMountTpls }}
   volumeMounts:
-    {{- range .volumeMountsTpls }}
+    {{- range $combinedVolumeMountTpls }}
 {{ tpl . $.root | indent 4 }}
     {{- end }}
-    {{- if .volumeMounts }}
-{{ tpl (toYaml .volumeMounts | nindent 4) $.root }}
+    {{- if $combinedVolumeMounts }}
+{{ tpl (toYaml $combinedVolumeMounts | nindent 4) $.root }}
     {{- end }}
   {{- end }}
 {{- end }}
