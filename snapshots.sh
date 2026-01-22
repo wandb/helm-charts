@@ -1,5 +1,5 @@
 #!/usr/bin/env bash 
-set -euo pipefail
+set -eo pipefail
 
 # Check if helm chartsnap plugin is installed
 if ! helm plugin list | grep -q "chartsnap"; then
