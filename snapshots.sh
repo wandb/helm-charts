@@ -20,7 +20,7 @@ function usage() {
   cat <<EOF
 A helper script for the helm-chartsnap plugin https://github.com/jlandowner/helm-chartsnap
 
-Usage: $0 [COMMAND]
+Usage: $0 [COMMAND] [CHART (default: operator-wandb)]
 
 Commands:
   build,    build the operator-wandb chart
@@ -28,6 +28,27 @@ Commands:
   run,      executes chartsnap to test helm changes
 EOF
 }
+
+function build_chart() {
+  local chart="$1"
+  echo "Building $chart"
+  helm cascade build "./charts/$chart"
+}
+
+function update_chart() {
+  local chart="$1"
+  local values_file="$2"
+  echo "updating $chart snapshots"
+  helm chartsnap -c "./charts/$chart" -u -f "$values_file"
+}
+
+function run_chart() {
+  local chart="$1"
+  local values_file="$2"
+  echo "Checking $chart snapshot tests"
+  helm chartsnap -c "./charts/$chart" -f "$values_file"
+}
+
 
 function main() {
   local chart="operator-wandb"
@@ -39,18 +60,20 @@ function main() {
   fi
 
   local func="$1"
+  local target_chart="$2"
+
+  if [ -n "$target_chart" ]; then
+    chart="$target_chart"
+  fi
   case "$func" in
     build)
-      echo "Building operator-wandb"
-      helm cascade build "./charts/$chart"
+      build_chart "$chart"
       ;;
     update)
-      echo "Updating operator-wandb snapshots"
-      helm chartsnap -c "./charts/$chart" -n default -u -f "./$values_dir/$chart"
+      update_chart "$chart" "./$values_dir/$chart"
       ;;
     run)
-      echo "Checking snapshot tests"
-      helm chartsnap -c "./charts/$chart" -n default -f "./$values_dir/$chart"
+      run_chart "$chart" "./$values_dir/$chart"
       ;;
     *)
       usage
