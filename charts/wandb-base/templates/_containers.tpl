@@ -113,19 +113,19 @@
   {{- $globalVolumeMounts := default list $.root.Values.global.volumeMounts }}
   {{- $localVolumeMountTpls := default list .volumeMountsTpls }}
   {{- $globalVolumeMountTpls := default list $.root.Values.global.volumeMountsTpls }}
-  {{- $mountPaths := list }}
+  {{- $volumeMountNames := list }}
   {{- $combinedVolumeMounts := list }}
   {{- range $volumeMount := $localVolumeMounts }}
     {{- $combinedVolumeMounts = append $combinedVolumeMounts $volumeMount }}
-    {{- if and (kindIs "map" $volumeMount) (hasKey $volumeMount "mountPath") }}
-      {{- $mountPaths = append $mountPaths $volumeMount.mountPath }}
+    {{- if and (kindIs "map" $volumeMount) (hasKey $volumeMount "name") }}
+      {{- $volumeMountNames = append $volumeMountNames $volumeMount.name }}
     {{- end }}
   {{- end }}
   {{- range $volumeMount := $globalVolumeMounts }}
-    {{- if and (kindIs "map" $volumeMount) (hasKey $volumeMount "mountPath") }}
-      {{- if not (has $volumeMount.mountPath $mountPaths) }}
+    {{- if and (kindIs "map" $volumeMount) (hasKey $volumeMount "name") }}
+      {{- if not (has $volumeMount.name $volumeMountNames) }}
         {{- $combinedVolumeMounts = append $combinedVolumeMounts $volumeMount }}
-        {{- $mountPaths = append $mountPaths $volumeMount.mountPath }}
+        {{- $volumeMountNames = append $volumeMountNames $volumeMount.name }}
       {{- end }}
     {{- else }}
       {{- $combinedVolumeMounts = append $combinedVolumeMounts $volumeMount }}
