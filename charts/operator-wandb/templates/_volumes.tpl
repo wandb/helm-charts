@@ -56,3 +56,16 @@
 {{- end }}
 {{- end }}
 {{- end }}
+
+
+{{- define "wandb.internalSignerVolumeMounts" -}}
+- name: wandb-internal-signer-root
+  mountPath: /vol/env
+{{- end -}}
+
+{{- define "wandb.internalSignerVolumes" -}}
+- name: wandb-internal-signer-root
+  secret:
+    secretName: "{{ .Release.Name }}-internal-signer"
+    optional: true
+{{- end -}}

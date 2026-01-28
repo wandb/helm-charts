@@ -305,6 +305,11 @@ global:
   weave-trace:
     enabled: false
 
+  # As part of the migration away from using local, the `bypass` setting will
+  # control whether the gorilla services will use the app service (and, thus, local)
+  localService:
+    bypass: false
+
   api:
     enabled: false
     rateLimits:
@@ -474,6 +479,7 @@ api:
         failureThreshold: 5
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
+        - '{{ include "wandb.internalSignerVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -488,6 +494,7 @@ api:
         verbs: ["get"]
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
+    - '{{ include "wandb.internalSignerVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -1697,6 +1704,7 @@ glue:
         failureThreshold: 3
       volumeMountsTpls:
         - '{{ include "wandb.caCertsVolumeMounts" . }}'
+        - '{{ include "wandb.internalSignerVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1713,6 +1721,7 @@ glue:
     type: Recreate
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
+    - '{{ include "wandb.internalSignerVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -1755,6 +1764,29 @@ glue:
         requests:
           cpu: "3"
           memory: 6Gi
+
+internalSignerPreHook:
+  install: true
+  kind: Job
+  podDisruptionBudget:
+    enabled: false
+  jobs:
+    internal-signer-pre-hook:
+      containers:
+        internal-signer-pre-hook:
+          args: ['secret-generation-job']
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  helmHook:
+    enabled: true
+    hook: "pre-upgrade"
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get", "patch", "create", "update"]
 
 metric-observer:
   install: false
