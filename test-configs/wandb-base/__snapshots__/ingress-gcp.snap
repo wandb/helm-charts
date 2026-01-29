@@ -32,17 +32,29 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
-# Source: wandb-base/templates/job.yaml
-apiVersion: batch/v1
-kind: Job
+# Source: wandb-base/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: chartsnap-test
+  name: chartsnap-wandb-base
   labels:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: wandb-base
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
 spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wandb-base
+      app.kubernetes.io/instance: chartsnap
   template:
     metadata:
       labels:
@@ -52,50 +64,6 @@ spec:
         app.kubernetes.io/managed-by: Helm
     spec:
       containers:
-      - name: test
-        command:
-        - /bin/bash
-        args:
-        - -c
-        - |
-          ls -hal /config/
-        envFrom:
-        env:
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "debian:12-slim"
-        imagePullPolicy:
-        volumeMounts:
-        - mountPath: /config/
-          name: shared-config
-      initContainers:
-      - name: start
-        command:
-        - /bin/bash
-        args:
-        - -c
-        - |
-          ls -hal /config/
-        envFrom:
-        env:
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "debian:12-slim"
-        imagePullPolicy:
-        volumeMounts:
-        - mountPath: /config/
-          name: shared-config
-      restartPolicy: Never
       serviceAccountName: chartsnap-wandb-base
       securityContext:
         fsGroup: 0
@@ -105,6 +73,7 @@ spec:
         runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
       topologySpreadConstraints:
       - labelSelector:
           matchLabels:
@@ -120,6 +89,42 @@ spec:
         maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
-      volumes:
-      - emptyDir: {}
-        name: shared-config
+---
+# Source: wandb-base/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    networking.gke.io/v1beta1.FrontendConfig: chartsnap-wandb-base-frontend-config
+spec:
+  rules:
+  - host: "wandb.example.test"
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: chartsnap-wandb-base
+            port:
+              number:
+---
+# Source: wandb-base/templates/ingress.yaml
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: chartsnap-wandb-base-frontend-config
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  redirectToHttps:
+    enabled: true
