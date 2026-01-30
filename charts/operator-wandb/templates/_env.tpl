@@ -374,6 +374,8 @@ Global values will override any chart-specific values.
 {{- define "wandb.sslCertEnvs" -}}
 - name: SSL_CERT_FILE
   value: "/etc/ssl/certs/ca-certificates.crt"
+- name: SSL_CERT_DIR
+  value: "/etc/ssl/certs"
 - name: REQUESTS_CA_BUNDLE
   value: "/etc/ssl/certs/ca-certificates.crt"
 {{- end -}}
