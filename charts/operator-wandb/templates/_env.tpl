@@ -336,6 +336,15 @@ Global values will override any chart-specific values.
 {{- end }}
 {{- end -}}
 
+{{- define "wandb.smtpEnvs" -}}
+- name: SMTP_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: "{{ include "wandb.smtp.passwordSecret" . }}"
+      key: "{{ .Values.global.email.smtp.passwordSecret.passwordKey }}"
+      optional: true
+{{- end -}}
+
 {{- define "wandb.downwardEnvs" -}}
 - name: G_HOST_IP
   valueFrom:
