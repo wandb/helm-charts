@@ -1,0 +1,21 @@
+{{- if not .Values.global.email.smtp.passwordSecret.name }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "{{ include "wandb.smtp.passwordSecret" . }}"
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  {{ .Values.global.email.smtp.passwordSecret.passwordKey }}: {{ include "wandb.smtp.password" . | b64enc }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-smtp-configmap
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  SMTP_HOST: "{{ include "wandb.smtp.host" . }}"
+  SMTP_PORT: "{{ include "wandb.smtp.port" . }}"
+  SMTP_USER: "{{ include "wandb.smtp.user" . }}"
