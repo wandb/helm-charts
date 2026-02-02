@@ -1,0 +1,38 @@
+# Example: Using KEDA to auto-scale the executor based on Kafka lag
+# The executor processes tasks from Kafka queues, so scaling based on
+# consumer lag provides efficient resource utilization.
+
+executor:
+  install: true
+  size: "production"
+  sizing:
+    production:
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+      autoscaling:
+        # Disable standard HPA in favor of KEDA
+        horizontal:
+          enabled: false
+        # Enable KEDA for event-driven autoscaling
+        keda:
+          enabled: true
+          minReplicaCount: 2     # Always keep at least 2 replicas
+          maxReplicaCount: 20    # Scale up to 20 replicas under high load
+          pollingInterval: 15    # Check Kafka lag every 15 seconds
+          cooldownPeriod: 300    # Wait 5 minutes before scaling down
+          triggers:
+            # Scale based on Kafka consumer lag
+            - type: kafka
+              metadata:
+                bootstrapServers: kafka.default.svc.cluster.local:9092
+                consumerGroup: executor-workers
+                topic: gorilla-tasks
+                lagThreshold: "10"       # Scale up if lag > 10 per replica
+                offsetResetPolicy: latest
+                allowIdleConsumers: "false"
+

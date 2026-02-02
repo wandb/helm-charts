@@ -187,6 +187,11 @@ Global values will override any chart-specific values.
 - name: MYSQL_USER
   value: "{{ include "wandb.mysql.user" . }}"
 {{- end -}}
+
+{{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") }}
+- name: MYSQL_CA_CERT_PATH
+  value: "/etc/ssl/certs/{{ include "wandb.mysql.certFileName" . }}"
+{{- end }}
 {{- end -}}
 
 {{- define "wandb.mysqlEnvs" -}}
@@ -372,5 +377,50 @@ Global values will override any chart-specific values.
 {{- if and .Values.traceRatio (ne .Values.traceRatio 0.0) }}
 - name: GORILLA_TRACER
   value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
+{{- end }}
+{{- end -}}
+
+{{- define "wandb.sslCertEnvs" -}}
+- name: SSL_CERT_FILE
+  value: "/etc/ssl/certs/ca-certificates.crt"
+- name: SSL_CERT_DIR
+  value: "/etc/ssl/certs"
+- name: REQUESTS_CA_BUNDLE
+  value: "/etc/ssl/certs/ca-certificates.crt"
+{{- end -}}
+
+{{- /*
+  ATTENTION!
+  the `wandb.rateLimitEnvs` is dependent on interpolated envs for redis
+  to form the connection string and must appear after the redis envs
+  in a pod's env section to work porperly.
+
+  Using the wandb-base chart that means that:
+    `{{ include "wandb.ratelimitEnvs" . }}`
+  MUST appear after:
+    `{{ include "wandb.redisEnvs" . }}`
+  in the `envTpls` section.
+*/ -}}
+{{- define "wandb.rateLimitEnvs" -}}
+{{- if and .Values.global.api.enabled .Values.global.api.rateLimits.enabled}}
+- name: GORILLA_LIMITER
+  value: "{{ include "wandb.redis.connectionString" . | trim }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
+  value: "{{ .Values.global.api.rateLimits.filestreamCount }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_SIZE
+  value: "{{ .Values.global.api.rateLimits.filestreamSize }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_PER_RUN_COUNT
+  value: "{{ .Values.global.api.rateLimits.fileStreamPerRunCount }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_RUN_UPDATE_COUNT
+  value: "{{ .Values.global.api.rateLimits.runUpdateCount }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_SDK_GRAPHQL_QUERY_SECONDS
+  value: "{{ .Values.global.api.rateLimits.sdkGraphqlQuerySeconds }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS
+  value: "{{ .Values.global.api.rateLimits.createArtifacts }}"
+- name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
+  value: "{{ .Values.global.api.rateLimits.createArtifactsTimeWindow }}"
+{{- else }}
+- name: GORILLA_LIMITER
+  value: "noop://"
 {{- end }}
 {{- end -}}

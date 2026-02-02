@@ -1233,7 +1233,6 @@ data:
   GORILLA_SESSION_LENGTH: "720h"
   GORILLA_SWEEP_PROVIDER: "http://chartsnap-app:8082"
   GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
-  GORILLA_LIMITER: "noop://"
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
   GORILLA_ONPREM_API_KEY_PREFIX: "local"
   GORILLA_SCHEMA_FILE: "/schema.graphql"
@@ -2636,7 +2635,7 @@ spec:
         app-common-annotation: app-common-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: app-0.11.5
+        helm.sh/chart: app-0.11.7
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -2809,6 +2808,14 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: BUCKET_QUEUE
@@ -2906,7 +2913,7 @@ spec:
         command:
         - bash
         - -c
-        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
+        - until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
@@ -3068,6 +3075,14 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: BUCKET_QUEUE
@@ -3107,6 +3122,16 @@ spec:
           readOnlyRootFilesystem: false
         image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
         imagePullPolicy:
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       serviceAccountName: chartsnap-app
       securityContext:
         fsGroup: 0
@@ -3184,7 +3209,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: console-0.11.5
+        helm.sh/chart: console-0.11.7
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3245,6 +3270,16 @@ spec:
           requests:
             cpu: "1"
             memory: 1Gi
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       serviceAccountName: chartsnap-console
       securityContext:
         fsGroup: 0
@@ -3270,6 +3305,23 @@ spec:
         maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/nginx/templates/deployment.yaml
 apiVersion: apps/v1
@@ -3305,7 +3357,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: nginx-0.11.5
+        helm.sh/chart: nginx-0.11.7
         app.kubernetes.io/name: nginx
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3348,6 +3400,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /etc/nginx/nginx.conf
           name: nginx-config
           subPath: nginx.conf
@@ -3377,6 +3438,22 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - configMap:
           name: 'chartsnap-nginx-configmap'
         name: nginx-config
@@ -3415,7 +3492,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: parquet-0.11.5
+        helm.sh/chart: parquet-0.11.7
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3580,6 +3657,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -3905,7 +3988,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: weave-0.11.5
+        helm.sh/chart: weave-0.11.7
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3919,6 +4002,12 @@ spec:
         - configMapRef:
             name: chartsnap-weave-configmap
         env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -3982,6 +4071,12 @@ spec:
         - configMapRef:
             name: chartsnap-weave-configmap
         env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -4009,6 +4104,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /tmp/
           name: temp-dir
         - mountPath: /vol/weave/cache
@@ -4356,7 +4460,7 @@ spec:
             global-pod-annotation: global-pod-annotation-value
             global-common-annotation: global-common-annotation-value
           labels:
-            helm.sh/chart: parquet-0.11.5
+            helm.sh/chart: parquet-0.11.7
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -4523,6 +4627,12 @@ spec:
                 secretKeyRef:
                   key: license
                   name: chartsnap-license
+            - name: SSL_CERT_FILE
+              value: /etc/ssl/certs/ca-certificates.crt
+            - name: SSL_CERT_DIR
+              value: /etc/ssl/certs
+            - name: REQUESTS_CA_BUNDLE
+              value: /etc/ssl/certs/ca-certificates.crt
             - name: BUCKET_PROXY
               value: "true"
             - name: GLOBAL_ADMIN_API_KEY
@@ -4902,6 +5012,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /cleanup-scripts
           name: app-rename-cleanup
       restartPolicy: Never
@@ -4930,6 +5049,22 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - configMap:
           defaultMode: 493
           name: 'chartsnap-app-rename-cleanup'
@@ -4999,6 +5134,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /cleanup-scripts
           name: app-rename-cleanup
       restartPolicy: Never
@@ -5027,6 +5171,22 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - configMap:
           defaultMode: 493
           name: 'chartsnap-app-rename-cleanup'
