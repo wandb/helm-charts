@@ -413,9 +413,7 @@ Global values will override any chart-specific values.
 
 - name: GORILLA_EMAIL_SINK
   value: "{{ include "wandb.emailSink" . | trim }}"
-
 {{- end -}}
-
 
 {{- define "wandb.downwardEnvs" -}}
 - name: G_HOST_IP
