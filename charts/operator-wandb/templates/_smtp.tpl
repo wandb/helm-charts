@@ -26,6 +26,17 @@ Return the SMTP password
 {{- print $.Values.global.email.smtp.password -}}
 {{- end -}}
 
+{{/*
+Const: Internals should not be tied back to the values.yaml in any way.
+*/}}
+{{- define "wandb.smtp.internalSecretName" -}}
+{{- print .Release.Name "-smtp-internal-secret" -}}
+{{- end -}}
+
+{{- define "wandb.smtp.internalSecretKey" -}}
+{{- print "SMTP_PASSWORD" -}}
+{{- end -}}
+
 {{- define "wandb.emailSink" -}}
 {{- if ne .Values.global.email.smtp.host "" -}}
 smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)

@@ -391,8 +391,8 @@ Global values will override any chart-specific values.
 - name: SMTP_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ .Release.Name }}-smtp-secret
-      key: SMTP_PASSWORD
+      name: {{ include "wandb.smtp.internalSecretName" . | quote }}
+      key: {{ include "wandb.smtp.internalSecretKey" . | quote }}
 {{- end }}
 
 {{- if kindIs "map" .Values.global.email.smtp.host }}
