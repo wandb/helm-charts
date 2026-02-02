@@ -1,15 +1,4 @@
 {{/*
-Return the name of the secret where SMTP password is stored, considering if the custom secret is defined
-*/}}
-{{- define "wandb.smtp.passwordSecret" -}}
-{{- if .Values.global.email.smtp.passwordSecret.name }}
-  {{- .Values.global.email.smtp.passwordSecret.name -}}
-{{- else }}
-  {{- print .Release.Name "-smtp-secret" -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
 Return the SMTP host
 */}}
 {{- define "wandb.smtp.host" -}}

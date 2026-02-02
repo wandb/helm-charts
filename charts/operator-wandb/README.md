@@ -224,14 +224,18 @@ The following credentials can be pulled from external Kubernetes Secrets:
 
 | Component | Configuration Path | Secret Fields |
 |-----------|-------------------|---------------|
-| **MySQL** | `global.mysql.passwordSecret` | `name`, `passwordKey`, `rootPasswordKey` |
+| Component | Configuration Path | Secret Reference Method |
+|-----------|-------------------|------------------------|
+| **MySQL** | `global.mysql.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
 | **Redis** | `global.redis.secret` | `secretName`, `secretKey` |
-| **ClickHouse** | `global.clickhouse.passwordSecret` | `name`, `passwordKey` |
+| **ClickHouse** | `global.clickhouse.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
 | **Kafka** | `global.kafka.passwordSecret` | `name`, `passwordKey` |
 | **OIDC** | `global.auth.oidc.oidcSecret` | `name`, `secretKey` |
-| **SMTP** | `global.email.smtp.passwordSecret` | `name`, `passwordKey` |
+| **SMTP** | `global.email.smtp.*` | Each field (host, port, user, password) can be a string or a map with `valueFrom` |
 
-### Example: Using an External SMTP Secret
+### Example: Using External Secrets with MySQL/ClickHouse/SMTP
+
+For MySQL, ClickHouse, and SMTP, each field can be configured as either a simple value or a Kubernetes secret reference:
 
 ```yaml
 global:
@@ -240,10 +244,26 @@ global:
       host: "smtp.example.com"
       port: 587
       user: "noreply@example.com"
-      password: ""  # Leave empty when using external secret
-      passwordSecret:
-        name: "my-smtp-secret"  # Reference your existing secret
-        passwordKey: "SMTP_PASSWORD"
+      password:
+        valueFrom:
+          secretKeyRef:
+            name: "my-smtp-secret"
+            key: "password"
+  
+  mysql:
+    host: "mysql.example.com"
+    port: 3306
+    database: "wandb_local"
+    user:
+      valueFrom:
+        secretKeyRef:
+          name: "my-mysql-secret"
+          key: "username"
+    password:
+      valueFrom:
+        secretKeyRef:
+          name: "my-mysql-secret"
+          key: "password"
 ```
 
 For complete examples with secrets and additional configurations, see:
