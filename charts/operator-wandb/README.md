@@ -214,6 +214,41 @@ The following Terraform (IaC) options use this approach:
 
 For production-grade implementation, the appropriate chart parameters should be used to point to prebuilt, externalized state stores.
 
+## Using External Secrets
+
+The chart supports referencing existing Kubernetes Secrets for sensitive credentials. This allows you to manage secrets externally using tools like External Secrets Operator, Sealed Secrets, or other secret management systems.
+
+### Supported Secret References
+
+The following credentials can be pulled from external Kubernetes Secrets:
+
+| Component | Configuration Path | Secret Fields |
+|-----------|-------------------|---------------|
+| **MySQL** | `global.mysql.passwordSecret` | `name`, `passwordKey`, `rootPasswordKey` |
+| **Redis** | `global.redis.secret` | `secretName`, `secretKey` |
+| **ClickHouse** | `global.clickhouse.passwordSecret` | `name`, `passwordKey` |
+| **Kafka** | `global.kafka.passwordSecret` | `name`, `passwordKey` |
+| **OIDC** | `global.auth.oidc.oidcSecret` | `name`, `secretKey` |
+| **SMTP** | `global.email.smtp.passwordSecret` | `name`, `passwordKey` |
+
+### Example: Using an External SMTP Secret
+
+```yaml
+global:
+  email:
+    smtp:
+      host: "smtp.example.com"
+      port: 587
+      user: "noreply@example.com"
+      password: ""  # Leave empty when using external secret
+      passwordSecret:
+        name: "my-smtp-secret"  # Reference your existing secret
+        passwordKey: "SMTP_PASSWORD"
+```
+
+For complete examples with secrets and additional configurations, see:
+- Values: [test-configs/operator-wandb/user-defined-secrets.yaml](../../test-configs/operator-wandb/user-defined-secrets.yaml)
+- Secrets: [test-configs/additional-resources/user-defined-secrets/](../../test-configs/additional-resources/user-defined-secrets/)
 
 ## Chart Relationship
 
