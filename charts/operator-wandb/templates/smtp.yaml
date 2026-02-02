@@ -1,6 +1,11 @@
-{{- /*
-This file is intentionally left empty as SMTP configuration is now handled
-entirely through environment variables in _env.tpl following the same pattern
-as MySQL configuration where each field can be either a string or a map with
-valueFrom for Kubernetes secret references.
-*/ -}}
+# Any time the password is not a map, we need to create this secret manually
+{{- if not (kindIs "map" .Values.global.email.smtp.password) }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "wandb.smtp.passwordSecretName" . | quote}}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  {{ include "wandb.smtp.passwordSecretKey" . | quote }}: {{ include "wandb.smtp.password" . | b64enc }}
+{{- end }}

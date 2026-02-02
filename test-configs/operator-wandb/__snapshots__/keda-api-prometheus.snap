@@ -239,7 +239,6 @@ metadata:
     "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
 data:
   GORILLA_STATSIG_KEY:
-  GORILLA_EMAIL_SINK: aHR0cHM6Ly9hcGkud2FuZGIuYWkvZW1haWwvZGlzcGF0Y2g=
   GORILLA_SLACK_CLIENT_ID:
   GORILLA_SLACK_SECRET:
   SLACK_CLIENT_ID:
@@ -309,6 +308,16 @@ data:
   # Set $gorillaSessionKey to existing secret data or generate a random one when not exists
   GORILLA_SESSION_KEY: "###DYNAMIC_FIELD###"
   GORILLA_AUTH_JWK_URL: "aHR0cDovL2NoYXJ0c25hcC1hcHA6ODA4My9hcGkvandrcy5qc29u"
+---
+# Source: operator-wandb/templates/smtp.yaml
+# Any time the password is not a map, we need to create this secret manually
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "chartsnap-smtp-secret"
+  labels:
+data:
+  "SMTP_PASSWORD":
 ---
 # Source: operator-wandb/charts/otel/charts/daemonset/templates/configmap.yaml
 apiVersion: v1
@@ -2413,13 +2422,16 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_PASSWORD
-          value: ""
-        - name: SMTP_PORT
-          value: "587"
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
         - name: SMTP_HOST
           value: ""
         - name: SMTP_USER
           value: ""
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -2681,13 +2693,16 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_PASSWORD
-          value: ""
-        - name: SMTP_PORT
-          value: "587"
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
         - name: SMTP_HOST
           value: ""
         - name: SMTP_USER
           value: ""
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3097,13 +3112,16 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_PASSWORD
-          value: ""
-        - name: SMTP_PORT
-          value: "587"
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
         - name: SMTP_HOST
           value: ""
         - name: SMTP_USER
           value: ""
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3903,13 +3921,16 @@ spec:
                   name: gorilla-statsig
                   optional: true
             - name: SMTP_PASSWORD
-              value: ""
-            - name: SMTP_PORT
-              value: "587"
+              valueFrom:
+                secretKeyRef:
+                  key: SMTP_PASSWORD
+                  name: chartsnap-smtp-secret
             - name: SMTP_HOST
               value: ""
             - name: SMTP_USER
               value: ""
+            - name: GORILLA_EMAIL_SINK
+              value: https://api.wandb.ai/email/dispatch
             - name: LICENSE
               valueFrom:
                 secretKeyRef:

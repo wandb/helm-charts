@@ -341,7 +341,7 @@ Global values will override any chart-specific values.
 {{- end }}
 {{- end -}}
 
-{{- define "wandb.smtpConfigEnvs" -}}
+{{- define "wandb.smtpEnvs" -}}
 {{- /*
   ATTENTION!
   
@@ -389,15 +389,10 @@ Global values will override any chart-specific values.
 {{- toYaml .Values.global.email.smtp.password | nindent 2 }}
 {{- else }}
 - name: SMTP_PASSWORD
-  value: "{{ include "wandb.smtp.password" . }}"
-{{- end }}
-
-{{- if kindIs "map" .Values.global.email.smtp.port }}
-- name: SMTP_PORT
-{{- toYaml .Values.global.email.smtp.port | nindent 2 }}
-{{- else }}
-- name: SMTP_PORT
-  value: "{{ include "wandb.smtp.port" . }}"
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "wandb.smtp.passwordSecretName" . | quote}}
+      key: {{ include "wandb.smtp.passwordSecretKey" . | quote }}
 {{- end }}
 
 {{- if kindIs "map" .Values.global.email.smtp.host }}
@@ -414,12 +409,13 @@ Global values will override any chart-specific values.
 {{- else }}
 - name: SMTP_USER
   value: "{{ include "wandb.smtp.user" . }}"
-{{- end -}}
+{{- end }}
+
+- name: GORILLA_EMAIL_SINK
+  value: "{{ include "wandb.emailSink" . | trim }}"
+
 {{- end -}}
 
-{{- define "wandb.smtpEnvs" -}}
-{{ include "wandb.smtpConfigEnvs" . }}
-{{- end -}}
 
 {{- define "wandb.downwardEnvs" -}}
 - name: G_HOST_IP
