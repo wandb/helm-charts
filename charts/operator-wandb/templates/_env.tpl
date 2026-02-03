@@ -208,7 +208,7 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.mysql" . | trim | quote }}
 {{- end -}}
 
-{{- define "wandb.clickhouseConfigEnvs" -}}
+{{- define "wandb.clickhouseEnvs" -}}
 {{- /*
   ATTENTION!
   
@@ -298,10 +298,6 @@ Global values will override any chart-specific values.
       name: {{ include "wandb.clickhouse.passwordSecret" . | quote}}
       key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
 {{- end -}}
-{{- end -}}
-
-{{- define "wandb.clickhouseEnvs" -}}
-{{ include "wandb.clickhouseConfigEnvs" . }}
 {{- end -}}
 
 {{- define "wandb.historyStoreEnvs" -}}
