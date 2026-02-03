@@ -400,7 +400,6 @@ Global values will override any chart-specific values.
   value: "{{ include "wandb.smtp.port" . }}"
 {{- end }}
 
-
 {{- if kindIs "map" .Values.global.email.smtp.user }}
 - name: SMTP_USER
 {{- toYaml .Values.global.email.smtp.user | nindent 2 }}
