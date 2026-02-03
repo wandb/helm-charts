@@ -30,7 +30,7 @@ Return the SMTP password
 Const: Internals should not be tied back to the values.yaml in any way.
 */}}
 {{- define "wandb.smtp.internalSecretName" -}}
-{{- print .Release.Name "-smtp-internal-secret" -}}
+{{- print .Release.Name "-smtp-secret" -}}
 {{- end -}}
 
 {{- define "wandb.smtp.internalSecretKey" -}}
