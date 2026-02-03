@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "wandb.fullname" . }}-test-env-expansion"
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: env-check
+      image: busybox:latest
+      envFrom:
+        - configMapRef:
+            name: "{{ .Release.Name }}-bucket-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-redis-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-kafka-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-global-configmap"
+            optional: true
+        - secretRef:
+            name: "{{ .Release.Name }}-global-secret"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-glue-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-api-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-app-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-anaconda2-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-frontend-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-weave-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-console-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-executor-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-filestream-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-flat-run-fields-updater-configmap"
+            optional: true
+        - configMapRef:
+            name: "{{ .Release.Name }}-local-configmap"
+            optional: true
+      env:
+{{ include "wandb.downwardEnvs" . | indent 8 }}
+{{ include "wandb.bucket.cwIdentity" . | indent 8 }}
+{{ include "wandb.bucketEnvs" . | indent 8 }}
+{{ include "wandb.mysqlEnvs" . | indent 8 }}
+{{ include "wandb.redisEnvs" . | indent 8 }}
+{{ include "wandb.queueEnvs" . | indent 8 }}
+{{ include "wandb.historyStoreEnvs" . | indent 8 }}
+{{ include "wandb.clickhouseConfigEnvs" . | indent 8 }}
+{{ include "wandb.clickhouseEnvs" . | indent 8 }}
+{{ include "wandb.smtpEnvs" . | indent 8 }}
+{{ include "wandb.oidcEnvs" . | indent 8 }}
+{{ include "wandb.observabilityEnvs" . | indent 8 }}
+{{ include "wandb.statsigEnvs" . | indent 8 }}
+{{ include "wandb.license" . | indent 8 }}
+{{ include "wandb.rateLimitEnvs" . | indent 8 }}
+{{ include "wandb.sslCertEnvs" . | indent 8 }}
+{{ include "wandb.extraEnv" . | indent 8 }}
+      command:
+        - sh
+        - -c
+        - |
+          echo "Checking for unresolved shell variable references in environment..."
+          echo ""
+          
+          # Check for $(VARIABLE) style references
+          FOUND=$(env | grep '(' || true)
+          
+          if [ -n "$FOUND" ]; then
+            echo "ERROR: Found unresolved shell variable references:"
+            echo "$FOUND"
+            echo ""
+            echo "These values contain unresolved \$(VARIABLE) references that should be"
+            echo "expanded using Helm templating instead of shell-style variable interpolation."
+            exit 1
+          fi
+          
+          echo "SUCCESS: No unresolved shell variable references found."
+          exit 0
+  restartPolicy: Never
