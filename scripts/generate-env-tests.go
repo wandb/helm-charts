@@ -206,7 +206,7 @@ func writeAnchorContainer(f *os.File) {
 	fmt.Fprintln(f, `          echo ""`)
 	fmt.Fprintln(f, "          ")
 	fmt.Fprintln(f, "          # Check for $(VARIABLE) style references")
-	fmt.Fprintln(f, "          FOUND=$(env | grep '(' || true)")
+	fmt.Fprintln(f, "          FOUND=$(env | grep '$(' || true)")
 	fmt.Fprintln(f, "          ")
 	fmt.Fprintln(f, "          if [ -n \"$FOUND\" ]; then")
 	fmt.Fprintln(f, `            echo "ERROR: Found \$(VARIABLE) references in environment:"`)
@@ -266,8 +266,9 @@ func writeServiceContainer(f *os.File, service string, config any) {
 		}
 	}
 
-	fmt.Fprintln(f, "      env:")
-
+	// Check if we have any env entries to write
+	var envLines []string
+	
 	if envTplsRaw, exists := configMap["envTpls"]; exists {
 		if envTpls, ok := envTplsRaw.([]any); ok {
 			for _, tpl := range envTpls {
@@ -276,14 +277,24 @@ func writeServiceContainer(f *os.File, service string, config any) {
 					if strings.HasSuffix(tplStr, " }}") {
 						tplStr = tplStr[:len(tplStr)-3] + " | indent 8 }}"
 					}
-					fmt.Fprintln(f, tplStr)
+					envLines = append(envLines, tplStr)
 				}
 			}
 		}
 	}
 
 	if _, hasEnv := configMap["env"]; hasEnv {
-		fmt.Fprintf(f, "{{ include \"wandb-base.env\" (dict \"env\" (index .Values \"%s\" \"env\") \"root\" .) | indent 8 }}\n", service)
+		envLines = append(envLines, fmt.Sprintf("{{ include \"wandb-base.env\" (dict \"env\" (index .Values \"%s\" \"env\") \"root\" .) | indent 8 }}", service))
+	}
+
+	// Write env section - use empty list if no entries
+	if len(envLines) == 0 {
+		fmt.Fprintln(f, "      env: []")
+	} else {
+		fmt.Fprintln(f, "      env:")
+		for _, line := range envLines {
+			fmt.Fprintln(f, line)
+		}
 	}
 
 	fmt.Fprintln(f, "      command: *env-expansion-test-command")
