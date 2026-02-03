@@ -1,7 +1,12 @@
 #!/usr/bin/env bash 
 set -eo pipefail
 
-# Check if helm chartsnap plugin is installed
+if ! command -v helm &> /dev/null; then
+  echo "❌ helm is not installed"
+  echo "Please install Helm: https://helm.sh/docs/intro/install/"
+  exit 1
+fi
+
 if ! helm plugin list | grep -q "chartsnap"; then
   echo "❌ helm chartsnap plugin is not installed"
   echo "Please install it by running:"
@@ -23,9 +28,10 @@ A helper script for the helm-chartsnap plugin https://github.com/jlandowner/helm
 Usage: $0 [COMMAND] [CHART (default: operator-wandb)]
 
 Commands:
-  build,    build the operator-wandb chart
-  update,   execute chartsnap to update the snapshots
-  run,      executes chartsnap to test helm changes
+  build,              build the operator-wandb chart
+  update,             execute chartsnap to update the snapshots
+  run,                executes chartsnap to test helm changes
+  generate-env-tests, generate environment expansion test from Chart.yaml and values.yaml
 EOF
 }
 
@@ -49,22 +55,30 @@ function run_chart() {
   helm chartsnap -c "./charts/$chart" -f "$values_file"
 }
 
+function generate_env_tests() {
+  local chart="$1"
+  
+  if ! command -v go &> /dev/null; then
+    echo "❌ go is not installed"
+    echo "Please install Go:"
+    echo "  brew install go"
+    echo "  or visit https://go.dev/doc/install"
+    exit 1
+  fi
+  
+  (cd scripts && go run generate-env-tests.go -chart "$chart")
+}
+
 
 function main() {
-  local chart="operator-wandb"
-  local values_dir="test-configs"
-
   if [ $# -eq 0 ]; then
     usage
     exit 1
   fi
 
   local func="$1"
-  local target_chart="$2"
-
-  if [ -n "$target_chart" ]; then
-    chart="$target_chart"
-  fi
+  local chart="${2:-operator-wandb}"
+  local values_dir="test-configs"
   case "$func" in
     build)
       build_chart "$chart"
@@ -74,6 +88,9 @@ function main() {
       ;;
     run)
       run_chart "$chart" "./$values_dir/$chart"
+      ;;
+    generate-env-tests)
+      generate_env_tests "$chart"
       ;;
     *)
       usage
