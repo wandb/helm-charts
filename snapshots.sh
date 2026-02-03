@@ -58,15 +58,33 @@ function run_chart() {
 function generate_env_tests() {
   local chart="$1"
   
-  if ! command -v go &> /dev/null; then
-    echo "❌ go is not installed"
-    echo "Please install Go:"
-    echo "  brew install go"
-    echo "  or visit https://go.dev/doc/install"
+  if ! command -v gomplate &> /dev/null; then
+    echo "❌ gomplate is not installed"
+    echo "Please install gomplate:"
+    echo "  brew install gomplate"
+    echo "  or visit https://gomplate.ca/install/"
     exit 1
   fi
-  
-  (cd scripts && go run generate-env-tests.go -chart "$chart")
+
+  local chart_dir="./charts/$chart"
+  local template_file="./scripts/templates/test-env-expansion.yaml.tpl"
+  local output_file="$chart_dir/templates/tests/test-env-expansion.yaml"
+
+  if [ ! -f "$chart_dir/Chart.yaml" ]; then
+    echo "❌ Chart.yaml not found for chart: $chart"
+    exit 1
+  fi
+
+  if [ ! -f "$template_file" ]; then
+    echo "❌ Template file not found: $template_file"
+    exit 1
+  fi
+
+  CHART_FILE="$chart_dir/Chart.yaml" \
+  VALUES_FILE="$chart_dir/values.yaml" \
+  gomplate \
+    -o "$output_file" \
+    -f "$template_file"
 }
 
 

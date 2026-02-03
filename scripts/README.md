@@ -1,21 +1,20 @@
 # Scripts
 
-## generate-env-tests.go
+## generate-env-tests (gomplate)
 
 Generates `test-env-expansion.yaml` from Chart.yaml and values.yaml to validate environment variables.
 
 ### Requirements
 
-- Go 1.25+
-- Network access (for `go run` to download module deps)
+- gomplate
 
 ### Installation
 
 ```bash
-# Install Go
-brew install go
+# Install gomplate
+brew install gomplate
 
-# Or download from https://go.dev/doc/install
+# Or visit https://gomplate.ca/install/
 ```
 
 ### Usage
@@ -25,7 +24,11 @@ brew install go
 ./snapshots.sh generate-env-tests
 
 # Or directly
-cd scripts && go run ./generate-env-tests.go -chart operator-wandb
+CHART_FILE=./charts/operator-wandb/Chart.yaml \
+VALUES_FILE=./charts/operator-wandb/values.yaml \
+gomplate \
+  -f ./scripts/templates/test-env-expansion.yaml.tpl \
+  -o ./charts/operator-wandb/templates/tests/test-env-expansion.yaml
 ```
 
 ### What it does
