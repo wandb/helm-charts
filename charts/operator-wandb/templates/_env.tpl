@@ -384,6 +384,31 @@ Global values will override any chart-specific values.
               key: "password"
 */ -}}
 
+{{- if kindIs "map" .Values.global.email.smtp.host }}
+- name: SMTP_HOST
+{{- toYaml .Values.global.email.smtp.host | nindent 2 }}
+{{- else }}
+- name: SMTP_HOST
+  value: "{{ include "wandb.smtp.host" . }}"
+{{- end }}
+
+{{- if kindIs "map" .Values.global.email.smtp.port -}}
+- name: SMTP_PORT
+{{- toYaml .Values.global.email.smtp.port | nindent 2 }}
+{{- else }}
+- name: SMTP_PORT
+  value: "{{ include "wandb.smtp.port" . }}"
+{{- end }}
+
+
+{{- if kindIs "map" .Values.global.email.smtp.user }}
+- name: SMTP_USER
+{{- toYaml .Values.global.email.smtp.user | nindent 2 }}
+{{- else }}
+- name: SMTP_USER
+  value: "{{ include "wandb.smtp.user" . }}"
+{{- end }}
+
 {{- if kindIs "map" .Values.global.email.smtp.password }}
 - name: SMTP_PASSWORD
 {{- toYaml .Values.global.email.smtp.password | nindent 2 }}
@@ -393,22 +418,6 @@ Global values will override any chart-specific values.
     secretKeyRef:
       name: {{ include "wandb.smtp.internalSecretName" . | quote }}
       key: {{ include "wandb.smtp.internalSecretKey" . | quote }}
-{{- end }}
-
-{{- if kindIs "map" .Values.global.email.smtp.host }}
-- name: SMTP_HOST
-{{- toYaml .Values.global.email.smtp.host | nindent 2 }}
-{{- else }}
-- name: SMTP_HOST
-  value: "{{ include "wandb.smtp.host" . }}"
-{{- end }}
-
-{{- if kindIs "map" .Values.global.email.smtp.user }}
-- name: SMTP_USER
-{{- toYaml .Values.global.email.smtp.user | nindent 2 }}
-{{- else }}
-- name: SMTP_USER
-  value: "{{ include "wandb.smtp.user" . }}"
 {{- end }}
 
 - name: GORILLA_EMAIL_SINK
