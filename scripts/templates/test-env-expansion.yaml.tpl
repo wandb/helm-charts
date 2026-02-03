@@ -4,7 +4,7 @@
 {{- $valuesRaw := file.Read (getenv "VALUES_FILE") -}}
 {{- $chart := data.YAML $chartRaw -}}
 {{- $values := data.YAML $valuesRaw -}}
-{{- $testImage := "busybox:stable-musl" -}}
+{{- $testImage := "us-docker.pkg.dev/wandb-production/public/busybox:stable-musl" -}}
 {{- $testImagePullPolicy := "IfNotPresent" }}
 
 apiVersion: v1
