@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	testImage = "busybox:stable-musl"
+	testImage = "us-docker.pkg.dev/wandb-production/public/busybox:stable-musl"
 	testImagePullPolicy = "IfNotPresent"
 )
 
