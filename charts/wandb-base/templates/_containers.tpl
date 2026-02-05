@@ -4,12 +4,11 @@
  */}}
 {{- define "wandb-base.containers" -}}
   {{- range $containerName, $containerSource := .containers -}}
-    {{/*
-    Since an empty bool is false, and we want the unspecified value to be true,
-    we create a dictionary with enabled=true and mergeOverwrite the provided values
-    */}}
-    {{- $containerSource := mergeOverwrite (dict "enabled" true) $containerSource}}
-    {{- if $containerSource.enabled -}}
+    {{- $enabled := true -}}
+    {{- if hasKey $containerSource "enabled" -}}
+        {{- $enabled = $containerSource.enabled -}}
+    {{- end -}}
+    {{- if $enabled -}}
       {{- $container := dict }}
       {{- $_ := deepCopy $containerSource | merge $container }}
       {{- $_ = set $container "name" $containerName }}
