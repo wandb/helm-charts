@@ -61,7 +61,10 @@ Return the kafka broker url port
 {{- if .Values.kafka.install -}}
 {{ printf "%s-%s" .Release.Name "kafka" }}
 {{- else if .Values.bufstream.install -}}
-bufstream
+{{- $bufstreamNamespace := default .Release.Namespace .Values.bufstream.namespaceOverride -}}
+{{ printf "bufstream.%s.svc.cluster.local" $bufstreamNamespace }}
+{{- else -}}
+bufstream.bufstream.svc.cluster.local
 {{- end -}}
 {{- else -}}
 {{ .Values.global.kafka.brokerHost }}

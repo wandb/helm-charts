@@ -32,8 +32,7 @@ global:
 
   storageClass: ""
 
-  banners:
-    {}
+  banners: {}
     # banner1:
     #   type: warning | error | info
     #   message: "This is a warning message"
@@ -88,6 +87,13 @@ global:
 
   extraEnvFrom: {}
   extraEnv: {}
+
+  # Global volumes applied to all pods
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
+  # Global volumeMounts applied to all containers
+  volumeMountsTpls:
+    - '{{ include "wandb.caCertsVolumeMounts" . }}'
 
   operator:
     namespace: default
@@ -206,6 +212,34 @@ global:
       user: ""
       password: ""
 
+  #
+  # For Advanced Users:
+  # the following email config options can passed as maps/objects
+  # so that their values can be pulled by existing secrets populated by other systems
+  #
+  # email:
+  #   smtp:
+  #     host:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "email-settings-secret"
+  #           key: "host"
+  #     port:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "email-settings-secret"
+  #           key: "port"
+  #     user:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "email-settings-secret"
+  #           key: "user"
+  #     password:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "email-settings-secret"
+  #           key: "password"
+
   auth:
     sessionLengthHours: 720
     # Internal URL for the auth service should be using oidc or auth0
@@ -315,13 +349,10 @@ global:
     enabled: false
     rateLimits:
       enabled: false
-      filestreamCount: 20  # number of request counts per second (project level)
-      filestreamSize: 40  # number of MB per second (project level)
-      fileStreamPerRunCount: 1  # number of request counts per run per second (project level)
-      runUpdateCount: 20  # number of run metadata update requests per second (project level)
-      sdkGraphqlQuerySeconds: 4  # request query seconds over DB per second (project level)
-      createArtifacts: 833  # number of create artifact requests per second (project level)
-      createArtifactsTimeWindow: 120  # 2 minutes - time window for create artifacts rate limit
+      filestreamCount: 500  # filestream requests per second (project level)
+      filestreamSize: 120  # filestream size in MB per second (project level)
+      fileStreamPerRunCount: 2  # filestream requests per run per second (run level)
+      runUpdateCount: 80  # run metadata update requests per second (project level)
     additionalPaths:
       proxy: false
       files: false
@@ -429,8 +460,10 @@ api:
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
     init-db:
       image:
@@ -443,8 +476,6 @@ api:
           "-c",
           'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
         ]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
     migrate-db:
       command:
         [
@@ -452,8 +483,6 @@ api:
           "-c",
           "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
         ]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     api:
       args: ["gorilla"]
@@ -480,7 +509,6 @@ api:
         successThreshold: 1
         failureThreshold: 5
       volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
         - '{{ include "wandb.internalSignerVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
@@ -495,7 +523,6 @@ api:
         resources: ["namespaces"]
         verbs: ["get"]
   volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
     - '{{ include "wandb.internalSignerVolumes" . }}'
   size: ""
   sizing:
@@ -610,9 +637,11 @@ app:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   service:
     enabled: true
     ports:
@@ -640,8 +669,6 @@ app:
           "-c",
           'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
         ]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     app:
       ports:
@@ -681,8 +708,6 @@ app:
         preStop:
           exec:
             command: ["sleep", "25"]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   role:
     create: true
     rules:
@@ -692,8 +717,6 @@ app:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -919,20 +942,18 @@ executor:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     GORILLA_TASK_QUEUE:
       value: '{{ include "wandb.executor.taskQueue" . }}'
   containers:
     executor:
       args: ["executor"]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
   strategy:
     type: Recreate
   size: ""
@@ -1021,16 +1042,14 @@ filemeta:
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   containers:
     filemeta:
       args: ["filemeta"]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       env: {}
       envFrom: {}
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -1119,6 +1138,8 @@ anaconda2:
       valueFrom:
         fieldRef:
           fieldPath: status.hostIP
+  envTpls:
+    - '{{ include "wandb.sslCertEnvs" . }}'
   envFrom:
     "{{ .Release.Name }}-anaconda2-configmap": "configMapRef"
   containers:
@@ -1183,20 +1204,18 @@ filestream:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
       value: '{{ include "wandb.fileStreamStoreConsumer" . }}'
   containers:
     filestream:
       args: ["filestream"]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -1293,17 +1312,15 @@ flat-run-fields-updater:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   containers:
     flat-run-fields-updater:
       args: ["flat-run-fields-updater"]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -1562,6 +1579,8 @@ frontend:
         protocol: TCP
         name: http
   env: {}
+  envTpls:
+    - '{{ include "wandb.sslCertEnvs" . }}'
   envFrom:
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
@@ -1664,7 +1683,9 @@ glue:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
     init-db:
       image:
@@ -1677,8 +1698,6 @@ glue:
           "-c",
           'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
         ]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
     migrate-db:
       command:
         [
@@ -1686,8 +1705,6 @@ glue:
           "-c",
           "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
         ]
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     glue:
       args: ["glue"]
@@ -1707,7 +1724,6 @@ glue:
         successThreshold: 1
         failureThreshold: 3
       volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
         - '{{ include "wandb.internalSignerVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
@@ -1724,7 +1740,6 @@ glue:
   strategy:
     type: Recreate
   volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
     - '{{ include "wandb.internalSignerVolumes" . }}'
   size: ""
   sizing:
@@ -1827,20 +1842,14 @@ metric-observer:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   containers:
     metric-observer:
       args: ["metric-observer"]
       env: {}
       envFrom: {}
-      volumeMounts:
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
   role:
     create: true
     rules:
@@ -1850,21 +1859,6 @@ metric-observer:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
-  volumes:
-    - name: wandb-ca-certs
-      configMap:
-        name: "{{ .Release.Name }}-ca-certs"
-    - name: wandb-ca-certs-user
-      configMap:
-        name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
-        optional: true
-    - name: redis-ca
-      secret:
-        secretName: '{{ include "wandb.redis.passwordSecret" . }}'
-        items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-        optional: true
   size: ""
   sizing:
     default:
@@ -1989,7 +1983,9 @@ parquet:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
   podAnnotationsTpls:
     - '{{ include "wandb.gcsFuseAnnotations" . }}'
   containers:
@@ -2018,7 +2014,6 @@ parquet:
         failureThreshold: 3
         successThreshold: 1
       volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
         - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
   cronJobs:
     parquet-backfill:
@@ -2038,14 +2033,9 @@ parquet:
             limits:
               cpu: 1
               memory: 1Gi
-          volumeMountsTpls:
-            - '{{ include "wandb.caCertsVolumeMounts" . }}'
       concurrencyPolicy: Forbid
       schedule: "* * * * *"
-      volumesTpls:
-        - '{{ include "wandb.caCertsVolumes" . }}'
   volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
     - '{{ include "wandb.gcsFuseVolumes" . }}'
   size: ""
   sizing:
@@ -2183,6 +2173,8 @@ weave:
       - port: 9994
         protocol: TCP
         name: weave
+  envTpls:
+    - '{{ include "wandb.sslCertEnvs" . }}'
   envFrom:
     "{{ .Release.Name }}-weave-configmap": "configMapRef"
   containers:
@@ -2210,8 +2202,6 @@ weave:
           mountPath: /tmp/
         - name: cache
           mountPath: /vol/weave/cache
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
     weave-cache-clear:
       command:
         - python
@@ -2235,8 +2225,6 @@ weave:
       emptyDir:
         sizeLimit: "{{ .Values.cache.size }}"
         medium: "{{ .Values.cache.medium }}"
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -2320,18 +2308,12 @@ weave-trace:
   envTpls:
     - '{{ include "wandb.clickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
   initContainers:
     weave-trace-migrate:
       args: ["python", "migrator.py"]
-      envTpls:
-        - '{{ include "wandb.sslCertEnvs" . }}'
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   containers:
     weave-trace:
       args:
@@ -2368,8 +2350,6 @@ weave-trace:
           mountPath: /tmp/
         - name: weave-trace-internal-jwt
           mountPath: /tmp/weave-trace/internal-jwt
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   service:
     enabled: true
     ports:
@@ -2475,16 +2455,12 @@ weave-trace-worker:
         secretKeyRef:
           name: weave-worker-auth
           key: key
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
   containers:
     weave-trace-worker:
       args:
         - "python"
         - "-m"
         - "src.workers.scoring_worker"
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       ports:
         - name: http
           containerPort: 8080
@@ -2582,16 +2558,12 @@ weave-evaluate-model-worker:
         secretKeyRef:
           name: weave-worker-auth
           key: key
-  volumesTpls:
-    - '{{ include "wandb.caCertsVolumes" . }}'
   containers:
     weave-evaluate-model-worker:
       args:
         - "python"
         - "-m"
         - "src.workers.evaluate_model_worker.evaluate_model_worker"
-      volumeMountsTpls:
-        - '{{ include "wandb.caCertsVolumeMounts" . }}'
       ports:
         - name: http
           containerPort: 8080

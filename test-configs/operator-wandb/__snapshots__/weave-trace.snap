@@ -658,7 +658,6 @@ metadata:
     "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
 data:
   GORILLA_STATSIG_KEY:
-  GORILLA_EMAIL_SINK: aHR0cHM6Ly9hcGkud2FuZGIuYWkvZW1haWwvZGlzcGF0Y2g=
   GORILLA_SLACK_CLIENT_ID:
   GORILLA_SLACK_SECRET:
   SLACK_CLIENT_ID:
@@ -728,6 +727,16 @@ data:
   # Set $gorillaSessionKey to existing secret data or generate a random one when not exists
   GORILLA_SESSION_KEY: "###DYNAMIC_FIELD###"
   GORILLA_AUTH_JWK_URL: "aHR0cDovL2NoYXJ0c25hcC1hcHA6ODA4My9hcGkvandrcy5qc29u"
+---
+# Source: operator-wandb/templates/smtp.yaml
+# Any time the password is not a map, we need to create this secret manually
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "chartsnap-smtp-secret"
+  labels:
+data:
+  SMTP_PASSWORD: ""
 ---
 # Source: operator-wandb/charts/clickhouse/templates/configd-configmap.yaml
 apiVersion: v1
@@ -1922,7 +1931,7 @@ metadata:
   name: chartsnap-kafka-configmap
   labels:
 data:
-  KAFKA_BROKER_HOST: ""
+  KAFKA_BROKER_HOST: "bufstream.bufstream.svc.cluster.local"
   KAFKA_BROKER_PORT: "9092"
   KAFKA_CLIENT_USER: ""
   KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE: "chartsnap-run-updates-shadow"
@@ -3306,7 +3315,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.11.6
+        helm.sh/chart: anaconda2-0.11.8
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3318,6 +3327,12 @@ spec:
         - configMapRef:
             name: chartsnap-anaconda2-configmap
         env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: DD_AGENT_HOST
@@ -3368,6 +3383,16 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       serviceAccountName: chartsnap-anaconda2
       securityContext:
         fsGroup: 0
@@ -3393,6 +3418,23 @@ spec:
         maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/api/templates/deployment.yaml
 apiVersion: apps/v1
@@ -3421,7 +3463,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: api-0.11.6
+        helm.sh/chart: api-0.11.8
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3576,6 +3618,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3588,6 +3643,12 @@ spec:
               name: chartsnap-license
         - name: GORILLA_LIMITER
           value: noop://
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -3798,6 +3859,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3810,6 +3884,12 @@ spec:
               name: chartsnap-license
         - name: GORILLA_LIMITER
           value: noop://
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -3995,6 +4075,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -4007,6 +4100,12 @@ spec:
               name: chartsnap-license
         - name: GORILLA_LIMITER
           value: noop://
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -4112,7 +4211,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.11.6
+        helm.sh/chart: app-0.11.8
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4271,6 +4370,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -4283,6 +4395,12 @@ spec:
               name: chartsnap-license
         - name: GORILLA_LIMITER
           value: noop://
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: BUCKET_QUEUE
@@ -4534,6 +4652,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -4546,6 +4677,12 @@ spec:
               name: chartsnap-license
         - name: GORILLA_LIMITER
           value: noop://
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: BUCKET_QUEUE
@@ -4667,7 +4804,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.11.6
+        helm.sh/chart: console-0.11.8
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4726,6 +4863,16 @@ spec:
           requests:
             cpu: 40m
             memory: 64Mi
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       serviceAccountName: chartsnap-console
       securityContext:
         fsGroup: 0
@@ -4751,6 +4898,23 @@ spec:
         maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/executor/templates/deployment.yaml
 apiVersion: apps/v1
@@ -4776,7 +4940,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: executor-0.11.6
+        helm.sh/chart: executor-0.11.8
         app.kubernetes.io/name: executor
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4927,6 +5091,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -4937,6 +5114,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -5042,7 +5225,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: filemeta-0.11.6
+        helm.sh/chart: filemeta-0.11.8
         app.kubernetes.io/name: filemeta
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5175,6 +5358,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5185,6 +5381,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -5288,7 +5490,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: frontend-0.11.6
+        helm.sh/chart: frontend-0.11.8
         app.kubernetes.io/name: frontend
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5304,6 +5506,12 @@ spec:
         - secretRef:
             name: chartsnap-global-secret
         env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -5332,6 +5540,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /docker-entrypoint.d/02_patch_env_js.sh
           name: wandb-setup-scripts
           subPath: 02_patch_env_js.sh
@@ -5361,6 +5578,22 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - configMap:
           defaultMode: 493
           items:
@@ -5393,7 +5626,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: glue-0.11.6
+        helm.sh/chart: glue-0.11.8
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5546,6 +5779,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5556,6 +5802,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -5751,6 +6003,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5761,6 +6026,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -5938,6 +6209,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5948,6 +6232,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -6047,7 +6337,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: nginx-0.11.6
+        helm.sh/chart: nginx-0.11.8
         app.kubernetes.io/name: nginx
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6088,6 +6378,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /etc/nginx/nginx.conf
           name: nginx-config
           subPath: nginx.conf
@@ -6117,6 +6416,22 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - configMap:
           name: 'chartsnap-nginx-configmap'
         name: nginx-config
@@ -6149,7 +6464,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.11.6
+        helm.sh/chart: parquet-0.11.8
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6302,6 +6617,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -6312,6 +6640,12 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -6630,7 +6964,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-trace-0.11.6
+        helm.sh/chart: weave-trace-0.11.8
         app.kubernetes.io/name: weave-trace
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6670,6 +7004,8 @@ spec:
               name: chartsnap-clickhouse
         - name: SSL_CERT_FILE
           value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
@@ -6761,6 +7097,8 @@ spec:
               name: chartsnap-clickhouse
         - name: SSL_CERT_FILE
           value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
@@ -6873,7 +7211,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.11.6
+        helm.sh/chart: weave-0.11.8
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6885,6 +7223,12 @@ spec:
         - configMapRef:
             name: chartsnap-weave-configmap
         env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -6948,6 +7292,12 @@ spec:
         - configMapRef:
             name: chartsnap-weave-configmap
         env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -6975,6 +7325,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /tmp/
           name: temp-dir
         - mountPath: /vol/weave/cache
@@ -7661,7 +8020,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.11.6
+            helm.sh/chart: parquet-0.11.8
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -7816,6 +8175,19 @@ spec:
                   key: GORILLA_STATSIG_KEY
                   name: gorilla-statsig
                   optional: true
+            - name: SMTP_HOST
+              value: ""
+            - name: SMTP_PORT
+              value: "587"
+            - name: SMTP_USER
+              value: ""
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: SMTP_PASSWORD
+                  name: chartsnap-smtp-secret
+            - name: GORILLA_EMAIL_SINK
+              value: https://api.wandb.ai/email/dispatch
             - name: LICENSE
               valueFrom:
                 secretKeyRef:
@@ -7826,6 +8198,12 @@ spec:
                 secretKeyRef:
                   key: license
                   name: chartsnap-license
+            - name: SSL_CERT_FILE
+              value: /etc/ssl/certs/ca-certificates.crt
+            - name: SSL_CERT_DIR
+              value: /etc/ssl/certs
+            - name: REQUESTS_CA_BUNDLE
+              value: /etc/ssl/certs/ca-certificates.crt
             - name: BUCKET_PROXY
               value: "true"
             - name: GLOBAL_ADMIN_API_KEY
@@ -8298,6 +8676,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /cleanup-scripts
           name: app-rename-cleanup
       restartPolicy: Never
@@ -8326,6 +8713,22 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - configMap:
           defaultMode: 493
           name: 'chartsnap-app-rename-cleanup'
@@ -8388,6 +8791,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /cleanup-scripts
           name: app-rename-cleanup
       restartPolicy: Never
@@ -8416,6 +8828,22 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - configMap:
           defaultMode: 493
           name: 'chartsnap-app-rename-cleanup'
