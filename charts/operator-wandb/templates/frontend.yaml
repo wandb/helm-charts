@@ -5,10 +5,18 @@ metadata:
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
+  {{- if not .Values.app.install }}
+  FRONTEND_APP_BACKEND: "{{ .Release.Name }}-api:8081"
+  FRONTEND_AUTH_BACKEND: "{{ .Release.Name }}-api:8081"
+
+  # this doesn't actually work, but the FE pod currently requires this host to be valid
+  FRONTEND_LOCAL_BACKEND: "{{ .Release.Name }}-api:8083"
+  {{- else }}
   FRONTEND_APP_BACKEND: "{{ .Release.Name }}-app:8080"
   FRONTEND_AUTH_BACKEND: "{{ .Release.Name }}-app:8080"
-  FRONTEND_WEAVE_BACKEND: "{{ .Release.Name }}-weave:9994"
   FRONTEND_LOCAL_BACKEND: "{{ .Release.Name }}-app:8083"
+  {{- end }}
+  FRONTEND_WEAVE_BACKEND: "{{ .Release.Name }}-weave:9994"
   REACT_APP_GIT_TAG: "HEAD"
   REACT_APP_HOST: "{{ .Values.global.host }}"
   REACT_APP_ENVIRONMENT_NAME: "local"
