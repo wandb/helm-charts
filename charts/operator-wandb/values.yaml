@@ -26,6 +26,7 @@ global:
     # Example:
     # imagePullSecrets: &imagePullSecrets
     #   - my-registry-secret
+  signerKeyPath: "/vol/env"
 
   cloudProvider: ""
 
@@ -339,6 +340,11 @@ global:
   weave-trace:
     enabled: false
 
+  # As part of the migration away from using local, the `bypass` setting will
+  # control whether the gorilla services will use the app service (and, thus, local)
+  localService:
+    bypass: false
+
   api:
     enabled: false
     rateLimits:
@@ -463,6 +469,7 @@ api:
       image:
         repository: wandb/local
         tag: latest
+      enabled: '{{ if .Values.global.localService.bypass }}false{{ else }}true{{ end }}'
       command:
         [
           "bash",
@@ -501,6 +508,8 @@ api:
         periodSeconds: 5
         successThreshold: 1
         failureThreshold: 5
+      volumeMountsTpls:
+        - '{{ include "wandb.internalSignerVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -513,6 +522,8 @@ api:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
+  volumesTpls:
+    - '{{ include "wandb.internalSignerVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -648,6 +659,7 @@ app:
         name: local
   initContainers:
     init-db:
+      enabled: true
       image:
         repository: wandb/local
         tag: latest
@@ -1679,6 +1691,7 @@ glue:
       image:
         repository: wandb/local
         tag: latest
+      enabled: '{{ if .Values.global.localService.bypass }}false{{ else }}true{{ end }}'
       command:
         [
           "bash",
@@ -1710,6 +1723,8 @@ glue:
         timeoutSeconds: 1
         successThreshold: 1
         failureThreshold: 3
+      volumeMountsTpls:
+        - '{{ include "wandb.internalSignerVolumeMounts" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1724,6 +1739,8 @@ glue:
         verbs: ["get"]
   strategy:
     type: Recreate
+  volumesTpls:
+    - '{{ include "wandb.internalSignerVolumes" . }}'
   size: ""
   sizing:
     small:
@@ -1766,6 +1783,32 @@ glue:
         requests:
           cpu: "3"
           memory: 6Gi
+
+internalSignerPreHook:
+  install: true
+  kind: Job
+  podDisruptionBudget:
+    enabled: false
+  jobs:
+    internal-signer-pre-hook:
+      containers:
+        internal-signer-pre-hook:
+          envFrom:
+            "{{ .Release.Name }}-internal-signer-configmap": "configMapRef"
+          args:
+            - 'secret-generation-job'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  helmHook:
+    enabled: true
+    hook: "pre-upgrade,pre-install"
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get", "patch", "create", "update"]
 
 metric-observer:
   install: false
