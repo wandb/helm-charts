@@ -1,0 +1,94 @@
+# 0.78.0-preLocalBypass.1770421024
+global:
+  #repositoryPrefix: "us-docker.pkg.dev/wandb-production/public"
+  #imageRegistry: "us-docker.pkg.dev/wandb-production/public"
+  bucket:
+    provider: "s3"
+    name: "minio:9000/bucket"
+    region: "us-east-1"
+    accessKey: "minio"
+    secretKey: "testpassword"
+  env:
+    GLOBAL_ADMIN_API_KEY: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+    GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS: "true"
+    BUCKET_PROXY: "true"
+    GORILLA_GLUE_FILE_STORE_IS_PROXIED: "true"
+    GORILLA_FILE_STORE_IS_PROXIED: "true"
+  redis:
+    password: "redis123"
+  glue:
+    enabled: true
+  # As part of the migration away from using local, the `bypass` setting will
+  # control whether the gorilla services will use the app service (and, thus, local)
+  localService:
+    bypass: false
+  api:
+    enabled: true
+  executor:
+    enabled: true
+  size: "testing"
+
+#api:
+#  image:
+#    tag: 0.78.0-preLocalBypass.1770421024
+
+app:
+#  image:
+#    repository: wandb/local-dev
+#    tag: 0.78.0-preLocalBypass.1770421024
+  env:
+    GORILLA_STORAGE_BUCKET: "s3://local-files"
+    GORILLA_FILEMETA_ENABLED: "false"
+
+#glue:
+#  image:
+#    tag: 0.78.0-preLocalBypass.1770421024
+    
+executor:
+  install: true
+
+filemeta:
+  install: true
+
+frontend:
+  install: true
+
+internalSignerPreHook:
+  image:
+    tag: 0.78.0-preLocalBypass.1770421024
+
+nginx:
+  install: true
+  additionalServices:
+    bucket:
+      host: "http://minio:9000"
+      headers:
+        Host: "minio:9000"
+
+ingress:
+  install: false
+  create: false
+
+mysql:
+  install: true
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+
+redis:
+  install: true
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+
+reloader:
+  install: true
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+
+anaconda2:
+  install: true
