@@ -2650,7 +2650,20 @@ spec:
         command:
         - bash
         - -c
-        - "LOG_FILE=\"/tmp/migrate.log\" \n./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE\nEXIT_CODE=${PIPESTATUS[0]}\nMIGRATION_FILE_MISSING_ERROR_CODE=101\nif [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then\n  exit 0\nelse\n  # missing migration error log from golang-migrate@v4 -- older versions of megabinary\n  if grep -q \"no migration found for version\" $LOG_FILE; then\n    exit 0\n  fi\n  exit $EXIT_CODE\nfi\n"
+        - |
+          LOG_FILE="/tmp/migrate.log"
+          ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
+          EXIT_CODE=${PIPESTATUS[0]}
+          MIGRATION_FILE_MISSING_ERROR_CODE=101
+          if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
+            exit 0
+          else
+            # missing migration error log from golang-migrate@v4 -- older versions of megabinary
+            if grep -q "no migration found for version" $LOG_FILE; then
+              exit 0
+            fi
+            exit $EXIT_CODE
+          fi
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
