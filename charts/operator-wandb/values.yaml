@@ -26,6 +26,7 @@ global:
     # Example:
     # imagePullSecrets: &imagePullSecrets
     #   - my-registry-secret
+  signerKeyPath: "/vol/env"
 
   cloudProvider: ""
 
@@ -339,6 +340,11 @@ global:
   weave-trace:
     enabled: false
 
+  # As part of the migration away from using local, the `bypass` setting will
+  # control whether the gorilla services will use the app service (and, thus, local)
+  localService:
+    bypass: false
+
   api:
     enabled: false
     rateLimits:
@@ -459,23 +465,27 @@ api:
     - '{{ include "wandb.rateLimitEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
-    init-db:
-      image:
-        repository: wandb/local
-        tag: latest
-      command:
-        [
-          "bash",
-          "-c",
-          'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
-        ]
     migrate-db:
       command:
-        [
-          "bash",
-          "-c",
-          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
-        ]
+        - bash
+        - -c
+        - |
+          LOG_FILE="/tmp/migrate.log"
+          ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
+          EXIT_CODE=${PIPESTATUS[0]}
+          MIGRATION_FILE_MISSING_ERROR_CODE=101
+          if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
+            exit 0
+          else
+            # missing migration error log from golang-migrate@v4 -- older versions of megabinary
+            if grep -q "no migration found for version" $LOG_FILE; then
+              exit 0
+            fi
+            exit $EXIT_CODE
+          fi
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   containers:
     api:
       args: ["gorilla"]
@@ -501,6 +511,11 @@ api:
         periodSeconds: 5
         successThreshold: 1
         failureThreshold: 5
+      volumeMountsTpls:
+        - '{{ include "wandb.internalSignerVolumeMounts" . }}'
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   image:
     repository: wandb/megabinary
     tag: latest
@@ -513,6 +528,11 @@ api:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
+  volumesTpls:
+    - '{{ include "wandb.internalSignerVolumes" . }}'
+  volumes:
+    - name: temp-dir
+      emptyDir: {}
   size: ""
   sizing:
     small:
@@ -648,9 +668,7 @@ app:
         name: local
   initContainers:
     init-db:
-      image:
-        repository: wandb/local
-        tag: latest
+      enabled: true
       command:
         [
           "bash",
@@ -1675,23 +1693,27 @@ glue:
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
-    init-db:
-      image:
-        repository: wandb/local
-        tag: latest
-      command:
-        [
-          "bash",
-          "-c",
-          'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
-        ]
     migrate-db:
       command:
-        [
-          "bash",
-          "-c",
-          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
-        ]
+        - bash
+        - -c
+        - |
+          LOG_FILE="/tmp/migrate.log"
+          ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
+          EXIT_CODE=${PIPESTATUS[0]}
+          MIGRATION_FILE_MISSING_ERROR_CODE=101
+          if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
+            exit 0
+          else
+            # missing migration error log from golang-migrate@v4 -- older versions of megabinary
+            if grep -q "no migration found for version" $LOG_FILE; then
+              exit 0
+            fi
+            exit $EXIT_CODE
+          fi
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   containers:
     glue:
       args: ["glue"]
@@ -1710,6 +1732,11 @@ glue:
         timeoutSeconds: 1
         successThreshold: 1
         failureThreshold: 3
+      volumeMountsTpls:
+        - '{{ include "wandb.internalSignerVolumeMounts" . }}'
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1724,6 +1751,11 @@ glue:
         verbs: ["get"]
   strategy:
     type: Recreate
+  volumesTpls:
+    - '{{ include "wandb.internalSignerVolumes" . }}'
+  volumes:
+    - name: temp-dir
+      emptyDir: {}
   size: ""
   sizing:
     small:
@@ -1766,6 +1798,32 @@ glue:
         requests:
           cpu: "3"
           memory: 6Gi
+
+internalSignerPreHook:
+  install: true
+  kind: Job
+  podDisruptionBudget:
+    enabled: false
+  jobs:
+    internal-signer-pre-hook:
+      containers:
+        internal-signer-pre-hook:
+          envFrom:
+            "{{ .Release.Name }}-internal-signer-configmap": "configMapRef"
+          args:
+            - 'secret-generation-job'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  helmHook:
+    enabled: true
+    hook: "pre-upgrade,pre-install"
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get", "patch", "create", "update"]
 
 metric-observer:
   install: false
