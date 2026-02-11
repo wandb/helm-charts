@@ -3177,12 +3177,14 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
+        - mountPath: /tmp/
+          name: temp-dir
       initContainers:
       - name: migrate-db
         command:
         - bash
         - -c
-        - ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true
+        - "LOG_FILE=\"/tmp/migrate.log\" \n./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE\nEXIT_CODE=${PIPESTATUS[0]}\nMIGRATION_FILE_MISSING_ERROR_CODE=101\nif [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then\n  exit 0\nelse\n  # missing migration error log from golang-migrate@v4 -- older versions of megabinary\n  if grep -q \"no migration found for version\" $LOG_FILE; then\n    exit 0\n  fi\n  exit $EXIT_CODE\nfi\n"
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
@@ -3394,6 +3396,8 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
+        - mountPath: /tmp/
+          name: temp-dir
       serviceAccountName: chartsnap-api
       securityContext:
         fsGroup: 0
@@ -3439,6 +3443,8 @@ spec:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
           optional: true
+      - emptyDir: {}
+        name: temp-dir
 ---
 # Source: operator-wandb/charts/console/templates/deployment.yaml
 apiVersion: apps/v1
@@ -4519,12 +4525,14 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
+        - mountPath: /tmp/
+          name: temp-dir
       initContainers:
       - name: migrate-db
         command:
         - bash
         - -c
-        - ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true
+        - "LOG_FILE=\"/tmp/migrate.log\"\n./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE\nEXIT_CODE=${PIPESTATUS[0]}\nMIGRATION_FILE_MISSING_ERROR_CODE=101\nif [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then\n  exit 0\nelse\n  # missing migration error log from golang-migrate@v4 -- older versions of megabinary\n  if grep -q \"no migration found for version\" $LOG_FILE; then\n    exit 0\n  fi\n  exit $EXIT_CODE\nfi         \n"
         envFrom:
         - configMapRef:
             name: chartsnap-bucket-configmap
@@ -4726,6 +4734,8 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
+        - mountPath: /tmp/
+          name: temp-dir
       serviceAccountName: chartsnap-glue
       securityContext:
         fsGroup: 0
@@ -4771,6 +4781,8 @@ spec:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
           optional: true
+      - emptyDir: {}
+        name: temp-dir
 ---
 # Source: operator-wandb/charts/nginx/templates/deployment.yaml
 apiVersion: apps/v1

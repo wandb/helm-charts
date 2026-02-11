@@ -465,24 +465,27 @@ api:
     - '{{ include "wandb.rateLimitEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
-    init-db:
-      image:
-        repository: wandb/local
-        tag: latest
-      enabled: '{{ if .Values.global.localService.bypass }}false{{ else }}true{{ end }}'
-      command:
-        [
-          "bash",
-          "-c",
-          'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
-        ]
     migrate-db:
       command:
-        [
-          "bash",
-          "-c",
-          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
-        ]
+        - bash
+        - -c
+        - |
+          LOG_FILE="/tmp/migrate.log" 
+          ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
+          EXIT_CODE=${PIPESTATUS[0]}
+          MIGRATION_FILE_MISSING_ERROR_CODE=101
+          if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
+            exit 0
+          else
+            # missing migration error log from golang-migrate@v4 -- older versions of megabinary
+            if grep -q "no migration found for version" $LOG_FILE; then
+              exit 0
+            fi
+            exit $EXIT_CODE
+          fi
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   containers:
     api:
       args: ["gorilla"]
@@ -510,6 +513,9 @@ api:
         failureThreshold: 5
       volumeMountsTpls:
         - '{{ include "wandb.internalSignerVolumeMounts" . }}'
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   image:
     repository: wandb/megabinary
     tag: latest
@@ -524,6 +530,9 @@ api:
         verbs: ["get"]
   volumesTpls:
     - '{{ include "wandb.internalSignerVolumes" . }}'
+  volumes:
+    - name: temp-dir
+      emptyDir: {}
   size: ""
   sizing:
     small:
@@ -660,9 +669,6 @@ app:
   initContainers:
     init-db:
       enabled: true
-      image:
-        repository: wandb/local
-        tag: latest
       command:
         [
           "bash",
@@ -1687,24 +1693,27 @@ glue:
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
-    init-db:
-      image:
-        repository: wandb/local
-        tag: latest
-      enabled: '{{ if .Values.global.localService.bypass }}false{{ else }}true{{ end }}'
-      command:
-        [
-          "bash",
-          "-c",
-          'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
-        ]
     migrate-db:
       command:
-        [
-          "bash",
-          "-c",
-          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
-        ]
+        - bash
+        - -c
+        - |
+          LOG_FILE="/tmp/migrate.log"
+          ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
+          EXIT_CODE=${PIPESTATUS[0]}
+          MIGRATION_FILE_MISSING_ERROR_CODE=101
+          if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
+            exit 0
+          else
+            # missing migration error log from golang-migrate@v4 -- older versions of megabinary
+            if grep -q "no migration found for version" $LOG_FILE; then
+              exit 0
+            fi
+            exit $EXIT_CODE
+          fi         
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   containers:
     glue:
       args: ["glue"]
@@ -1725,6 +1734,9 @@ glue:
         failureThreshold: 3
       volumeMountsTpls:
         - '{{ include "wandb.internalSignerVolumeMounts" . }}'
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1741,6 +1753,9 @@ glue:
     type: Recreate
   volumesTpls:
     - '{{ include "wandb.internalSignerVolumes" . }}'
+  volumes:
+    - name: temp-dir
+      emptyDir: {}
   size: ""
   sizing:
     small:
