@@ -1,6 +1,14 @@
-# Example: Using KEDA to auto-scale the executor based on Kafka lag
-# The executor processes tasks from Kafka queues, so scaling based on
-# consumer lag provides efficient resource utilization.
+# Example: Using KEDA to auto-scale flat-run-fields-updater based on Kafka lag
+#
+# With KEDA defaults now in the sizing presets, users only need to:
+# 1. Enable KEDA (keda.enabled: true)
+# 2. Disable HPA (horizontal.enabled: false)
+# 3. Provide triggers
+# 4. Optionally override minReplicaCount for dev (0 vs production default)
+#
+# The sizing preset provides: pollingInterval, cooldownPeriod, fallback,
+# advanced HPA behavior, and production-safe min/max replica counts.
+
 flat-run-fields-updater:
   install: true
   size: "large"
@@ -9,19 +17,26 @@ flat-run-fields-updater:
       autoscaling:
         horizontal:
           enabled: false
-        # Enable KEDA for event-driven autoscaling
         keda:
           enabled: true
+          # Override minReplicaCount for dev (sizing default is 6 for large)
           minReplicaCount: 0
+          # Override maxReplicaCount for dev (sizing default is 15 for large)
           maxReplicaCount: 3
-          pollingInterval: 15
-          cooldownPeriod: 30
           triggers:
             - type: kafka
               metadata:
                 bootstrapServers: bufstream.bufstream.svc.cluster.local:9092
                 consumerGroup: flat-run-fields-updater
                 topic: wandb-run-updates-shadow
-                lagThreshold: "10"       # Scale up if lag > 10 per replica
+                lagThreshold: "10"
                 limitToPartitionsWithLag: "true"
-
+            # Optional: Add CPU/memory triggers for hybrid scaling
+            - type: cpu
+              metricType: Utilization
+              metadata:
+                value: "80"
+            - type: memory
+              metricType: Utilization
+              metadata:
+                value: "80"

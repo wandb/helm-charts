@@ -8,6 +8,7 @@
 - name: redis-ca
   mountPath: /etc/ssl/certs/redis_ca.pem
   subPath: redis_ca.pem
+{{ include "wandb.mysql.caCertVolumeMount" . }}
 {{- end -}}
 
 {{- define "wandb.caCertsVolumes" -}}
@@ -27,6 +28,7 @@
       - key: REDIS_CA_CERT
         path: redis_ca.pem
     optional: true
+{{ include "wandb.mysql.caCertVolume" . }}
 {{- end -}}
 
 {{- define "wandb.gcsFuseVolumeMounts" }}
@@ -52,5 +54,21 @@
 {{- else }}
   emptyDir: {}
 {{- end }}
+{{- end }}
+{{- end }}
+
+
+{{- define "wandb.internalSignerVolumeMounts" }}
+{{- if .Values.global.localService.bypass }}
+- name: wandb-internal-signer-root
+  mountPath: /vol/env
+{{- end }}
+{{- end }}
+
+{{- define "wandb.internalSignerVolumes" }}
+{{- if .Values.global.localService.bypass }}
+- name: wandb-internal-signer-root
+  secret:
+    secretName: "{{ .Release.Name }}-internal-signer"
 {{- end }}
 {{- end }}
