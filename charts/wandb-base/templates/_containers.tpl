@@ -22,6 +22,7 @@
       {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) -}}
       {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $.root.Values.global.env $.root.Values.global.extraEnv) -}}
       {{- $_ = set $container "root" $.root -}}
+      {{- $_ = set $container "globalVolumesOptOut" $.globalVolumesOptOut -}}
       {{- if eq $.source "containers" }}
         {{/* Merge in resources from .Values.resources to support legacy chart values */}}
         {{- $_ = set $container "resources" (merge (default (dict) ($container.resources)) (default (dict) ($.root.Values.resources))) -}}
@@ -122,11 +123,10 @@
   resources:
     {{- toYaml .resources | nindent 4 }}
   {{- end }}
-
   {{- $localVolumeMounts := default list .volumeMounts }}
-  {{- $globalVolumeMounts := default list $.root.Values.global.volumeMounts }}
+  {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) .globalVolumesOptOut }}
   {{- $localVolumeMountTpls := default list .volumeMountsTpls }}
-  {{- $globalVolumeMountTpls := default list $.root.Values.global.volumeMountsTpls }}
+  {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) .globalVolumesOptOut }}
   {{- $volumeMountNames := list }}
   {{- $combinedVolumeMounts := list }}
   {{- range $volumeMount := $localVolumeMounts }}
