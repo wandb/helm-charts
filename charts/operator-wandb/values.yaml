@@ -26,13 +26,13 @@ global:
     # Example:
     # imagePullSecrets: &imagePullSecrets
     #   - my-registry-secret
+  signerKeyPath: "/vol/env"
 
   cloudProvider: ""
 
   storageClass: ""
 
-  banners:
-    {}
+  banners: {}
     # banner1:
     #   type: warning | error | info
     #   message: "This is a warning message"
@@ -212,6 +212,34 @@ global:
       user: ""
       password: ""
 
+  #
+  # For Advanced Users:
+  # the following email config options can passed as maps/objects
+  # so that their values can be pulled by existing secrets populated by other systems
+  #
+  # email:
+  #   smtp:
+  #     host:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "email-settings-secret"
+  #           key: "host"
+  #     port:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "email-settings-secret"
+  #           key: "port"
+  #     user:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "email-settings-secret"
+  #           key: "user"
+  #     password:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "email-settings-secret"
+  #           key: "password"
+
   auth:
     sessionLengthHours: 720
     # Internal URL for the auth service should be using oidc or auth0
@@ -311,6 +339,11 @@ global:
 
   weave-trace:
     enabled: false
+
+  # As part of the migration away from using local, the `bypass` setting will
+  # control whether the gorilla services will use the app service (and, thus, local)
+  localService:
+    bypass: false
 
   api:
     enabled: false
@@ -427,27 +460,32 @@ api:
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
-    init-db:
-      image:
-        repository: wandb/local
-        tag: latest
-      command:
-        [
-          "bash",
-          "-c",
-          'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
-        ]
     migrate-db:
       command:
-        [
-          "bash",
-          "-c",
-          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
-        ]
+        - bash
+        - -c
+        - |
+          LOG_FILE="/tmp/migrate.log"
+          ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
+          EXIT_CODE=${PIPESTATUS[0]}
+          MIGRATION_FILE_MISSING_ERROR_CODE=101
+          if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
+            exit 0
+          else
+            # missing migration error log from golang-migrate@v4 -- older versions of megabinary
+            if grep -q "no migration found for version" $LOG_FILE; then
+              exit 0
+            fi
+            exit $EXIT_CODE
+          fi
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   containers:
     api:
       args: ["gorilla"]
@@ -473,6 +511,11 @@ api:
         periodSeconds: 5
         successThreshold: 1
         failureThreshold: 5
+      volumeMountsTpls:
+        - '{{ include "wandb.internalSignerVolumeMounts" . }}'
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   image:
     repository: wandb/megabinary
     tag: latest
@@ -485,6 +528,11 @@ api:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
+  volumesTpls:
+    - '{{ include "wandb.internalSignerVolumes" . }}'
+  volumes:
+    - name: temp-dir
+      emptyDir: {}
   size: ""
   sizing:
     small:
@@ -598,6 +646,7 @@ app:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
@@ -619,9 +668,7 @@ app:
         name: local
   initContainers:
     init-db:
-      image:
-        repository: wandb/local
-        tag: latest
+      enabled: true
       command:
         [
           "bash",
@@ -901,6 +948,7 @@ executor:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   env:
@@ -1000,6 +1048,7 @@ filemeta:
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   containers:
@@ -1161,6 +1210,7 @@ filestream:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   env:
@@ -1268,6 +1318,7 @@ flat-run-fields-updater:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   containers:
@@ -1638,26 +1689,31 @@ glue:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
-    init-db:
-      image:
-        repository: wandb/local
-        tag: latest
-      command:
-        [
-          "bash",
-          "-c",
-          'until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done',
-        ]
     migrate-db:
       command:
-        [
-          "bash",
-          "-c",
-          "./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE || true; ./megabinary migrate --db=$GORILLA_METADATA_STORE --usage-db=$GORILLA_USAGE_STORE || true",
-        ]
+        - bash
+        - -c
+        - |
+          LOG_FILE="/tmp/migrate.log"
+          ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
+          EXIT_CODE=${PIPESTATUS[0]}
+          MIGRATION_FILE_MISSING_ERROR_CODE=101
+          if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
+            exit 0
+          else
+            # missing migration error log from golang-migrate@v4 -- older versions of megabinary
+            if grep -q "no migration found for version" $LOG_FILE; then
+              exit 0
+            fi
+            exit $EXIT_CODE
+          fi
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   containers:
     glue:
       args: ["glue"]
@@ -1676,6 +1732,11 @@ glue:
         timeoutSeconds: 1
         successThreshold: 1
         failureThreshold: 3
+      volumeMountsTpls:
+        - '{{ include "wandb.internalSignerVolumeMounts" . }}'
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1690,6 +1751,11 @@ glue:
         verbs: ["get"]
   strategy:
     type: Recreate
+  volumesTpls:
+    - '{{ include "wandb.internalSignerVolumes" . }}'
+  volumes:
+    - name: temp-dir
+      emptyDir: {}
   size: ""
   sizing:
     small:
@@ -1733,6 +1799,32 @@ glue:
           cpu: "3"
           memory: 6Gi
 
+internalSignerPreHook:
+  install: true
+  kind: Job
+  podDisruptionBudget:
+    enabled: false
+  jobs:
+    internal-signer-pre-hook:
+      containers:
+        internal-signer-pre-hook:
+          envFrom:
+            "{{ .Release.Name }}-internal-signer-configmap": "configMapRef"
+          args:
+            - 'secret-generation-job'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  helmHook:
+    enabled: true
+    hook: "pre-upgrade,pre-install"
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["secrets"]
+        verbs: ["get", "patch", "create", "update"]
+
 metric-observer:
   install: false
   image:
@@ -1765,6 +1857,7 @@ metric-observer:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   containers:
@@ -1905,6 +1998,7 @@ parquet:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   podAnnotationsTpls:
@@ -2293,7 +2387,6 @@ weave-trace:
     small:
       resources:
         limits:
-          cpu: "4"
           memory: 8Gi
         requests:
           cpu: "1"
@@ -2301,60 +2394,56 @@ weave-trace:
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 2
+          maxReplicas: 4
           minReplicas: 2
     medium:
       resources:
         limits:
-          cpu: "4"
           memory: 8Gi
         requests:
-          cpu: "2"
+          cpu: "1"
           memory: 4Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 3
-          minReplicas: 1
+          maxReplicas: 6
+          minReplicas: 3
     large:
       resources:
         limits:
-          cpu: "4"
           memory: 8Gi
         requests:
-          cpu: "3"
+          cpu: "1"
           memory: 6Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 4
-          minReplicas: 2
+          maxReplicas: 10
+          minReplicas: 4
     xlarge:
       resources:
         limits:
-          cpu: "4"
           memory: 8Gi
         requests:
-          cpu: "3"
+          cpu: "1"
           memory: 6Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 5
-          minReplicas: 2
+          maxReplicas: 15
+          minReplicas: 5
     xxlarge:
       resources:
         limits:
-          cpu: "4"
           memory: 8Gi
         requests:
-          cpu: "3"
+          cpu: "1"
           memory: 6Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 6
-          minReplicas: 2
+          maxReplicas: 20
+          minReplicas: 6
 
 weave-trace-worker:
   install: false
@@ -2396,7 +2485,6 @@ weave-trace-worker:
     small:
       resources:
         limits:
-          cpu: "4"
           memory: 8Gi
         requests:
           cpu: "1"
@@ -2404,59 +2492,55 @@ weave-trace-worker:
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 2
+          maxReplicas: 4
           minReplicas: 1
     medium:
       resources:
         limits:
-          cpu: "4"
           memory: 8Gi
         requests:
-          cpu: "2"
-          memory: 4Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 3
-          minReplicas: 1
-    large:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "3"
-          memory: 4Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 4
-          minReplicas: 2
-    xlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "3"
-          memory: 4Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 5
-          minReplicas: 2
-    xxlarge:
-      resources:
-        limits:
-          cpu: "4"
-          memory: 8Gi
-        requests:
-          cpu: "3"
+          cpu: "1"
           memory: 4Gi
       autoscaling:
         horizontal:
           enabled: true
           maxReplicas: 6
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 10
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 15
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 20
           minReplicas: 2
 
 weave-evaluate-model-worker:
