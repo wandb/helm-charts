@@ -14,15 +14,25 @@
         {{- end -}}
     {{- end -}}
     {{- if $enabled -}}
+      {{- $globalOptOut := merge $.globalOptOut (default dict $containerSource.globalOptOut) -}}
+      {{- $globalOptOutVolumes := false -}}
+      {{- if and (hasKey $globalOptOut "volumes") -}}
+        {{- if kindIs "string" $globalOptOut.volumes -}}
+            {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes .root | trim) "true" -}}
+        {{- else -}}
+            {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
+        {{- end -}}
+      {{- end -}}
+
       {{- $container := dict }}
       {{- $_ := deepCopy $containerSource | merge $container -}}
       {{- $_ = set $container "name" $containerName -}}
+      {{- $_ = set $container "globalOptOutVolumes" $globalOptOutVolumes}}
       {{- $_ = set $container "securityContext" (coalesce $container.securityContext (merge $.root.Values.securityContext $.root.Values.container.securityContext)) -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
       {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) -}}
       {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $.root.Values.global.env $.root.Values.global.extraEnv) -}}
       {{- $_ = set $container "root" $.root -}}
-      {{- $_ = set $container "globalVolumesOptOut" $.globalVolumesOptOut -}}
       {{- if eq $.source "containers" }}
         {{/* Merge in resources from .Values.resources to support legacy chart values */}}
         {{- $_ = set $container "resources" (merge (default (dict) ($container.resources)) (default (dict) ($.root.Values.resources))) -}}
@@ -124,9 +134,10 @@
     {{- toYaml .resources | nindent 4 }}
   {{- end }}
   {{- $localVolumeMounts := default list .volumeMounts }}
-  {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) .globalVolumesOptOut }}
+  {{- $globalOptOutVolumes := .globalOptOutVolumes -}}
+  {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
   {{- $localVolumeMountTpls := default list .volumeMountsTpls }}
-  {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) .globalVolumesOptOut }}
+  {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) $globalOptOutVolumes }}
   {{- $volumeMountNames := list }}
   {{- $combinedVolumeMounts := list }}
   {{- range $volumeMount := $localVolumeMounts }}

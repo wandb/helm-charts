@@ -1,13 +1,5 @@
 {{- define "wandb-base.pod" }}
-{{- $globalVolumesOptOut := false -}}
-{{- if and (kindIs "map" .podData.globalOptOut) (hasKey .podData.globalOptOut "volumes") -}}
-  {{- $globalVolOptOutValue := .podData.globalOptOut.volumes -}}
-  {{- if kindIs "string" $globalVolOptOutValue -}}
-    {{- $globalVolumesOptOut = eq (tpl $globalVolOptOutValue $.root | trim) "true" -}}
-  {{- else -}}
-    {{- $globalVolumesOptOut = $globalVolOptOutValue -}}
-  {{- end -}}
-{{- end -}}
+{{- $globalOptOut := (default dict .podData.globalOptOut) -}}
 metadata:
   {{- if or .podData.podAnnotations .podData.podAnnotationsTpls (include "wandb-base.podAnnotations" $.root) (include "wandb-base.commonAnnotations" $.root) }}
   annotations:
@@ -29,7 +21,7 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   containers:
-    {{- include "wandb-base.containers" (dict "containers" .podData.containers "root" $.root "source" "containers" "globalVolumesOptOut" $globalVolumesOptOut) | nindent 4 }}
+    {{- include "wandb-base.containers" (dict "containers" .podData.containers "root" $.root "source" "containers" "globalOptOut" $globalOptOut) | nindent 4 }}
   {{- $combinedSecrets := concat (default list $.root.Values.imagePullSecrets) (default list $.root.Values.global.imagePullSecrets) }}
   {{- $secretNames := list }}
   {{- range $secret := $combinedSecrets }}
@@ -50,7 +42,7 @@ spec:
   {{- end }}
   {{- if .podData.initContainers }}
   initContainers:
-    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers" "globalVolumesOptOut" $globalVolumesOptOut) | nindent 4 }}
+    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers" "globalOptOut" $globalOptOut) | nindent 4 }}
   {{- end }}
   {{- $nodeSelector := coalesce .podData.nodeSelector $.root.Values.nodeSelector $.root.Values.global.nodeSelector -}}
   {{- if $nodeSelector }}
@@ -78,9 +70,17 @@ spec:
   topologySpreadConstraints:
     {{- include "wandb-base.topologySpreadConstraints" $.root | nindent 4 }}
   {{- $localVolumes := default list .podData.volumes }}
-  {{- $globalVolumes := ternary list (default list $.root.Values.global.volumes) $globalVolumesOptOut }}
+  {{- $globalOptOutVolumes := false -}}
+  {{- if and (hasKey $globalOptOut "volumes") -}}
+    {{- if kindIs "string" $globalOptOut.volumes -}}
+      {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes .root | trim) "true" -}}
+    {{- else -}}
+      {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $globalVolumes := ternary list (default list $.root.Values.global.volumes) $globalOptOutVolumes }}
   {{- $localVolumeTpls := default list .podData.volumesTpls }}
-  {{- $globalVolumeTpls := ternary list (default list $.root.Values.global.volumesTpls) $globalVolumesOptOut }}
+  {{- $globalVolumeTpls := ternary list (default list $.root.Values.global.volumesTpls) $globalOptOutVolumes }}
   {{- $volumeNames := list }}
   {{- $combinedVolumes := list }}
   {{- range $volume := $localVolumes }}
