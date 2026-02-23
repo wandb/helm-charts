@@ -14,9 +14,20 @@
         {{- end -}}
     {{- end -}}
     {{- if $enabled -}}
+      {{- $globalOptOut := merge $.globalOptOut (default dict $containerSource.globalOptOut) -}}
+      {{- $globalOptOutVolumes := false -}}
+      {{- if and (hasKey $globalOptOut "volumes") -}}
+        {{- if kindIs "string" $globalOptOut.volumes -}}
+            {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes .root | trim) "true" -}}
+        {{- else -}}
+            {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
+        {{- end -}}
+      {{- end -}}
+
       {{- $container := dict }}
       {{- $_ := deepCopy $containerSource | merge $container -}}
       {{- $_ = set $container "name" $containerName -}}
+      {{- $_ = set $container "globalOptOutVolumes" $globalOptOutVolumes}}
       {{- $_ = set $container "securityContext" (coalesce $container.securityContext (merge $.root.Values.securityContext $.root.Values.container.securityContext)) -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
       {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) -}}
@@ -122,11 +133,11 @@
   resources:
     {{- toYaml .resources | nindent 4 }}
   {{- end }}
-
   {{- $localVolumeMounts := default list .volumeMounts }}
-  {{- $globalVolumeMounts := default list $.root.Values.global.volumeMounts }}
+  {{- $globalOptOutVolumes := .globalOptOutVolumes -}}
+  {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
   {{- $localVolumeMountTpls := default list .volumeMountsTpls }}
-  {{- $globalVolumeMountTpls := default list $.root.Values.global.volumeMountsTpls }}
+  {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) $globalOptOutVolumes }}
   {{- $volumeMountNames := list }}
   {{- $combinedVolumeMounts := list }}
   {{- range $volumeMount := $localVolumeMounts }}
