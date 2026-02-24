@@ -14,7 +14,7 @@
         {{- end -}}
     {{- end -}}
     {{- if $enabled -}}
-      {{- $globalOptOut := merge $.globalOptOut (default dict $containerSource.globalOptOut) -}}
+      {{- $globalOptOut := (default dict .root.globalOptOut) -}}
       {{- $globalOptOutVolumes := false -}}
       {{- if and (hasKey $globalOptOut "volumes") -}}
         {{- if kindIs "string" $globalOptOut.volumes -}}
@@ -23,11 +23,14 @@
             {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
         {{- end -}}
       {{- end -}}
+      {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
+      {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) $globalOptOutVolumes }}
 
       {{- $container := dict }}
       {{- $_ := deepCopy $containerSource | merge $container -}}
       {{- $_ = set $container "name" $containerName -}}
-      {{- $_ = set $container "globalOptOutVolumes" $globalOptOutVolumes}}
+      {{- $_ = set $container "globalVolumeMounts" $globalVolumeMounts -}}
+      {{- $_ = set $container "globalVolumeMountsTpls" $globalVolumeMountTpls -}}
       {{- $_ = set $container "securityContext" (coalesce $container.securityContext (merge $.root.Values.securityContext $.root.Values.container.securityContext)) -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
       {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) -}}
@@ -134,10 +137,7 @@
     {{- toYaml .resources | nindent 4 }}
   {{- end }}
   {{- $localVolumeMounts := default list .volumeMounts }}
-  {{- $globalOptOutVolumes := .globalOptOutVolumes -}}
-  {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
   {{- $localVolumeMountTpls := default list .volumeMountsTpls }}
-  {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) $globalOptOutVolumes }}
   {{- $volumeMountNames := list }}
   {{- $combinedVolumeMounts := list }}
   {{- range $volumeMount := $localVolumeMounts }}
@@ -146,7 +146,7 @@
       {{- $volumeMountNames = append $volumeMountNames $volumeMount.name }}
     {{- end }}
   {{- end }}
-  {{- range $volumeMount := $globalVolumeMounts }}
+  {{- range $volumeMount := .globalVolumeMounts }}
     {{- if and (kindIs "map" $volumeMount) (hasKey $volumeMount "name") }}
       {{- if not (has $volumeMount.name $volumeMountNames) }}
         {{- $combinedVolumeMounts = append $combinedVolumeMounts $volumeMount }}
@@ -156,7 +156,7 @@
       {{- $combinedVolumeMounts = append $combinedVolumeMounts $volumeMount }}
     {{- end }}
   {{- end }}
-  {{- $combinedVolumeMountTpls := concat $localVolumeMountTpls $globalVolumeMountTpls }}
+  {{- $combinedVolumeMountTpls := concat $localVolumeMountTpls .globalVolumeMountTpls }}
   {{- if or $combinedVolumeMounts $combinedVolumeMountTpls }}
   volumeMounts:
     {{- range $combinedVolumeMountTpls }}
