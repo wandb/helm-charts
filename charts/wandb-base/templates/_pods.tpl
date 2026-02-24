@@ -41,7 +41,7 @@ spec:
   {{- end }}
   {{- if .podData.initContainers }}
   initContainers:
-    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers") | nindent 4 }}
+    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers" ) | nindent 4 }}
   {{- end }}
   {{- $nodeSelector := coalesce .podData.nodeSelector $.root.Values.nodeSelector $.root.Values.global.nodeSelector -}}
   {{- if $nodeSelector }}
@@ -68,10 +68,19 @@ spec:
   {{- end }}
   topologySpreadConstraints:
     {{- include "wandb-base.topologySpreadConstraints" $.root | nindent 4 }}
+  {{- $globalOptOut := (default dict .root.globalOptOut) -}}
+  {{- $globalOptOutVolumes := false -}}
+  {{- if and (hasKey $globalOptOut "volumes") -}}
+    {{- if kindIs "string" $globalOptOut.volumes -}}
+      {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes .root | trim) "true" -}}
+    {{- else -}}
+      {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
+    {{- end -}}
+  {{- end -}}
   {{- $localVolumes := default list .podData.volumes }}
-  {{- $globalVolumes := default list $.root.Values.global.volumes }}
+  {{- $globalVolumes := ternary list (default list $.root.Values.global.volumes) $globalOptOutVolumes }}
   {{- $localVolumeTpls := default list .podData.volumesTpls }}
-  {{- $globalVolumeTpls := default list $.root.Values.global.volumesTpls }}
+  {{- $globalVolumeTpls := ternary list (default list $.root.Values.global.volumesTpls) $globalOptOutVolumes }}
   {{- $volumeNames := list }}
   {{- $combinedVolumes := list }}
   {{- range $volume := $localVolumes }}
