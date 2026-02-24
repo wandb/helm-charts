@@ -1,9 +1,4 @@
 {{- define "wandb-base.pod" }}
-{{/* 
-{{- if ne $.root.Chart.Name "internalSignerPreHook" -}}
-{{- fail (printf "ROOT %s" (.root | toJson)) -}}
-{{- end -}}
-*/}}
 metadata:
   {{- if or .podData.podAnnotations .podData.podAnnotationsTpls (include "wandb-base.podAnnotations" $.root) (include "wandb-base.commonAnnotations" $.root) }}
   annotations:
@@ -46,7 +41,7 @@ spec:
   {{- end }}
   {{- if .podData.initContainers }}
   initContainers:
-    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers" ) | nindent 4 }}
+    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers") | nindent 4 }}
   {{- end }}
   {{- $nodeSelector := coalesce .podData.nodeSelector $.root.Values.nodeSelector $.root.Values.global.nodeSelector -}}
   {{- if $nodeSelector }}
