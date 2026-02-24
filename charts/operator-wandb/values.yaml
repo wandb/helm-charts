@@ -349,10 +349,10 @@ global:
     enabled: false
     rateLimits:
       enabled: false
-      filestreamCount: 500  # filestream requests per second (project level)
-      filestreamSize: 120  # filestream size in MB per second (project level)
-      fileStreamPerRunCount: 2  # filestream requests per run per second (run level)
-      runUpdateCount: 80  # run metadata update requests per second (project level)
+      filestreamCount: 500 # filestream requests per second (project level)
+      filestreamSize: 120 # filestream size in MB per second (project level)
+      fileStreamPerRunCount: 2 # filestream requests per run per second (run level)
+      runUpdateCount: 80 # run metadata update requests per second (project level)
     additionalPaths:
       proxy: false
       files: false
@@ -465,6 +465,8 @@ api:
     - '{{ include "wandb.rateLimitEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
+    init-db:
+      enabled: false
     migrate-db:
       command:
         - bash
@@ -1693,6 +1695,8 @@ glue:
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
+    init-db:
+      enabled: false
     migrate-db:
       command:
         - bash
@@ -1802,16 +1806,19 @@ glue:
 internalSignerPreHook:
   install: true
   kind: Job
+  globalOptOut:
+    volumes: true
   podDisruptionBudget:
     enabled: false
   jobs:
     internal-signer-pre-hook:
       containers:
         internal-signer-pre-hook:
-          envFrom:
-            "{{ .Release.Name }}-internal-signer-configmap": "configMapRef"
+          env:
+            INTERNAL_SIGNER_K8S_SECRET_NAME: "{{ .Release.Name }}-internal-signer"
+            INTERNAL_SIGNER_K8S_NAMESPACE: "{{ .Release.Namespace }}"
           args:
-            - 'secret-generation-job'
+            - "secret-generation-job"
   image:
     repository: wandb/megabinary
     tag: latest
