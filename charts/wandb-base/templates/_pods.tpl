@@ -1,4 +1,9 @@
 {{- define "wandb-base.pod" }}
+{{/* 
+{{- if ne $.root.Chart.Name "internalSignerPreHook" -}}
+{{- fail (printf "ROOT %s" (.root | toJson)) -}}
+{{- end -}}
+*/}}
 metadata:
   {{- if or .podData.podAnnotations .podData.podAnnotationsTpls (include "wandb-base.podAnnotations" $.root) (include "wandb-base.commonAnnotations" $.root) }}
   annotations:
@@ -68,13 +73,13 @@ spec:
   {{- end }}
   topologySpreadConstraints:
     {{- include "wandb-base.topologySpreadConstraints" $.root | nindent 4 }}
-  {{- $globalOptOut := (default dict .root.globalOptOut) -}}
   {{- $globalOptOutVolumes := false -}}
+  {{- $globalOptOut := (default dict $.root.Values.globalOptOut) -}}
   {{- if and (hasKey $globalOptOut "volumes") -}}
     {{- if kindIs "string" $globalOptOut.volumes -}}
-      {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes .root | trim) "true" -}}
+        {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes $.root | trim) "true" -}}
     {{- else -}}
-      {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
+        {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
     {{- end -}}
   {{- end -}}
   {{- $localVolumes := default list .podData.volumes }}

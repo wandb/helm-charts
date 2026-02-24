@@ -14,18 +14,17 @@
         {{- end -}}
     {{- end -}}
     {{- if $enabled -}}
-      {{- $globalOptOut := (default dict .root.globalOptOut) -}}
       {{- $globalOptOutVolumes := false -}}
+      {{- $globalOptOut := (default dict $.root.Values.globalOptOut) -}}
       {{- if and (hasKey $globalOptOut "volumes") -}}
         {{- if kindIs "string" $globalOptOut.volumes -}}
-            {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes .root | trim) "true" -}}
+            {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes $.root | trim) "true" -}}
         {{- else -}}
             {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
         {{- end -}}
       {{- end -}}
       {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
       {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) $globalOptOutVolumes }}
-
       {{- $container := dict }}
       {{- $_ := deepCopy $containerSource | merge $container -}}
       {{- $_ = set $container "name" $containerName -}}
@@ -156,7 +155,7 @@
       {{- $combinedVolumeMounts = append $combinedVolumeMounts $volumeMount }}
     {{- end }}
   {{- end }}
-  {{- $combinedVolumeMountTpls := concat $localVolumeMountTpls .globalVolumeMountTpls }}
+  {{- $combinedVolumeMountTpls := concat $localVolumeMountTpls .globalVolumeMountsTpls }}
   {{- if or $combinedVolumeMounts $combinedVolumeMountTpls }}
   volumeMounts:
     {{- range $combinedVolumeMountTpls }}
