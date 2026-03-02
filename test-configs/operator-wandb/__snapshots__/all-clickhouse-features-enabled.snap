@@ -1,14 +1,5 @@
 # chartsnap: snapshot_version=v3
 ---
-apiVersion: helm-chartsnap.jlandowner.dev/v1alpha1
-kind: Unknown
-metadata:
-  name: helm-output
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-raw: |-
-  ###DYNAMIC_FIELD###
----
 # Source: operator-wandb/charts/clickhouse/templates/keeper/networkpolicy.yaml
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
@@ -359,6 +350,27 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
+# Source: operator-wandb/charts/weave-trace/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-weave-trace
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: weave-trace
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: weave-trace
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
 # Source: operator-wandb/charts/weave/templates/pdb.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -584,6 +596,19 @@ metadata:
   name: chartsnap-reloader
   namespace: default
 ---
+# Source: operator-wandb/charts/weave-trace/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-weave-trace
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: weave-trace
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
 # Source: operator-wandb/charts/weave/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -596,6 +621,16 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
+---
+# Source: operator-wandb/templates/bucket.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chartsnap-bucket
+  labels:
+data:
+  ACCESS_KEY: bWluaW8=
+  SECRET_KEY: dGVzdHBhc3N3b3Jk
 ---
 # Source: operator-wandb/templates/clickhouse.yaml
 apiVersion: v1
@@ -648,6 +683,18 @@ metadata:
 data:
   license: ""
 ---
+# Source: operator-wandb/templates/mysql.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chartsnap-mysql
+  annotations:
+    "helm.sh/resource-policy": "keep"
+  labels:
+data:
+  MYSQL_ROOT_PASSWORD: '###DYNAMIC_FIELD###'
+  MYSQL_PASSWORD: '###DYNAMIC_FIELD###'
+---
 # Source: operator-wandb/templates/parquet.yaml
 apiVersion: v1
 kind: Secret
@@ -655,6 +702,30 @@ metadata:
   name: chartsnap-parquet-secret
   labels:
 data: {}
+---
+# Source: operator-wandb/templates/redis.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "chartsnap-redis-secret"
+  labels:
+data:
+  REDIS_PASSWORD:
+  REDIS_CA_CERT:
+---
+# Source: operator-wandb/templates/registry-search.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "chartsnap-registry-search-secret"
+  annotations:
+    "helm.sh/resource-policy": "keep"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
+  labels:
+data:
+  REGISTRY_SEARCH_CH_PASSWORD: cmVnaXN0cnktc2VhcmNoLXBhc3N3b3JkLTEyMw==
 ---
 # Source: operator-wandb/templates/session-key.yaml
 apiVersion: v1
@@ -679,7 +750,7 @@ metadata:
   name: "chartsnap-smtp-secret"
   labels:
 data:
-  SMTP_PASSWORD: "c3VwZXItc2VjcmV0LXBhc3N3b3Jk"
+  SMTP_PASSWORD: ""
 ---
 # Source: operator-wandb/charts/clickhouse/templates/configd-configmap.yaml
 apiVersion: v1
@@ -1596,6 +1667,7 @@ data:
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
   GORILLA_AUTH_METHOD: implicit
+  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{"system:serviceaccount:default:chartsnap-weave-trace": "https://kubernetes.default.svc.cluster.local"}'
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
   GORILLA_LOCAL_SERVICE_BYPASS: 'false'
 ---
@@ -1717,7 +1789,7 @@ data:
   REACT_APP_ENVIRONMENT_NAME: "local"
   REACT_APP_ENVIRONMENT_IS_PRIVATE: "true"
   REACT_APP_ANALYTICS_DISABLED: "true"
-  WEAVE_TRACES_ENABLED: 'false'
+  WEAVE_TRACES_ENABLED: 'true'
   SERVER_FLAG_WEAVE_1_PERCENTAGE: "100"
   WEAVE_ENABLED: "true"
   OPERATOR_ENABLED: "true"
@@ -1944,6 +2016,9 @@ data:
 
         location /graphql2 {
           proxy_pass http://chartsnap-api:8081;
+        }
+        location /traces {
+          proxy_pass http://chartsnap-weave-trace:8722;
         }
         location /bucket {
           proxy_set_header Host minio:9000;
@@ -3047,6 +3122,28 @@ spec:
     app.kubernetes.io/name: redis
     app.kubernetes.io/component: master
 ---
+# Source: operator-wandb/charts/weave-trace/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-weave-trace
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: weave-trace
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8722
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app.kubernetes.io/name: weave-trace
+    app.kubernetes.io/instance: chartsnap
+---
 # Source: operator-wandb/charts/weave/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -3144,8 +3241,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: "wandb-mysql-password-secret-user-defined"
-              key: "PASSWORD"
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -3153,10 +3250,7 @@ spec:
         - name: MYSQL_DATABASE
           value: "wandb_local"
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: "wandb"
         - name: K8S_NODE_NAME
           valueFrom:
             fieldRef:
@@ -3354,7 +3448,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -3448,20 +3542,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -3474,8 +3568,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -3483,10 +3577,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -3500,29 +3591,29 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -3546,18 +3637,18 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_HOST
-          value: smtp.example.com
+          value: ""
         - name: SMTP_PORT
           value: "587"
         - name: SMTP_USER
-          value: noreply@example.com
+          value: ""
         - name: SMTP_PASSWORD
           valueFrom:
             secretKeyRef:
               key: SMTP_PASSWORD
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
-          value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3577,30 +3668,18 @@ spec:
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
         - name: REGISTRY_SEARCH_CH_HOST
-          valueFrom:
-            configMapKeyRef:
-              key: host
-              name: registry-search-settings-user-defined
+          value: clickhouse.example.com
         - name: REGISTRY_SEARCH_CH_PORT
-          valueFrom:
-            configMapKeyRef:
-              key: port
-              name: registry-search-settings-user-defined
+          value: "8123"
         - name: REGISTRY_SEARCH_CH_DATABASE
-          valueFrom:
-            configMapKeyRef:
-              key: database
-              name: registry-search-settings-user-defined
+          value: registry_search
         - name: REGISTRY_SEARCH_CH_USER
-          valueFrom:
-            configMapKeyRef:
-              key: user
-              name: registry-search-settings-user-defined
+          value: default
         - name: REGISTRY_SEARCH_CH_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: password
-              name: registry-search-password-user-defined
+              key: REGISTRY_SEARCH_CH_PASSWORD
+              name: chartsnap-registry-search-secret
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
           value: clickhouse://$(REGISTRY_SEARCH_CH_USER):$(REGISTRY_SEARCH_CH_PASSWORD)@$(REGISTRY_SEARCH_CH_HOST):$(REGISTRY_SEARCH_CH_PORT)/$(REGISTRY_SEARCH_CH_DATABASE)?fail-fast=true&tls=true
         - name: BUCKET_PROXY
@@ -3734,20 +3813,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -3760,8 +3839,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -3769,10 +3848,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -3786,29 +3862,29 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -3832,18 +3908,18 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_HOST
-          value: smtp.example.com
+          value: ""
         - name: SMTP_PORT
           value: "587"
         - name: SMTP_USER
-          value: noreply@example.com
+          value: ""
         - name: SMTP_PASSWORD
           valueFrom:
             secretKeyRef:
               key: SMTP_PASSWORD
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
-          value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3863,30 +3939,18 @@ spec:
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
         - name: REGISTRY_SEARCH_CH_HOST
-          valueFrom:
-            configMapKeyRef:
-              key: host
-              name: registry-search-settings-user-defined
+          value: clickhouse.example.com
         - name: REGISTRY_SEARCH_CH_PORT
-          valueFrom:
-            configMapKeyRef:
-              key: port
-              name: registry-search-settings-user-defined
+          value: "8123"
         - name: REGISTRY_SEARCH_CH_DATABASE
-          valueFrom:
-            configMapKeyRef:
-              key: database
-              name: registry-search-settings-user-defined
+          value: registry_search
         - name: REGISTRY_SEARCH_CH_USER
-          valueFrom:
-            configMapKeyRef:
-              key: user
-              name: registry-search-settings-user-defined
+          value: default
         - name: REGISTRY_SEARCH_CH_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: password
-              name: registry-search-password-user-defined
+              key: REGISTRY_SEARCH_CH_PASSWORD
+              name: chartsnap-registry-search-secret
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
           value: clickhouse://$(REGISTRY_SEARCH_CH_USER):$(REGISTRY_SEARCH_CH_PASSWORD)@$(REGISTRY_SEARCH_CH_HOST):$(REGISTRY_SEARCH_CH_PORT)/$(REGISTRY_SEARCH_CH_DATABASE)?fail-fast=true&tls=true
         - name: BUCKET_PROXY
@@ -3963,7 +4027,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -4065,20 +4129,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -4089,8 +4153,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -4098,10 +4162,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -4115,29 +4176,29 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4161,18 +4222,18 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_HOST
-          value: smtp.example.com
+          value: ""
         - name: SMTP_PORT
           value: "587"
         - name: SMTP_USER
-          value: noreply@example.com
+          value: ""
         - name: SMTP_PASSWORD
           valueFrom:
             secretKeyRef:
               key: SMTP_PASSWORD
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
-          value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -4350,20 +4411,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -4374,8 +4435,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -4383,10 +4444,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -4400,29 +4458,29 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4446,18 +4504,18 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_HOST
-          value: smtp.example.com
+          value: ""
         - name: SMTP_PORT
           value: "587"
         - name: SMTP_USER
-          value: noreply@example.com
+          value: ""
         - name: SMTP_PASSWORD
           valueFrom:
             secretKeyRef:
               key: SMTP_PASSWORD
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
-          value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -4564,7 +4622,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -4654,7 +4712,7 @@ spec:
             cpu: "2"
             memory: 2Gi
           requests:
-            cpu: 50m
+            cpu: 40m
             memory: 64Mi
         volumeMounts:
         - name: wandb-ca-certs-root
@@ -4703,7 +4761,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -4792,20 +4850,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -4818,8 +4876,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -4827,10 +4885,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -4844,27 +4899,27 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4888,18 +4943,18 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_HOST
-          value: smtp.example.com
+          value: ""
         - name: SMTP_PORT
           value: "587"
         - name: SMTP_USER
-          value: noreply@example.com
+          value: ""
         - name: SMTP_PASSWORD
           valueFrom:
             secretKeyRef:
               key: SMTP_PASSWORD
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
-          value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -4927,7 +4982,7 @@ spec:
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
         - name: GORILLA_TASK_QUEUE
-          value: 'redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)&concurrency=10'
+          value: 'redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)&concurrency=10'
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -4988,7 +5043,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -5076,20 +5131,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -5102,8 +5157,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -5111,10 +5166,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -5128,29 +5180,29 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_STATSIG_KEY
           valueFrom:
             secretKeyRef:
@@ -5158,18 +5210,18 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_HOST
-          value: smtp.example.com
+          value: ""
         - name: SMTP_PORT
           value: "587"
         - name: SMTP_USER
-          value: noreply@example.com
+          value: ""
         - name: SMTP_PASSWORD
           valueFrom:
             secretKeyRef:
               key: SMTP_PASSWORD
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
-          value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5256,7 +5308,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -5388,7 +5440,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -5484,20 +5536,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -5510,8 +5562,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -5519,10 +5571,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -5536,29 +5585,29 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -5582,18 +5631,18 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_HOST
-          value: smtp.example.com
+          value: ""
         - name: SMTP_PORT
           value: "587"
         - name: SMTP_USER
-          value: noreply@example.com
+          value: ""
         - name: SMTP_PASSWORD
           valueFrom:
             secretKeyRef:
               key: SMTP_PASSWORD
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
-          value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5611,30 +5660,18 @@ spec:
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
         - name: REGISTRY_SEARCH_CH_HOST
-          valueFrom:
-            configMapKeyRef:
-              key: host
-              name: registry-search-settings-user-defined
+          value: clickhouse.example.com
         - name: REGISTRY_SEARCH_CH_PORT
-          valueFrom:
-            configMapKeyRef:
-              key: port
-              name: registry-search-settings-user-defined
+          value: "8123"
         - name: REGISTRY_SEARCH_CH_DATABASE
-          valueFrom:
-            configMapKeyRef:
-              key: database
-              name: registry-search-settings-user-defined
+          value: registry_search
         - name: REGISTRY_SEARCH_CH_USER
-          valueFrom:
-            configMapKeyRef:
-              key: user
-              name: registry-search-settings-user-defined
+          value: default
         - name: REGISTRY_SEARCH_CH_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: password
-              name: registry-search-password-user-defined
+              key: REGISTRY_SEARCH_CH_PASSWORD
+              name: chartsnap-registry-search-secret
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
           value: clickhouse://$(REGISTRY_SEARCH_CH_USER):$(REGISTRY_SEARCH_CH_PASSWORD)@$(REGISTRY_SEARCH_CH_HOST):$(REGISTRY_SEARCH_CH_PORT)/$(REGISTRY_SEARCH_CH_DATABASE)?fail-fast=true&tls=true
         - name: BUCKET_PROXY
@@ -5753,20 +5790,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -5779,8 +5816,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -5788,10 +5825,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -5805,29 +5839,29 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -5851,18 +5885,18 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_HOST
-          value: smtp.example.com
+          value: ""
         - name: SMTP_PORT
           value: "587"
         - name: SMTP_USER
-          value: noreply@example.com
+          value: ""
         - name: SMTP_PASSWORD
           valueFrom:
             secretKeyRef:
               key: SMTP_PASSWORD
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
-          value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -5880,30 +5914,18 @@ spec:
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
         - name: REGISTRY_SEARCH_CH_HOST
-          valueFrom:
-            configMapKeyRef:
-              key: host
-              name: registry-search-settings-user-defined
+          value: clickhouse.example.com
         - name: REGISTRY_SEARCH_CH_PORT
-          valueFrom:
-            configMapKeyRef:
-              key: port
-              name: registry-search-settings-user-defined
+          value: "8123"
         - name: REGISTRY_SEARCH_CH_DATABASE
-          valueFrom:
-            configMapKeyRef:
-              key: database
-              name: registry-search-settings-user-defined
+          value: registry_search
         - name: REGISTRY_SEARCH_CH_USER
-          valueFrom:
-            configMapKeyRef:
-              key: user
-              name: registry-search-settings-user-defined
+          value: default
         - name: REGISTRY_SEARCH_CH_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: password
-              name: registry-search-password-user-defined
+              key: REGISTRY_SEARCH_CH_PASSWORD
+              name: chartsnap-registry-search-secret
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
           value: clickhouse://$(REGISTRY_SEARCH_CH_USER):$(REGISTRY_SEARCH_CH_PASSWORD)@$(REGISTRY_SEARCH_CH_HOST):$(REGISTRY_SEARCH_CH_PORT)/$(REGISTRY_SEARCH_CH_DATABASE)?fail-fast=true&tls=true
         - name: BUCKET_PROXY
@@ -5974,7 +5996,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -6099,7 +6121,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -6195,20 +6217,20 @@ spec:
         - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              key: KEY_ID
-              name: wandb-bucket-secret-user-defined
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              key: ACCESS_KEY
-              name: wandb-bucket-secret-user-defined
+              key: SECRET_KEY
+              name: chartsnap-bucket
               optional: true
         - name: BUCKET
           value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -6221,8 +6243,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-mysql-password-secret-user-defined
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -6230,10 +6252,7 @@ spec:
         - name: MYSQL_DATABASE
           value: wandb_local
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -6247,29 +6266,29 @@ spec:
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: PASSWORD
-              name: wandb-redis-password-secret-user-defined
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
               optional: true
         - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: GORILLA_TASK_QUEUE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+          value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
         - name: KAFKA_CLIENT_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -6293,18 +6312,18 @@ spec:
               name: gorilla-statsig
               optional: true
         - name: SMTP_HOST
-          value: smtp.example.com
+          value: ""
         - name: SMTP_PORT
           value: "587"
         - name: SMTP_USER
-          value: noreply@example.com
+          value: ""
         - name: SMTP_PASSWORD
           valueFrom:
             secretKeyRef:
               key: SMTP_PASSWORD
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
-          value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -6413,7 +6432,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -6612,6 +6631,253 @@ spec:
           type: RuntimeDefault
       serviceAccountName: chartsnap-reloader
 ---
+# Source: operator-wandb/charts/weave-trace/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-weave-trace-bc
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: weave-trace
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: weave-trace
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: weave-trace-0.11.11
+        app.kubernetes.io/name: weave-trace
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: weave-trace
+        args:
+        - uvicorn
+        - src.trace_server:app
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8080"
+        envFrom:
+        - configMapRef:
+            name: chartsnap-global-configmap
+        - secretRef:
+            name: chartsnap-global-secret
+        - configMapRef:
+            name: chartsnap-weave-trace-configmap
+        env:
+        - name: WF_CLICKHOUSE_HOST
+          value: chartsnap-clickhouse-headless
+        - name: WF_CLICKHOUSE_PORT
+          value: "8123"
+        - name: WF_CLICKHOUSE_DATABASE
+          value: weave_trace_db
+        - name: WF_CLICKHOUSE_USER
+          value: default
+        - name: WF_CLICKHOUSE_REPLICATED
+          value: "false"
+        - name: WF_CLICKHOUSE_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CLICKHOUSE_PASSWORD
+              name: chartsnap-clickhouse
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: BUCKET_PROXY
+          value: "true"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /traces/health
+            port: http
+          timeoutSeconds: 2
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /traces/health
+            port: http
+          timeoutSeconds: 2
+        startupProbe:
+          failureThreshold: 12
+          httpGet:
+            path: /traces/health
+            port: http
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+        - mountPath: /tmp/
+          name: temp-dir
+        - mountPath: /tmp/weave-trace/internal-jwt
+          name: weave-trace-internal-jwt
+      initContainers:
+      - name: weave-trace-migrate
+        args:
+        - python
+        - migrator.py
+        envFrom:
+        - configMapRef:
+            name: chartsnap-global-configmap
+        - secretRef:
+            name: chartsnap-global-secret
+        - configMapRef:
+            name: chartsnap-weave-trace-configmap
+        env:
+        - name: WF_CLICKHOUSE_HOST
+          value: chartsnap-clickhouse-headless
+        - name: WF_CLICKHOUSE_PORT
+          value: "8123"
+        - name: WF_CLICKHOUSE_DATABASE
+          value: weave_trace_db
+        - name: WF_CLICKHOUSE_USER
+          value: default
+        - name: WF_CLICKHOUSE_REPLICATED
+          value: "false"
+        - name: WF_CLICKHOUSE_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CLICKHOUSE_PASSWORD
+              name: chartsnap-clickhouse
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: BUCKET_PROXY
+          value: "true"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+        - mountPath: /tmp/
+          name: temp-dir
+      serviceAccountName: chartsnap-weave-trace
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: weave-trace
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: weave-trace
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
+      - emptyDir: {}
+        name: temp-dir
+      - name: weave-trace-internal-jwt
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: internal-service
+              expirationSeconds: 600
+              path: token
+---
 # Source: operator-wandb/charts/weave/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -6803,7 +7069,7 @@ spec:
           optional: true
       - name: redis-ca
         secret:
-          secretName: 'wandb-redis-password-secret-user-defined'
+          secretName: 'chartsnap-redis-secret'
           items:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
@@ -7215,8 +7481,8 @@ spec:
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: "wandb-mysql-password-secret-user-defined"
-              key: "PASSWORD"
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -7224,15 +7490,12 @@ spec:
         - name: MYSQL_DATABASE
           value: "wandb_local"
         - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              key: USER
-              name: wandb-mysql-password-secret-user-defined
+          value: "wandb"
         - name: MYSQL_ROOT_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: wandb-mysql-password-secret-user-defined
-              key: ROOT_PASSWORD
+              name: chartsnap-mysql
+              key: MYSQL_ROOT_PASSWORD
         livenessProbe:
           tcpSocket:
             port: 3306
@@ -7259,7 +7522,7 @@ spec:
             cpu: 4000m
             memory: 8Gi
           requests:
-            cpu: 50m
+            cpu: 40m
             memory: 64Mi
       volumes:
       - name: initdb
@@ -7512,20 +7775,20 @@ spec:
             - name: AZURE_STORAGE_KEY
               valueFrom:
                 secretKeyRef:
-                  key: KEY_ID
-                  name: wandb-bucket-secret-user-defined
+                  key: ACCESS_KEY
+                  name: chartsnap-bucket
                   optional: true
             - name: BUCKET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  key: KEY_ID
-                  name: wandb-bucket-secret-user-defined
+                  key: ACCESS_KEY
+                  name: chartsnap-bucket
                   optional: true
             - name: BUCKET_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  key: ACCESS_KEY
-                  name: wandb-bucket-secret-user-defined
+                  key: SECRET_KEY
+                  name: chartsnap-bucket
                   optional: true
             - name: BUCKET
               value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
@@ -7538,8 +7801,8 @@ spec:
             - name: MYSQL_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  key: PASSWORD
-                  name: wandb-mysql-password-secret-user-defined
+                  key: MYSQL_PASSWORD
+                  name: chartsnap-mysql
             - name: MYSQL_PORT
               value: "3306"
             - name: MYSQL_HOST
@@ -7547,10 +7810,7 @@ spec:
             - name: MYSQL_DATABASE
               value: wandb_local
             - name: MYSQL_USER
-              valueFrom:
-                secretKeyRef:
-                  key: USER
-                  name: wandb-mysql-password-secret-user-defined
+              value: wandb
             - name: MYSQL
               value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
             - name: GORILLA_ANALYTICS_SINK
@@ -7564,29 +7824,29 @@ spec:
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  key: PASSWORD
-                  name: wandb-redis-password-secret-user-defined
+                  key: REDIS_PASSWORD
+                  name: chartsnap-redis-secret
                   optional: true
             - name: REDIS
-              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_AUDITOR_CACHE
-              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_CACHE
-              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_FILE_METADATA_SOURCE
-              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_LOCKER
-              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_METADATA_CACHE
-              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_SETTINGS_CACHE
-              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_USAGE_METRICS_CACHE
-              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: GORILLA_TASK_QUEUE
-              value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+              value: redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
             - name: KAFKA_CLIENT_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -7610,18 +7870,18 @@ spec:
                   name: gorilla-statsig
                   optional: true
             - name: SMTP_HOST
-              value: smtp.example.com
+              value: ""
             - name: SMTP_PORT
               value: "587"
             - name: SMTP_USER
-              value: noreply@example.com
+              value: ""
             - name: SMTP_PASSWORD
               valueFrom:
                 secretKeyRef:
                   key: SMTP_PASSWORD
                   name: chartsnap-smtp-secret
             - name: GORILLA_EMAIL_SINK
-              value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+              value: https://api.wandb.ai/email/dispatch
             - name: LICENSE
               valueFrom:
                 secretKeyRef:
@@ -7715,7 +7975,7 @@ spec:
               optional: true
           - name: redis-ca
             secret:
-              secretName: 'wandb-redis-password-secret-user-defined'
+              secretName: 'chartsnap-redis-secret'
               items:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
@@ -7814,6 +8074,82 @@ data:
         fi
       fi
     done
+---
+# Source: operator-wandb/templates/tests/test-weave.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "chartsnap-operator-wandb-test-weave"
+  annotations:
+    "helm.sh/hook": test
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+data:
+  test.py: |
+    import weave
+    import json
+    from datetime import datetime
+
+    # Initialize weave
+    weave.init('mock-trace-example')
+
+    # Define a mock LLM call function
+    @weave.op()
+    def mock_llm_call(prompt: str) -> str:
+      # Instead of making an actual LLM call, we'll just return a mock response
+      mock_response = {
+        "id": "mock-llm-call-123",
+        "model": "gpt-4",
+        "created": datetime.now().isoformat(),
+        "choices": [{
+          "message": {
+            "role": "assistant",
+            "content": "This is a mock response to: " + prompt
+          }
+        }]
+      }
+
+      return json.dumps(mock_response)
+
+    # Create a mock trace
+    @weave.op()
+    def create_mock_trace():
+      # Call the mock LLM function
+      response = mock_llm_call("What is the capital of France?")
+
+      # Return the response
+      return {
+      "prompt": "What is the capital of France?",
+      "response": response,
+      "metadata": {
+        "model": "gpt-4",
+        "temperature": 0.7,
+        "max_tokens": 100
+      }
+    }
+
+    if __name__ == "__main__":
+      # Create and log the mock trace
+      result, call = create_mock_trace.call()
+
+      # Set a custom display name for the call
+      call.set_display_name("Mock LLM Call - Capital of France")
+
+      # Add feedback to the call using the correct method
+      call.feedback.add("rating", {"value": 5, "comment": "Great response! Very informative."})
+
+      # Get call information and convert datetime objects to ISO format strings
+      call_info = {
+      "id": call.id,
+      "trace_id": call.trace_id,
+      "started_at": call.started_at.isoformat() if call.started_at else None,
+      "ended_at": call.ended_at.isoformat() if call.ended_at else None,
+      "inputs": call.inputs,
+      "output": call.output
+    }
+
+    print("Mock trace created and logged successfully!")
+    print("Call information:", json.dumps(call_info, indent=2))
 ---
 # Source: operator-wandb/charts/appRenamePostHook/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -7939,6 +8275,42 @@ spec:
     - sh
     - -c
     - "pip install wandb && wandb verify"
+  restartPolicy: Never
+---
+# Source: operator-wandb/templates/tests/test-weave.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "chartsnap-operator-wandb-test-weave"
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: operator-wandb
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+  - name: wandb-verify
+    image: us-docker.pkg.dev/wandb-production/public/python:3.12
+    env:
+    - name: WANDB_BASE_URL
+      value: "http://chartsnap-nginx:8080"
+    - name: WANDB_API_KEY
+      value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+    command:
+    - sh
+    - -c
+    - "pip install weave && (timeout=240; start_time=$(date +%s); until python /tmp/test.py || [ $(($(date +%s) - start_time)) -gt $timeout ]; do echo 'weave verify failed, retrying...' && cat /tmp/debug-cli.root.log; sleep 10; done)"
+    volumeMounts:
+    - name: test-script
+      mountPath: /tmp/test.py
+      subPath: test.py
+  volumes:
+  - name: test-script
+    configMap:
+      name: "chartsnap-operator-wandb-test-weave"
   restartPolicy: Never
 ---
 # Source: operator-wandb/charts/appRenamePostHook/templates/job.yaml
