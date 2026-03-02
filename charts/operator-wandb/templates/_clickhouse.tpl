@@ -2,10 +2,10 @@
 Return name of secret where clickhouse information is stored
 */}}
 {{- define "wandb.clickhouse.passwordSecret" -}}
-{{- if .Values.global.clickhouse.passwordSecret.name }}
-  {{- .Values.global.clickhouse.passwordSecret.name -}}
+{{- if .clickhouseConfig.name }}
+  {{- .clickhouseConfig.name -}}
 {{- else -}}
-  {{- print .Release.Name "-clickhouse" -}}
+  {{- print .root.Release.Name "-clickhouse" -}}
 {{- end -}}
 {{- end }}
 
@@ -50,3 +50,14 @@ Return the database password
 {{- define "wandb.clickhouse.password" -}}
 {{- print $.Values.global.clickhouse.password -}}
 {{- end -}}
+
+
+{{/* {{ include "clickhouseConfig" "root" . "serviceName" "weaveTrace" }} */}}
+{{- define "clickhouseConfig" }}
+
+{{ $default := .root.Values.global.clickhouse.default }}
+{{ $service := get .root.Values.global.clickhouse .serviceName }}
+
+$mergedConfig := merge $default $service
+
+{{- end }}

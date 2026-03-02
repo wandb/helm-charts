@@ -208,6 +208,7 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.mysql" . | trim | quote }}
 {{- end -}}
 
+{{/* include "wandb.clickhouseConfigEnvs" "root" . "serviceName" "runStore "envvarPrefix" "RUNSTORE" */}}
 {{- define "wandb.clickhouseConfigEnvs" -}}
 {{- /*
   ATTENTION!
@@ -248,60 +249,76 @@ Global values will override any chart-specific values.
         ...
 */ -}}
 
-{{- if kindIs "map" .Values.global.clickhouse.host }}
-- name: WF_CLICKHOUSE_HOST
-{{- toYaml .Values.global.clickhouse.host | nindent 2 }}
+{{ $clickhouseConfig := fromYaml (include "clickhouseConfig" "root" .root "serviceName" .serviceName) }}
+
+{{- if kindIs "map" $clickhouseConfig.host }}
+- name: {{ .envvarPrefix }}_CLICKHOUSE_HOST
+{{- toYaml $clickhouseConfig.host | nindent 2 }}
 {{- else }}
-- name: WF_CLICKHOUSE_HOST
+- name: {{ .envvarPrefix }}_CLICKHOUSE_HOST
   value: "{{ include "wandb.clickhouse.host" . }}"
 {{- end }}
 
-{{- if kindIs "map" .Values.global.clickhouse.port }}
-- name: WF_CLICKHOUSE_PORT
-{{- toYaml .Values.global.clickhouse.port | nindent 2 }}
+{{- if kindIs "map" $clickhouseConfig.port }}
+- name: {{ .envvarPrefix }}_CLICKHOUSE_PORT
+{{- toYaml $clickhouseConfig.port | nindent 2 }}
 {{- else }}
-- name: WF_CLICKHOUSE_PORT
+- name: {{ .envvarPrefix }}_CLICKHOUSE_PORT
   value: "{{ include "wandb.clickhouse.port" . }}"
 {{- end }}
 
-{{- if kindIs "map" .Values.global.clickhouse.database }}
-- name: WF_CLICKHOUSE_DATABASE
-{{- toYaml .Values.global.clickhouse.database | nindent 2 }}
+{{- if kindIs "map" $clickhouseConfig.database }}
+- name: {{ .envvarPrefix }}_CLICKHOUSE_DATABASE
+{{- toYaml $clickhouseConfig.database | nindent 2 }}
 {{- else }}
-- name: WF_CLICKHOUSE_DATABASE
+- name: {{ .envvarPrefix }}_CLICKHOUSE_DATABASE
   value: "{{ include "wandb.clickhouse.database" . }}"
 {{- end }}
 
-{{- if kindIs "map" .Values.global.clickhouse.user }}
-- name: WF_CLICKHOUSE_USER
-{{- toYaml .Values.global.clickhouse.user | nindent 2 }}
+{{- if kindIs "map" $clickhouseConfig.user }}
+- name: {{ .envvarPrefix }}_CLICKHOUSE_USER
+{{- toYaml $clickhouseConfig.user | nindent 2 }}
 {{- else }}
-- name: WF_CLICKHOUSE_USER
+- name: {{ .envvarPrefix }}_CLICKHOUSE_USER
   value: "{{ include "wandb.clickhouse.user" . }}"
 {{- end }}
 
-{{- if kindIs "map" .Values.global.clickhouse.replicated }}
-- name: WF_CLICKHOUSE_REPLICATED
-{{- toYaml .Values.global.clickhouse.replicated | nindent 2 }}
+{{- if kindIs "map" $clickhouseConfig.replicated }}
+- name: {{ .envvarPrefix }}_CLICKHOUSE_REPLICATED
+{{- toYaml $clickhouseConfig.replicated | nindent 2 }}
 {{- else }}
-- name: WF_CLICKHOUSE_REPLICATED
-  value: "{{ .Values.global.clickhouse.replicated }}"
+- name: {{ .envvarPrefix }}_CLICKHOUSE_REPLICATED
+  value: "{{ $clickhouseConfig.replicated }}"
 {{- end }}
 
-{{- if kindIs "map" .Values.global.clickhouse.password }}
-- name: WF_CLICKHOUSE_PASS
-{{- toYaml .Values.global.clickhouse.password | nindent 2 }}
+{{- if kindIs "map" $clickhouseConfig.password }}
+- name: {{ .envvarPrefix }}_CLICKHOUSE_PASS
+{{- toYaml $clickhouseConfig.password | nindent 2 }}
 {{- else }}
-- name: WF_CLICKHOUSE_PASS
+- name: {{ .envvarPrefix }}_CLICKHOUSE_PASS
   valueFrom:
     secretKeyRef:
-      name: {{ include "wandb.clickhouse.passwordSecret" . | quote}}
-      key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
+      name: {{ include "wandb.clickhouse.passwordSecret" "root" . "clickhouseConfig" $clickhouseConfig | quote}}
+      key: "{{ $clickhouseConfig.passwordSecret.passwordKey }}"
 {{- end -}}
 {{- end -}}
 
 {{- define "wandb.clickhouseEnvs" -}}
 {{ include "wandb.clickhouseConfigEnvs" . }}
+{{- end -}}
+
+{{- define "wandb.runStoreEnvs" -}}
+{{ include "wandb.clickhouseConfigEnvs" "root" . "serviceName" "runStore" "envvarPrefix" "RUNSTORE" }}
+- name: GORILLA_RUN_STORE_ACCELERATOR
+  value: clickhouse://$(RUNSTORE_CH_USER):$(RUNSTORE_CH_PASSWORD)@$(RUNSTORE_CH_HOST):$(RUNSTORE_CH_PORT)/$(RUNSTORE_CH_DATABASE)?fail-fast=true&tls=true
+{{- end -}}
+
+{{- define "wandb.registrySearchEnvs" -}}
+{{- if .Values.global.registrySearch.enabled }}
+{{ include "wandb.clickhouseConfigEnvs" "root" . "serviceName" "runStore" "envvarPrefix" "RUNSTORE" }}
+- name: GORILLA_REGISTRY_SEARCH_ADDRESS
+  value: clickhouse://$(RUNSTORE_CH_USER):$(RUNSTORE_CH_PASSWORD)@$(RUNSTORE_CH_HOST):$(RUNSTORE_CH_PORT)/$(RUNSTORE_CH_DATABASE)?fail-fast=true&tls=true
+{{- end }}
 {{- end -}}
 
 {{- define "wandb.historyStoreEnvs" -}}

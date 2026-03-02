@@ -162,17 +162,26 @@ global:
       proto: "grpc"
 
   clickhouse:
-    host: "{{ .Release.Name }}-clickhouse-headless"
-    port: ""
-    password: ""
-    passwordSecret:
-      name: ""
-      passwordKey: "CLICKHOUSE_PASSWORD"
-    database: "weave_trace_db"
-    user: "default"
-    # Required when using replicated services on self-managed ClickHouse (not ClickHouse Cloud).
-    # Flag will substitute MergeTree() with ReplicatedMergeTree() and use `ON CLUSTER` on table creation.
-    replicated: false
+    default:
+      host: "{{ .Release.Name }}-clickhouse-headless"
+      port: ""
+      password: ""
+      passwordSecret:
+        name: ""
+        passwordKey: "CLICKHOUSE_PASSWORD"
+      database: "default"
+      user: "default"
+      # Required when using replicated services on self-managed ClickHouse (not ClickHouse Cloud).
+      # Flag will substitute MergeTree() with ReplicatedMergeTree() and use `ON CLUSTER` on table creation.
+      replicated: false
+    weaveTrace:
+      port: 8443
+      database: "weave_trace_db"
+    runsAccelerator:
+      port: 9440
+      database: "ra"
+
+  }
   #
   # FOR ADVANCED USERS:
   # the following clickhouse config options can passed as maps/objects
@@ -464,6 +473,7 @@ api:
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.runStoreEnvs" . }}'
   initContainers:
     init-db:
       enabled: false
