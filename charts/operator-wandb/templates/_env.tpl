@@ -304,6 +304,85 @@ Global values will override any chart-specific values.
 {{ include "wandb.clickhouseConfigEnvs" . }}
 {{- end -}}
 
+{{- define "wandb.registrySearchEnvs" -}}
+{{- /*
+  ATTENTION!
+
+  REGISTRY_SEARCH_CH_HOST, REGISTRY_SEARCH_CH_PORT, REGISTRY_SEARCH_CH_DATABASE,
+  REGISTRY_SEARCH_CH_USER, REGISTRY_SEARCH_CH_PASSWORD
+
+  Are all set in the values.yaml under global.registrySearch.(host,port,database,user,password)
+
+  The following blocks enable values to be provided in one of two ways:
+
+  AS STANDARD:
+    registrySearch:
+      enabled: true
+      host: "clickhouse.example.com"
+      port: 9440
+      user: "default"
+      password: "supersafe"
+      database: "registry_search"
+
+  AS K8s REFS:
+    registrySearch:
+      enabled: true
+      host:
+        valueFrom:
+          secretKeyRef:
+            name: "registry-search-secret"
+            key: "host"
+      port:
+        valueFrom:
+          configMapKeyRef:
+            name: "registry-search-config"
+            key: "port"
+      ...
+*/ -}}
+{{- if .Values.global.registrySearch.enabled }}
+{{- if kindIs "map" .Values.global.registrySearch.host }}
+- name: REGISTRY_SEARCH_CH_HOST
+{{- toYaml .Values.global.registrySearch.host | nindent 2 }}
+{{- else }}
+- name: REGISTRY_SEARCH_CH_HOST
+  value: "{{ include "wandb.registrySearch.host" . }}"
+{{- end }}
+{{- if kindIs "map" .Values.global.registrySearch.port }}
+- name: REGISTRY_SEARCH_CH_PORT
+{{- toYaml .Values.global.registrySearch.port | nindent 2 }}
+{{- else }}
+- name: REGISTRY_SEARCH_CH_PORT
+  value: "{{ include "wandb.registrySearch.port" . }}"
+{{- end }}
+{{- if kindIs "map" .Values.global.registrySearch.database }}
+- name: REGISTRY_SEARCH_CH_DATABASE
+{{- toYaml .Values.global.registrySearch.database | nindent 2 }}
+{{- else }}
+- name: REGISTRY_SEARCH_CH_DATABASE
+  value: "{{ include "wandb.registrySearch.database" . }}"
+{{- end }}
+{{- if kindIs "map" .Values.global.registrySearch.user }}
+- name: REGISTRY_SEARCH_CH_USER
+{{- toYaml .Values.global.registrySearch.user | nindent 2 }}
+{{- else }}
+- name: REGISTRY_SEARCH_CH_USER
+  value: "{{ include "wandb.registrySearch.user" . }}"
+{{- end }}
+{{- if kindIs "map" .Values.global.registrySearch.password }}
+- name: REGISTRY_SEARCH_CH_PASSWORD
+{{- toYaml .Values.global.registrySearch.password | nindent 2 }}
+{{- else }}
+- name: REGISTRY_SEARCH_CH_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "wandb.registrySearch.internalSecretName" . | quote }}
+      key: {{ include "wandb.registrySearch.internalSecretKey" . | quote }}
+{{- end }}
+- name: GORILLA_REGISTRY_SEARCH_ADDRESS
+  value: "{{ include "wandb.registrySearchAddress" . | trim }}"
+{{- end }}
+{{- end -}}
+
 {{- define "wandb.historyStoreEnvs" -}}
 - name: GORILLA_HISTORY_STORE
   value: {{ include "wandb.historyStore" . | quote }}
