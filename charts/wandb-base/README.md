@@ -60,6 +60,31 @@ envFrom:
   app-secrets: "secretRef"
 ```
 
+### Volumes
+
+Volumes can be defined at multiple levels and are combined by name. The chart uses the pod- or chart-level volume when a name collides with a global volume.
+
+Global volumes are useful when a parent chart needs to attach shared volumes across multiple subcharts. You can also use templated volumes via `volumesTpls` and `global.volumesTpls`.
+
+Example:
+
+```yaml
+global:
+  volumes:
+    - name: shared-config
+      configMap:
+        name: shared-config
+
+volumes:
+  - name: data
+    emptyDir: {}
+  - name: shared-config
+    configMap:
+      name: chart-specific-config
+```
+
+In this example, the `shared-config` volume from `volumes` overrides the global definition.
+
 ### Pod Resources
 
 Resource requests and limits can be defined at multiple levels, with the following precedence (highest to lowest):

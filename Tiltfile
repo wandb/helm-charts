@@ -86,8 +86,11 @@ for app in ['app', 'console', 'executor', 'parquet', 'weave', 'weave-trace']:
     postfix = current_values.get(app, {}).get('deploymentPostfix', "")
     if postfix != "":
         app_names[app] += '-' + postfix
-k8s_resource(app_names['app'], objects=['wandb-app:ServiceAccount:' + current_namespace])
-k8s_resource(app_names['console'])
+
+if current_values.get('app', {}).get('install', False):
+    k8s_resource(app_names['app'], objects=['wandb-app:ServiceAccount:' + current_namespace])
+if current_values.get('console', {}).get('install', False):
+    k8s_resource(app_names['console'])
 k8s_resource("wandb-nginx", port_forwards=settings["forwardedPorts"]["nginx"], objects=['wandb-console:ServiceAccount:' + current_namespace])
 if current_values.get('anaconda2', {}).get('install', False):
     k8s_resource('wandb-anaconda2', objects=['wandb-anaconda2:ServiceAccount:' + current_namespace])
