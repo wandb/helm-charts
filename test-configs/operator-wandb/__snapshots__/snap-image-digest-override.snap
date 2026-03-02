@@ -195,6 +195,27 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
+# Source: operator-wandb/charts/parquet-metadata-cache/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-parquet-metadata-cache
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: parquet-metadata-cache
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: parquet-metadata-cache
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
 # Source: operator-wandb/charts/parquet/templates/pdb.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -481,6 +502,14 @@ metadata:
 data:
   MYSQL_ROOT_PASSWORD: '###DYNAMIC_FIELD###'
   MYSQL_PASSWORD: '###DYNAMIC_FIELD###'
+---
+# Source: operator-wandb/templates/parquet-metadata-cache.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chartsnap-parquet-metadata-cache-secret
+  labels:
+data: {}
 ---
 # Source: operator-wandb/templates/parquet.yaml
 apiVersion: v1
@@ -1673,6 +1702,17 @@ data:
       }
     }
 ---
+# Source: operator-wandb/templates/parquet-metadata-cache.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-parquet-metadata-cache-configmap
+  labels:
+data:
+  # Port configuration
+  GORILLA_PARQUET_METADATA_CACHE_PORT: "9091"
+  GORILLA_MAX_COLUMN_CHUNKS: "10000"
+---
 # Source: operator-wandb/templates/parquet.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -1690,6 +1730,8 @@ data:
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648" # 2GB
   GORILLA_COLLECT_AUDIT_LOGS: "true"
+  # Parquet metadata cache configuration
+  GORILLA_PARQUET_READER_REMOTE_METADATA_CACHE_ADDR: "chartsnap-parquet-metadata-cache:9091"
 ---
 # Source: operator-wandb/templates/redis.yaml
 apiVersion: v1
@@ -2268,12 +2310,33 @@ spec:
     protocol: TCP
     name: otlp-http
   selector:
-    helm.sh/chart: daemonset-0.1.0
+    helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: daemonset
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "0.33.0"
     wandb.com/app-name: daemonset-0.1.0
     app.kubernetes.io/managed-by: Helm
+---
+# Source: operator-wandb/charts/parquet-metadata-cache/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-parquet-metadata-cache
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: parquet-metadata-cache
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+  - name: grpc
+    port: 9091
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: parquet-metadata-cache
+    app.kubernetes.io/instance: chartsnap
 ---
 # Source: operator-wandb/charts/parquet/templates/service.yaml
 apiVersion: v1
@@ -2346,7 +2409,7 @@ spec:
     protocol: TCP
     name: mysql-exporter
   selector:
-    helm.sh/chart: mysql-exporter-0.1.0
+    helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: prometheus-mysql-exporter
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "0.33.0"
@@ -2376,7 +2439,7 @@ spec:
     protocol: TCP
     name: redis-exporter
   selector:
-    helm.sh/chart: redis-exporter-0.1.0
+    helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: prometheus-redis-exporter
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "0.33.0"
@@ -2473,7 +2536,7 @@ spec:
     matchLabels:
       app.kubernetes.io/name: daemonset
       app.kubernetes.io/instance: chartsnap
-      helm.sh/chart: daemonset-0.1.0
+      helm.sh/chart: '###CHART_VERSION###'
       app.kubernetes.io/name: daemonset
       app.kubernetes.io/instance: chartsnap
       app.kubernetes.io/version: "0.33.0"
@@ -2482,7 +2545,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: daemonset-0.1.0
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: daemonset
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "0.33.0"
@@ -2622,7 +2685,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.11.11
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "anacdigest12"
@@ -2760,7 +2823,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: api-0.11.11
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3294,7 +3357,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.11.11
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3866,7 +3929,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.11.11
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3992,7 +4055,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: executor-0.11.11
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: executor
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "execdigest12"
@@ -4270,7 +4333,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: filestream-0.11.11
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: filestream
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "filestream12"
@@ -4550,7 +4613,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: flat-run-fields-updater-0.11.11
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: flat-run-fields-updater
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "frfudigest12"
@@ -4815,7 +4878,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: glue-0.11.11
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5295,6 +5358,269 @@ spec:
       - emptyDir: {}
         name: temp-dir
 ---
+# Source: operator-wandb/charts/parquet-metadata-cache/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-parquet-metadata-cache-bc
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: parquet-metadata-cache
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: parquet-metadata-cache
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: '###CHART_VERSION###'
+        app.kubernetes.io/name: parquet-metadata-cache
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: parquet-metadata-cache
+        args:
+        - parquet-metadata-cache
+        envFrom:
+        - configMapRef:
+            name: chartsnap-bucket-configmap
+        - configMapRef:
+            name: chartsnap-global-configmap
+        - secretRef:
+            name: chartsnap-global-secret
+        - configMapRef:
+            name: chartsnap-kafka-configmap
+        - configMapRef:
+            name: chartsnap-parquet-metadata-cache-configmap
+        - configMapRef:
+            name: chartsnap-redis-configmap
+        env:
+        - name: G_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
+              name: gorilla-coreweave-caios
+              optional: true
+        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
+              name: gorilla-coreweave-caios
+              optional: true
+        - name: AZURE_STORAGE_KEY
+          valueFrom:
+            secretKeyRef:
+              key: ACCESS_KEY
+              name: chartsnap-bucket
+              optional: true
+        - name: BUCKET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: ACCESS_KEY
+              name: chartsnap-bucket
+              optional: true
+        - name: BUCKET_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: SECRET_KEY
+              name: chartsnap-bucket
+              optional: true
+        - name: BUCKET
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+        - name: GORILLA_FILE_STORE
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+        - name: GORILLA_STORAGE_BUCKET
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: MYSQL_PASSWORD
+              name: chartsnap-mysql
+        - name: MYSQL_PORT
+          value: "3306"
+        - name: MYSQL_HOST
+          value: chartsnap-mysql
+        - name: MYSQL_DATABASE
+          value: wandb_local
+        - name: MYSQL_USER
+          value: wandb
+        - name: MYSQL
+          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+        - name: GORILLA_ANALYTICS_SINK
+          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+        - name: GORILLA_METADATA_STORE
+          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+        - name: GORILLA_RUN_STORE
+          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+        - name: GORILLA_USAGE_STORE
+          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REDIS_PASSWORD
+              name: chartsnap-redis-secret
+              optional: true
+        - name: REDIS
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_AUDITOR_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_FILE_METADATA_SOURCE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_LOCKER
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_METADATA_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_SETTINGS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_USAGE_METRICS_CACHE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: GORILLA_TASK_QUEUE
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
+        - name: KAFKA_CLIENT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: KAFKA_CLIENT_PASSWORD
+              name: chartsnap-kafka
+              optional: true
+        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
+          value: pubsub:/playground-111/filestream
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
+          value: pubsub:/playground-111/run-updates-shadow
+        - name: GORILLA_HISTORY_STORE
+          value: http://chartsnap-parquet:8087/_goRPC_,bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
+        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+          value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
+        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
+          value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
+        - name: GORILLA_STATSIG_KEY
+          valueFrom:
+            secretKeyRef:
+              key: GORILLA_STATSIG_KEY
+              name: gorilla-statsig
+              optional: true
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: license
+              name: chartsnap-license
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: license
+              name: chartsnap-license
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "wandb/megabinary:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 9091
+          name: grpc
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "6"
+            memory: 16Gi
+          requests:
+            cpu: "4"
+            memory: 16Gi
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+      serviceAccountName: wandb-parquet
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: parquet-metadata-cache
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: parquet-metadata-cache
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
+---
 # Source: operator-wandb/charts/parquet/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -5323,7 +5649,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.11.11
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5628,7 +5954,7 @@ spec:
         app.kubernetes.io/name: prometheus
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: v2.47.0
-        helm.sh/chart: instance-24.5.0
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/part-of: prometheus
     spec:
@@ -5727,7 +6053,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.11.11
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6140,7 +6466,7 @@ spec:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: redis
         app.kubernetes.io/version: 7.2.4
-        helm.sh/chart: redis-18.19.4
+        helm.sh/chart: '###CHART_VERSION###'
         app.kubernetes.io/component: master
       annotations:
         checksum/configmap: 86bcc953bb473748a3d3dc60b7c11f34e60c93519234d4c37f42e22ada559d47
@@ -6292,7 +6618,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.11.11
+            helm.sh/chart: '###CHART_VERSION###'
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -6641,8 +6967,6 @@ metadata:
     "helm.sh/hook": pre-upgrade,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
     "helm.sh/hook-weight": "-5"
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
 data:
   pre_upgrade.sh: |
     #!/bin/bash
