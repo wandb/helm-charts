@@ -408,6 +408,12 @@ Global values will override any chart-specific values.
 # {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "historyUpdater" "envvarPrefix" "HISTORY_UPDATER" "finalEnvName" "GORILLA_STORAGE_ENGINE_ADDRESS") -}}
 # {{- end -}}
 
+# TODO: uncomment when weave trace is ready to be interated. 
+# Note, right now it is using WF_CLICKHOUSE as the envvar prefix, but we should probably change it to something else.
+# {{- define "wandb.weaveTraceEnvs" -}}
+# {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "weaveTrace" "envvarPrefix" "WEAVE_TRACE" "finalEnvName" "GORILLA_WEAVE_TRACE_ADDRESS") -}}
+# {{- end -}}
+
 {{- define "wandb.historyStoreEnvs" -}}
 - name: GORILLA_HISTORY_STORE
   value: {{ include "wandb.historyStore" . | quote }}
