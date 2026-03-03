@@ -355,7 +355,7 @@ Global values will override any chart-specific values.
 {{- toYaml $config.host | nindent 2 }}
 {{- else }}
 - name: {{ $prefix }}_HOST
-  value: {{ $config.host | quote }}
+  value: {{ tpl ($config.host | toString) .root | quote }}
 {{- end }}
 {{- if kindIs "map" $config.port }}
 - name: {{ $prefix }}_PORT
@@ -403,9 +403,10 @@ Global values will override any chart-specific values.
 {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runsAccelerator" "envvarPrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR") -}}
 {{- end -}}
 
-{{- define "wandb.historyUpdaterEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "historyUpdater" "envvarPrefix" "HISTORY_UPDATER" "finalEnvName" "GORILLA_STORAGE_ENGINE_ADDRESS") -}}
-{{- end -}}
+# TODO: uncomment when history updater is ready to be interated.
+# {{- define "wandb.historyUpdaterEnvs" -}}
+# {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "historyUpdater" "envvarPrefix" "HISTORY_UPDATER" "finalEnvName" "GORILLA_STORAGE_ENGINE_ADDRESS") -}}
+# {{- end -}}
 
 {{- define "wandb.historyStoreEnvs" -}}
 - name: GORILLA_HISTORY_STORE
