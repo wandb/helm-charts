@@ -8,13 +8,12 @@
   and a wrapper template in _env.tpl — no changes needed here.
 */}}
 {{- range $featureName, $featureConfig := .Values.global.olap -}}
-{{- if ne $featureName "default" -}}
-{{- $config := include "wandb.olapConfig" (dict "root" $ "featureName" $featureName) | fromYaml -}}
-{{- if and $config.enabled (not (kindIs "map" $config.password)) -}}
-{{- $envvarPrefix := $featureName | snakecase | upper -}}
-{{- $secretName := include "wandb.olapSecretName" (dict "root" $ "featureName" $featureName) -}}
-{{- $secretKey := include "wandb.olapSecretKey" (dict "envvarPrefix" $envvarPrefix) -}}
-{{- $existingSecret := (lookup "v1" "Secret" $.Release.Namespace $secretName) -}}
+  {{- if ne $featureName "default" -}}
+    {{- $config := include "wandb.olapConfig" (dict "root" $ "featureName" $featureName) | fromYaml -}}
+    {{- if and $config.enabled (not (kindIs "map" $config.password)) -}}
+      {{- $envvarPrefix := $featureName | snakecase | upper -}}
+      {{- $secretName := include "wandb.olapSecretName" (dict "root" $ "featureName" $featureName) -}}
+      {{- $secretKey := include "wandb.olapSecretKey" (dict "envvarPrefix" $envvarPrefix) -}}
 ---
 apiVersion: v1
 kind: Secret
@@ -28,11 +27,7 @@ metadata:
   labels:
     {{- include "wandb.commonLabels" $ | nindent 4 }}
 data:
-{{- if $existingSecret }}
-  {{ $secretKey }}: {{ default (default "" (index $existingSecret.data $secretKey)) ($config.password | b64enc) }}
-{{- else }}
-  {{ $secretKey }}: {{ default (randAlphaNum 64) $config.password | b64enc }}
-{{- end }}
-{{- end }}
-{{- end }}
+  {{ $secretKey }}: {{ $config.password | b64enc }}
+    {{- end }}
+  {{- end }}
 {{- end }}
