@@ -444,6 +444,8 @@ metadata:
   labels:
 data:
   HISTORY_UPDATER_PASSWORD: '###DYNAMIC_FIELD###'
+---
+# Source: operator-wandb/templates/olap.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -455,7 +457,9 @@ metadata:
     "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
   labels:
 data:
-  REGISTRY_SEARCH_PASSWORD: c2hhcmVkLXBhc3N3b3Jk---
+  REGISTRY_SEARCH_PASSWORD: '###DYNAMIC_FIELD###'
+---
+# Source: operator-wandb/templates/olap.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -467,7 +471,7 @@ metadata:
     "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
   labels:
 data:
-  RUNS_ACCELERATOR_PASSWORD: cnVucy1zcGVjaWZpYy1wYXNzd29yZA==
+  RUNS_ACCELERATOR_PASSWORD: '###DYNAMIC_FIELD###'
 ---
 # Source: operator-wandb/templates/parquet.yaml
 apiVersion: v1
@@ -3009,7 +3013,7 @@ spec:
               name: chartsnap-olap-runs-accelerator
         - name: RUNS_ACCELERATOR_PARAMS
           value: ?custom-param=yes&fail-fast=true&tls=true
-        - name: GORILLA_RUN_STORE_ACCELERATOR
+        - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
           value: clickhouse://$(RUNS_ACCELERATOR_USER):$(RUNS_ACCELERATOR_PASSWORD)@$(RUNS_ACCELERATOR_HOST):$(RUNS_ACCELERATOR_PORT)/$(RUNS_ACCELERATOR_DATABASE)$(RUNS_ACCELERATOR_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
@@ -3299,7 +3303,7 @@ spec:
               name: chartsnap-olap-runs-accelerator
         - name: RUNS_ACCELERATOR_PARAMS
           value: ?custom-param=yes&fail-fast=true&tls=true
-        - name: GORILLA_RUN_STORE_ACCELERATOR
+        - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
           value: clickhouse://$(RUNS_ACCELERATOR_USER):$(RUNS_ACCELERATOR_PASSWORD)@$(RUNS_ACCELERATOR_HOST):$(RUNS_ACCELERATOR_PORT)/$(RUNS_ACCELERATOR_DATABASE)$(RUNS_ACCELERATOR_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
@@ -4492,7 +4496,7 @@ spec:
               name: chartsnap-olap-runs-accelerator
         - name: RUNS_ACCELERATOR_PARAMS
           value: ?custom-param=yes&fail-fast=true&tls=true
-        - name: GORILLA_RUN_STORE_ACCELERATOR
+        - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
           value: clickhouse://$(RUNS_ACCELERATOR_USER):$(RUNS_ACCELERATOR_PASSWORD)@$(RUNS_ACCELERATOR_HOST):$(RUNS_ACCELERATOR_PORT)/$(RUNS_ACCELERATOR_DATABASE)$(RUNS_ACCELERATOR_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
@@ -4765,7 +4769,7 @@ spec:
               name: chartsnap-olap-runs-accelerator
         - name: RUNS_ACCELERATOR_PARAMS
           value: ?custom-param=yes&fail-fast=true&tls=true
-        - name: GORILLA_RUN_STORE_ACCELERATOR
+        - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
           value: clickhouse://$(RUNS_ACCELERATOR_USER):$(RUNS_ACCELERATOR_PASSWORD)@$(RUNS_ACCELERATOR_HOST):$(RUNS_ACCELERATOR_PORT)/$(RUNS_ACCELERATOR_DATABASE)$(RUNS_ACCELERATOR_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
@@ -6444,6 +6448,179 @@ spec:
     - sh
     - -c
     - "pip install wandb && wandb verify"
+  restartPolicy: Never
+---
+# Source: operator-wandb/templates/tests/test-olap.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "chartsnap-operator-wandb-test-olap-history-updater"
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: operator-wandb
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+  - name: test-olap-envs
+    image: us-docker.pkg.dev/wandb-production/public/python:3.12
+    env:
+    - name: HISTORY_UPDATER_HOST
+      value: "shared-clickhouse.example.com"
+    - name: HISTORY_UPDATER_PORT
+      value: "9440"
+    - name: HISTORY_UPDATER_DATABASE
+      value: "custom_history_db"
+    - name: HISTORY_UPDATER_USER
+      value: "shared-user"
+    - name: HISTORY_UPDATER_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: "chartsnap-olap-history-updater"
+          key: "HISTORY_UPDATER_PASSWORD"
+    - name: HISTORY_UPDATER_PARAMS
+      value: "?fail-fast=true&tls=false"
+    - name: TEST_CONNECTION_URL
+      value: "clickhouse://$(HISTORY_UPDATER_USER):$(HISTORY_UPDATER_PASSWORD)@$(HISTORY_UPDATER_HOST):$(HISTORY_UPDATER_PORT)/$(HISTORY_UPDATER_DATABASE)$(HISTORY_UPDATER_PARAMS)"
+    command:
+    - sh
+    - -c
+    - |
+      echo "Testing OLAP env vars for historyUpdater..."
+      fail=0
+      for var in HISTORY_UPDATER_HOST HISTORY_UPDATER_PORT HISTORY_UPDATER_DATABASE HISTORY_UPDATER_USER HISTORY_UPDATER_PASSWORD HISTORY_UPDATER_PARAMS; do
+        val=$(eval echo "\$$var")
+        if [ -z "$val" ]; then
+          echo "FAIL: $var is not set"
+          fail=1
+        else
+          echo "OK: $var is set"
+        fi
+      done
+      if [ -z "$TEST_CONNECTION_URL" ]; then
+        echo "FAIL: TEST_CONNECTION_URL is not set"
+        fail=1
+      else
+        echo "OK: TEST_CONNECTION_URL=$TEST_CONNECTION_URL"
+      fi
+      exit $fail
+  restartPolicy: Never---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "chartsnap-operator-wandb-test-olap-registry-search"
+  labels:
+    helm.sh/chart: operator-wandb-0.41.0
+    app.kubernetes.io/name: operator-wandb
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+  - name: test-olap-envs
+    image: us-docker.pkg.dev/wandb-production/public/python:3.12
+    env:
+    - name: REGISTRY_SEARCH_HOST
+      value: "shared-clickhouse.example.com"
+    - name: REGISTRY_SEARCH_PORT
+      value: "9440"
+    - name: REGISTRY_SEARCH_DATABASE
+      value: "custom_registry_db"
+    - name: REGISTRY_SEARCH_USER
+      value: "shared-user"
+    - name: REGISTRY_SEARCH_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: "chartsnap-olap-registry-search"
+          key: "REGISTRY_SEARCH_PASSWORD"
+    - name: REGISTRY_SEARCH_PARAMS
+      value: "?fail-fast=true&tls=true"
+    - name: TEST_CONNECTION_URL
+      value: "clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)"
+    command:
+    - sh
+    - -c
+    - |
+      echo "Testing OLAP env vars for registrySearch..."
+      fail=0
+      for var in REGISTRY_SEARCH_HOST REGISTRY_SEARCH_PORT REGISTRY_SEARCH_DATABASE REGISTRY_SEARCH_USER REGISTRY_SEARCH_PASSWORD REGISTRY_SEARCH_PARAMS; do
+        val=$(eval echo "\$$var")
+        if [ -z "$val" ]; then
+          echo "FAIL: $var is not set"
+          fail=1
+        else
+          echo "OK: $var is set"
+        fi
+      done
+      if [ -z "$TEST_CONNECTION_URL" ]; then
+        echo "FAIL: TEST_CONNECTION_URL is not set"
+        fail=1
+      else
+        echo "OK: TEST_CONNECTION_URL=$TEST_CONNECTION_URL"
+      fi
+      exit $fail
+  restartPolicy: Never---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "chartsnap-operator-wandb-test-olap-runs-accelerator"
+  labels:
+    helm.sh/chart: operator-wandb-0.41.0
+    app.kubernetes.io/name: operator-wandb
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+  - name: test-olap-envs
+    image: us-docker.pkg.dev/wandb-production/public/python:3.12
+    env:
+    - name: RUNS_ACCELERATOR_HOST
+      value: "runs-clickhouse.example.com"
+    - name: RUNS_ACCELERATOR_PORT
+      value: "9440"
+    - name: RUNS_ACCELERATOR_DATABASE
+      value: "custom_runs_db"
+    - name: RUNS_ACCELERATOR_USER
+      value: "shared-user"
+    - name: RUNS_ACCELERATOR_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: "chartsnap-olap-runs-accelerator"
+          key: "RUNS_ACCELERATOR_PASSWORD"
+    - name: RUNS_ACCELERATOR_PARAMS
+      value: "?custom-param=yes&fail-fast=true&tls=true"
+    - name: TEST_CONNECTION_URL
+      value: "clickhouse://$(RUNS_ACCELERATOR_USER):$(RUNS_ACCELERATOR_PASSWORD)@$(RUNS_ACCELERATOR_HOST):$(RUNS_ACCELERATOR_PORT)/$(RUNS_ACCELERATOR_DATABASE)$(RUNS_ACCELERATOR_PARAMS)"
+    command:
+    - sh
+    - -c
+    - |
+      echo "Testing OLAP env vars for runsAccelerator..."
+      fail=0
+      for var in RUNS_ACCELERATOR_HOST RUNS_ACCELERATOR_PORT RUNS_ACCELERATOR_DATABASE RUNS_ACCELERATOR_USER RUNS_ACCELERATOR_PASSWORD RUNS_ACCELERATOR_PARAMS; do
+        val=$(eval echo "\$$var")
+        if [ -z "$val" ]; then
+          echo "FAIL: $var is not set"
+          fail=1
+        else
+          echo "OK: $var is set"
+        fi
+      done
+      if [ -z "$TEST_CONNECTION_URL" ]; then
+        echo "FAIL: TEST_CONNECTION_URL is not set"
+        fail=1
+      else
+        echo "OK: TEST_CONNECTION_URL=$TEST_CONNECTION_URL"
+      fi
+      exit $fail
   restartPolicy: Never
 ---
 # Source: operator-wandb/charts/appRenamePostHook/templates/job.yaml

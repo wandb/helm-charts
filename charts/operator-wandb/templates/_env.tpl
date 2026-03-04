@@ -400,7 +400,7 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.runsAcceleratorEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runsAccelerator" "envvarPrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR") -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runsAccelerator" "envvarPrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") -}}
 {{- end -}}
 
 # TODO: uncomment when history updater is ready to be interated.
