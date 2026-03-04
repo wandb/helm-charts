@@ -304,6 +304,116 @@ Global values will override any chart-specific values.
 {{ include "wandb.clickhouseConfigEnvs" . }}
 {{- end -}}
 
+{{- define "wandb.olapFeatureEnvs" -}}
+{{- /*
+  Shared template for OLAP feature environment variables.
+
+  Params (via dict):
+    root           - top-level Helm context (.)
+    featureName    - key under global.olap, e.g. "registrySearch"
+    envvarPrefix   - env var prefix, e.g. "REGISTRY_SEARCH"
+    finalEnvName   - the composed URL env var, e.g. "GORILLA_REGISTRY_SEARCH_ADDRESS"
+
+  Merges global.olap.<featureName> over global.olap.default.
+  Each field supports both plain values and K8s refs (valueFrom maps).
+  The params map is serialized into a query string. The type field drives
+  the connection URL schema.
+
+  AS STANDARD:
+    olap:
+      default:
+        host: "clickhouse.example.com"
+        port: "9440"
+        user: "default"
+        password: "supersafe"
+      registrySearch:
+        enabled: true
+        database: "registry_search"
+
+  AS K8s REFS:
+    olap:
+      registrySearch:
+        enabled: true
+        host:
+          valueFrom:
+            configMapKeyRef:
+              name: "clickhouse-registry-search"
+              key: "host"
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: "clickhouse-registry-search-password"
+              key: "password"
+*/ -}}
+{{- $config := include "wandb.olapConfig" (dict "root" .root "featureName" .featureName) | fromYaml -}}
+{{- if $config.enabled -}}
+{{- $prefix := .envvarPrefix -}}
+{{- $secretName := include "wandb.olapSecretName" (dict "root" .root "featureName" .featureName) -}}
+{{- $secretKey := include "wandb.olapSecretKey" (dict "envvarPrefix" $prefix) -}}
+{{- if kindIs "map" $config.host }}
+- name: {{ $prefix }}_HOST
+{{- toYaml $config.host | nindent 2 }}
+{{- else }}
+- name: {{ $prefix }}_HOST
+  value: {{ tpl ($config.host | toString) .root | quote }}
+{{- end }}
+{{- if kindIs "map" $config.port }}
+- name: {{ $prefix }}_PORT
+{{- toYaml $config.port | nindent 2 }}
+{{- else }}
+- name: {{ $prefix }}_PORT
+  value: {{ $config.port | toString | quote }}
+{{- end }}
+{{- if kindIs "map" $config.database }}
+- name: {{ $prefix }}_DATABASE
+{{- toYaml $config.database | nindent 2 }}
+{{- else }}
+- name: {{ $prefix }}_DATABASE
+  value: {{ $config.database | quote }}
+{{- end }}
+{{- if kindIs "map" $config.user }}
+- name: {{ $prefix }}_USER
+{{- toYaml $config.user | nindent 2 }}
+{{- else }}
+- name: {{ $prefix }}_USER
+  value: {{ $config.user | quote }}
+{{- end }}
+{{- if kindIs "map" $config.password }}
+- name: {{ $prefix }}_PASSWORD
+{{- toYaml $config.password | nindent 2 }}
+{{- else }}
+- name: {{ $prefix }}_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ $secretName | quote }}
+      key: {{ $secretKey | quote }}
+{{- end }}
+- name: {{ $prefix }}_PARAMS
+  value: {{ include "wandb.olapParamsQuery" (dict "params" $config.params) | quote }}
+- name: {{ .finalEnvName }}
+  value: "{{ $config.type }}://$({{ $prefix }}_USER):$({{ $prefix }}_PASSWORD)@$({{ $prefix }}_HOST):$({{ $prefix }}_PORT)/$({{ $prefix }}_DATABASE)$({{ $prefix }}_PARAMS)"
+{{- end }}
+{{- end -}}
+
+{{- define "wandb.registrySearchEnvs" -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "registrySearch" "envvarPrefix" "REGISTRY_SEARCH" "finalEnvName" "GORILLA_REGISTRY_SEARCH_ADDRESS") -}}
+{{- end -}}
+
+{{- define "wandb.runsAcceleratorEnvs" -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runsAccelerator" "envvarPrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") -}}
+{{- end -}}
+
+# TODO: uncomment when history updater is ready to be interated.
+# {{- define "wandb.historyUpdaterEnvs" -}}
+# {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "historyUpdater" "envvarPrefix" "HISTORY_UPDATER" "finalEnvName" "GORILLA_STORAGE_ENGINE_ADDRESS") -}}
+# {{- end -}}
+
+# TODO: uncomment when weave trace is ready to be interated. 
+# Note, right now it is using WF_CLICKHOUSE as the envvar prefix, but we should probably change it to something else.
+# {{- define "wandb.weaveTraceEnvs" -}}
+# {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "weaveTrace" "envvarPrefix" "WEAVE_TRACE" "finalEnvName" "GORILLA_WEAVE_TRACE_ADDRESS") -}}
+# {{- end -}}
+
 {{- define "wandb.historyStoreEnvs" -}}
 - name: GORILLA_HISTORY_STORE
   value: {{ include "wandb.historyStore" . | quote }}

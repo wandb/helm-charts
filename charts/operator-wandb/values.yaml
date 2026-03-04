@@ -161,6 +161,18 @@ global:
       # grpc, http
       proto: "grpc"
 
+  # Weave Trace ClickHouse connection config.
+  #
+  # This section configures how weave-trace connects to ClickHouse.
+  # It does NOT control the ClickHouse server itself.
+  #
+  # NOTE: When the bundled clickhouse subchart is installed (clickhouse.install: true),
+  # the subchart's auth.existingSecret is wired to passwordSecret below via the
+  # wandb.clickhouse.passwordSecret helper. This means passwordSecret.name controls
+  # BOTH the weave-trace client connection AND the clickhouse server's admin password.
+  # This coupling is intentional for local/test deployments so a single secret is
+  # shared. In production, the clickhouse subchart is not installed and this section
+  # only affects the weave-trace client connection.
   clickhouse:
     host: "{{ .Release.Name }}-clickhouse-headless"
     port: ""
@@ -204,6 +216,97 @@ global:
   #       secretKeyRef:
   #         name: "clickhouse-settings-secret"
   #         key: "password"
+
+  # OLAP database configuration (ClickHouse)
+  #
+  # Features like Registry Search, Runs Accelerator, and History Updater each
+  # need their own OLAP database connection. Rather than configuring each
+  # independently, this uses a "default + override" pattern:
+  #
+  #   1. "default" defines shared connection settings (host, port, user, password, params, type).
+  #      Do not set "enabled: true" on default — it is not a feature itself.
+  #
+  #   2. Each feature (registrySearch, runsAccelerator, etc.) only declares what
+  #      differs from the default — typically just "enabled" and "database".
+  #      All other fields are inherited from default automatically.
+  #
+  #   3. To enable a feature: set enabled: true on the feature key and ensure
+  #      the default has a valid host/password (or use valueFrom K8s refs).
+  #
+  #   4. To override a field for one feature (e.g. a different host), set it
+  #      directly on the feature key — it takes precedence over the default.
+  #
+  # Each enabled feature produces:
+  #   - Component env vars: {PREFIX}_HOST, {PREFIX}_PORT, {PREFIX}_DATABASE,
+  #     {PREFIX}_USER, {PREFIX}_PASSWORD, {PREFIX}_PARAMS
+  #   - A composed connection URL env var (e.g. GORILLA_REGISTRY_SEARCH_ADDRESS)
+  #   - An internal K8s Secret for the password (unless password is a valueFrom map)
+  #
+  # Example — shared instance, two features with different databases:
+  #   olap:
+  #     default:
+  #       host: "clickhouse.example.com"
+  #       password: "shared-password"
+  #     registrySearch:
+  #       enabled: true
+  #     runsAccelerator:
+  #       enabled: true
+  #
+  olap:
+    default:
+      # enabled: false # Falsy by default.
+      host: ""
+      # If you are using ClickHouse Cloud, you should set the port to the port of the ClickHouse Cloud instance.
+      # https://clickhouse.com/docs/guides/sre/network-ports
+      port: "9440"
+      user: "default"
+      password: ""
+      database: ""
+      params:
+        fail-fast: "true"
+        tls: "true"
+      type: clickhouse
+    registrySearch:
+      enabled: false
+      database: "artifacts"
+    runsAccelerator:
+      enabled: false
+      database: "runs"
+    historyUpdater:
+      enabled: false
+      database: "history"
+    # TODO
+    # weaveTrace:
+    #   enabled: false
+    #   port: 8443
+    #   database: "weave_trace_db"
+
+  #
+  # FOR ADVANCED USERS:
+  # Any OLAP field can be a valueFrom map instead of a plain value, pulling
+  # from existing K8s Secrets or ConfigMaps. This works on both default and
+  # feature-level keys. Feature-level overrides still merge on top of default.
+  #
+  # olap:
+  #   default:
+  #     host:
+  #       valueFrom:
+  #         configMapKeyRef:
+  #           name: "clickhouse-shared-config"
+  #           key: "host"
+  #     password:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "clickhouse-shared-password"
+  #           key: "password"
+  #   registrySearch:
+  #     enabled: true
+  #     # Feature-specific override — this host is used instead of the default
+  #     host:
+  #       valueFrom:
+  #         configMapKeyRef:
+  #           name: "clickhouse-registry-search"
+  #           key: "host"
 
   email:
     smtp:
@@ -464,6 +567,8 @@ api:
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.registrySearchEnvs" . }}'
+    - '{{ include "wandb.runsAcceleratorEnvs" . }}'
   initContainers:
     init-db:
       enabled: false
@@ -1698,6 +1803,8 @@ glue:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.registrySearchEnvs" . }}'
+    - '{{ include "wandb.runsAcceleratorEnvs" . }}'
   initContainers:
     init-db:
       enabled: false
