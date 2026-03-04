@@ -1,0 +1,117 @@
+global:
+  repositoryPrefix: "us-docker.pkg.dev/wandb-production/public"
+  imageRegistry: "us-docker.pkg.dev/wandb-production/public"
+  bucket:
+    provider: "s3"
+    name: "minio:9000/bucket"
+    region: "us-east-1"
+    accessKey: "minio"
+    secretKey: "testpassword"
+  env:
+    GLOBAL_ADMIN_API_KEY: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+    GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS: "true"
+    BUCKET_PROXY: "true"
+    GORILLA_GLUE_FILE_STORE_IS_PROXIED: "true"
+    GORILLA_FILE_STORE_IS_PROXIED: "true"
+  api:
+    enabled: true
+  glue:
+    enabled: true
+  # Test: multiple features enabled, merge precedence, custom params
+  olap:
+    default:
+      host: "shared-clickhouse.example.com"
+      port: "9440"
+      user: "shared-user"
+      password: "shared-password"
+    registrySearch:
+      enabled: true
+      database: "custom_registry_db"
+      # Override default params in the clickhouse client of the app — Not an overide of the default params in the value.yaml.
+      params:
+        tls: "false"
+    runsAccelerator:
+      enabled: true
+      # Override host at feature level — should take precedence over default
+      host: "runs-clickhouse.example.com"
+      database: "custom_runs_db"
+      password: "runs-specific-password"
+      params:
+        # Adding a custom param to the clickhouse client of the app not in the default clickhouse client of the applicatoin.
+        custom-param: "yes"
+    historyUpdater:
+      enabled: true
+      database: "custom_history_db"
+  size: "testing"
+
+# Wire historyUpdaterEnvs into api for testing (not in default values.yaml yet).
+api:
+  containers:
+    api:
+      envTpls:
+        - '{{ include "wandb.downwardEnvs" . }}'
+        - '{{ include "wandb.bucket.cwIdentity" . }}'
+        - '{{ include "wandb.bucketEnvs" . }}'
+        - '{{ include "wandb.mysqlEnvs" . }}'
+        - '{{ include "wandb.redisEnvs" . }}'
+        - '{{ include "wandb.queueEnvs" . }}'
+        - '{{ include "wandb.historyStoreEnvs" . }}'
+        - '{{ include "wandb.statsigEnvs" . }}'
+        - '{{ include "wandb.observabilityEnvs" . }}'
+        - '{{ include "wandb.oidcEnvs" . }}'
+        - '{{ include "wandb.smtpEnvs" . }}'
+        - '{{ include "wandb.license" . }}'
+        - '{{ include "wandb.rateLimitEnvs" . }}'
+        - '{{ include "wandb.sslCertEnvs" . }}'
+        - '{{ include "wandb.registrySearchEnvs" . }}'
+        - '{{ include "wandb.runsAcceleratorEnvs" . }}'
+        - '{{ include "wandb.historyUpdaterEnvs" . }}'
+
+app:
+  env:
+    GORILLA_STORAGE_BUCKET: "s3://local-files"
+    GORILLA_FILEMETA_ENABLED: "false"
+
+frontend:
+  install: true
+
+console:
+  containers:
+    console:
+      resources:
+        requests:
+          cpu: 40m
+          memory: 64Mi
+
+nginx:
+  install: true
+  additionalServices:
+    bucket:
+      host: "http://minio:9000"
+      headers:
+        Host: "minio:9000"
+
+ingress:
+  install: false
+  create: false
+
+mysql:
+  install: true
+  resources:
+    requests:
+      cpu: "40m"
+      memory: "64Mi"
+
+redis:
+  install: true
+  resources:
+    requests:
+      cpu: "40m"
+      memory: "64Mi"
+
+reloader:
+  install: true
+  resources:
+    requests:
+      cpu: "40m"
+      memory: "64Mi"
