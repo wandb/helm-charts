@@ -13,35 +13,41 @@ global:
     BUCKET_PROXY: "true"
     GORILLA_GLUE_FILE_STORE_IS_PROXIED: "true"
     GORILLA_FILE_STORE_IS_PROXIED: "true"
-  clickhouse:
-    port: "8123"
-  glue:
-    enabled: true
   api:
     enabled: true
-  executor:
+  glue:
     enabled: true
-  weave-trace:
-    enabled: true
-  registrySearch:
-    enabled: true
-    host: "clickhouse.example.com"
-    port: "8123"
-    user: "default"
-    password: "registry-search-password-123"
-    database: "registry_search"
+  # Test: multiple features enabled, merge precedence, custom params
+  olap:
+    default:
+      host: "shared-clickhouse.example.com"
+      port: "9440"
+      user: "shared-user"
+      password: "shared-password"
+    registrySearch:
+      enabled: true
+      database: "custom_registry_db"
+    runsAccelerator:
+      enabled: true
+      # Override host at feature level — should take precedence over default
+      host: "runs-clickhouse.example.com"
+      database: "custom_runs_db"
+      password: "runs-specific-password"
+      # Override params — extends default params via deep merge
+      params:
+        custom-param: "yes"
+    historyUpdater:
+      enabled: true
+      database: "custom_history_db"
+      # Override params — overrides a default param value
+      params:
+        tls: "false"
   size: "testing"
 
 app:
   env:
     GORILLA_STORAGE_BUCKET: "s3://local-files"
     GORILLA_FILEMETA_ENABLED: "false"
-
-executor:
-  install: true
-
-filemeta:
-  install: true
 
 frontend:
   install: true
@@ -53,9 +59,6 @@ console:
         requests:
           cpu: 40m
           memory: 64Mi
-
-weave-trace:
-  install: true
 
 nginx:
   install: true
@@ -83,30 +86,9 @@ redis:
       cpu: "40m"
       memory: "64Mi"
 
-clickhouse:
-  install: true
-  clickhouse:
-    port: "8123"
-  persistence:
-    size: 2Gi
-  keeper:
-    persistence:
-      size: 2Gi
-    resources:
-      requests:
-        cpu: "40m"
-        memory: "64Mi"
-  resources:
-    requests:
-      cpu: "40m"
-      memory: "64Mi"
-
 reloader:
   install: true
   resources:
     requests:
       cpu: "40m"
       memory: "64Mi"
-
-anaconda2:
-  install: true

@@ -695,6 +695,34 @@ data:
   MYSQL_ROOT_PASSWORD: '###DYNAMIC_FIELD###'
   MYSQL_PASSWORD: '###DYNAMIC_FIELD###'
 ---
+# Source: operator-wandb/templates/olap.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "chartsnap-olap-registry-search"
+  annotations:
+    "helm.sh/resource-policy": "keep"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
+  labels:
+data:
+  REGISTRY_SEARCH_PASSWORD: '###DYNAMIC_FIELD###'
+---
+# Source: operator-wandb/templates/olap.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "chartsnap-olap-runs-accelerator"
+  annotations:
+    "helm.sh/resource-policy": "keep"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
+  labels:
+data:
+  RUNS_ACCELERATOR_PASSWORD: '###DYNAMIC_FIELD###'
+---
 # Source: operator-wandb/templates/parquet.yaml
 apiVersion: v1
 kind: Secret
@@ -712,20 +740,6 @@ metadata:
 data:
   REDIS_PASSWORD:
   REDIS_CA_CERT:
----
-# Source: operator-wandb/templates/registry-search.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: "chartsnap-registry-search-secret"
-  annotations:
-    "helm.sh/resource-policy": "keep"
-    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
-    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
-    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
-  labels:
-data:
-  REGISTRY_SEARCH_CH_PASSWORD: cmVnaXN0cnktc2VhcmNoLXBhc3N3b3JkLTEyMw==
 ---
 # Source: operator-wandb/templates/session-key.yaml
 apiVersion: v1
@@ -3667,21 +3681,40 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
-        - name: REGISTRY_SEARCH_CH_HOST
-          value: clickhouse.example.com
-        - name: REGISTRY_SEARCH_CH_PORT
-          value: "8123"
-        - name: REGISTRY_SEARCH_CH_DATABASE
-          value: registry_search
-        - name: REGISTRY_SEARCH_CH_USER
+        - name: REGISTRY_SEARCH_HOST
+          value: chartsnap-clickhouse-headless
+        - name: REGISTRY_SEARCH_PORT
+          value: "9000"
+        - name: REGISTRY_SEARCH_DATABASE
+          value: artifacts
+        - name: REGISTRY_SEARCH_USER
           value: default
-        - name: REGISTRY_SEARCH_CH_PASSWORD
+        - name: REGISTRY_SEARCH_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: REGISTRY_SEARCH_CH_PASSWORD
-              name: chartsnap-registry-search-secret
+              key: REGISTRY_SEARCH_PASSWORD
+              name: chartsnap-olap-registry-search
+        - name: REGISTRY_SEARCH_PARAMS
+          value: ?fail-fast=true&tls=false
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
-          value: clickhouse://$(REGISTRY_SEARCH_CH_USER):$(REGISTRY_SEARCH_CH_PASSWORD)@$(REGISTRY_SEARCH_CH_HOST):$(REGISTRY_SEARCH_CH_PORT)/$(REGISTRY_SEARCH_CH_DATABASE)?fail-fast=true&tls=true
+          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
+        - name: RUNS_ACCELERATOR_HOST
+          value: chartsnap-clickhouse-headless
+        - name: RUNS_ACCELERATOR_PORT
+          value: "9000"
+        - name: RUNS_ACCELERATOR_DATABASE
+          value: runs
+        - name: RUNS_ACCELERATOR_USER
+          value: default
+        - name: RUNS_ACCELERATOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RUNS_ACCELERATOR_PASSWORD
+              name: chartsnap-olap-runs-accelerator
+        - name: RUNS_ACCELERATOR_PARAMS
+          value: ?fail-fast=true&tls=false
+        - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
+          value: clickhouse://$(RUNS_ACCELERATOR_USER):$(RUNS_ACCELERATOR_PASSWORD)@$(RUNS_ACCELERATOR_HOST):$(RUNS_ACCELERATOR_PORT)/$(RUNS_ACCELERATOR_DATABASE)$(RUNS_ACCELERATOR_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -3938,21 +3971,40 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
-        - name: REGISTRY_SEARCH_CH_HOST
-          value: clickhouse.example.com
-        - name: REGISTRY_SEARCH_CH_PORT
-          value: "8123"
-        - name: REGISTRY_SEARCH_CH_DATABASE
-          value: registry_search
-        - name: REGISTRY_SEARCH_CH_USER
+        - name: REGISTRY_SEARCH_HOST
+          value: chartsnap-clickhouse-headless
+        - name: REGISTRY_SEARCH_PORT
+          value: "9000"
+        - name: REGISTRY_SEARCH_DATABASE
+          value: artifacts
+        - name: REGISTRY_SEARCH_USER
           value: default
-        - name: REGISTRY_SEARCH_CH_PASSWORD
+        - name: REGISTRY_SEARCH_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: REGISTRY_SEARCH_CH_PASSWORD
-              name: chartsnap-registry-search-secret
+              key: REGISTRY_SEARCH_PASSWORD
+              name: chartsnap-olap-registry-search
+        - name: REGISTRY_SEARCH_PARAMS
+          value: ?fail-fast=true&tls=false
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
-          value: clickhouse://$(REGISTRY_SEARCH_CH_USER):$(REGISTRY_SEARCH_CH_PASSWORD)@$(REGISTRY_SEARCH_CH_HOST):$(REGISTRY_SEARCH_CH_PORT)/$(REGISTRY_SEARCH_CH_DATABASE)?fail-fast=true&tls=true
+          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
+        - name: RUNS_ACCELERATOR_HOST
+          value: chartsnap-clickhouse-headless
+        - name: RUNS_ACCELERATOR_PORT
+          value: "9000"
+        - name: RUNS_ACCELERATOR_DATABASE
+          value: runs
+        - name: RUNS_ACCELERATOR_USER
+          value: default
+        - name: RUNS_ACCELERATOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RUNS_ACCELERATOR_PASSWORD
+              name: chartsnap-olap-runs-accelerator
+        - name: RUNS_ACCELERATOR_PARAMS
+          value: ?fail-fast=true&tls=false
+        - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
+          value: clickhouse://$(RUNS_ACCELERATOR_USER):$(RUNS_ACCELERATOR_PASSWORD)@$(RUNS_ACCELERATOR_HOST):$(RUNS_ACCELERATOR_PORT)/$(RUNS_ACCELERATOR_DATABASE)$(RUNS_ACCELERATOR_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -5659,21 +5711,40 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
-        - name: REGISTRY_SEARCH_CH_HOST
-          value: clickhouse.example.com
-        - name: REGISTRY_SEARCH_CH_PORT
-          value: "8123"
-        - name: REGISTRY_SEARCH_CH_DATABASE
-          value: registry_search
-        - name: REGISTRY_SEARCH_CH_USER
+        - name: REGISTRY_SEARCH_HOST
+          value: chartsnap-clickhouse-headless
+        - name: REGISTRY_SEARCH_PORT
+          value: "9000"
+        - name: REGISTRY_SEARCH_DATABASE
+          value: artifacts
+        - name: REGISTRY_SEARCH_USER
           value: default
-        - name: REGISTRY_SEARCH_CH_PASSWORD
+        - name: REGISTRY_SEARCH_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: REGISTRY_SEARCH_CH_PASSWORD
-              name: chartsnap-registry-search-secret
+              key: REGISTRY_SEARCH_PASSWORD
+              name: chartsnap-olap-registry-search
+        - name: REGISTRY_SEARCH_PARAMS
+          value: ?fail-fast=true&tls=false
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
-          value: clickhouse://$(REGISTRY_SEARCH_CH_USER):$(REGISTRY_SEARCH_CH_PASSWORD)@$(REGISTRY_SEARCH_CH_HOST):$(REGISTRY_SEARCH_CH_PORT)/$(REGISTRY_SEARCH_CH_DATABASE)?fail-fast=true&tls=true
+          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
+        - name: RUNS_ACCELERATOR_HOST
+          value: chartsnap-clickhouse-headless
+        - name: RUNS_ACCELERATOR_PORT
+          value: "9000"
+        - name: RUNS_ACCELERATOR_DATABASE
+          value: runs
+        - name: RUNS_ACCELERATOR_USER
+          value: default
+        - name: RUNS_ACCELERATOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RUNS_ACCELERATOR_PASSWORD
+              name: chartsnap-olap-runs-accelerator
+        - name: RUNS_ACCELERATOR_PARAMS
+          value: ?fail-fast=true&tls=false
+        - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
+          value: clickhouse://$(RUNS_ACCELERATOR_USER):$(RUNS_ACCELERATOR_PASSWORD)@$(RUNS_ACCELERATOR_HOST):$(RUNS_ACCELERATOR_PORT)/$(RUNS_ACCELERATOR_DATABASE)$(RUNS_ACCELERATOR_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -5913,21 +5984,40 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
-        - name: REGISTRY_SEARCH_CH_HOST
-          value: clickhouse.example.com
-        - name: REGISTRY_SEARCH_CH_PORT
-          value: "8123"
-        - name: REGISTRY_SEARCH_CH_DATABASE
-          value: registry_search
-        - name: REGISTRY_SEARCH_CH_USER
+        - name: REGISTRY_SEARCH_HOST
+          value: chartsnap-clickhouse-headless
+        - name: REGISTRY_SEARCH_PORT
+          value: "9000"
+        - name: REGISTRY_SEARCH_DATABASE
+          value: artifacts
+        - name: REGISTRY_SEARCH_USER
           value: default
-        - name: REGISTRY_SEARCH_CH_PASSWORD
+        - name: REGISTRY_SEARCH_PASSWORD
           valueFrom:
             secretKeyRef:
-              key: REGISTRY_SEARCH_CH_PASSWORD
-              name: chartsnap-registry-search-secret
+              key: REGISTRY_SEARCH_PASSWORD
+              name: chartsnap-olap-registry-search
+        - name: REGISTRY_SEARCH_PARAMS
+          value: ?fail-fast=true&tls=false
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
-          value: clickhouse://$(REGISTRY_SEARCH_CH_USER):$(REGISTRY_SEARCH_CH_PASSWORD)@$(REGISTRY_SEARCH_CH_HOST):$(REGISTRY_SEARCH_CH_PORT)/$(REGISTRY_SEARCH_CH_DATABASE)?fail-fast=true&tls=true
+          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
+        - name: RUNS_ACCELERATOR_HOST
+          value: chartsnap-clickhouse-headless
+        - name: RUNS_ACCELERATOR_PORT
+          value: "9000"
+        - name: RUNS_ACCELERATOR_DATABASE
+          value: runs
+        - name: RUNS_ACCELERATOR_USER
+          value: default
+        - name: RUNS_ACCELERATOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RUNS_ACCELERATOR_PASSWORD
+              name: chartsnap-olap-runs-accelerator
+        - name: RUNS_ACCELERATOR_PARAMS
+          value: ?fail-fast=true&tls=false
+        - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
+          value: clickhouse://$(RUNS_ACCELERATOR_USER):$(RUNS_ACCELERATOR_PASSWORD)@$(RUNS_ACCELERATOR_HOST):$(RUNS_ACCELERATOR_PORT)/$(RUNS_ACCELERATOR_DATABASE)$(RUNS_ACCELERATOR_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -8275,6 +8365,122 @@ spec:
     - sh
     - -c
     - "pip install wandb && wandb verify"
+  restartPolicy: Never
+---
+# Source: operator-wandb/templates/tests/test-olap.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "chartsnap-operator-wandb-test-olap-registry-search"
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: operator-wandb
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+  - name: test-olap-envs
+    image: us-docker.pkg.dev/wandb-production/public/python:3.12
+    env:
+    - name: REGISTRY_SEARCH_HOST
+      value: "chartsnap-clickhouse-headless"
+    - name: REGISTRY_SEARCH_PORT
+      value: "9000"
+    - name: REGISTRY_SEARCH_DATABASE
+      value: "artifacts"
+    - name: REGISTRY_SEARCH_USER
+      value: "default"
+    - name: REGISTRY_SEARCH_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: "chartsnap-olap-registry-search"
+          key: "REGISTRY_SEARCH_PASSWORD"
+    - name: REGISTRY_SEARCH_PARAMS
+      value: "?fail-fast=true&tls=false"
+    - name: TEST_CONNECTION_URL
+      value: "clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)"
+    command:
+    - sh
+    - -c
+    - |
+      echo "Testing OLAP env vars for registrySearch..."
+      fail=0
+      for var in REGISTRY_SEARCH_HOST REGISTRY_SEARCH_PORT REGISTRY_SEARCH_DATABASE REGISTRY_SEARCH_USER REGISTRY_SEARCH_PASSWORD REGISTRY_SEARCH_PARAMS; do
+        val=$(eval echo "\$$var")
+        if [ -z "$val" ]; then
+          echo "FAIL: $var is not set"
+          fail=1
+        else
+          echo "OK: $var is set"
+        fi
+      done
+      if [ -z "$TEST_CONNECTION_URL" ]; then
+        echo "FAIL: TEST_CONNECTION_URL is not set"
+        fail=1
+      else
+        echo "OK: TEST_CONNECTION_URL=$TEST_CONNECTION_URL"
+      fi
+      exit $fail
+  restartPolicy: Never---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "chartsnap-operator-wandb-test-olap-runs-accelerator"
+  labels:
+    helm.sh/chart: operator-wandb-0.41.0
+    app.kubernetes.io/name: operator-wandb
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+  - name: test-olap-envs
+    image: us-docker.pkg.dev/wandb-production/public/python:3.12
+    env:
+    - name: RUNS_ACCELERATOR_HOST
+      value: "chartsnap-clickhouse-headless"
+    - name: RUNS_ACCELERATOR_PORT
+      value: "9000"
+    - name: RUNS_ACCELERATOR_DATABASE
+      value: "runs"
+    - name: RUNS_ACCELERATOR_USER
+      value: "default"
+    - name: RUNS_ACCELERATOR_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: "chartsnap-olap-runs-accelerator"
+          key: "RUNS_ACCELERATOR_PASSWORD"
+    - name: RUNS_ACCELERATOR_PARAMS
+      value: "?fail-fast=true&tls=false"
+    - name: TEST_CONNECTION_URL
+      value: "clickhouse://$(RUNS_ACCELERATOR_USER):$(RUNS_ACCELERATOR_PASSWORD)@$(RUNS_ACCELERATOR_HOST):$(RUNS_ACCELERATOR_PORT)/$(RUNS_ACCELERATOR_DATABASE)$(RUNS_ACCELERATOR_PARAMS)"
+    command:
+    - sh
+    - -c
+    - |
+      echo "Testing OLAP env vars for runsAccelerator..."
+      fail=0
+      for var in RUNS_ACCELERATOR_HOST RUNS_ACCELERATOR_PORT RUNS_ACCELERATOR_DATABASE RUNS_ACCELERATOR_USER RUNS_ACCELERATOR_PASSWORD RUNS_ACCELERATOR_PARAMS; do
+        val=$(eval echo "\$$var")
+        if [ -z "$val" ]; then
+          echo "FAIL: $var is not set"
+          fail=1
+        else
+          echo "OK: $var is set"
+        fi
+      done
+      if [ -z "$TEST_CONNECTION_URL" ]; then
+        echo "FAIL: TEST_CONNECTION_URL is not set"
+        fail=1
+      else
+        echo "OK: TEST_CONNECTION_URL=$TEST_CONNECTION_URL"
+      fi
+      exit $fail
   restartPolicy: Never
 ---
 # Source: operator-wandb/templates/tests/test-weave.yaml

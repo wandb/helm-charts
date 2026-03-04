@@ -304,84 +304,115 @@ Global values will override any chart-specific values.
 {{ include "wandb.clickhouseConfigEnvs" . }}
 {{- end -}}
 
-{{- define "wandb.registrySearchEnvs" -}}
+{{- define "wandb.olapFeatureEnvs" -}}
 {{- /*
-  ATTENTION!
+  Shared template for OLAP feature environment variables.
 
-  REGISTRY_SEARCH_CH_HOST, REGISTRY_SEARCH_CH_PORT, REGISTRY_SEARCH_CH_DATABASE,
-  REGISTRY_SEARCH_CH_USER, REGISTRY_SEARCH_CH_PASSWORD
+  Params (via dict):
+    root           - top-level Helm context (.)
+    featureName    - key under global.olap, e.g. "registrySearch"
+    envvarPrefix   - env var prefix, e.g. "REGISTRY_SEARCH"
+    finalEnvName   - the composed URL env var, e.g. "GORILLA_REGISTRY_SEARCH_ADDRESS"
 
-  Are all set in the values.yaml under global.registrySearch.(host,port,database,user,password)
-
-  The following blocks enable values to be provided in one of two ways:
+  Merges global.olap.<featureName> over global.olap.default.
+  Each field supports both plain values and K8s refs (valueFrom maps).
+  The params map is serialized into a query string. The type field drives
+  the connection URL schema.
 
   AS STANDARD:
-    registrySearch:
-      enabled: true
-      host: "clickhouse.example.com"
-      port: 9440
-      user: "default"
-      password: "supersafe"
-      database: "registry_search"
+    olap:
+      default:
+        host: "clickhouse.example.com"
+        port: "9440"
+        user: "default"
+        password: "supersafe"
+      registrySearch:
+        enabled: true
+        database: "registry_search"
 
   AS K8s REFS:
-    registrySearch:
-      enabled: true
-      host:
-        valueFrom:
-          secretKeyRef:
-            name: "registry-search-secret"
-            key: "host"
-      port:
-        valueFrom:
-          configMapKeyRef:
-            name: "registry-search-config"
-            key: "port"
-      ...
+    olap:
+      registrySearch:
+        enabled: true
+        host:
+          valueFrom:
+            configMapKeyRef:
+              name: "clickhouse-registry-search"
+              key: "host"
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: "clickhouse-registry-search-password"
+              key: "password"
 */ -}}
-{{- if .Values.global.registrySearch.enabled }}
-{{- if kindIs "map" .Values.global.registrySearch.host }}
-- name: REGISTRY_SEARCH_CH_HOST
-{{- toYaml .Values.global.registrySearch.host | nindent 2 }}
+{{- $config := include "wandb.olapConfig" (dict "root" .root "featureName" .featureName) | fromYaml -}}
+{{- if $config.enabled -}}
+{{- $prefix := .envvarPrefix -}}
+{{- $secretName := include "wandb.olapSecretName" (dict "root" .root "featureName" .featureName) -}}
+{{- $secretKey := include "wandb.olapSecretKey" (dict "envvarPrefix" $prefix) -}}
+{{- if kindIs "map" $config.host }}
+- name: {{ $prefix }}_HOST
+{{- toYaml $config.host | nindent 2 }}
 {{- else }}
-- name: REGISTRY_SEARCH_CH_HOST
-  value: "{{ include "wandb.registrySearch.host" . }}"
+- name: {{ $prefix }}_HOST
+  value: {{ tpl ($config.host | toString) .root | quote }}
 {{- end }}
-{{- if kindIs "map" .Values.global.registrySearch.port }}
-- name: REGISTRY_SEARCH_CH_PORT
-{{- toYaml .Values.global.registrySearch.port | nindent 2 }}
+{{- if kindIs "map" $config.port }}
+- name: {{ $prefix }}_PORT
+{{- toYaml $config.port | nindent 2 }}
 {{- else }}
-- name: REGISTRY_SEARCH_CH_PORT
-  value: "{{ include "wandb.registrySearch.port" . }}"
+- name: {{ $prefix }}_PORT
+  value: {{ $config.port | toString | quote }}
 {{- end }}
-{{- if kindIs "map" .Values.global.registrySearch.database }}
-- name: REGISTRY_SEARCH_CH_DATABASE
-{{- toYaml .Values.global.registrySearch.database | nindent 2 }}
+{{- if kindIs "map" $config.database }}
+- name: {{ $prefix }}_DATABASE
+{{- toYaml $config.database | nindent 2 }}
 {{- else }}
-- name: REGISTRY_SEARCH_CH_DATABASE
-  value: "{{ include "wandb.registrySearch.database" . }}"
+- name: {{ $prefix }}_DATABASE
+  value: {{ $config.database | quote }}
 {{- end }}
-{{- if kindIs "map" .Values.global.registrySearch.user }}
-- name: REGISTRY_SEARCH_CH_USER
-{{- toYaml .Values.global.registrySearch.user | nindent 2 }}
+{{- if kindIs "map" $config.user }}
+- name: {{ $prefix }}_USER
+{{- toYaml $config.user | nindent 2 }}
 {{- else }}
-- name: REGISTRY_SEARCH_CH_USER
-  value: "{{ include "wandb.registrySearch.user" . }}"
+- name: {{ $prefix }}_USER
+  value: {{ $config.user | quote }}
 {{- end }}
-{{- if kindIs "map" .Values.global.registrySearch.password }}
-- name: REGISTRY_SEARCH_CH_PASSWORD
-{{- toYaml .Values.global.registrySearch.password | nindent 2 }}
+{{- if kindIs "map" $config.password }}
+- name: {{ $prefix }}_PASSWORD
+{{- toYaml $config.password | nindent 2 }}
 {{- else }}
-- name: REGISTRY_SEARCH_CH_PASSWORD
+- name: {{ $prefix }}_PASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ include "wandb.registrySearch.internalSecretName" . | quote }}
-      key: {{ include "wandb.registrySearch.internalSecretKey" . | quote }}
+      name: {{ $secretName | quote }}
+      key: {{ $secretKey | quote }}
 {{- end }}
-- name: GORILLA_REGISTRY_SEARCH_ADDRESS
-  value: "{{ include "wandb.registrySearchAddress" . | trim }}"
+- name: {{ $prefix }}_PARAMS
+  value: {{ include "wandb.olapParamsQuery" (dict "params" $config.params) | quote }}
+- name: {{ .finalEnvName }}
+  value: "{{ $config.type }}://$({{ $prefix }}_USER):$({{ $prefix }}_PASSWORD)@$({{ $prefix }}_HOST):$({{ $prefix }}_PORT)/$({{ $prefix }}_DATABASE)$({{ $prefix }}_PARAMS)"
 {{- end }}
 {{- end -}}
+
+{{- define "wandb.registrySearchEnvs" -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "registrySearch" "envvarPrefix" "REGISTRY_SEARCH" "finalEnvName" "GORILLA_REGISTRY_SEARCH_ADDRESS") -}}
+{{- end -}}
+
+{{- define "wandb.runsAcceleratorEnvs" -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runsAccelerator" "envvarPrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") -}}
+{{- end -}}
+
+# TODO: uncomment when history updater is ready to be interated.
+# {{- define "wandb.historyUpdaterEnvs" -}}
+# {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "historyUpdater" "envvarPrefix" "HISTORY_UPDATER" "finalEnvName" "GORILLA_STORAGE_ENGINE_ADDRESS") -}}
+# {{- end -}}
+
+# TODO: uncomment when weave trace is ready to be interated. 
+# Note, right now it is using WF_CLICKHOUSE as the envvar prefix, but we should probably change it to something else.
+# {{- define "wandb.weaveTraceEnvs" -}}
+# {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "weaveTrace" "envvarPrefix" "WEAVE_TRACE" "finalEnvName" "GORILLA_WEAVE_TRACE_ADDRESS") -}}
+# {{- end -}}
 
 {{- define "wandb.historyStoreEnvs" -}}
 - name: GORILLA_HISTORY_STORE
