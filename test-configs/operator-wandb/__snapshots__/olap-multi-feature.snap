@@ -435,20 +435,6 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: "chartsnap-olap-history-updater"
-  annotations:
-    "helm.sh/resource-policy": "keep"
-    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
-    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
-    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
-  labels:
-data:
-  HISTORY_UPDATER_PASSWORD: '###DYNAMIC_FIELD###'
----
-# Source: operator-wandb/templates/olap.yaml
-apiVersion: v1
-kind: Secret
-metadata:
   name: "chartsnap-olap-registry-search"
   annotations:
     "helm.sh/resource-policy": "keep"
@@ -6456,7 +6442,7 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "chartsnap-operator-wandb-test-olap-history-updater"
+  name: "chartsnap-operator-wandb-test-olap-registry-search"
   labels:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: operator-wandb
@@ -6470,67 +6456,6 @@ spec:
   - name: test-olap-envs
     image: us-docker.pkg.dev/wandb-production/public/python:3.12
     env:
-    # TODO: validate this doesn't silently break inside the operator. Punting for now.
-    #
-    - name: HISTORY_UPDATER_HOST
-      value: "shared-clickhouse.example.com"
-    - name: HISTORY_UPDATER_PORT
-      value: "9440"
-    - name: HISTORY_UPDATER_DATABASE
-      value: "custom_history_db"
-    - name: HISTORY_UPDATER_USER
-      value: "shared-user"
-    - name: HISTORY_UPDATER_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: "chartsnap-olap-history-updater"
-          key: "HISTORY_UPDATER_PASSWORD"
-    - name: HISTORY_UPDATER_PARAMS
-      value: ""
-    - name: TEST_CONNECTION_URL
-      value: "clickhouse://$(HISTORY_UPDATER_USER):$(HISTORY_UPDATER_PASSWORD)@$(HISTORY_UPDATER_HOST):$(HISTORY_UPDATER_PORT)/$(HISTORY_UPDATER_DATABASE)$(HISTORY_UPDATER_PARAMS)"
-    command:
-    - sh
-    - -c
-    - |
-      echo "Testing OLAP env vars for historyUpdater..."
-      fail=0
-      for var in HISTORY_UPDATER_HOST HISTORY_UPDATER_PORT HISTORY_UPDATER_DATABASE HISTORY_UPDATER_USER HISTORY_UPDATER_PASSWORD HISTORY_UPDATER_PARAMS; do
-        val=$(eval echo "\$$var")
-        if [ -z "$val" ]; then
-          echo "FAIL: $var is not set"
-          fail=1
-        else
-          echo "OK: $var is set"
-        fi
-      done
-      if [ -z "$TEST_CONNECTION_URL" ]; then
-        echo "FAIL: TEST_CONNECTION_URL is not set"
-        fail=1
-      else
-        echo "OK: TEST_CONNECTION_URL=$TEST_CONNECTION_URL"
-      fi
-      exit $fail
-  restartPolicy: Never---
-apiVersion: v1
-kind: Pod
-metadata:
-  name: "chartsnap-operator-wandb-test-olap-registry-search"
-  labels:
-    helm.sh/chart: operator-wandb-0.41.0
-    app.kubernetes.io/name: operator-wandb
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.0.0"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": test
-spec:
-  containers:
-  - name: test-olap-envs
-    image: us-docker.pkg.dev/wandb-production/public/python:3.12
-    env:
-    # TODO: validate this doesn't silently break inside the operator. Punting for now.
-    #
     - name: REGISTRY_SEARCH_HOST
       value: "shared-clickhouse.example.com"
     - name: REGISTRY_SEARCH_PORT
@@ -6588,8 +6513,6 @@ spec:
   - name: test-olap-envs
     image: us-docker.pkg.dev/wandb-production/public/python:3.12
     env:
-    # TODO: validate this doesn't silently break inside the operator. Punting for now.
-    #
     - name: RUN_STORE_ACCELERATOR_HOST
       value: "runs-clickhouse.example.com"
     - name: RUN_STORE_ACCELERATOR_PORT

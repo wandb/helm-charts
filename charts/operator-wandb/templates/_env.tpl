@@ -347,10 +347,12 @@ Global values will override any chart-specific values.
 */ -}}
 {{- $config := include "wandb.olapConfig" (dict "root" .root "featureName" .featureName) | fromYaml -}}
 {{- if $config.enabled -}}
-  # TODO: validate this doesn't silently break inside the operator. Punting for now.
-  # {{- if and (not (kindIs "map" $config.host)) (empty $config.host) -}}
-  #   {{- fail (printf "global.olap.%s: host must be set (either in global.olap.default.host or global.olap.%s.host) when enabled" .featureName .featureName) -}}
-  # {{- end -}}
+  {{- /*
+    # TODO: validate this doesn't silently break inside the operator. Punting for now.
+    # {{- if and (not (kindIs "map" $config.host)) (empty $config.host) -}}
+    #   {{- fail (printf "global.olap.%s: host must be set (either in global.olap.default.host or global.olap.%s.host) when enabled" .featureName .featureName) -}}
+    # {{- end -}}
+ */}}
   {{- $prefix := .envvarPrefix -}}
   {{- $secretName := include "wandb.olapSecretName" (dict "root" .root "featureName" .featureName) -}}
   {{- $secretKey := include "wandb.olapSecretKey" (dict "envvarPrefix" $prefix) -}}
@@ -407,16 +409,20 @@ Global values will override any chart-specific values.
 {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envvarPrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") -}}
 {{- end -}}
 
+{{/* 
 # TODO: wire into api/glue etc envTpls when history updater is ready.
 # {{- define "wandb.historyUpdaterEnvs" -}}
 # {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "historyUpdater" "envvarPrefix" "HISTORY_UPDATER" "finalEnvName" "GORILLA_STORAGE_ENGINE_ADDRESS") -}}
 # {{- end -}}
+ */}}
 
+{{/* 
 # TODO: uncomment when weave trace is ready to be integrated. 
 # Note, right now it is using WF_CLICKHOUSE as the envvar prefix, but we might want to change this to something else if not overly coupled in the weaveTrace code. 
 # {{- define "wandb.weaveTraceEnvs" -}}
 # {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "weaveTrace" "envvarPrefix" "WEAVE_TRACE" "finalEnvName" "GORILLA_WEAVE_TRACE_ADDRESS") -}}
 # {{- end -}}
+ */}}
 
 {{- define "wandb.historyStoreEnvs" -}}
 - name: GORILLA_HISTORY_STORE
