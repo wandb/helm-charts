@@ -403,8 +403,8 @@ Global values will override any chart-specific values.
 {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "registrySearch" "envvarPrefix" "REGISTRY_SEARCH" "finalEnvName" "GORILLA_REGISTRY_SEARCH_ADDRESS") -}}
 {{- end -}}
 
-{{- define "wandb.runsAcceleratorEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runsAccelerator" "envvarPrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") -}}
+{{- define "wandb.runStoreAcceleratorEnvs" -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envvarPrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") -}}
 {{- end -}}
 
 # TODO: wire into api/glue etc envTpls when history updater is ready.
