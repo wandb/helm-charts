@@ -313,6 +313,7 @@ Global values will override any chart-specific values.
     featureName    - key under global.olap, e.g. "registrySearch"
     envVarPrefix   - env var prefix, e.g. "REGISTRY_SEARCH"
     finalEnvName   - the composed URL env var, e.g. "GORILLA_REGISTRY_SEARCH_ADDRESS"
+    migratePrefix  - (optional) prefix for MIGRATE_*_DB env var; defaults to envVarPrefix
 
   Merges global.olap.<featureName> over global.olap.default.
   Each field supports both plain values and K8s refs (valueFrom maps).
@@ -399,22 +400,18 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.olapParamsQuery" (dict "params" $config.params) | quote }}
 - name: {{ .finalEnvName }}
   value: {{ $finalConnectionUrl | quote }}
-- name: "MIGRATE_{{ $prefix }}_DB"
+{{- $migratePrefix := default $prefix .migratePrefix }}
+- name: "MIGRATE_{{ $migratePrefix }}_DB"
   value: {{ $finalConnectionUrl | quote }}
   {{- end }}
 {{- end -}}
 
 {{- define "wandb.registrySearchEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "registrySearch" "envVarPrefix" "REGISTRY_SEARCH" "finalEnvName" "GORILLA_REGISTRY_SEARCH_ADDRESS") -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "registrySearch" "envVarPrefix" "REGISTRY_SEARCH" "migratePrefix" "ARTIFACTS" "finalEnvName" "GORILLA_REGISTRY_SEARCH_ADDRESS") -}}
 {{- end -}}
 
 {{- define "wandb.runStoreAcceleratorEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") }}
-{{- /* TODO: (David Jackson) Remove RUNS_ACCELERATOR in next server release. This is just to ensure we don't break the migration-db init container. */}}
-{{- if .Values.global.olap.runStoreAccelerator.enabled }}
-- name: MIGRATE_RUNS_ACCELERATOR_DB
-  value: "$(MIGRATE_RUN_STORE_ACCELERATOR_DB)"
-{{- end }}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUN_STORE_ACCELERATOR" "migratePrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") }}
 {{- end -}}
 
 {{- /* TODO: Anni/Seong to look into schema migrations for history.
