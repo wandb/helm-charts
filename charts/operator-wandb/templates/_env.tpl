@@ -394,10 +394,13 @@ Global values will override any chart-specific values.
       name: {{ $secretName | quote }}
       key: {{ $secretKey | quote }}
 {{- end }}
+  {{- $finalConnectionUrl := printf "%s://$(%s_USER):$(%s_PASSWORD)@$(%s_HOST):$(%s_PORT)/$(%s_DATABASE)$(%s_PARAMS)" $config.type $prefix $prefix $prefix $prefix $prefix $prefix }}
 - name: {{ $prefix }}_PARAMS
   value: {{ include "wandb.olapParamsQuery" (dict "params" $config.params) | quote }}
 - name: {{ .finalEnvName }}
-  value: "{{ $config.type }}://$({{ $prefix }}_USER):$({{ $prefix }}_PASSWORD)@$({{ $prefix }}_HOST):$({{ $prefix }}_PORT)/$({{ $prefix }}_DATABASE)$({{ $prefix }}_PARAMS)"
+  value: {{ $finalConnectionUrl | quote }}
+- name: "MIGRATE_{{ $prefix }}_DB"
+  value: {{ $finalConnectionUrl | quote }}
   {{- end }}
 {{- end -}}
 
@@ -407,14 +410,13 @@ Global values will override any chart-specific values.
 
 {{- define "wandb.runStoreAcceleratorEnvs" -}}
 {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envvarPrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") -}}
+{{- /* TODO: (David Jackson) Remove RUNS_ACCELERATOR in next server release. This is just to ensure we don't break the migration-db init container. */ -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envvarPrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUNS_ACCELERATOR_ADDRESS") -}}
 {{- end -}}
 
-{{/* 
-# TODO: wire into api/glue etc envTpls when history updater is ready.
-# {{- define "wandb.historyUpdaterEnvs" -}}
-# {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "historyUpdater" "envvarPrefix" "HISTORY_UPDATER" "finalEnvName" "GORILLA_STORAGE_ENGINE_ADDRESS") -}}
-# {{- end -}}
- */}}
+{{- define "wandb.historyUpdaterEnvs" -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "historyUpdater" "envvarPrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_ADDRESS") -}}
+{{- end -}}
 
 {{/* 
 # TODO: uncomment when weave trace is ready to be integrated. 
