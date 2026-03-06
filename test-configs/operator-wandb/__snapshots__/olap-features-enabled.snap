@@ -699,7 +699,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: "chartsnap-olap-history-updater"
+  name: "chartsnap-olap-history"
   annotations:
     "helm.sh/resource-policy": "keep"
     "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
@@ -707,7 +707,7 @@ metadata:
     "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
   labels:
 data:
-  HISTORY_UPDATER_PASSWORD: '###DYNAMIC_FIELD###'
+  HISTORY_PASSWORD: dGVzdC1jbGlja2hvdXNlLXBhc3N3b3Jk
 ---
 # Source: operator-wandb/templates/olap.yaml
 apiVersion: v1
@@ -3749,7 +3749,7 @@ spec:
           valueFrom:
             secretKeyRef:
               key: HISTORY_PASSWORD
-              name: chartsnap-olap-history-updater
+              name: chartsnap-olap-history
         - name: HISTORY_PARAMS
           value: ?tls=false
         - name: GORILLA_HISTORY_ADDRESS
@@ -4064,7 +4064,7 @@ spec:
           valueFrom:
             secretKeyRef:
               key: HISTORY_PASSWORD
-              name: chartsnap-olap-history-updater
+              name: chartsnap-olap-history
         - name: HISTORY_PARAMS
           value: ?tls=false
         - name: GORILLA_HISTORY_ADDRESS
@@ -5829,7 +5829,7 @@ spec:
           valueFrom:
             secretKeyRef:
               key: HISTORY_PASSWORD
-              name: chartsnap-olap-history-updater
+              name: chartsnap-olap-history
         - name: HISTORY_PARAMS
           value: ?tls=false
         - name: GORILLA_HISTORY_ADDRESS
@@ -6127,7 +6127,7 @@ spec:
           valueFrom:
             secretKeyRef:
               key: HISTORY_PASSWORD
-              name: chartsnap-olap-history-updater
+              name: chartsnap-olap-history
         - name: HISTORY_PARAMS
           value: ?tls=false
         - name: GORILLA_HISTORY_ADDRESS
@@ -8487,7 +8487,7 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: "chartsnap-operator-wandb-test-olap-history-updater"
+  name: "chartsnap-operator-wandb-test-olap-history"
   labels:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: operator-wandb
@@ -8501,32 +8501,32 @@ spec:
   - name: test-olap-envs
     image: us-docker.pkg.dev/wandb-production/public/python:3.12
     env:
-    - name: HISTORY_UPDATER_HOST
+    - name: HISTORY_HOST
       value: "chartsnap-clickhouse-headless"
-    - name: HISTORY_UPDATER_PORT
+    - name: HISTORY_PORT
       value: "9000"
-    - name: HISTORY_UPDATER_DATABASE
+    - name: HISTORY_DATABASE
       value: "history"
-    - name: HISTORY_UPDATER_USER
+    - name: HISTORY_USER
       value: "default"
-    - name: HISTORY_UPDATER_PASSWORD
+    - name: HISTORY_PASSWORD
       valueFrom:
         secretKeyRef:
-          name: "chartsnap-olap-history-updater"
-          key: "HISTORY_UPDATER_PASSWORD"
-    - name: HISTORY_UPDATER_PARAMS
+          name: "chartsnap-olap-history"
+          key: "HISTORY_PASSWORD"
+    - name: HISTORY_PARAMS
       value: "?tls=false"
     - name: TEST_CONNECTION_URL
-      value: "clickhouse://$(HISTORY_UPDATER_USER):$(HISTORY_UPDATER_PASSWORD)@$(HISTORY_UPDATER_HOST):$(HISTORY_UPDATER_PORT)/$(HISTORY_UPDATER_DATABASE)$(HISTORY_UPDATER_PARAMS)"
-    - name: "MIGRATE_HISTORY_UPDATER_DB"
-      value: "clickhouse://$(HISTORY_UPDATER_USER):$(HISTORY_UPDATER_PASSWORD)@$(HISTORY_UPDATER_HOST):$(HISTORY_UPDATER_PORT)/$(HISTORY_UPDATER_DATABASE)$(HISTORY_UPDATER_PARAMS)"
+      value: "clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)"
+    - name: "MIGRATE_HISTORY_DB"
+      value: "clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)"
     command:
     - sh
     - -c
     - |
-      echo "Testing OLAP env vars for historyUpdater..."
+      echo "Testing OLAP env vars for history..."
       fail=0
-      for var in HISTORY_UPDATER_HOST HISTORY_UPDATER_PORT HISTORY_UPDATER_DATABASE HISTORY_UPDATER_USER HISTORY_UPDATER_PASSWORD HISTORY_UPDATER_PARAMS; do
+      for var in HISTORY_HOST HISTORY_PORT HISTORY_DATABASE HISTORY_USER HISTORY_PASSWORD HISTORY_PARAMS; do
         val=$(eval echo "\$$var")
         if [ -z "$val" ]; then
           echo "FAIL: $var is not set"
