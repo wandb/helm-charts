@@ -414,12 +414,9 @@ Global values will override any chart-specific values.
 {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUN_STORE_ACCELERATOR" "migratePrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") }}
 {{- end -}}
 
-{{- /* TODO: Re-enable once history migration SQL is fixed for self-hosted ClickHouse.
-   See history-migration-fails.md for root cause.
 {{- define "wandb.historyEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_ADDRESS") -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "migratePrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_ADDRESS") -}}
 {{- end -}}
-*/ -}}
 
 {{/* 
 # TODO: uncomment when weave trace is ready to be integrated. 
