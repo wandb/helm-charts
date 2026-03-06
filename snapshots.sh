@@ -16,6 +16,15 @@ if ! helm plugin list | grep -q "cascade"; then
   exit 1
 fi
 
+# Check if ct (chart-testing) is installed
+function check_ct() {
+  if ! command -v ct &> /dev/null; then
+    echo "❌ ct (chart-testing) is not installed"
+    echo "Install: https://github.com/helm/chart-testing#installation"
+    exit 1
+  fi
+}
+
 function usage() {
   cat <<EOF
 A helper script for the helm-chartsnap plugin https://github.com/jlandowner/helm-chartsnap
@@ -26,6 +35,7 @@ Commands:
   build,    build the operator-wandb chart
   update,   execute chartsnap to update the snapshots
   run,      executes chartsnap to test helm changes
+  lint,     lint the operator-wandb chart with ct lint
 EOF
 }
 
@@ -49,6 +59,12 @@ function run_chart() {
   helm chartsnap -c "./charts/$chart" -f "$values_file"
 }
 
+function lint_chart() {
+  local chart="$1"
+  check_ct
+  echo "Linting $chart"
+  ct lint --config ct.yaml --charts "./charts/$chart"
+}
 
 function main() {
   local chart="operator-wandb"
@@ -74,6 +90,9 @@ function main() {
       ;;
     run)
       run_chart "$chart" "./$values_dir/$chart"
+      ;;
+    lint)
+      lint_chart "$chart"
       ;;
     *)
       usage
