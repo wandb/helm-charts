@@ -2,7 +2,7 @@
   {{- if ne $featureName "default" -}}
     {{- $config := include "wandb.olapConfig" (dict "root" $ "featureName" $featureName) | fromYaml -}}
     {{- if $config.enabled -}}
-      {{- $envvarPrefix := $featureName | snakecase | upper -}}
+      {{- $envVarPrefix := $featureName | snakecase | upper -}}
       {{- $kebab := $featureName | snakecase | replace "_" "-" -}}
 ---
 apiVersion: v1
@@ -18,14 +18,14 @@ spec:
     - name: test-olap-envs
       image: us-docker.pkg.dev/wandb-production/public/python:3.12
       env:
-        {{- include "wandb.olapFeatureEnvs" (dict "root" $ "featureName" $featureName "envvarPrefix" $envvarPrefix "finalEnvName" "TEST_CONNECTION_URL") | nindent 8 }}
+        {{- include "wandb.olapFeatureEnvs" (dict "root" $ "featureName" $featureName "envVarPrefix" $envVarPrefix "finalEnvName" "TEST_CONNECTION_URL") | nindent 8 }}
       command:
         - sh
         - -c
         - |
           echo "Testing OLAP env vars for {{ $featureName }}..."
           fail=0
-          for var in {{ $envvarPrefix }}_HOST {{ $envvarPrefix }}_PORT {{ $envvarPrefix }}_DATABASE {{ $envvarPrefix }}_USER {{ $envvarPrefix }}_PASSWORD {{ $envvarPrefix }}_PARAMS; do
+          for var in {{ $envVarPrefix }}_HOST {{ $envVarPrefix }}_PORT {{ $envVarPrefix }}_DATABASE {{ $envVarPrefix }}_USER {{ $envVarPrefix }}_PASSWORD {{ $envVarPrefix }}_PARAMS; do
             val=$(eval echo "\$$var")
             if [ -z "$val" ]; then
               echo "FAIL: $var is not set"

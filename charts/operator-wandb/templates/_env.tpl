@@ -311,7 +311,7 @@ Global values will override any chart-specific values.
   Params (via dict):
     root           - top-level Helm context (.)
     featureName    - key under global.olap, e.g. "registrySearch"
-    envvarPrefix   - env var prefix, e.g. "REGISTRY_SEARCH"
+    envVarPrefix   - env var prefix, e.g. "REGISTRY_SEARCH"
     finalEnvName   - the composed URL env var, e.g. "GORILLA_REGISTRY_SEARCH_ADDRESS"
 
   Merges global.olap.<featureName> over global.olap.default.
@@ -353,9 +353,9 @@ Global values will override any chart-specific values.
     #   {{- fail (printf "global.olap.%s: host must be set (either in global.olap.default.host or global.olap.%s.host) when enabled" .featureName .featureName) -}}
     # {{- end -}}
  */}}
-  {{- $prefix := .envvarPrefix -}}
+  {{- $prefix := .envVarPrefix -}}
   {{- $secretName := include "wandb.olapSecretName" (dict "root" .root "featureName" .featureName) -}}
-  {{- $secretKey := include "wandb.olapSecretKey" (dict "envvarPrefix" $prefix) -}}
+  {{- $secretKey := include "wandb.olapSecretKey" (dict "envVarPrefix" $prefix) -}}
 {{- if kindIs "map" $config.host }}
 - name: {{ $prefix }}_HOST
 {{- toYaml $config.host | nindent 2 }}
@@ -405,24 +405,24 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.registrySearchEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "registrySearch" "envvarPrefix" "REGISTRY_SEARCH" "finalEnvName" "GORILLA_REGISTRY_SEARCH_ADDRESS") -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "registrySearch" "envVarPrefix" "REGISTRY_SEARCH" "finalEnvName" "GORILLA_REGISTRY_SEARCH_ADDRESS") -}}
 {{- end -}}
 
 {{- define "wandb.runStoreAcceleratorEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envvarPrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") -}}
 {{- /* TODO: (David Jackson) Remove RUNS_ACCELERATOR in next server release. This is just to ensure we don't break the migration-db init container. */ -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envvarPrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUNS_ACCELERATOR_ADDRESS") -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUNS_ACCELERATOR_ADDRESS") -}}
 {{- end -}}
 
 {{- define "wandb.historyUpdaterEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "historyUpdater" "envvarPrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_ADDRESS") -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "historyUpdater" "envVarPrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_ADDRESS") -}}
 {{- end -}}
 
 {{/* 
 # TODO: uncomment when weave trace is ready to be integrated. 
-# Note, right now it is using WF_CLICKHOUSE as the envvar prefix, but we might want to change this to something else if not overly coupled in the weaveTrace code. 
+# Note, right now it is using WF_CLICKHOUSE as the env var prefix, but we might want to change this to something else if not overly coupled in the weaveTrace code. 
 # {{- define "wandb.weaveTraceEnvs" -}}
-# {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "weaveTrace" "envvarPrefix" "WEAVE_TRACE" "finalEnvName" "GORILLA_WEAVE_TRACE_ADDRESS") -}}
+# {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "weaveTrace" "envVarPrefix" "WEAVE_TRACE" "finalEnvName" "GORILLA_WEAVE_TRACE_ADDRESS") -}}
 # {{- end -}}
  */}}
 

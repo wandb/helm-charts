@@ -32,12 +32,12 @@ Returns: e.g. "myrelease-olap-registry-search"
 wandb.olapSecretKey returns the data key for the password within the OLAP secret.
 
 Usage:
-  include "wandb.olapSecretKey" (dict "envvarPrefix" "REGISTRY_SEARCH")
+  include "wandb.olapSecretKey" (dict "envVarPrefix" "REGISTRY_SEARCH")
 
 Returns: e.g. "REGISTRY_SEARCH_PASSWORD"
 */}}
 {{- define "wandb.olapSecretKey" -}}
-{{- printf "%s_PASSWORD" .envvarPrefix -}}
+{{- printf "%s_PASSWORD" .envVarPrefix -}}
 {{- end -}}
 
 {{/*
