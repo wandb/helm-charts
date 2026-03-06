@@ -417,9 +417,11 @@ Global values will override any chart-specific values.
 {{- end }}
 {{- end -}}
 
+{{- /* TODO: Anni/Seong to look into schema migrations for history.
 {{- define "wandb.historyEnvs" -}}
 {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_ADDRESS") -}}
 {{- end -}}
+*/ -}}
 
 {{/* 
 # TODO: uncomment when weave trace is ready to be integrated. 
