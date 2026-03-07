@@ -18,15 +18,15 @@ spec:
     - name: test-olap-envs
       image: us-docker.pkg.dev/wandb-production/public/python:3.12
       env:
-        {{- include "wandb.olapFeatureEnvs" (dict "root" $ "featureName" $featureName "envVarPrefix" $envVarPrefix "finalEnvName" "TEST_CONNECTION_URL") | nindent 8 }}
+        {{- include "wandb.olapFeatureEnvs" (dict "root" $ "featureName" $featureName "envVarPrefix" $envVarPrefix "migratePrefix" $envVarPrefix "finalEnvName" "TEST_CONNECTION_URL") | nindent 8 }}
       command:
         - sh
         - -c
         - |
           echo "Testing OLAP env vars for {{ $featureName }}..."
           fail=0
-          for var in {{ $envVarPrefix }}_HOST {{ $envVarPrefix }}_PORT {{ $envVarPrefix }}_DATABASE {{ $envVarPrefix }}_USER {{ $envVarPrefix }}_PASSWORD {{ $envVarPrefix }}_PARAMS; do
-            val=$(eval echo "\$$var")
+          for var in {{ $envVarPrefix }}_HOST {{ $envVarPrefix }}_PORT {{ $envVarPrefix }}_DATABASE {{ $envVarPrefix }}_USER {{ $envVarPrefix }}_PASSWORD {{ $envVarPrefix }}_PARAMS MIGRATE_{{ $envVarPrefix }}_DB; do
+            val=$(printenv "$var" || true)
             if [ -z "$val" ]; then
               echo "FAIL: $var is not set"
               fail=1
@@ -38,7 +38,7 @@ spec:
             echo "FAIL: TEST_CONNECTION_URL is not set"
             fail=1
           else
-            echo "OK: TEST_CONNECTION_URL=$TEST_CONNECTION_URL"
+            echo "OK: TEST_CONNECTION_URL is set"
           fi
           exit $fail
   restartPolicy: Never
