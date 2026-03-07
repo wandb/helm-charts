@@ -1,0 +1,47 @@
+{{- range $featureName, $featureConfig := .Values.global.olap -}}
+  {{- if ne $featureName "default" -}}
+    {{- $config := include "wandb.olapConfig" (dict "root" $ "featureName" $featureName) | fromYaml -}}
+    {{- if $config.enabled -}}
+      {{- $envVarPrefix := $featureName | snakecase | upper -}}
+      {{- $kebab := $featureName | snakecase | replace "_" "-" -}}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "wandb.fullname" $ }}-test-olap-{{ $kebab }}"
+  labels:
+    {{- include "wandb.labels" $ | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: test-olap-envs
+      image: us-docker.pkg.dev/wandb-production/public/python:3.12
+      env:
+        {{- include "wandb.olapFeatureEnvs" (dict "root" $ "featureName" $featureName "envVarPrefix" $envVarPrefix "migratePrefix" $envVarPrefix "finalEnvName" "TEST_CONNECTION_URL") | nindent 8 }}
+      command:
+        - sh
+        - -c
+        - |
+          echo "Testing OLAP env vars for {{ $featureName }}..."
+          fail=0
+          for var in {{ $envVarPrefix }}_HOST {{ $envVarPrefix }}_PORT {{ $envVarPrefix }}_DATABASE {{ $envVarPrefix }}_USER {{ $envVarPrefix }}_PASSWORD {{ $envVarPrefix }}_PARAMS MIGRATE_{{ $envVarPrefix }}_DB; do
+            val=$(printenv "$var" || true)
+            if [ -z "$val" ]; then
+              echo "FAIL: $var is not set"
+              fail=1
+            else
+              echo "OK: $var is set"
+            fi
+          done
+          if [ -z "$TEST_CONNECTION_URL" ]; then
+            echo "FAIL: TEST_CONNECTION_URL is not set"
+            fail=1
+          else
+            echo "OK: TEST_CONNECTION_URL is set"
+          fi
+          exit $fail
+  restartPolicy: Never
+    {{- end }}
+  {{- end }}
+{{- end }}
