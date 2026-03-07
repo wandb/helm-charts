@@ -411,7 +411,10 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.runStoreAcceleratorEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUN_STORE_ACCELERATOR" "migratePrefix" "RUNS_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") }}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUN_STORE_ACCELERATOR" "migratePrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") }}
+{{- /*TODO: Remove once Go code migrates EnvVarPrefix from RUNS_ACCELERATOR to RUN_STORE_ACCELERATOR */}}
+- name: MIGRATE_RUNS_ACCELERATOR_DB
+  value: "$(MIGRATE_RUN_STORE_ACCELERATOR_DB)"
 {{- end -}}
 
 {{- define "wandb.historyEnvs" -}}
