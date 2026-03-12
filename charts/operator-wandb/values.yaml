@@ -2899,6 +2899,104 @@ weave-evaluate-model-worker:
           maxReplicas: 6
           minReplicas: 2
 
+weave-trace-alert-worker:
+  install: false
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/weave-trace
+    tag: latest
+  datadog:
+    enabled: false
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  env:
+    WANDB_INTERNAL_SERVICE_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: weave-worker-auth
+          key: key
+  containers:
+    weave-trace-alert-worker:
+      args:
+        - "python"
+        - "-m"
+        - "src.workers.alert_worker.alert_worker"
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+  service:
+    ports:
+      - name: http
+        port: 8724
+        protocol: TCP
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 1
+    large:
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 10
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 15
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 20
+          minReplicas: 2
+
 nginx:
   install: false
   additionalServices: {}
