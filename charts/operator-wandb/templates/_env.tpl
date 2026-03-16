@@ -578,6 +578,10 @@ Global values will override any chart-specific values.
 - name: GORILLA_TRACER
   value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
 {{- end }}
+{{- if .Values.global.otel.profiles.enabled }}
+- name: GORILLA_PROFILER
+  value: '{{ include "wandb.otelProfilesEndpoint" . | trim }}'
+{{- end }}
 {{- end -}}
 
 {{- define "wandb.sslCertEnvs" -}}
