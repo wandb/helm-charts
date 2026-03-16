@@ -81,6 +81,17 @@ otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset
 {{- end -}}
 {{- end -}}
 
+{{/*
+Return the endpoint to send otel profiles to
+*/}}
+{{- define "wandb.otelProfilesEndpoint" -}}
+{{- if .Values.global.otel.profiles.host -}}
+otlp+{{ .Values.global.otel.profiles.proto }}://{{ .Values.global.otel.profiles.host }}:{{ .Values.global.otel.profiles.port }}
+{{- else -}}
+otlp+{{ .Values.global.otel.profiles.proto }}://{{ .Release.Name }}-otel-daemonset:{{ .Values.global.otel.profiles.port }}
+{{- end -}}
+{{- end -}}
+
 {{- define "wandb.internalJWTMap" -}}
 '{
 {{- $items := list -}}
