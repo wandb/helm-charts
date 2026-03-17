@@ -20,21 +20,21 @@
 {{- end -}}
 
 {{- define "wandb.liveHistoryStore" -}}
-{{- $historyStore := include "wandb.mysql" . -}}
+{{- $stores := list -}}
+{{- if .Values.global.olap.history.enabled -}}
+  {{- $stores = append $stores "$(GORILLA_STORAGE_ENGINE_ADDRESS)" -}}
+{{- end -}}
 {{- if or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled -}}
-  {{- $stores := list -}}
-
   {{- if .Values.global.bigtable.v3.enabled -}}
     {{- $stores = append $stores (printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
   {{- end -}}
-
   {{- if .Values.global.bigtable.v2.enabled -}}
     {{- $stores = append $stores (printf "bigtablev2://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
   {{- end -}}
-
-  {{- $historyStore = join "," $stores -}}
+{{- else -}}
+  {{- $stores = append $stores (include "wandb.mysql" .) -}}
 {{- end -}}
-{{- $historyStore -}}
+{{- join "," $stores -}}
 {{- end -}}
 
 {{- define "wandb.fileStreamWorkerStore" -}}
