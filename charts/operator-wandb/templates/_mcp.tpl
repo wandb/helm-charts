@@ -22,4 +22,32 @@ override WF_TRACE_SERVER_URL in the mcp-server.env values block.
   value: "http://{{ .Release.Name }}-weave-trace:8722"
 - name: WANDB_BASE_URL
   value: {{ .Values.global.host | quote }}
+{{- if .Values.datadog.enabled }}
+- name: MCP_DATADOG_ENABLED
+  value: "true"
+- name: DD_SERVICE
+  value: "mcp-server"
+- name: DD_ENV
+  value: "production"
+- name: DD_AGENT_HOST
+  valueFrom:
+    fieldRef:
+      fieldPath: status.hostIP
+- name: DD_TRACE_AGENT_HOSTNAME
+  valueFrom:
+    fieldRef:
+      fieldPath: status.hostIP
+- name: DD_EXCEPTION_REPLAY_ENABLED
+  value: "false"
+- name: DD_TRACE_HEADER_TAGS
+  value: ""
+{{- end }}
+{{- if .Values.otel.enabled }}
+- name: MCP_OTEL_ENABLED
+  value: "true"
+- name: OTEL_SERVICE_NAME
+  value: "mcp-server"
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: "http://{{ .Release.Name }}-otel-collector:4317"
+{{- end }}
 {{- end -}}
