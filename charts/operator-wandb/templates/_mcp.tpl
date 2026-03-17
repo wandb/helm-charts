@@ -1,4 +1,13 @@
 {{/*
+  Fail fast if mcp-server is enabled without a reachable weave-trace.
+*/}}
+{{- if and (index .Values "mcp-server" "install") (not (index .Values "weave-trace" "install")) -}}
+{{- if not (dig "mcp-server" "env" "WF_TRACE_SERVER_URL" "" .Values) -}}
+{{- fail "mcp-server requires weave-trace.install=true or mcp-server.env.WF_TRACE_SERVER_URL to be set" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Environment variables for the MCP server subchart.
 
 Resolves:

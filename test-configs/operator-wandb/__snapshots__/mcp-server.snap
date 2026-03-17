@@ -1904,6 +1904,9 @@ data:
         location /traces {
           proxy_pass http://chartsnap-weave-trace:8722;
         }
+        location /mcp {
+          proxy_pass http://chartsnap-mcp-server:8080;
+        }
         location /bucket {
           proxy_set_header Host minio:9000;
           proxy_pass http://minio:9000;
@@ -2735,7 +2738,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - port: 8080
+  - name: http
+    port: 8080
+    protocol: TCP
     targetPort: 8080
   selector:
     app.kubernetes.io/name: mcp-server
@@ -7443,7 +7448,7 @@ metadata:
 spec:
   containers:
   - name: mcp-health
-    image: busybox
+    image: busybox:1.36
     command: ['wget', '--spider', '-q']
     args: ['http://chartsnap-mcp-server:8080/health']
   restartPolicy: Never
