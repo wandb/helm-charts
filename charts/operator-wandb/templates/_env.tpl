@@ -420,7 +420,7 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.historyEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "migratePrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_ADDRESS") -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "migratePrefix" "HISTORY" "finalEnvName" "GORILLA_STORAGE_ENGINE_ADDRESS") -}}
 {{- end -}}
 
 {{/* 
