@@ -432,7 +432,6 @@ Global values will override any chart-specific values.
  */}}
 
 {{- define "wandb.historyStoreEnvs" -}}
-{{ include "wandb.historyEnvs" . }}
 - name: GORILLA_HISTORY_STORE
   value: {{ include "wandb.historyStore" . | quote }}
 - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
