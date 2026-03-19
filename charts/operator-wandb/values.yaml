@@ -279,6 +279,8 @@ global:
     history:
       enabled: false
       database: "history"
+      params:
+        max_open_conns: 300
     # TODO: wire this up when weave trace is ready to be migrated from global.clickhouse. to global.olap.weaveTrace.
     # weaveTrace:
     #   enabled: false
@@ -578,7 +580,6 @@ api:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.registrySearchEnvs" . }}'
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
-    - '{{ include "wandb.historyEnvs" . }}'
   initContainers:
     init-db:
       enabled: false
@@ -1312,8 +1313,8 @@ anaconda2:
 filestream:
   install: false
   deploymentPostfix: "bc"
-  pubsub:
-    subscriptions: ""
+  pubSub:
+    subscription: ""
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -1414,9 +1415,9 @@ filestream:
 flat-run-fields-updater:
   install: false
   deploymentPostfix: "bc"
-  pubsub:
-    # pubsub subscription comes from terraform
-    subscriptions: ""
+  pubSub:
+    # pubSub subscription comes from terraform
+    subscription: ""
   kafka:
     # flat-run-fields-updater and metric-observer use different consumer id on same topic
     consumerGroupId: "flat-run-fields-updater"
@@ -1445,6 +1446,274 @@ flat-run-fields-updater:
   containers:
     flat-run-fields-updater:
       args: ["flat-run-fields-updater"]
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 1
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 5
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 2
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 1
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 10
+          minReplicas: 3
+        keda:
+          enabled: false
+          minReplicaCount: 3
+          maxReplicaCount: 10
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 5
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 3
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    large:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 15
+          minReplicas: 6
+        keda:
+          enabled: false
+          minReplicaCount: 6
+          maxReplicaCount: 15
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 10
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 4
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    xlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 20
+          minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 20
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 15
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 5
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 30
+          minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 30
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 20
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 6
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+
+history-updater:
+  install: false
+  pubSub:
+    # pubSub subscription comes from terraform
+    subscription: ""
+  kafka:
+    consumerGroupId: "history-updater"
+  env:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_HISTORY_UPDATER:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-history-updater-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  containers:
+    history-updater:
+      args: ["history-updater"]
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1815,7 +2084,6 @@ glue:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.registrySearchEnvs" . }}'
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
-    - '{{ include "wandb.historyEnvs" . }}'
   initContainers:
     init-db:
       enabled: false
@@ -1959,7 +2227,7 @@ metric-observer:
   image:
     repository: wandb/megabinary
     tag: latest
-  pubsub:
+  pubSub:
     subscription: ""
   kafka:
     # metric-observer and flat-run-fields-updater use different consumer group id on same topic
@@ -2249,7 +2517,6 @@ parquet:
           enabled: true
           maxReplicas: 4
           minReplicas: 2
-
 parquet-metadata-cache:
   maxColumnChunks: 10000000
   install: false
@@ -2373,7 +2640,120 @@ parquet-metadata-cache:
           enabled: false
           maxReplicas: 1
           minReplicas: 1
-
+ch-history-cache:
+  install: false
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  service:
+    enabled: true
+    ports:
+      - port: 9091
+        protocol: TCP
+        name: grpc
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-ch-history-cache-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucket.cwIdentity" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  containers:
+    ch-history-cache:
+      args: ["ch-history-cache"]
+      ports:
+        - name: grpc
+          containerPort: 9091
+          protocol: TCP
+      livenessProbe:
+        grpc:
+          port: 9091
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        grpc:
+          port: 9091
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 16Gi
+        requests:
+          cpu: "1"
+          memory: 8Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
+    medium:
+      resources:
+        limits:
+          cpu: "15"
+          memory: 64Gi
+        requests:
+          cpu: "15"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
+    large:
+      resources:
+        limits:
+          cpu: "15"
+          memory: 64Gi
+        requests:
+          cpu: "15"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "15"
+          memory: 64Gi
+        requests:
+          cpu: "15"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "15"
+          memory: 64Gi
+        requests:
+          cpu: "15"
 settingsMigrationJob:
   install: false
   image:
