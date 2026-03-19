@@ -1,10 +1,5 @@
 {{- define "wandb.historyStore" -}}
     {{- $stores := list -}}
-
-    {{- if .Values.global.olap.history.enabled -}}
-        {{- $stores = append $stores "$(GORILLA_STORAGE_ENGINE_ADDRESS)" -}}
-    {{- end -}}
-
     {{- $stores = append $stores (printf "http://%s-parquet:8087/_goRPC_" .Release.Name) -}}
 
     {{- if not .Values.global.historyStore.parquetOnly -}}
