@@ -11,17 +11,22 @@ data:
   GORILLA_FRONTEND_HOST: "{{ .Values.global.host }}"
   GORILLA_LICENSE_CERT_PATH: "/jwks.json"
   GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL: "true"
+  {{- $corsOrigins := list }}
+  {{- if ne .Values.global.auth.oidc.clientId "" }}
+  {{- $corsOrigins = concat $corsOrigins (list .Values.global.host "null") | compact }}
+  {{- end }}
+  {{- if .Values.app.extraCors }}
+  {{- $corsOrigins = concat .Values.app.extraCors $corsOrigins | compact }}
+  {{- end }}
+  {{- if gt (len $corsOrigins) 0 }}
+  GORILLA_CORS_ORIGINS: "{{ join "," $corsOrigins }}"
+  {{- end }}
   {{- if ne .Values.global.auth.oidc.clientId "" }}
   GORILLA_OIDC_CLIENT_ID: "{{ .Values.global.auth.oidc.clientId }}"
   GORILLA_AUTH_METHOD: "{{ .Values.global.auth.oidc.authMethod }}"
   GORILLA_OIDC_ISSUER: "{{ .Values.global.auth.oidc.issuer }}"
   {{- end }}
   GORILLA_SESSION_LENGTH: "{{ .Values.global.auth.sessionLengthHours }}h"
-  {{- if .Values.app.extraCors }}
-  GORILLA_CORS_ORIGINS: "{{ join "," .Values.app.extraCors }}"
-  {{- else if .Values.global.auth.oidc.clientId }}
-  GORILLA_CORS_ORIGINS: "{{ join "," (list .Values.global.host "null") }}"
-  {{- end }}
   GORILLA_SWEEP_PROVIDER: "{{ include "wandb.anaconda2.sweepProvider" . }}"
   GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
