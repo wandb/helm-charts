@@ -633,7 +633,7 @@ Global values will override any chart-specific values.
   - name: GORILLA_LDAP_BIND_PW
     valueFrom:
       secretKeyRef:
-        name: {{ .Release.Name }}-global-secret
+        name: {{ .Release.Name }}-ldap-secret
         key: GORILLA_LDAP_BIND_PW
   {{- end }}
   {{- end }}
