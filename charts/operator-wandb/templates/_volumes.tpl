@@ -82,7 +82,7 @@
   {{- end }}
   {{- end -}}
 
-  {{- define "wandb.ldapVolumes" -}}
+{{- define "wandb.ldapVolumes" -}}
   {{- if and .Values.global.auth.ldap.enabled .Values.global.auth.ldap.tls .Values.global.auth.ldap.tlsCert.configMap.name }}
   - name: ldap-tls-cert
     configMap:
