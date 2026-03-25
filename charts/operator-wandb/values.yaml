@@ -91,9 +91,11 @@ global:
   # Global volumes applied to all pods
   volumesTpls:
     - '{{ include "wandb.caCertsVolumes" . }}'
+    - '{{ include "wandb.ldapVolumes" . }}'
   # Global volumeMounts applied to all containers
   volumeMountsTpls:
     - '{{ include "wandb.caCertsVolumeMounts" . }}'
+    - '{{ include "wandb.ldapVolumeMounts" . }}'
 
   operator:
     namespace: default
@@ -360,6 +362,27 @@ global:
       oidcSecret:
         name: ""
         secretKey: "OIDC_SECRET"
+    ldap:
+      enabled: false
+      # LDAP server address including "ldap://" or "ldaps://"
+      host: ""
+      # LDAP search base for finding users
+      baseDN: ""
+      # LDAP user to bind with (leave empty for anonymous bind)
+      bindDN: ""
+      # Bind password — can be a plain string or a K8s secretKeyRef map
+      bindPW: ""
+      # Comma-separated email and group ID attribute names
+      attributes: ""
+      # LDAP group allow list
+      groupAllowList: ""
+      # Enable LDAP TLS (LDAPS)
+      tls: false
+      # Pre-existing ConfigMap containing the CA certificate for the LDAP server
+      tlsCert:
+        configMap:
+          name: ""
+          key: ""
 
   # Storage bucket that will be used by the application by default but can be overridden by the user in the wandb-console.
   defaultBucket:
@@ -766,6 +789,7 @@ app:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
+    - '{{ include "wandb.ldapEnvs" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   service:
