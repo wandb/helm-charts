@@ -626,32 +626,14 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.ldapEnvs" -}}
-  {{- if .Values.global.auth.ldap.enabled }}
-  - name: GORILLA_LDAP_LOGIN                                                                                                                                                                                                                                                                                                           
-    value: "true"
-  - name: GORILLA_LDAP_ADDRESS                                                                                                                                                                                                                                                                                                         
-    value: {{ .Values.global.auth.ldap.host | quote }}                                                                                                                                                                                                                                                                               
-  - name: GORILLA_LDAP_BASE_DN
-    value: {{ .Values.global.auth.ldap.baseDN | quote }}                                                                                                                                                                                                                                                                             
-  - name: GORILLA_LDAP_BIND_DN                                                                                                                                                                                                                                                                                                         
-    value: {{ .Values.global.auth.ldap.bindDN | quote }}
-  {{- if kindIs "map" .Values.global.auth.ldap.bindPW }}                                                                                                                                                                                                                                                                             
-  - name: GORILLA_LDAP_BIND_PW                                                                                                                                                                                                                                                                                                         
-  {{- toYaml .Values.global.auth.ldap.bindPW | nindent 2 }}
-  {{- else if .Values.global.auth.ldap.bindPW }}                                                                                                                                                                                                                                                                                     
+  {{- if kindIs "map" .Values.global.auth.ldap.bindPW }}
   - name: GORILLA_LDAP_BIND_PW
-    valueFrom:                                                                                                                                                                                                                                                                                                                       
+  {{- toYaml .Values.global.auth.ldap.bindPW | nindent 2 }}
+  {{- else if .Values.global.auth.ldap.bindPW }}
+  - name: GORILLA_LDAP_BIND_PW
+    valueFrom:
       secretKeyRef:
         name: {{ .Release.Name }}-global-secret
-        key: GORILLA_LDAP_BIND_PW                                                                                                                                                                                                                                                                                                      
+        key: GORILLA_LDAP_BIND_PW
   {{- end }}
-  - name: GORILLA_LDAP_ATTRIBUTES                                                                                                                                                                                                                                                                                                      
-    value: {{ .Values.global.auth.ldap.attributes | quote }}
-  - name: GORILLA_LDAP_GROUP_ALLOW_LIST                                                                                                                                                                                                                                                                                                
-    value: {{ .Values.global.auth.ldap.groupAllowList | quote }}
-  {{- if .Values.global.auth.ldap.tls }}                                                                                                                                                                                                                                                                                             
-  - name: GORILLA_LDAP_TLS_ENABLE                                                                                                                                                                                                                                                                                                      
-    value: "true"
-  {{- end }}                                                                                                                                                                                                                                                                                                                         
-  {{- end }}      
-  {{- end -}}
+  {{- end }}
