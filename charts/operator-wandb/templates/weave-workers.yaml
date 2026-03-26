@@ -1,0 +1,301 @@
+{{- /*
+  Templatized weave worker deployments.
+  Iterates over .Values.global.weaveWorkers and generates ServiceAccount, PDB,
+  Deployment, and optionally HPA for each enabled worker. This replaces the need
+  for individual Chart.yaml subchart dependencies per worker.
+*/ -}}
+{{- range $workerName := .Values.global.weaveWorkers }}
+{{- $worker := get $.Values $workerName }}
+{{- if and $worker $worker.install }}
+
+{{- /* Resolve sizing */ -}}
+{{- $size := default "" (coalesce $worker.size $.Values.global.size) }}
+{{- $sizingDefault := default (dict) (get (default (dict) $worker.sizing) "default") }}
+{{- $sizingOverride := default (dict) (get (default (dict) $worker.sizing) $size) }}
+{{- $sizing := mergeOverwrite $sizingDefault $sizingOverride }}
+{{- $resources := default (dict) $sizing.resources }}
+
+{{- /* Resolve image */ -}}
+{{- $image := default (dict) $worker.image }}
+{{- $repository := default "wandb/weave-trace" $image.repository }}
+{{- if $.Values.global.repositoryPrefix }}
+  {{- $repository = printf "%s/%s" $.Values.global.repositoryPrefix $repository }}
+{{- end }}
+{{- $tag := default "latest" $image.tag }}
+{{- $imageRef := printf "%s:%s" $repository $tag }}
+{{- if $image.digest }}
+  {{- $imageRef = printf "%s@%s" $repository $image.digest }}
+{{- end }}
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $.Release.Name }}-{{ $workerName }}
+  labels:
+    app.kubernetes.io/name: {{ $workerName }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    {{- if $image.digest }}
+    app.kubernetes.io/version: {{ $image.digest | trimPrefix "sha256:" | trunc 12 | quote }}
+    {{- else }}
+    app.kubernetes.io/version: {{ $tag | trunc 63 | quote }}
+    {{- end }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    {{- include "wandb.commonLabels" $ | nindent 4 }}
+automountServiceAccountToken: true
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Release.Name }}-{{ $workerName }}
+  labels:
+    app.kubernetes.io/name: {{ $workerName }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    {{- if $image.digest }}
+    app.kubernetes.io/version: {{ $image.digest | trimPrefix "sha256:" | trunc 12 | quote }}
+    {{- else }}
+    app.kubernetes.io/version: {{ $tag | trunc 63 | quote }}
+    {{- end }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    {{- include "wandb.commonLabels" $ | nindent 4 }}
+spec:
+  maxUnavailable: 1
+  selector:
+    matchExpressions:
+      - key: batch.kubernetes.io/job-name
+        operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: {{ $workerName }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-{{ $workerName }}{{- if $worker.deploymentPostfix }}-{{ $worker.deploymentPostfix }}{{- end }}
+  labels:
+    app.kubernetes.io/name: {{ $workerName }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    {{- if $image.digest }}
+    app.kubernetes.io/version: {{ $image.digest | trimPrefix "sha256:" | trunc 12 | quote }}
+    {{- else }}
+    app.kubernetes.io/version: {{ $tag | trunc 63 | quote }}
+    {{- end }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    {{- include "wandb.commonLabels" $ | nindent 4 }}
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: {{ default 1 $sizing.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $workerName }}
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $workerName }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
+        {{- if $image.digest }}
+        app.kubernetes.io/version: {{ $image.digest | trimPrefix "sha256:" | trunc 12 | quote }}
+        {{- else }}
+        app.kubernetes.io/version: {{ $tag | trunc 63 | quote }}
+        {{- end }}
+        app.kubernetes.io/managed-by: {{ $.Release.Service }}
+        {{- include "wandb.commonLabels" $ | nindent 8 }}
+        {{- include "wandb.podLabels" $ | nindent 8 }}
+    spec:
+      {{- $imagePullSecrets := concat (default list $.Values.global.imagePullSecrets) }}
+      {{- $uniqueSecrets := list }}
+      {{- range $secret := $imagePullSecrets }}
+        {{- if kindIs "string" $secret }}
+          {{- $uniqueSecrets = append $uniqueSecrets $secret }}
+        {{- else if kindIs "map" $secret }}
+          {{- if hasKey $secret "name" }}
+            {{- $uniqueSecrets = append $uniqueSecrets $secret.name }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- $uniqueSecrets = uniq (compact $uniqueSecrets) }}
+      {{- if $uniqueSecrets }}
+      imagePullSecrets:
+        {{- range $name := $uniqueSecrets }}
+        - name: {{ tpl $name $ }}
+        {{- end }}
+      {{- end }}
+      containers:
+      {{- range $containerName, $container := $worker.containers }}
+      - name: {{ $containerName }}
+        {{- if $container.command }}
+        command:
+          {{- toYaml $container.command | nindent 10 }}
+        {{- end }}
+        {{- if $container.args }}
+        args:
+          {{- toYaml $container.args | nindent 10 }}
+        {{- end }}
+        {{- /* envFrom */ -}}
+        {{- $envFrom := merge (default (dict) $container.envFrom) (default (dict) $worker.envFrom) }}
+        {{- if $envFrom }}
+        envFrom:
+          {{- range $key, $value := $envFrom }}
+          - {{ $value }}:
+              name: {{ tpl $key $ }}
+          {{- end }}
+        {{- end }}
+        env:
+        {{- /* Render envTpls */ -}}
+        {{- if $worker.envTpls }}
+          {{- range $worker.envTpls }}
+            {{- tpl . $ | nindent 8 }}
+          {{- end }}
+        {{- end }}
+        {{- /* Render merged env vars: global.env + worker.env + container.env */ -}}
+        {{- $mergedEnv := merge (default (dict) $container.env) (default (dict) $worker.env) $.Values.global.env (default (dict) $.Values.global.extraEnv) }}
+        {{- /* Remove env vars already rendered by envTpls */ -}}
+        {{- $envTplNames := list }}
+        {{- if $worker.envTpls }}
+          {{- range $worker.envTpls }}
+            {{- range $envVar := (tpl . $ | fromYamlArray) }}
+              {{- $envTplNames = append $envTplNames $envVar.name }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        {{- range $key, $value := $mergedEnv }}
+          {{- if not (has $key $envTplNames) }}
+            {{- if kindIs "map" $value }}
+        - name: {{ $key }}
+              {{- toYaml $value | nindent 10 }}
+            {{- else }}
+        - name: {{ $key }}
+          value: {{ toString $value | quote }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: {{ $imageRef | quote }}
+        imagePullPolicy: {{ default "IfNotPresent" $image.pullPolicy }}
+        {{- if $container.ports }}
+        ports:
+          {{- toYaml $container.ports | nindent 10 }}
+        {{- end }}
+        {{- if $container.livenessProbe }}
+        livenessProbe:
+          {{- toYaml $container.livenessProbe | nindent 10 }}
+        {{- end }}
+        {{- if $container.readinessProbe }}
+        readinessProbe:
+          {{- toYaml $container.readinessProbe | nindent 10 }}
+        {{- end }}
+        {{- if $container.startupProbe }}
+        startupProbe:
+          {{- toYaml $container.startupProbe | nindent 10 }}
+        {{- end }}
+        {{- if $resources }}
+        resources:
+          {{- toYaml $resources | nindent 10 }}
+        {{- end }}
+        volumeMounts:
+        {{- include "wandb.caCertsVolumeMounts" $ | nindent 8 }}
+        {{- if $container.volumeMounts }}
+          {{- toYaml $container.volumeMounts | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      serviceAccountName: {{ $.Release.Name }}-{{ $workerName }}
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      {{- $nodeSelector := coalesce $worker.nodeSelector $.Values.global.nodeSelector }}
+      {{- if $nodeSelector }}
+      nodeSelector:
+        {{- toYaml $nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- $tolerations := coalesce $worker.tolerations $.Values.global.tolerations }}
+      {{- if $tolerations }}
+      tolerations:
+        {{- toYaml $tolerations | nindent 8 }}
+      {{- end }}
+      {{- $priorityClassName := coalesce $worker.priorityClassName $.Values.global.priorityClassName }}
+      {{- if $priorityClassName }}
+      priorityClassName: {{ tpl $priorityClassName $ }}
+      {{- end }}
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: {{ $.Release.Name }}
+            app.kubernetes.io/name: {{ $workerName }}
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: {{ $.Release.Name }}
+            app.kubernetes.io/name: {{ $workerName }}
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      {{- include "wandb.caCertsVolumes" $ | nindent 6 }}
+      {{- if $worker.volumes }}
+        {{- tpl (toYaml $worker.volumes | nindent 6) $ }}
+      {{- end }}
+
+{{- /* HPA - check if sizing has horizontal autoscaling enabled */ -}}
+{{- $hpa := default (dict) (default (dict) $sizing.autoscaling).horizontal }}
+{{- $hpaOverride := default (dict) (default (dict) $worker.autoscaling).horizontal }}
+{{- $hpaMerged := mergeOverwrite $hpa $hpaOverride }}
+{{- if $hpaMerged.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $.Release.Name }}-{{ $workerName }}
+  labels:
+    app.kubernetes.io/name: {{ $workerName }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    {{- include "wandb.commonLabels" $ | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $.Release.Name }}-{{ $workerName }}{{- if $worker.deploymentPostfix }}-{{ $worker.deploymentPostfix }}{{- end }}
+  minReplicas: {{ default 1 $hpaMerged.minReplicas }}
+  maxReplicas: {{ default 5 $hpaMerged.maxReplicas }}
+  metrics:
+    {{- if $hpaMerged.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $hpaMerged.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if $hpaMerged.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $hpaMerged.targetMemoryUtilizationPercentage }}
+    {{- end }}
+{{- end }}
+
+{{- end }}
+{{- end }}
