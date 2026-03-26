@@ -28,6 +28,25 @@ jobs:
         with:
           version: v3.20.1
 
+      - name: Install git-cliff
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+
+      - name: Generate per-chart changelogs
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^)
+          for chart in $(ct list-changed --config ct.yaml); do
+            chart_name=$(basename $chart)
+            git-cliff --tag-pattern="$chart-*" --include-path="charts/$chart/**/*" --output "charts/$chart_name/CHANGELOG.md"
+          done
+
+      - name: Commit changelogs
+        run: |
+          git add charts/*/CHANGELOG.md
+          git commit -m "docs: update chart changelogs [no ci]"
+          git push
+
       - name: Install Helm Deps
         run: |
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
