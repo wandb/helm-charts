@@ -401,48 +401,6 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
-# Source: operator-wandb/charts/weave-evaluate-model-worker/templates/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: chartsnap-weave-evaluate-model-worker
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-evaluate-model-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  selector:
-    matchExpressions:
-    - key: batch.kubernetes.io/job-name
-      operator: DoesNotExist
-    matchLabels:
-      app.kubernetes.io/name: weave-evaluate-model-worker
-      app.kubernetes.io/instance: chartsnap
-  maxUnavailable: 1
----
-# Source: operator-wandb/charts/weave-trace-worker/templates/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: chartsnap-weave-trace-worker
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  selector:
-    matchExpressions:
-    - key: batch.kubernetes.io/job-name
-      operator: DoesNotExist
-    matchLabels:
-      app.kubernetes.io/name: weave-trace-worker
-      app.kubernetes.io/instance: chartsnap
-  maxUnavailable: 1
----
 # Source: operator-wandb/charts/weave-trace/templates/pdb.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -484,6 +442,48 @@ spec:
       app.kubernetes.io/name: weave
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
+---
+# Source: operator-wandb/templates/weave-workers.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-weave-trace-worker
+  labels:
+    app.kubernetes.io/name: weave-trace-worker
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: '###CHART_VERSION###'
+spec:
+  maxUnavailable: 1
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: weave-trace-worker
+      app.kubernetes.io/instance: chartsnap
+---
+# Source: operator-wandb/templates/weave-workers.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-weave-evaluate-model-worker
+  labels:
+    app.kubernetes.io/name: weave-evaluate-model-worker
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: '###CHART_VERSION###'
+spec:
+  maxUnavailable: 1
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: weave-evaluate-model-worker
+      app.kubernetes.io/instance: chartsnap
 ---
 # Source: operator-wandb/charts/anaconda2/templates/serviceaccount.yaml
 apiVersion: v1
@@ -716,32 +716,6 @@ metadata:
   name: chartsnap-reloader
   namespace: default
 ---
-# Source: operator-wandb/charts/weave-evaluate-model-worker/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-weave-evaluate-model-worker
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-evaluate-model-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
-# Source: operator-wandb/charts/weave-trace-worker/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-weave-trace-worker
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
 # Source: operator-wandb/charts/weave-trace/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -766,6 +740,32 @@ metadata:
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: operator-wandb/templates/weave-workers.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-weave-trace-worker
+  labels:
+    app.kubernetes.io/name: weave-trace-worker
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: '###CHART_VERSION###'
+automountServiceAccountToken: true
+---
+# Source: operator-wandb/templates/weave-workers.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-weave-evaluate-model-worker
+  labels:
+    app.kubernetes.io/name: weave-evaluate-model-worker
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: '###CHART_VERSION###'
 automountServiceAccountToken: true
 ---
 # Source: operator-wandb/templates/bucket.yaml
@@ -6866,308 +6866,6 @@ spec:
           type: RuntimeDefault
       serviceAccountName: chartsnap-reloader
 ---
-# Source: operator-wandb/charts/weave-evaluate-model-worker/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chartsnap-weave-evaluate-model-worker-bc
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-evaluate-model-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    reloader.stakater.com/auto: "true"
-spec:
-  replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: weave-evaluate-model-worker
-      app.kubernetes.io/instance: chartsnap
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: weave-evaluate-model-worker-0.11.11
-        app.kubernetes.io/name: weave-evaluate-model-worker
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      containers:
-      - name: weave-evaluate-model-worker
-        args:
-        - python
-        - -m
-        - src.workers.evaluate_model_worker.evaluate_model_worker
-        envFrom:
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-weave-trace-configmap
-        env:
-        - name: WF_CLICKHOUSE_HOST
-          value: chartsnap-clickhouse-headless
-        - name: WF_CLICKHOUSE_PORT
-          value: "8123"
-        - name: WF_CLICKHOUSE_DATABASE
-          value: weave_trace_db
-        - name: WF_CLICKHOUSE_USER
-          value: default
-        - name: WF_CLICKHOUSE_REPLICATED
-          value: "false"
-        - name: WF_CLICKHOUSE_PASS
-          valueFrom:
-            secretKeyRef:
-              key: CLICKHOUSE_PASSWORD
-              name: chartsnap-clickhouse
-        - name: SSL_CERT_FILE
-          value: /etc/ssl/certs/ca-certificates.crt
-        - name: SSL_CERT_DIR
-          value: /etc/ssl/certs
-        - name: REQUESTS_CA_BUNDLE
-          value: /etc/ssl/certs/ca-certificates.crt
-        - name: BUCKET_PROXY
-          value: "true"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
-        - name: GORILLA_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: WANDB_INTERNAL_SERVICE_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: key
-              name: weave-worker-auth
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8080
-          name: http
-          protocol: TCP
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-        volumeMounts:
-        - name: wandb-ca-certs-root
-          mountPath: /usr/local/share/ca-certificates/
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
-      serviceAccountName: chartsnap-weave-evaluate-model-worker
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
-      topologySpreadConstraints:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: weave-evaluate-model-worker
-        maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfiable: ScheduleAnyway
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: weave-evaluate-model-worker
-        maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-      volumes:
-      - name: wandb-ca-certs-root
-        emptyDir: {}
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
----
-# Source: operator-wandb/charts/weave-trace-worker/templates/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: chartsnap-weave-trace-worker-bc
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace-worker
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    reloader.stakater.com/auto: "true"
-spec:
-  replicas: 1
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: weave-trace-worker
-      app.kubernetes.io/instance: chartsnap
-  template:
-    metadata:
-      labels:
-        helm.sh/chart: weave-trace-worker-0.11.11
-        app.kubernetes.io/name: weave-trace-worker
-        app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
-        app.kubernetes.io/managed-by: Helm
-    spec:
-      containers:
-      - name: weave-trace-worker
-        args:
-        - python
-        - -m
-        - src.workers.scoring_worker
-        envFrom:
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-weave-trace-configmap
-        env:
-        - name: WF_CLICKHOUSE_HOST
-          value: chartsnap-clickhouse-headless
-        - name: WF_CLICKHOUSE_PORT
-          value: "8123"
-        - name: WF_CLICKHOUSE_DATABASE
-          value: weave_trace_db
-        - name: WF_CLICKHOUSE_USER
-          value: default
-        - name: WF_CLICKHOUSE_REPLICATED
-          value: "false"
-        - name: WF_CLICKHOUSE_PASS
-          valueFrom:
-            secretKeyRef:
-              key: CLICKHOUSE_PASSWORD
-              name: chartsnap-clickhouse
-        - name: SSL_CERT_FILE
-          value: /etc/ssl/certs/ca-certificates.crt
-        - name: SSL_CERT_DIR
-          value: /etc/ssl/certs
-        - name: REQUESTS_CA_BUNDLE
-          value: /etc/ssl/certs/ca-certificates.crt
-        - name: BUCKET_PROXY
-          value: "true"
-        - name: GLOBAL_ADMIN_API_KEY
-          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
-        - name: GORILLA_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
-          value: "true"
-        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
-          value: "true"
-        - name: WANDB_INTERNAL_SERVICE_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: key
-              name: weave-worker-auth
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8080
-          name: http
-          protocol: TCP
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-        volumeMounts:
-        - name: wandb-ca-certs-root
-          mountPath: /usr/local/share/ca-certificates/
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
-      serviceAccountName: chartsnap-weave-trace-worker
-      securityContext:
-        fsGroup: 0
-        fsGroupChangePolicy: OnRootMismatch
-        runAsGroup: 0
-        runAsNonRoot: true
-        runAsUser: 999
-        seccompProfile:
-          type: RuntimeDefault
-      terminationGracePeriodSeconds: 60
-      topologySpreadConstraints:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: weave-trace-worker
-        maxSkew: 1
-        topologyKey: topology.kubernetes.io/zone
-        whenUnsatisfiable: ScheduleAnyway
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: weave-trace-worker
-        maxSkew: 1
-        topologyKey: kubernetes.io/hostname
-        whenUnsatisfiable: ScheduleAnyway
-      volumes:
-      - name: wandb-ca-certs-root
-        emptyDir: {}
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
----
 # Source: operator-wandb/charts/weave-trace/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -7617,6 +7315,298 @@ spec:
           medium: ''
           sizeLimit: '20Gi'
         name: cache
+---
+# Source: operator-wandb/templates/weave-workers.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-weave-trace-worker-bc
+  labels:
+    app.kubernetes.io/name: weave-trace-worker
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: '###CHART_VERSION###'
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: weave-trace-worker
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: weave-trace-worker
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: weave-trace-worker
+        args:
+        - python
+        - -m
+        - src.workers.scoring_worker
+        envFrom:
+        - secretRef:
+            name: chartsnap-global-secret
+        - configMapRef:
+            name: chartsnap-weave-trace-configmap
+        env:
+        - name: WF_CLICKHOUSE_HOST
+          value: "chartsnap-clickhouse-headless"
+        - name: WF_CLICKHOUSE_PORT
+          value: "8123"
+        - name: WF_CLICKHOUSE_DATABASE
+          value: "weave_trace_db"
+        - name: WF_CLICKHOUSE_USER
+          value: "default"
+        - name: WF_CLICKHOUSE_REPLICATED
+          value: "false"
+        - name: WF_CLICKHOUSE_PASS
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-clickhouse"
+              key: "CLICKHOUSE_PASSWORD"
+        - name: SSL_CERT_FILE
+          value: "/etc/ssl/certs/ca-certificates.crt"
+        - name: SSL_CERT_DIR
+          value: "/etc/ssl/certs"
+        - name: REQUESTS_CA_BUNDLE
+          value: "/etc/ssl/certs/ca-certificates.crt"
+        - name: BUCKET_PROXY
+          value: "true"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        - name: WANDB_INTERNAL_SERVICE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: key
+              name: weave-worker-auth
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+      serviceAccountName: chartsnap-weave-trace-worker
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: weave-trace-worker
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: weave-trace-worker
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
+---
+# Source: operator-wandb/templates/weave-workers.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-weave-evaluate-model-worker-bc
+  labels:
+    app.kubernetes.io/name: weave-evaluate-model-worker
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: '###CHART_VERSION###'
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: weave-evaluate-model-worker
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: weave-evaluate-model-worker
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: weave-evaluate-model-worker
+        args:
+        - python
+        - -m
+        - src.workers.evaluate_model_worker.evaluate_model_worker
+        envFrom:
+        - secretRef:
+            name: chartsnap-global-secret
+        - configMapRef:
+            name: chartsnap-weave-trace-configmap
+        env:
+        - name: WF_CLICKHOUSE_HOST
+          value: "chartsnap-clickhouse-headless"
+        - name: WF_CLICKHOUSE_PORT
+          value: "8123"
+        - name: WF_CLICKHOUSE_DATABASE
+          value: "weave_trace_db"
+        - name: WF_CLICKHOUSE_USER
+          value: "default"
+        - name: WF_CLICKHOUSE_REPLICATED
+          value: "false"
+        - name: WF_CLICKHOUSE_PASS
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-clickhouse"
+              key: "CLICKHOUSE_PASSWORD"
+        - name: SSL_CERT_FILE
+          value: "/etc/ssl/certs/ca-certificates.crt"
+        - name: SSL_CERT_DIR
+          value: "/etc/ssl/certs"
+        - name: REQUESTS_CA_BUNDLE
+          value: "/etc/ssl/certs/ca-certificates.crt"
+        - name: BUCKET_PROXY
+          value: "true"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        - name: WANDB_INTERNAL_SERVICE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: key
+              name: weave-worker-auth
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-trace:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+      serviceAccountName: chartsnap-weave-evaluate-model-worker
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: weave-evaluate-model-worker
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: weave-evaluate-model-worker
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/bufstream/templates/deployment.yaml
 apiVersion: apps/v1
@@ -8442,7 +8432,6 @@ spec:
           runAsGroup: 0
           runAsNonRoot: true
           runAsUser: 1001
-          seLinuxOptions: null
           seccompProfile:
             type: RuntimeDefault
         command:
