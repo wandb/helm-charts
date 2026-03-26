@@ -15,17 +15,9 @@
 {{- $sizing := mergeOverwrite $sizingDefault $sizingOverride }}
 {{- $resources := default (dict) $sizing.resources }}
 
-{{- /* Resolve image */ -}}
-{{- $image := default (dict) $worker.image }}
-{{- $repository := default "wandb/weave-trace" $image.repository }}
-{{- if $.Values.global.repositoryPrefix }}
-  {{- $repository = printf "%s/%s" $.Values.global.repositoryPrefix $repository }}
-{{- end }}
-{{- $tag := default "latest" $image.tag }}
-{{- $imageRef := printf "%s:%s" $repository $tag }}
-{{- if $image.digest }}
-  {{- $imageRef = printf "%s@%s" $repository $image.digest }}
-{{- end }}
+{{- /* Worker-level image defaults (used for labels and as fallback per container) */ -}}
+{{- $workerImage := default (dict) $worker.image }}
+{{- $workerTag := default "latest" $workerImage.tag }}
 
 ---
 apiVersion: v1
@@ -35,10 +27,10 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ $workerName }}
     app.kubernetes.io/instance: {{ $.Release.Name }}
-    {{- if $image.digest }}
-    app.kubernetes.io/version: {{ $image.digest | trimPrefix "sha256:" | trunc 12 | quote }}
+    {{- if $workerImage.digest }}
+    app.kubernetes.io/version: {{ $workerImage.digest | trimPrefix "sha256:" | trunc 12 | quote }}
     {{- else }}
-    app.kubernetes.io/version: {{ $tag | trunc 63 | quote }}
+    app.kubernetes.io/version: {{ $workerTag | trunc 63 | quote }}
     {{- end }}
     app.kubernetes.io/managed-by: {{ $.Release.Service }}
     {{- include "wandb.commonLabels" $ | nindent 4 }}
@@ -51,10 +43,10 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ $workerName }}
     app.kubernetes.io/instance: {{ $.Release.Name }}
-    {{- if $image.digest }}
-    app.kubernetes.io/version: {{ $image.digest | trimPrefix "sha256:" | trunc 12 | quote }}
+    {{- if $workerImage.digest }}
+    app.kubernetes.io/version: {{ $workerImage.digest | trimPrefix "sha256:" | trunc 12 | quote }}
     {{- else }}
-    app.kubernetes.io/version: {{ $tag | trunc 63 | quote }}
+    app.kubernetes.io/version: {{ $workerTag | trunc 63 | quote }}
     {{- end }}
     app.kubernetes.io/managed-by: {{ $.Release.Service }}
     {{- include "wandb.commonLabels" $ | nindent 4 }}
@@ -75,10 +67,10 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ $workerName }}
     app.kubernetes.io/instance: {{ $.Release.Name }}
-    {{- if $image.digest }}
-    app.kubernetes.io/version: {{ $image.digest | trimPrefix "sha256:" | trunc 12 | quote }}
+    {{- if $workerImage.digest }}
+    app.kubernetes.io/version: {{ $workerImage.digest | trimPrefix "sha256:" | trunc 12 | quote }}
     {{- else }}
-    app.kubernetes.io/version: {{ $tag | trunc 63 | quote }}
+    app.kubernetes.io/version: {{ $workerTag | trunc 63 | quote }}
     {{- end }}
     app.kubernetes.io/managed-by: {{ $.Release.Service }}
     {{- include "wandb.commonLabels" $ | nindent 4 }}
@@ -100,10 +92,10 @@ spec:
       labels:
         app.kubernetes.io/name: {{ $workerName }}
         app.kubernetes.io/instance: {{ $.Release.Name }}
-        {{- if $image.digest }}
-        app.kubernetes.io/version: {{ $image.digest | trimPrefix "sha256:" | trunc 12 | quote }}
+        {{- if $workerImage.digest }}
+        app.kubernetes.io/version: {{ $workerImage.digest | trimPrefix "sha256:" | trunc 12 | quote }}
         {{- else }}
-        app.kubernetes.io/version: {{ $tag | trunc 63 | quote }}
+        app.kubernetes.io/version: {{ $workerTag | trunc 63 | quote }}
         {{- end }}
         app.kubernetes.io/managed-by: {{ $.Release.Service }}
         {{- include "wandb.commonLabels" $ | nindent 8 }}
@@ -183,8 +175,18 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: {{ $imageRef | quote }}
-        imagePullPolicy: {{ default "IfNotPresent" $image.pullPolicy }}
+        {{- $cImage := default (dict) $container.image }}
+        {{- $effImage := merge $cImage $workerImage }}
+        {{- $repository := default "wandb/weave-trace" $effImage.repository }}
+        {{- if $.Values.global.repositoryPrefix }}
+          {{- $repository = printf "%s/%s" $.Values.global.repositoryPrefix $repository }}
+        {{- end }}
+        {{- if $effImage.digest }}
+        image: {{ printf "%s@%s" $repository $effImage.digest | quote }}
+        {{- else }}
+        image: {{ printf "%s:%s" $repository (default "latest" $effImage.tag) | quote }}
+        {{- end }}
+        imagePullPolicy: {{ default "IfNotPresent" $effImage.pullPolicy }}
         {{- if $container.ports }}
         ports:
           {{- toYaml $container.ports | nindent 10 }}
