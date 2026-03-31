@@ -624,3 +624,21 @@ Global values will override any chart-specific values.
   value: "noop://"
 {{- end }}
 {{- end -}}
+
+{{- define "wandb.ldapEnvs" -}}
+  {{- if .Values.global.auth.ldap.enabled}}
+  {{- if kindIs "map" .Values.global.auth.ldap.bindPW }}
+  - name: LDAP_BIND_PW
+  {{- toYaml .Values.global.auth.ldap.bindPW | nindent 2 }}
+  {{- else if .Values.global.auth.ldap.bindPW }}
+  - name: LDAP_BIND_PW
+    valueFrom:
+      secretKeyRef:
+        name: {{ .Release.Name }}-ldap-secret
+        key: LDAP_BIND_PW
+  {{- end }}
+  - name: GORILLA_LDAP_CONNECTION_STRING
+    value: {{ include "wandb.ldapConnectionString" . | quote }}
+  {{- end }}
+  {{- end }}
+
