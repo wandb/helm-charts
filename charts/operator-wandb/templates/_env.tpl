@@ -637,6 +637,6 @@ Global values will override any chart-specific values.
         key: LDAP_BIND_PW
   {{- end }}
   - name: GORILLA_LDAP_CONNECTION_STRING
-    value: "{{ include "wandb.ldapConnectionString" . | quote}}"
+    value: {{ include "wandb.ldapConnectionString" . | quote }}
   {{- end }}
 
