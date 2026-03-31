@@ -7,10 +7,10 @@ metadata:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
   {{ .Values.global.auth.oidc.oidcSecret.secretKey }}: {{ .Values.global.auth.oidc.secret | b64enc }}
----
 {{- end }}
 
 {{- if and .Values.app.internalJWTMap (gt (len .Values.app.internalJWTMap) 0) }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -25,4 +25,19 @@ subjects:
   - kind: Group
     name: system:unauthenticated
     apiGroup: rbac.authorization.k8s.io
+{{- end }}
+
+{{- if and .Values.global.auth.ldap.enabled .Values.global.auth.ldap.bindPW (not (kindIs "map" .Values.global.auth.ldap.bindPW)) }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Release.Name }}-ldap-secret
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+data:
+  LDAP_BIND_PW: {{ .Values.global.auth.ldap.bindPW | b64enc }}
+
 {{- end }}
