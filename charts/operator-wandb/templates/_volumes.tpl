@@ -83,12 +83,12 @@
   {{- end -}}
 
 {{- define "wandb.ldapVolumes" -}}
-  {{- if and .Values.global.auth.ldap.enabled .Values.global.auth.ldap.tls .Values.global.auth.ldap.tlsCert.configMap.name }}
+  {{- if and .Values.global.auth.ldap.enabled .Values.global.auth.ldap.tls .Values.global.auth.ldap.tlsCert.configMap.name .Values.global.auth.ldap.tlsCert.configMap.key}}
   - name: ldap-tls-cert
     configMap:
-      name: {{ .Values.global.auth.ldap.tlsCert.configMap.name }}
+      name: "{{ .Values.global.auth.ldap.tlsCert.configMap.name }}"
       items:
-        - key: {{ .Values.global.auth.ldap.tlsCert.configMap.key }}
+        - key: "{{ .Values.global.auth.ldap.tlsCert.configMap.key }}"
           path: ca.crt
   {{- end }}
   {{- end -}}
