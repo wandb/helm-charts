@@ -72,3 +72,23 @@
     secretName: "{{ .Release.Name }}-internal-signer"
 {{- end }}
 {{- end }}
+
+{{- define "wandb.ldapVolumeMounts" -}}
+  {{- if and .Values.global.auth.ldap.enabled .Values.global.auth.ldap.tls .Values.global.auth.ldap.tlsCert.configMap.name }}
+  - name: ldap-tls-cert
+    mountPath: /var/run/secrets/wandb.ai/ldap/ca.crt
+    subPath: ca.crt
+    readOnly: true
+  {{- end }}
+  {{- end -}}
+
+{{- define "wandb.ldapVolumes" -}}
+  {{- if and .Values.global.auth.ldap.enabled .Values.global.auth.ldap.tls .Values.global.auth.ldap.tlsCert.configMap.name }}
+  - name: ldap-tls-cert
+    configMap:
+      name: {{ .Values.global.auth.ldap.tlsCert.configMap.name }}
+      items:
+        - key: {{ .Values.global.auth.ldap.tlsCert.configMap.key }}
+          path: ca.crt
+  {{- end }}
+  {{- end -}}
