@@ -45,7 +45,7 @@ It expects a dictionary with two entries:
   path: /
   backend:
     service:
-      {{- if eq $.Values.ingress.defaultBackend "console" }}
+      {{- if and (eq $.Values.ingress.defaultBackend "console") $.Values.console.install }}
       name: {{ $.Release.Name }}-console
       port:
         number: 8082
@@ -178,6 +178,7 @@ It expects a dictionary with two entries:
         number: 8081
 {{- end }}
 {{- end }}
+{{- if $.Values.console.install }}
 - pathType: Prefix
   path: /console
   backend:
@@ -185,4 +186,5 @@ It expects a dictionary with two entries:
       name: {{ $.Release.Name }}-console
       port:
         number: 8082
+{{- end }}
 {{- end }}
