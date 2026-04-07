@@ -49,7 +49,7 @@ extensions:
 processors:
   batch: {}
   memory_limiter:
-    check_interval: 5s
+    check_interval: 1s
     limit_percentage: 80
     spike_limit_percentage: 25
   k8sattributes:
