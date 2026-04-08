@@ -50,4 +50,24 @@ override WF_TRACE_SERVER_URL in the mcp-server.env values block.
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: "http://{{ .Release.Name }}-otel-collector:4317"
 {{- end }}
+{{- with (index .Values "mcp-server") }}
+{{- if .auth }}
+{{- if .auth.mode }}
+- name: MCP_AUTH_MODE
+  value: {{ .auth.mode | quote }}
+{{- end }}
+{{- if .auth.issuer }}
+- name: MCP_OAUTH_ISSUER
+  value: {{ .auth.issuer | quote }}
+{{- end }}
+{{- if .auth.audience }}
+- name: MCP_OAUTH_AUDIENCE
+  value: {{ .auth.audience | quote }}
+{{- end }}
+{{- if .auth.requiredScopes }}
+- name: MCP_OAUTH_REQUIRED_SCOPES
+  value: {{ .auth.requiredScopes | quote }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end -}}
