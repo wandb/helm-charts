@@ -49,7 +49,8 @@ extensions:
 processors:
   batch: {}
   memory_limiter:
-    check_interval: 5s
+    {{! recommended check_interval is 1s: https://github.com/open-telemetry/opentelemetry-collector/blob/main/processor/memorylimiterprocessor/README.md}}
+    check_interval: 1s
     limit_percentage: 80
     spike_limit_percentage: 25
   k8sattributes:
