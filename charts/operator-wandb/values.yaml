@@ -2526,12 +2526,12 @@ parquet:
           minReplicas: 2
 
 parquet-metadata-cache:
-  maxColumnChunks: 10000000
+  maxCacheBytes: "10000000000"  # 10GB — Rust uses ~6x less memory per entry than Go
   install: false
   serviceAccount:
     create: true
   image:
-    repository: wandb/megabinary
+    repository: wandb/parquet-metadata-cache  # dedicated Rust image, not megabinary
     tag: latest
   service:
     enabled: true
@@ -2539,10 +2539,11 @@ parquet-metadata-cache:
       - port: 9091
         protocol: TCP
         name: grpc
+      - port: 8081
+        protocol: TCP
+        name: pprof
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-parquet-metadata-cache-configmap": "configMapRef"
@@ -2550,34 +2551,31 @@ parquet-metadata-cache:
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.redisEnvs" . }}'
-    - '{{ include "wandb.queueEnvs" . }}'
-    - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
-    - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.license" . }}'
   containers:
     parquet-metadata-cache:
-      args: ["parquet-metadata-cache"]
+      # No args — Rust binary is the entrypoint directly
       ports:
         - name: grpc
           containerPort: 9091
           protocol: TCP
+        - name: pprof
+          containerPort: 8081
+          protocol: TCP
       livenessProbe:
         grpc:
           port: 9091
-        initialDelaySeconds: 30
-        periodSeconds: 30
-        timeoutSeconds: 30
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 5
         failureThreshold: 3
         successThreshold: 1
       readinessProbe:
         grpc:
           port: 9091
-        initialDelaySeconds: 30
-        periodSeconds: 30
-        timeoutSeconds: 30
+        initialDelaySeconds: 3
+        periodSeconds: 5
+        timeoutSeconds: 5
         failureThreshold: 3
         successThreshold: 1
   size: ""
@@ -2585,11 +2583,11 @@ parquet-metadata-cache:
     small:
       resources:
         limits:
-          cpu: "6"
-          memory: 16Gi
-        requests:
           cpu: "4"
-          memory: 16Gi
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
       autoscaling:
         horizontal:
           enabled: false
@@ -2598,11 +2596,11 @@ parquet-metadata-cache:
     medium:
       resources:
         limits:
-          cpu: "15"
-          memory: 64Gi
+          cpu: "8"
+          memory: 16Gi
         requests:
-          cpu: "15"
-          memory: 64Gi
+          cpu: "4"
+          memory: 8Gi
       autoscaling:
         horizontal:
           enabled: false
@@ -2611,25 +2609,24 @@ parquet-metadata-cache:
     large:
       resources:
         limits:
-          cpu: "15"
-          memory: 64Gi
+          cpu: "8"
+          memory: 16Gi
         requests:
-          cpu: "15"
-          memory: 64Gi
+          cpu: "4"
+          memory: 8Gi
       autoscaling:
         horizontal:
           enabled: false
           maxReplicas: 1
           minReplicas: 1
-    # At larger t-shirt sizes, reserve an entire node for parquet.
     xlarge:
       resources:
         limits:
-          cpu: "15"
-          memory: 64Gi
+          cpu: "8"
+          memory: 32Gi
         requests:
-          cpu: "15"
-          memory: 64Gi
+          cpu: "4"
+          memory: 16Gi
       autoscaling:
         horizontal:
           enabled: false
@@ -2638,11 +2635,11 @@ parquet-metadata-cache:
     xxlarge:
       resources:
         limits:
-          cpu: "15"
-          memory: 64Gi
+          cpu: "8"
+          memory: 32Gi
         requests:
-          cpu: "15"
-          memory: 64Gi
+          cpu: "4"
+          memory: 16Gi
       autoscaling:
         horizontal:
           enabled: false
