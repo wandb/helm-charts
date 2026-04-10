@@ -176,3 +176,14 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 {{- end }}
+
+{{- define "otelAgent.prometheusSelfReceiver" -}}
+receivers:
+  prometheus_self:
+    config:
+      scrape_configs:
+        - job_name: otelcol-self
+          scrape_interval: 30s
+          static_configs:
+            - targets: [localhost:8888]
+{{- end }}
