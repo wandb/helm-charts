@@ -27,6 +27,13 @@ Return the SMTP password
 {{- end -}}
 
 {{/*
+Return the SMTP mailFrom address
+*/}}
+{{- define "wandb.smtp.mailFrom" -}}
+{{- print $.Values.global.email.smtp.mailFrom -}}
+{{- end -}}
+
+{{/*
 Const: Internals should not be tied back to the values.yaml in any way.
 */}}
 {{- define "wandb.smtp.internalSecretName" -}}
