@@ -2836,6 +2836,82 @@ weave:
           maxReplicas: 6
           minReplicas: 2
 
+## MCP Server -- Model Context Protocol server for AI agent access to W&B data.
+## Requires weave-trace to be installed (WF_TRACE_SERVER_URL points to in-cluster weave-trace).
+## If weave-trace is disabled, override WF_TRACE_SERVER_URL in the env block below.
+## Disabled by default. Enable with: mcp-server.install: true
+## Docs: https://github.com/wandb/wandb-mcp-server
+mcp-server:
+  install: false
+  image:
+    repository: wandb/mcp-server
+    tag: "0.3.0"
+  containers:
+    mcp-server:
+      args:
+        - "sh"
+        - "entrypoint.sh"
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8080
+        initialDelaySeconds: 10
+        periodSeconds: 30
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+  service:
+    enabled: true
+    type: ClusterIP
+    ports:
+      - name: http
+        port: 8080
+        targetPort: 8080
+        protocol: TCP
+  envFrom:
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.mcpEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+  env:
+    WANDB_SILENT: "True"
+    WEAVE_SILENT: "True"
+    WEAVE_DISABLED: "true"
+    MCP_TRANSPORT: "http"
+    ENVIRONMENT: "production"
+    MCP_ANALYTICS_DISABLED: "false"
+    MCP_SEGMENT_FORWARD: "true"
+    MCP_AUTH_DISABLED: "false"
+    MCP_RATE_LIMIT_ENABLED: "true"
+    MCP_RATE_LIMIT_PER_KEY: "60/minute"
+    MCP_RATE_LIMIT_GLOBAL: "1000/minute"
+    WANDB_CACHE_DIR: "/tmp/.wandb_cache"
+    WANDB_CONFIG_DIR: "/tmp/.wandb_config"
+    WANDB_DATA_DIR: "/tmp/.wandb_data"
+    HOME: "/tmp"
+  ## Observability -- all disabled by default.
+  ## Prerequisites before enabling:
+  ##   - ddtrace / opentelemetry-distro baked into the MCP server image (>= 0.3.0)
+  ##   - dd-agent DaemonSet running on nodes (for datadog)
+  ##   - OTEL Collector deployed in-cluster (for otel)
+  ##   - Datadog Monitors + PagerDuty integration configured (ops layer)
+  ##   - ADR filed, security review completed
+  datadog:
+    enabled: false
+  otel:
+    enabled: false
+
 weave-trace:
   install: false
   deploymentPostfix: "bc"
