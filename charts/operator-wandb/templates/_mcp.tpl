@@ -25,10 +25,14 @@ override WF_TRACE_SERVER_URL in the mcp-server.env values block.
 {{- if .Values.datadog.enabled }}
 - name: MCP_DATADOG_ENABLED
   value: "true"
+- name: MCP_DATADOG_FORWARD
+  value: "true"
 - name: DD_SERVICE
   value: "mcp-server"
 - name: DD_ENV
   value: "production"
+- name: DD_VERSION
+  value: {{ index .Values "mcp-server" "image" "tag" | quote }}
 - name: DD_AGENT_HOST
   valueFrom:
     fieldRef:
@@ -41,6 +45,13 @@ override WF_TRACE_SERVER_URL in the mcp-server.env values block.
   value: "false"
 - name: DD_TRACE_HEADER_TAGS
   value: ""
+{{- with dig "mcp-server" "analytics" "datadogApiKeySecret" "name" "" .Values }}
+- name: DD_API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ . }}
+      key: {{ dig "mcp-server" "analytics" "datadogApiKeySecret" "key" "api-key" $.Values }}
+{{- end }}
 {{- end }}
 {{- if .Values.otel.enabled }}
 - name: MCP_OTEL_ENABLED
