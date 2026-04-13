@@ -27,7 +27,7 @@
 set -euo pipefail
 
 # --- Configuration (edit for new releases) ---
-CHART_VERSION="0.42.0-PR571-f0f6e79e"
+CHART_VERSION="0.42.0-PR571-594d8993"
 IMAGE_REPO="us-central1-docker.pkg.dev/wandb-mcp-production/cloud-run-source-deploy/mcp-server"
 IMAGE_TAG="0.3.0"
 SOURCE_SHA="5dbe1e46161f2d53a43d426cde7b1172efef1861"
