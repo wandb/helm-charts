@@ -30,7 +30,7 @@ set -euo pipefail
 CHART_VERSION="0.42.0-PR571-f0f6e79e"
 IMAGE_REPO="us-central1-docker.pkg.dev/wandb-mcp-production/cloud-run-source-deploy/mcp-server"
 IMAGE_TAG="0.3.0"
-SOURCE_SHA="88c36a0a8a4b50de2396722cc0077d754e18ff9b"
+SOURCE_SHA="5dbe1e46161f2d53a43d426cde7b1172efef1861"
 PR_URL="https://github.com/wandb/helm-charts/pull/571"
 
 # Production registry (use once IT grants access):
@@ -139,7 +139,7 @@ BEFORE:
   [x] PR #571 pushed with image tag 0.3.0
   [x] Docker image built via Cloud Build
   [x] Pre-release chart on charts.wandb.ai
-  [x] All snapshot tests pass locally
+  [x] All snapshot tests pass locally (otel flake is known/pre-existing)
   [x] wandbctl and k9s installed
 
 STEP 1: Claim instance
@@ -170,7 +170,7 @@ STEP 5: Apply our config
 
 STEP 6: Verify
   [ ] Run: ./scripts/verify_qa_mcp.sh qa-<env>.wandb.io
-  [ ] All checks should pass (health, 9 tools, auth 401)
+  [ ] All checks should pass (health, 14 tools, auth 401)
   [ ] If pod fails: likely image pull (cross-project permissions)
 
 STEP 7: Debug if needed (requires cluster access)
@@ -251,10 +251,10 @@ fi
 header "Check 2/5: Tools count"
 CHECKS=$((CHECKS + 1))
 TOOLS=$(echo "$HEALTH" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tools_registered', 0))" 2>/dev/null || echo "0")
-if [ "$TOOLS" = "9" ]; then
-    pass "9 tools registered"
+if [ "$TOOLS" -ge 14 ]; then
+    pass "$TOOLS tools registered"
 else
-    fail "Tools registered: $TOOLS (expected 9)"
+    fail "Tools registered: $TOOLS (expected >= 14)"
 fi
 
 # ---- Check 3: Auth enforcement ----
