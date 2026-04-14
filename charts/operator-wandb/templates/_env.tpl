@@ -472,9 +472,9 @@ Global values will override any chart-specific values.
 {{- /*
   ATTENTION!
   
-  SMTP_PASSWORD, SMTP_PORT, SMTP_HOST, SMTP_USER
+  SMTP_PASSWORD, SMTP_PORT, SMTP_HOST, SMTP_USER, GORILLA_EMAIL_FROM_ADDRESS
 
-  Are all set in the values.yaml under global.email.smtp.(host,port,user,password)
+  Are all set in the values.yaml under global.email.smtp.(host,port,user,password,mailFrom)
 
   The following blocks enable values to be provided in one of two ways:
 
@@ -485,6 +485,7 @@ Global values will override any chart-specific values.
         port: 587
         user: "noreply@example.com"
         password: "supersafe"
+        mailFrom: "noreply@example.com"
 
   AS K8s REFS:
     email:
@@ -509,6 +510,11 @@ Global values will override any chart-specific values.
             secretKeyRef:
               name: "smtp-settings-secret"
               key: "password"
+        mailFrom:
+          valueFrom:
+            secretKeyRef:
+              name: "smtp-settings-secret"
+              key: "mailFrom"
 */ -}}
 
 {{- if kindIs "map" .Values.global.email.smtp.host }}
@@ -548,6 +554,14 @@ Global values will override any chart-specific values.
 
 - name: GORILLA_EMAIL_SINK
   value: "{{ include "wandb.emailSink" . | trim }}"
+
+{{- if kindIs "map" .Values.global.email.smtp.mailFrom }}
+- name: GORILLA_EMAIL_FROM_ADDRESS
+{{- toYaml .Values.global.email.smtp.mailFrom | nindent 2 }}
+{{- else if ne .Values.global.email.smtp.mailFrom "" }}
+- name: GORILLA_EMAIL_FROM_ADDRESS
+  value: "{{ include "wandb.smtp.mailFrom" . }}"
+{{- end }}
 {{- end -}}
 
 {{- define "wandb.downwardEnvs" -}}
