@@ -161,6 +161,10 @@ global:
       # grpc, http
       proto: "grpc"
 
+  lumen:
+    enabled: false
+    addr: "16060"
+
   # Weave Trace ClickHouse connection config.
   #
   # This section configures how weave-trace connects to ClickHouse.
@@ -657,6 +661,8 @@ api:
   volumes:
     - name: temp-dir
       emptyDir: {}
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   size: ""
   sizing:
     small:
@@ -1082,6 +1088,8 @@ executor:
   env:
     GORILLA_TASK_QUEUE:
       value: '{{ include "wandb.executor.taskQueue" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     executor:
       args: ["executor"]
@@ -1179,6 +1187,8 @@ filemeta:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     filemeta:
       args: ["filemeta"]
@@ -1344,6 +1354,8 @@ filestream:
   env:
     GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
       value: '{{ include "wandb.fileStreamStoreConsumer" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     filestream:
       args: ["filestream"]
@@ -1455,6 +1467,8 @@ flat-run-fields-updater:
   image:
     repository: wandb/megabinary
     tag: latest
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   size: ""
   sizing:
     small:
@@ -1718,6 +1732,8 @@ history-updater:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     history-updater:
       args: ["history-updater"]
@@ -2085,6 +2101,7 @@ glue:
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
@@ -2143,6 +2160,8 @@ glue:
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -2413,6 +2432,7 @@ parquet:
     - '{{ include "wandb.sslCertEnvs" . }}'
   podAnnotationsTpls:
     - '{{ include "wandb.gcsFuseAnnotations" . }}'
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     parquet:
       args: ["parquet"]
@@ -2563,6 +2583,8 @@ parquet-metadata-cache:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     parquet-metadata-cache:
       args: ["parquet-metadata-cache"]
@@ -3322,6 +3344,17 @@ otel:
 #   extraVolumeMounts:
 #     - name: "otel-config"
 #       mountPath: /conf/config.yaml
+
+#  lumen:
+#    enabled: false
+#    schedule: "*/15 * * * *"  # Run every 15 minutes
+#    concurrencyPolicy: "Forbid"
+#    failedJobsHistoryLimit: 3
+#    successfulJobsHistoryLimit: 5
+#    startingDeadlineSeconds: 300
+#    annotations:
+#      "lumen.wandb.ai/agent": "true"
+
 
 # It is *strongly* recommended to supply passwords yourself for production installs.
 kafka:
