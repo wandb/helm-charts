@@ -3356,17 +3356,6 @@ otel:
 #     - name: "otel-config"
 #       mountPath: /conf/config.yaml
 
-#  lumen:
-#    enabled: false
-#    schedule: "*/15 * * * *"  # Run every 15 minutes
-#    concurrencyPolicy: "Forbid"
-#    failedJobsHistoryLimit: 3
-#    successfulJobsHistoryLimit: 5
-#    startingDeadlineSeconds: 300
-#    annotations:
-#      "lumen.wandb.ai/agent": "true"
-
-
 # It is *strongly* recommended to supply passwords yourself for production installs.
 kafka:
   install: false
@@ -3526,3 +3515,37 @@ clickhouse:
       enabled: true
       size: 8Gi
       storageClass: ""
+
+lumen:
+  kind: CronJob
+  image:
+    repository: wandb/lumen
+    tag: latest
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: false
+  cronJobs:
+    agent:
+      enabled: true
+      schedule: "*/15 * * * *"  # Run every 15 minutes
+      concurrencyPolicy: "Forbid"
+      failedJobsHistoryLimit: 3
+      successfulJobsHistoryLimit: 5
+      startingDeadlineSeconds: 300
+      annotations:
+        "lumen.wandb.ai/agent": "true"
+      containers:
+        collector:
+          args: [ "collector" ]
+#          envFrom:
+#            "{{ .Release.Name }}-glue-configmap": "configMapRef"
+          resources:
+            requests:
+              cpu: 1
+              memory: 1Gi
+            limits:
+              cpu: 1
+              memory: 1Gi
