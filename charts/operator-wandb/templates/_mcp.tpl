@@ -18,11 +18,13 @@ Requires weave-trace to be installed. If weave-trace is disabled,
 override WF_TRACE_SERVER_URL in the mcp-server.env values block.
 */}}
 {{- define "wandb.mcpEnvs" -}}
+{{- if not (index .Values "mcp-server" "env" "WF_TRACE_SERVER_URL") }}
 - name: WF_TRACE_SERVER_URL
   value: "http://{{ .Release.Name }}-weave-trace:8722"
+{{- end }}
 - name: WANDB_BASE_URL
   value: {{ .Values.global.host | quote }}
-{{- if .Values.datadog.enabled }}
+{{- if index .Values "mcp-server" "datadog" "enabled" }}
 - name: MCP_DATADOG_ENABLED
   value: "true"
 - name: MCP_DATADOG_FORWARD
@@ -53,7 +55,7 @@ override WF_TRACE_SERVER_URL in the mcp-server.env values block.
       key: {{ index $.Values "mcp-server" "analytics" "datadogApiKeySecret" "key" | default "api-key" }}
 {{- end }}
 {{- end }}
-{{- if .Values.otel.enabled }}
+{{- if index .Values "mcp-server" "otel" "enabled" }}
 - name: MCP_OTEL_ENABLED
   value: "true"
 - name: OTEL_SERVICE_NAME
