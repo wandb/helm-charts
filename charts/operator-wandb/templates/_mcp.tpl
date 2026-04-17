@@ -2,7 +2,7 @@
   Fail fast if mcp-server is enabled without a reachable weave-trace.
 */}}
 {{- if and (index .Values "mcp-server" "install") (not (index .Values "weave-trace" "install")) -}}
-{{- if not (dig "mcp-server" "env" "WF_TRACE_SERVER_URL" "" .Values) -}}
+{{- if not (index .Values "mcp-server" "env" "WF_TRACE_SERVER_URL") -}}
 {{- fail "mcp-server requires weave-trace.install=true or mcp-server.env.WF_TRACE_SERVER_URL to be set" -}}
 {{- end -}}
 {{- end -}}
@@ -45,12 +45,12 @@ override WF_TRACE_SERVER_URL in the mcp-server.env values block.
   value: "false"
 - name: DD_TRACE_HEADER_TAGS
   value: ""
-{{- with dig "mcp-server" "analytics" "datadogApiKeySecret" "name" "" .Values }}
+{{- with index .Values "mcp-server" "analytics" "datadogApiKeySecret" "name" }}
 - name: DD_API_KEY
   valueFrom:
     secretKeyRef:
       name: {{ . }}
-      key: {{ dig "mcp-server" "analytics" "datadogApiKeySecret" "key" "api-key" $.Values }}
+      key: {{ index $.Values "mcp-server" "analytics" "datadogApiKeySecret" "key" | default "api-key" }}
 {{- end }}
 {{- end }}
 {{- if .Values.otel.enabled }}
