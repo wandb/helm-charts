@@ -178,6 +178,15 @@ It expects a dictionary with two entries:
         number: 8081
 {{- end }}
 {{- end }}
+{{- if index .Values "mcp-server" "install" }}
+- pathType: Prefix
+  path: /mcp
+  backend:
+    service:
+      name: {{ $.Release.Name }}-mcp-server
+      port:
+        number: 8080
+{{- end }}
 - pathType: Prefix
   path: /console
   backend:
