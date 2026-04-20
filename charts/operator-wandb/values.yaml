@@ -2911,17 +2911,27 @@ mcp-server:
     MCP_RATE_LIMIT_ENABLED: "true"
     MCP_RATE_LIMIT_PER_KEY: "60/minute"
     MCP_RATE_LIMIT_GLOBAL: "1000/minute"
-    WANDB_CACHE_DIR: "/tmp/.wandb_cache"
-    WANDB_CONFIG_DIR: "/tmp/.wandb_config"
-    WANDB_DATA_DIR: "/tmp/.wandb_data"
-    HOME: "/tmp"
-  ## Observability -- all disabled by default.
+    # Note: WANDB_CACHE_DIR, WANDB_CONFIG_DIR, WANDB_DATA_DIR, and HOME=/tmp
+    # are already set by the MCP Docker image. The emptyDir volume mounted
+    # at /tmp/ above gives the pod isolated writable scratch space matching
+    # the image's defaults.
+  ## Observability -- all disabled by default, matching other W&B services.
   ## Prerequisites before enabling:
   ##   - ddtrace / opentelemetry-distro baked into the MCP server image (>= 0.3.0)
   ##   - dd-agent DaemonSet running on nodes (for datadog)
   ##   - OTEL Collector deployed in-cluster (for otel)
   ##   - Datadog Monitors + PagerDuty integration configured (ops layer)
   ##   - ADR filed, security review completed
+  ##
+  ## Datadog API key inheritance (K8s managed-install):
+  ## When datadog.enabled=true, _mcp.tpl sets DD_AGENT_HOST=status.hostIP which
+  ## routes traces/stats to the node-local Datadog Agent DaemonSet. The agent
+  ## holds the API key from the shared `datadog-secrets` secret in the `datadog`
+  ## namespace (managed by core/charts/datadog Terraform). NO workload-level
+  ## DD_API_KEY is needed -- do NOT set analytics.datadogApiKeySecret on K8s.
+  ##
+  ## The analytics.datadogApiKeySecret values block is ONLY for edge cases
+  ## without a local DD agent (e.g., Cloud Run). Leave unset on managed-install.
   datadog:
     enabled: false
   otel:
