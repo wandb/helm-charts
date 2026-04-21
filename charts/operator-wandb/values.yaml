@@ -2389,13 +2389,14 @@ x-wandb-parquet-backfill: &wandbParquetBackfill
   concurrencyPolicy: Forbid
   schedule: "* * * * *"
 
-# Shared envFrom entries for Parquet and parquet-headless; each subchart adds its configMapRef.
+# Shared envFrom for both Parquet megabinary subcharts; includes the app ConfigMap from templates/parquet.yaml.
 x-wandb-parquet-envFrom: &wandbParquetEnvFrom
   "{{ .Release.Name }}-bucket-configmap": "configMapRef"
   "{{ .Release.Name }}-redis-configmap": "configMapRef"
   "{{ .Release.Name }}-kafka-configmap": "configMapRef"
   "{{ .Release.Name }}-global-configmap": "configMapRef"
   "{{ .Release.Name }}-global-secret": "secretRef"
+  "{{ .Release.Name }}-parquet-configmap": "configMapRef"
 
 # Shared defaults for the Parquet and parquet-headless wandb-base subcharts.
 x-wandb-parquet: &wandbParquet
@@ -2539,7 +2540,6 @@ parquet:
         name: parquet
   envFrom:
     <<: *wandbParquetEnvFrom
-    "{{ .Release.Name }}-parquet-configmap": "configMapRef"
   cronJobs:
     parquet-backfill:
       <<: *wandbParquetBackfill
@@ -2557,7 +2557,6 @@ parquet-headless:
         name: parquet-headless
   envFrom:
     <<: *wandbParquetEnvFrom
-    "{{ .Release.Name }}-parquet-headless-configmap": "configMapRef"
   cronJobs:
     parquet-headless-backfill:
       <<: *wandbParquetBackfill
