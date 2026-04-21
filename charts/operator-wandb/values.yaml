@@ -2367,20 +2367,42 @@ metric-observer:
           maxReplicas: 20
           minReplicas: 8
 
-parquet:
-  install: true
+# Shared backfill spec for Parquet and parquet-headless. CronJob names in wandb-base
+# are $RELEASE-$key; keys differ per subchart to avoid a resource collision.
+x-wandb-parquet-backfill: &wandbParquetBackfill
+  enabled: false
+  containers:
+    backfill-job:
+      args: ["glue"]
+      env:
+        GORILLA_GLUE_EXECUTE: "true"
+        GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
+      envFrom:
+        "{{ .Release.Name }}-glue-configmap": "configMapRef"
+      resources:
+        requests:
+          cpu: 1
+          memory: 1Gi
+        limits:
+          cpu: 1
+          memory: 1Gi
+  concurrencyPolicy: Forbid
+  schedule: "* * * * *"
+
+# Shared envFrom entries for Parquet and parquet-headless; each subchart adds its configMapRef.
+x-wandb-parquet-envFrom: &wandbParquetEnvFrom
+  "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+  "{{ .Release.Name }}-redis-configmap": "configMapRef"
+  "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+  "{{ .Release.Name }}-global-configmap": "configMapRef"
+  "{{ .Release.Name }}-global-secret": "secretRef"
+
+# Shared defaults for the Parquet and parquet-headless wandb-base subcharts.
+x-wandb-parquet: &wandbParquet
   deploymentPostfix: "bc"
   image:
     repository: wandb/megabinary
     tag: latest
-  service:
-    enabled: true
-    # Optional. Set to "None" for a headless Service (no virtual ClusterIP).
-    # clusterIP: "None"
-    ports:
-      - port: 8087
-        protocol: TCP
-        name: parquet
   fuse:
     enabled: false
     resources:
@@ -2392,13 +2414,6 @@ parquet:
         memory: 2Gi
         ephemeral-storage: 10Gi
     fileCacheCapacity: 9.5Gi
-  envFrom:
-    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
-    "{{ .Release.Name }}-global-configmap": "configMapRef"
-    "{{ .Release.Name }}-global-secret": "secretRef"
-    "{{ .Release.Name }}-parquet-configmap": "configMapRef"
   envTpls:
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
@@ -2442,26 +2457,6 @@ parquet:
         successThreshold: 1
       volumeMountsTpls:
         - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
-  cronJobs:
-    parquet-backfill:
-      enabled: false
-      containers:
-        backfill-job:
-          args: ["glue"]
-          env:
-            GORILLA_GLUE_EXECUTE: "true"
-            GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
-          envFrom:
-            "{{ .Release.Name }}-glue-configmap": "configMapRef"
-          resources:
-            requests:
-              cpu: 1
-              memory: 1Gi
-            limits:
-              cpu: 1
-              memory: 1Gi
-      concurrencyPolicy: Forbid
-      schedule: "* * * * *"
   volumesTpls:
     - '{{ include "wandb.gcsFuseVolumes" . }}'
   size: ""
@@ -2532,6 +2527,42 @@ parquet:
           enabled: true
           maxReplicas: 4
           minReplicas: 2
+
+parquet:
+  <<: *wandbParquet
+  install: true
+  service:
+    enabled: true
+    # Optional. Set to "None" for a headless Service (no virtual ClusterIP).
+    # clusterIP: "None"
+    ports:
+      - port: 8087
+        protocol: TCP
+        name: parquet
+  envFrom:
+    <<: *wandbParquetEnvFrom
+    "{{ .Release.Name }}-parquet-configmap": "configMapRef"
+  cronJobs:
+    parquet-backfill:
+      <<: *wandbParquetBackfill
+
+# Second Parquet stack (e.g. headless Service for pod DNS). Opt-in; uses shared defaults above.
+parquet-headless:
+  <<: *wandbParquet
+  install: false
+  service:
+    enabled: true
+    clusterIP: "None"
+    ports:
+      - port: 8087
+        protocol: TCP
+        name: parquet-headless
+  envFrom:
+    <<: *wandbParquetEnvFrom
+    "{{ .Release.Name }}-parquet-headless-configmap": "configMapRef"
+  cronJobs:
+    parquet-headless-backfill:
+      <<: *wandbParquetBackfill
 
 parquet-metadata-cache:
   maxColumnChunks: 10000000
