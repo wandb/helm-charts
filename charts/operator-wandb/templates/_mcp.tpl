@@ -22,7 +22,11 @@ directly; .Values.global.* is auto-propagated by helm. Do NOT use
 fails helm render with "index of nil pointer".
 
 Resolves:
-- WF_TRACE_SERVER_URL: in-cluster weave-trace service (port 8722)
+- WF_TRACE_SERVER_URL: public weave-trace URL via ingress (global.host + /traces).
+  The chart's weave-trace subchart mounts the FastAPI app under API_PATH_PREFIX=/traces
+  (see templates/weave-trace.yaml), so the in-cluster Service path http://<release>-weave-trace:8722
+  returns 404 without the prefix. Using the ingress URL matches the convention other
+  internal consumers use (see weave-trace.yaml WF_TRACE_SERVER_URL line).
 - WANDB_BASE_URL: the W&B instance URL (from global.host)
 
 Requires weave-trace to be installed. If weave-trace is disabled,
@@ -31,7 +35,7 @@ override WF_TRACE_SERVER_URL in the mcp-server.env values block.
 {{- define "wandb.mcpEnvs" -}}
 {{- if not (index .Values "env" "WF_TRACE_SERVER_URL") }}
 - name: WF_TRACE_SERVER_URL
-  value: "http://{{ .Release.Name }}-weave-trace:8722"
+  value: "{{ .Values.global.host }}/traces"
 {{- end }}
 - name: WANDB_BASE_URL
   value: {{ .Values.global.host | quote }}
