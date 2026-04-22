@@ -321,6 +321,7 @@ global:
       port: 587
       user: ""
       password: ""
+      mailFrom: ""
 
   #
   # For Advanced Users:
@@ -349,6 +350,11 @@ global:
   #         secretKeyRef:
   #           name: "email-settings-secret"
   #           key: "password"
+  #     mailFrom:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "email-settings-secret"
+  #           key: "mailFrom"
 
   auth:
     sessionLengthHours: 720
@@ -2861,6 +2867,105 @@ weave:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+
+## MCP Server -- Model Context Protocol server for AI agent access to W&B data.
+## Requires weave-trace to be installed (WF_TRACE_SERVER_URL points to in-cluster weave-trace).
+## If weave-trace is disabled, override WF_TRACE_SERVER_URL in the env block below.
+## Disabled by default. Enable with: mcp-server.install: true
+## Docs: https://github.com/wandb/wandb-mcp-server
+mcp-server:
+  install: false
+  image:
+    repository: wandb/mcp-server
+    tag: "0.3.2"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 0
+  containers:
+    mcp-server:
+      args:
+        - "sh"
+        - "entrypoint.sh"
+      livenessProbe:
+        httpGet:
+          path: /mcp/health
+          port: 8080
+        initialDelaySeconds: 10
+        periodSeconds: 30
+      readinessProbe:
+        httpGet:
+          path: /mcp/health
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
+  volumes:
+    - name: temp-dir
+      emptyDir: {}
+  service:
+    enabled: true
+    type: ClusterIP
+    ports:
+      - name: http
+        port: 8080
+        targetPort: 8080
+        protocol: TCP
+  envFrom:
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.mcpEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+  env:
+    WANDB_SILENT: "True"
+    WEAVE_SILENT: "True"
+    WEAVE_DISABLED: "true"
+    MCP_TRANSPORT: "http"
+    ENVIRONMENT: "production"
+    MCP_ANALYTICS_DISABLED: "false"
+    MCP_SEGMENT_FORWARD: "true"
+    MCP_AUTH_DISABLED: "false"
+    MCP_RATE_LIMIT_ENABLED: "true"
+    MCP_RATE_LIMIT_PER_KEY: "60/minute"
+    MCP_RATE_LIMIT_GLOBAL: "1000/minute"
+    # Note: WANDB_CACHE_DIR, WANDB_CONFIG_DIR, WANDB_DATA_DIR, and HOME=/tmp
+    # are already set by the MCP Docker image. The emptyDir volume mounted
+    # at /tmp/ above gives the pod isolated writable scratch space matching
+    # the image's defaults.
+  ## Observability -- all disabled by default, matching other W&B services.
+  ## Prerequisites before enabling:
+  ##   - ddtrace / opentelemetry-distro baked into the MCP server image (>= 0.3.0)
+  ##   - dd-agent DaemonSet running on nodes (for datadog)
+  ##   - OTEL Collector deployed in-cluster (for otel)
+  ##   - Datadog Monitors + PagerDuty integration configured (ops layer)
+  ##   - ADR filed, security review completed
+  ##
+  ## Datadog API key inheritance (K8s managed-install):
+  ## When datadog.enabled=true, _mcp.tpl sets DD_AGENT_HOST=status.hostIP which
+  ## routes traces/stats to the node-local Datadog Agent DaemonSet. The agent
+  ## holds the API key from the shared `datadog-secrets` secret in the `datadog`
+  ## namespace (managed by core/charts/datadog Terraform). NO workload-level
+  ## DD_API_KEY is needed -- do NOT set analytics.datadogApiKeySecret on K8s.
+  ##
+  ## The analytics.datadogApiKeySecret values block is ONLY for edge cases
+  ## without a local DD agent (e.g., Cloud Run). Leave unset on managed-install.
+  datadog:
+    enabled: false
+  otel:
+    enabled: false
+  analytics:
+    datadogApiKeySecret:
+      name: ""
+      key: "api-key"
 
 weave-trace:
   install: false
