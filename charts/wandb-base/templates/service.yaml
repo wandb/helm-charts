@@ -1,5 +1,6 @@
 {{- if .Values.service.enabled }}
-{{- if eq .Values.global.cloudProvider "gcp" }}
+{{- $headless := eq .Values.service.clusterIP "None" }}
+{{- if and (eq .Values.global.cloudProvider "gcp") (not $headless) }}
 ---
 apiVersion: cloud.google.com/v1
 kind: BackendConfig
@@ -14,6 +15,7 @@ spec:
   {{- end }}
   timeoutSec: 120
 {{- end }}
+
 ---
 apiVersion: v1
 kind: Service
@@ -30,12 +32,15 @@ metadata:
     {{- if and ( eq .Values.global.cloudProvider "aws" ) .Values.service.loadBalancerHealthCheckPath }}
     alb.ingress.kubernetes.io/healthcheck-path: {{ .Values.service.loadBalancerHealthCheckPath }}
     {{- end }}
-    {{- if eq .Values.global.cloudProvider "gcp" }}
+    {{- if and (eq .Values.global.cloudProvider "gcp") (not $headless) }}
     cloud.google.com/neg: '{"ingress": true}'
     cloud.google.com/backend-config: '{"default": "{{ include "wandb-base.fullname" . }}-backend-config"}'
     {{- end }}
 spec:
   type: {{ .Values.service.type }}
+  {{- with .Values.service.clusterIP }}
+  clusterIP: {{ . }}
+  {{- end }}
   ports:
     {{- with .Values.service.ports }}
     {{- toYaml . | nindent 4 }}

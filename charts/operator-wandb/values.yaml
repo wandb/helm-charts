@@ -2367,18 +2367,43 @@ metric-observer:
           maxReplicas: 20
           minReplicas: 8
 
-parquet:
-  install: true
+# Shared backfill spec for Parquet and parquet-headless. CronJob names in wandb-base
+# are $RELEASE-$key; keys differ per subchart to avoid a resource collision.
+x-wandb-parquet-backfill: &wandbParquetBackfill
+  enabled: false
+  containers:
+    backfill-job:
+      args: ["glue"]
+      env:
+        GORILLA_GLUE_EXECUTE: "true"
+        GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
+      envFrom:
+        "{{ .Release.Name }}-glue-configmap": "configMapRef"
+      resources:
+        requests:
+          cpu: 1
+          memory: 1Gi
+        limits:
+          cpu: 1
+          memory: 1Gi
+  concurrencyPolicy: Forbid
+  schedule: "* * * * *"
+
+# Shared envFrom for both Parquet megabinary subcharts; includes the app ConfigMap from templates/parquet.yaml.
+x-wandb-parquet-envFrom: &wandbParquetEnvFrom
+  "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+  "{{ .Release.Name }}-redis-configmap": "configMapRef"
+  "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+  "{{ .Release.Name }}-global-configmap": "configMapRef"
+  "{{ .Release.Name }}-global-secret": "secretRef"
+  "{{ .Release.Name }}-parquet-configmap": "configMapRef"
+
+# Shared defaults for the Parquet and parquet-headless wandb-base subcharts.
+x-wandb-parquet: &wandbParquet
   deploymentPostfix: "bc"
   image:
     repository: wandb/megabinary
     tag: latest
-  service:
-    enabled: true
-    ports:
-      - port: 8087
-        protocol: TCP
-        name: parquet
   fuse:
     enabled: false
     resources:
@@ -2390,13 +2415,6 @@ parquet:
         memory: 2Gi
         ephemeral-storage: 10Gi
     fileCacheCapacity: 9.5Gi
-  envFrom:
-    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
-    "{{ .Release.Name }}-redis-configmap": "configMapRef"
-    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
-    "{{ .Release.Name }}-global-configmap": "configMapRef"
-    "{{ .Release.Name }}-global-secret": "secretRef"
-    "{{ .Release.Name }}-parquet-configmap": "configMapRef"
   envTpls:
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
@@ -2413,53 +2431,6 @@ parquet:
     - '{{ include "wandb.sslCertEnvs" . }}'
   podAnnotationsTpls:
     - '{{ include "wandb.gcsFuseAnnotations" . }}'
-  containers:
-    parquet:
-      args: ["parquet"]
-      ports:
-        - name: parquet
-          containerPort: 8087
-          protocol: TCP
-      livenessProbe:
-        httpGet:
-          path: /healthz
-          port: 8087
-        initialDelaySeconds: 30
-        periodSeconds: 30
-        timeoutSeconds: 30
-        failureThreshold: 3
-        successThreshold: 1
-      readinessProbe:
-        httpGet:
-          path: /ready
-          port: 8087
-        initialDelaySeconds: 30
-        periodSeconds: 30
-        timeoutSeconds: 30
-        failureThreshold: 3
-        successThreshold: 1
-      volumeMountsTpls:
-        - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
-  cronJobs:
-    parquet-backfill:
-      enabled: false
-      containers:
-        backfill-job:
-          args: ["glue"]
-          env:
-            GORILLA_GLUE_EXECUTE: "true"
-            GORILLA_GLUE_EXECUTE_TASK_NAME: "EXPORTHISTORYTOPARQUET"
-          envFrom:
-            "{{ .Release.Name }}-glue-configmap": "configMapRef"
-          resources:
-            requests:
-              cpu: 1
-              memory: 1Gi
-            limits:
-              cpu: 1
-              memory: 1Gi
-      concurrencyPolicy: Forbid
-      schedule: "* * * * *"
   volumesTpls:
     - '{{ include "wandb.gcsFuseVolumes" . }}'
   size: ""
@@ -2530,6 +2501,90 @@ parquet:
           enabled: true
           maxReplicas: 4
           minReplicas: 2
+
+parquet:
+  <<: *wandbParquet
+  install: true
+  service:
+    enabled: true
+    ports:
+      - port: 8087
+        protocol: TCP
+        name: parquet
+  containers:
+    parquet:
+      args: ["parquet"]
+      volumeMountsTpls:
+        - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
+      ports:
+        - name: parquet
+          containerPort: 8087
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8087
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8087
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+  envFrom:
+    <<: *wandbParquetEnvFrom
+  cronJobs:
+    parquet-backfill:
+      <<: *wandbParquetBackfill
+
+# Second Parquet stack (e.g. headless Service for pod DNS). Opt-in; uses shared defaults above.
+parquet-headless:
+  <<: *wandbParquet
+  install: false
+  service:
+    enabled: true
+    clusterIP: "None"
+    ports:
+      - port: 8087
+        protocol: TCP
+        name: parquet-headless
+  containers:
+    parquet:
+      args: ["parquet"]
+      volumeMountsTpls:
+        - '{{ include "wandb.gcsFuseVolumeMounts" . }}'
+      ports:
+        - name: parquet
+          containerPort: 8087
+          protocol: TCP
+      livenessProbe:
+        grpc:
+          port: 8087
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        grpc:
+          port: 8087
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+  envFrom:
+    <<: *wandbParquetEnvFrom
+  cronJobs:
+    parquet-headless-backfill:
+      <<: *wandbParquetBackfill
 
 parquet-metadata-cache:
   maxColumnChunks: 10000000
