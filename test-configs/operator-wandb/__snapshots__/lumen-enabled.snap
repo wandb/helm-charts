@@ -439,7 +439,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: lumen
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "v0.1.0"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -1757,6 +1757,21 @@ data:
   HOST: "http://localhost:8080"
   LOCAL_K8S_SIGNER_SECRET_NAME: "chartsnap-internal-signer"
   LOCAL_K8S_SIGNER_NAMESPACE: "default"
+---
+# Source: operator-wandb/templates/lumen.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-lumen-configmap
+  labels:
+data:
+  LUMEN_CONFIG_PATH: "/app/definitions/collector/managed-install.yaml"
+  LUMEN_SNAPSHOT_PREFIX: "snapshot"
+  LUMEN_CUSTOMER_NAME: "chartsnap"
+  LUMEN_AGENT_EXPORT_ROOT: ""
+  LUMEN_PARQUET_ROOT: ""
+  LUMEN_PROCESSOR_COMPLETED_ROOT: ""
+  LUMEN_PROCESSOR_INBOUND_ROOT: ""
 ---
 # Source: operator-wandb/templates/nginx.yaml
 apiVersion: v1
@@ -6562,7 +6577,7 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: lumen
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/version: "v0.1.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   concurrencyPolicy: Forbid
@@ -6576,7 +6591,7 @@ spec:
             helm.sh/chart: lumen-0.11.11
             app.kubernetes.io/name: lumen
             app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/version: "latest"
+            app.kubernetes.io/version: "v0.1.0"
             app.kubernetes.io/managed-by: Helm
         spec:
           containers:
@@ -6584,6 +6599,8 @@ spec:
             args:
             - collector
             envFrom:
+            - configMapRef:
+                name: chartsnap-lumen-configmap
             env:
             securityContext:
               allowPrivilegeEscalation: false
@@ -6592,7 +6609,7 @@ spec:
                 drop: []
               privileged: false
               readOnlyRootFilesystem: false
-            image: "us-docker.pkg.dev/wandb-production/public/wandb/lumen:latest"
+            image: "us-docker.pkg.dev/wandb-production/public/us-central1-docker.pkg.dev/playground-111/lumen/lumen:v0.1.0"
             imagePullPolicy: IfNotPresent
             resources:
               limits:
