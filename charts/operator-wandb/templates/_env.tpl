@@ -110,7 +110,7 @@ Global values will override any chart-specific values.
 {{- define "wandb.lumenEnvs" -}}
 {{- if .Values.global.lumen.enabled }}
 - name: GORILLA_LUMEN_ADDR
-  value: "{{ .Values.global.lumen.addr }}"
+  value: "{{ with .Values.global.lumen.port }}:{{ . }}{{ end }}"
 {{- end }}
 {{- end -}}
 

@@ -68,9 +68,7 @@ gke-gcsfuse/metadata-prefetch-memory-limit: "{{ .Values.fuse.resources.limits.me
 
 {{- define "wandb.lumenAnnotations" -}}
 {{- if .Values.global.lumen.enabled }}
-"lumen.wandb.ai/port": "{{ .Values.global.lumen.addr }}"
+"lumen.wandb.ai/port": "{{ with .Values.global.lumen.port }}:{{ . }}{{ end }}"
 "lumen.wandb.ai/enabled": "true"
-{{- else }}
-"lumen.wandb.ai/enabled": "false"
 {{- end }}
 {{- end -}}
