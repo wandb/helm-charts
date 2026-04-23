@@ -161,6 +161,12 @@ global:
       # grpc, http
       proto: "grpc"
 
+  lumen:
+    enabled: false
+    port: ""
+    snapshotPrefix: "snapshot"
+    lumenBucket: ""
+
   # Weave Trace ClickHouse connection config.
   #
   # This section configures how weave-trace connects to ClickHouse.
@@ -581,6 +587,7 @@ api:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
@@ -657,6 +664,8 @@ api:
   volumes:
     - name: temp-dir
       emptyDir: {}
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   size: ""
   sizing:
     small:
@@ -1077,11 +1086,14 @@ executor:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     GORILLA_TASK_QUEUE:
       value: '{{ include "wandb.executor.taskQueue" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     executor:
       args: ["executor"]
@@ -1177,8 +1189,11 @@ filemeta:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     filemeta:
       args: ["filemeta"]
@@ -1339,11 +1354,14 @@ filestream:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
       value: '{{ include "wandb.fileStreamStoreConsumer" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     filestream:
       args: ["filestream"]
@@ -1447,6 +1465,7 @@ flat-run-fields-updater:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   containers:
@@ -1455,6 +1474,8 @@ flat-run-fields-updater:
   image:
     repository: wandb/megabinary
     tag: latest
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   size: ""
   sizing:
     small:
@@ -1716,8 +1737,11 @@ history-updater:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     history-updater:
       args: ["history-updater"]
@@ -2092,6 +2116,7 @@ glue:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.registrySearchEnvs" . }}'
@@ -2143,6 +2168,8 @@ glue:
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -2267,8 +2294,11 @@ metric-observer:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     metric-observer:
       args: ["metric-observer"]
@@ -2409,10 +2439,12 @@ parquet:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   podAnnotationsTpls:
     - '{{ include "wandb.gcsFuseAnnotations" . }}'
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     parquet:
       args: ["parquet"]
@@ -2562,7 +2594,10 @@ parquet-metadata-cache:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.lumenEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumenAnnotations" . }}'
   containers:
     parquet-metadata-cache:
       args: ["parquet-metadata-cache"]
@@ -3581,3 +3616,37 @@ clickhouse:
       enabled: true
       size: 8Gi
       storageClass: ""
+
+lumen:
+  kind: CronJob
+  image:
+    repository: wandb/lumen
+    tag: latest
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: false
+  cronJobs:
+    agent:
+      enabled: true
+      schedule: "*/15 * * * *"  # Run every 15 minutes
+      concurrencyPolicy: "Forbid"
+      failedJobsHistoryLimit: 3
+      successfulJobsHistoryLimit: 5
+      startingDeadlineSeconds: 300
+      annotations:
+        "lumen.wandb.ai/agent": "true"
+      containers:
+        collector:
+          args: ["collector"]
+          envFrom:
+            "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+          resources:
+            requests:
+              cpu: 1
+              memory: 1Gi
+            limits:
+              cpu: 1
+              memory: 1Gi
