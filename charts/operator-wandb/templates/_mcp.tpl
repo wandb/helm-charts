@@ -76,7 +76,7 @@ override WF_TRACE_SERVER_URL in the mcp-server.env values block.
   value: "true"
 {{- end }}
 - name: DD_SERVICE
-  value: "wandb-mcp-server"
+  value: {{ index .Values "datadog" "service" | default "wandb-mcp-server-onprem" | quote }}
 - name: DD_ENV
   value: {{ index .Values "datadog" "env" | default "production" | quote }}
 - name: DD_VERSION
