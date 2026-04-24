@@ -62,6 +62,15 @@ override WF_TRACE_SERVER_URL in the mcp-server.env values block.
 {{- end }}
 - name: WANDB_BASE_URL
   value: {{ .Values.global.host | quote }}
+{{/*
+  Privacy level for customer-supplied content in logs. Default here is "standard"
+  (redact free-text params, demote verbose log sites to DEBUG) so customer K8s
+  installs don't retain plaintext customer queries/descriptions/titles in logs.
+  Override via mcp-server.privacy.logLevel: "off" | "standard" | "strict".
+  See https://github.com/wandb/wandb-mcp-server/blob/main/docs/OBSERVABILITY.md
+*/}}
+- name: MCP_LOG_PRIVACY_LEVEL
+  value: {{ index .Values "privacy" "logLevel" | default "standard" | quote }}
 {{- if index .Values "datadog" "enabled" }}
 - name: MCP_DATADOG_ENABLED
   value: "true"
