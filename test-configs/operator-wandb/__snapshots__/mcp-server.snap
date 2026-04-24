@@ -5022,12 +5022,19 @@ spec:
       app.kubernetes.io/instance: chartsnap
   template:
     metadata:
+      annotations:
+        ad.datadoghq.com/mcp-server.tags: '["product:wandb","component:mcp-server","deployment_type:dedicated-cloud","customer:acme","team:ml-platform","region:us-west1"]'
       labels:
         helm.sh/chart: mcp-server-0.11.11
         app.kubernetes.io/name: mcp-server
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "0.3.2"
         app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: "mcp-server"
+        app.kubernetes.io/part-of: "wandb-platform"
+        tags.datadoghq.com/env: "production"
+        tags.datadoghq.com/service: "wandb-mcp-server-onprem"
+        tags.datadoghq.com/version: "0.3.2"
     spec:
       containers:
       - name: mcp-server
@@ -5042,6 +5049,30 @@ spec:
           value: https://wandb.example.com/traces
         - name: WANDB_BASE_URL
           value: https://wandb.example.com
+        - name: MCP_DATADOG_ENABLED
+          value: "true"
+        - name: MCP_DATADOG_FORWARD
+          value: "true"
+        - name: DD_SERVICE
+          value: wandb-mcp-server-onprem
+        - name: DD_ENV
+          value: production
+        - name: DD_VERSION
+          value: 0.3.2
+        - name: DD_AGENT_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: DD_TRACE_AGENT_HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: DD_EXCEPTION_REPLAY_ENABLED
+          value: "false"
+        - name: DD_TRACE_HEADER_TAGS
+          value: ""
+        - name: MCP_LOG_FORMAT
+          value: json
         - name: SSL_CERT_FILE
           value: /etc/ssl/certs/ca-certificates.crt
         - name: SSL_CERT_DIR
