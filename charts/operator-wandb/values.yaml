@@ -2899,7 +2899,7 @@ mcp-server:
   ## setting mcp-server.podLabels in your values; top-level keys merge over the defaults.
   ## The template refs below resolve at render time; datadog.env/image.tag always have defaults.
   podLabels:
-    tags.datadoghq.com/service: wandb-mcp-server
+    tags.datadoghq.com/service: '{{ .Values.datadog.service }}'
     tags.datadoghq.com/env: '{{ .Values.datadog.env }}'
     tags.datadoghq.com/version: '{{ .Values.image.tag }}'
     app.kubernetes.io/component: mcp-server
@@ -2957,6 +2957,12 @@ mcp-server:
     ## When mode="agent" (default), MCP_DATADOG_FORWARD is NOT set so the pod does not
     ## double-ship to DD; the DD Agent DaemonSet handles everything.
     mode: "agent"
+    ## DD service name for logs, APM traces, and metrics. The default distinguishes
+    ## helm-chart-installed deployments (dedicated-cloud, self-managed, customer K8s)
+    ## from W&B's SaaS-hosted Cloud Run service which owns `wandb-mcp-server`. Keep
+    ## them split so each fleet owns its dashboards/monitors/SLOs cleanly. Override
+    ## if you want a per-install name (e.g. "acme-mcp" for single-tenant branding).
+    service: "wandb-mcp-server-onprem"
     ## Environment tag (DD_ENV, tags.datadoghq.com/env). Override per-deployment.
     env: "production"
     ## Install-type tag for cross-deployment dashboards:
