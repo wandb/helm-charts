@@ -2893,6 +2893,24 @@ mcp-server:
         port: 8080
         targetPort: 8080
         protocol: TCP
+  ## Pod labels -- always applied. Default set wires Datadog Unified Service Tagging
+  ## (joins logs <-> APM traces) and standard K8s app labels for dashboard grouping.
+  ## These labels are harmless when Datadog is not installed. Override or extend by
+  ## setting mcp-server.podLabels in your values; top-level keys merge over the defaults.
+  ## The template refs below resolve at render time; datadog.env/image.tag always have defaults.
+  podLabels:
+    tags.datadoghq.com/service: '{{ .Values.datadog.service }}'
+    tags.datadoghq.com/env: '{{ .Values.datadog.env }}'
+    tags.datadoghq.com/version: '{{ .Values.image.tag }}'
+    app.kubernetes.io/component: mcp-server
+    app.kubernetes.io/part-of: wandb-platform
+  ## Pod annotations. `ad.datadoghq.com/mcp-server.tags` surfaces extra DD tags per-container
+  ## (product, component, deployment_type, optional customer + extraTags). The value is
+  ## rendered by the wandb.mcpDatadogTags helper from datadog.deploymentType / customer /
+  ## extraTags in the values below.
+  ## See https://docs.datadoghq.com/containers/kubernetes/tag/ for the Autodiscovery tag format.
+  podAnnotations:
+    ad.datadoghq.com/mcp-server.tags: '{{ include "wandb.mcpDatadogTags" . }}'
   envFrom:
     "{{ .Release.Name }}-global-configmap": "configMapRef"
   envTpls:
@@ -2918,25 +2936,50 @@ mcp-server:
   ## Observability -- all disabled by default, matching other W&B services.
   ## Prerequisites before enabling:
   ##   - ddtrace / opentelemetry-distro baked into the MCP server image (>= 0.3.0)
-  ##   - dd-agent DaemonSet running on nodes (for datadog)
+  ##   - dd-agent DaemonSet running on nodes (for datadog.mode=agent, primary K8s path)
   ##   - OTEL Collector deployed in-cluster (for otel)
-  ##   - Datadog Monitors + PagerDuty integration configured (ops layer)
-  ##   - ADR filed, security review completed
   ##
-  ## Datadog API key inheritance (K8s managed-install):
-  ## When datadog.enabled=true, _mcp.tpl sets DD_AGENT_HOST=status.hostIP which
-  ## routes traces/stats to the node-local Datadog Agent DaemonSet. The agent
-  ## holds the API key from the shared `datadog-secrets` secret in the `datadog`
-  ## namespace (managed by core/charts/datadog Terraform). NO workload-level
-  ## DD_API_KEY is needed -- do NOT set analytics.datadogApiKeySecret on K8s.
+  ## TWO OBSERVABILITY MODES:
   ##
-  ## The analytics.datadogApiKeySecret values block is ONLY for edge cases
-  ## without a local DD agent (e.g., Cloud Run). Leave unset on managed-install.
+  ## 1. AGENT (default, managed K8s) -- recommended for all dedicated-install and self-hosted
+  ##    customers. The Datadog Agent DaemonSet on each node collects pod stdout logs, APM
+  ##    traces (via DD_AGENT_HOST=status.hostIP on :8126), and DogStatsD metrics. The DD API
+  ##    key lives ONLY on the agent (typically in the `datadog-secrets` Secret in the `datadog`
+  ##    namespace, managed by core/charts/datadog Terraform). The MCP pod holds no DD credentials.
+  ##
+  ## 2. FORWARDER (serverless only -- Cloud Run, Lambda) -- the MCP pod POSTs events directly
+  ##    to https://http-intake.logs.<DD_SITE>/api/v2/logs using a DD_API_KEY sourced from
+  ##    analytics.datadogApiKeySecret or GCP Secret Manager (via MCP_SERVER_SECRETS_PROVIDER=gcp
+  ##    at the app level). Not appropriate for K8s -- duplicates what the agent already does.
   datadog:
     enabled: false
+    ## Ingestion path: "agent" (preferred on K8s) or "forwarder" (serverless only).
+    ## When mode="agent" (default), MCP_DATADOG_FORWARD is NOT set so the pod does not
+    ## double-ship to DD; the DD Agent DaemonSet handles everything.
+    mode: "agent"
+    ## DD service name for logs, APM traces, and metrics. The default distinguishes
+    ## helm-chart-installed deployments (dedicated-cloud, self-managed, customer K8s)
+    ## from W&B's SaaS-hosted Cloud Run service which owns `wandb-mcp-server`. Keep
+    ## them split so each fleet owns its dashboards/monitors/SLOs cleanly. Override
+    ## if you want a per-install name (e.g. "acme-mcp" for single-tenant branding).
+    service: "wandb-mcp-server-onprem"
+    ## Environment tag (DD_ENV, tags.datadoghq.com/env). Override per-deployment.
+    env: "production"
+    ## Install-type tag for cross-deployment dashboards:
+    ##   "dedicated-cloud" | "self-managed" | "multi-tenant" | "cloud-run"
+    ## Surfaces as `deployment_type:<value>` on every log, metric, and trace.
+    deploymentType: "self-managed"
+    ## Per-customer tag for dedicated installs. Empty = omitted.
+    ## Surfaces as `customer:<value>`. Useful for W&B-operated dashboards spanning customers.
+    customer: ""
+    ## Extra DD tags appended to Autodiscovery. Example:
+    ##   extraTags: ["team:ml-platform", "region:us-west1", "tier:prod"]
+    extraTags: []
   otel:
     enabled: false
   analytics:
+    ## ONLY relevant for serverless/forwarder mode. On managed K8s (mode=agent),
+    ## leave this unset -- the DD Agent holds the API key.
     datadogApiKeySecret:
       name: ""
       key: "api-key"
