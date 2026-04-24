@@ -2983,6 +2983,25 @@ mcp-server:
     datadogApiKeySecret:
       name: ""
       key: "api-key"
+  ## Privacy-level gate for customer-supplied content in logs.
+  ## See https://github.com/wandb/wandb-mcp-server/blob/main/docs/OBSERVABILITY.md
+  ##
+  ##   off      - today's behavior: free-text params (query, prompt, description, ...)
+  ##              and identifiers (entity_name, project_name, user_id, email_domain)
+  ##              pass through to logs plaintext. Cloud Run uses this explicitly so its
+  ##              BigQuery analytics pipeline keeps plaintext cohort fields.
+  ##   standard - (default for K8s) redacts free-text param values to
+  ##              "<redacted: text len=N>"; demotes verbose ToolCall/raw-body logs to
+  ##              DEBUG. Customer entity/project names still plaintext so customer
+  ##              operators can still correlate their own telemetry.
+  ##   strict   - additionally hashes entity/project/run/user identifiers to
+  ##              "<h:sha256_prefix>". For regulated customers (HIPAA, FedRAMP, etc.)
+  ##              where even the identifiers should not be retained in plaintext.
+  ##
+  ## Surfaces as env var MCP_LOG_PRIVACY_LEVEL on the pod. Injected by
+  ## templates/_mcp.tpl::wandb.mcpEnvs. Wire-up: wandb/wandb-mcp-server#56.
+  privacy:
+    logLevel: "standard"
 
 weave-trace:
   install: false
