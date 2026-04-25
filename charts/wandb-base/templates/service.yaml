@@ -2,7 +2,7 @@
 {{- $root := .root -}}
 {{- $service := .service -}}
 {{- $serviceType := default "ClusterIP" $service.type -}}
-{{- $isHeadless := eq (lower $serviceType) "headless" -}}
+{{- $isHeadless := default false $service.headless -}}
 {{- $internal := or (default false $service.internal) $isHeadless -}}
 {{- $serviceName := required "service.name is required" $service.name | trunc 63 | trimSuffix "-" -}}
 {{- if $service.enabled }}
@@ -45,11 +45,9 @@ metadata:
     cloud.google.com/backend-config: '{"default": "{{ $serviceName }}-backend-config"}'
     {{- end }}
 spec:
-  {{- if $isHeadless }}
-  type: ClusterIP
-  clusterIP: None
-  {{- else }}
   type: {{ $serviceType }}
+  {{- if $isHeadless }}
+  clusterIP: None
   {{- end }}
   ports:
     {{- with $service.ports }}
