@@ -4,8 +4,8 @@
 {{- $serviceType := default "ClusterIP" $service.type -}}
 {{- $isHeadless := eq (lower $serviceType) "headless" -}}
 {{- $internal := or (default false $service.internal) $isHeadless -}}
+{{- $serviceName := required "service.name is required" $service.name | trunc 63 | trimSuffix "-" -}}
 {{- if $service.enabled }}
-{{- $serviceName := default (include "wandb-base.fullname" $root) $service.name | trunc 63 | trimSuffix "-" }}
 {{- if and (not $internal) (eq $root.Values.global.cloudProvider "gcp") }}
 ---
 apiVersion: cloud.google.com/v1
@@ -60,7 +60,11 @@ spec:
 {{- end }}
 {{- end }}
 
-{{- include "wandb-base.serviceResource" (dict "root" . "service" .Values.service) }}
+{{- $defaultService := deepCopy .Values.service -}}
+{{- if not $defaultService.name -}}
+{{- $_ := set $defaultService "name" (include "wandb-base.fullname" .) -}}
+{{- end -}}
+{{- include "wandb-base.serviceResource" (dict "root" . "service" $defaultService) }}
 {{- range $service := .Values.services }}
 {{- include "wandb-base.serviceResource" (dict "root" $ "service" $service) }}
 {{- end }}
