@@ -1,16 +1,23 @@
-{{- if .Values.service.enabled }}
-{{- if eq .Values.global.cloudProvider "gcp" }}
+{{- define "wandb-base.serviceResource" -}}
+{{- $root := .root -}}
+{{- $service := .service -}}
+{{- $serviceType := default "ClusterIP" $service.type -}}
+{{- $isHeadless := eq (lower $serviceType) "headless" -}}
+{{- $internal := or (default false $service.internal) $isHeadless -}}
+{{- $serviceName := required "service.name is required" $service.name | trunc 63 | trimSuffix "-" -}}
+{{- if $service.enabled }}
+{{- if and (not $internal) (eq $root.Values.global.cloudProvider "gcp") }}
 ---
 apiVersion: cloud.google.com/v1
 kind: BackendConfig
 metadata:
-  name: {{ include "wandb-base.fullname" . }}-backend-config
+  name: {{ $serviceName }}-backend-config
   labels:
-    {{- include "wandb-base.labels" . | nindent 4 }}
+    {{- include "wandb-base.labels" $root | nindent 4 }}
 spec:
-  {{- if .Values.global.gcpSecurityPolicy }}
+  {{- if $root.Values.global.gcpSecurityPolicy }}
   securityPolicy:
-    name: {{ .Values.global.gcpSecurityPolicy }}
+    name: {{ $root.Values.global.gcpSecurityPolicy }}
   {{- end }}
   timeoutSec: 120
 {{- end }}
@@ -18,28 +25,46 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "wandb-base.serviceName" . }}
+  name: {{ $serviceName }}
   labels:
-    {{- include "wandb-base.labels" . | nindent 4 }}
-    {{- if .Values.service.labels -}}
-    {{-   toYaml .Values.service.labels | nindent 4 }}
+    {{- include "wandb-base.labels" $root | nindent 4 }}
+    {{- if $service.labels -}}
+    {{- toYaml $service.labels | nindent 4 }}
     {{- end }}
   annotations:
-    {{- tpl (include "wandb-base.commonAnnotations" . | nindent 4) . }}
-    {{- tpl (include "wandb-base.serviceAnnotations" . | nindent 4) . }}
-    {{- if and ( eq .Values.global.cloudProvider "aws" ) .Values.service.loadBalancerHealthCheckPath }}
-    alb.ingress.kubernetes.io/healthcheck-path: {{ .Values.service.loadBalancerHealthCheckPath }}
+    {{- tpl (include "wandb-base.commonAnnotations" $root | nindent 4) $root }}
+    {{- $allServiceAnnotations := merge (default (dict) $service.annotations) $root.Values.global.service.annotations }}
+    {{- if $allServiceAnnotations }}
+    {{- toYaml $allServiceAnnotations | nindent 4 }}
     {{- end }}
-    {{- if eq .Values.global.cloudProvider "gcp" }}
+    {{- if and (not $internal) (eq $root.Values.global.cloudProvider "aws") $service.loadBalancerHealthCheckPath }}
+    alb.ingress.kubernetes.io/healthcheck-path: {{ $service.loadBalancerHealthCheckPath }}
+    {{- end }}
+    {{- if and (not $internal) (eq $root.Values.global.cloudProvider "gcp") }}
     cloud.google.com/neg: '{"ingress": true}'
-    cloud.google.com/backend-config: '{"default": "{{ include "wandb-base.fullname" . }}-backend-config"}'
+    cloud.google.com/backend-config: '{"default": "{{ $serviceName }}-backend-config"}'
     {{- end }}
 spec:
-  type: {{ .Values.service.type }}
+  {{- if $isHeadless }}
+  type: ClusterIP
+  clusterIP: None
+  {{- else }}
+  type: {{ $serviceType }}
+  {{- end }}
   ports:
-    {{- with .Values.service.ports }}
+    {{- with $service.ports }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
   selector:
-    {{- include "wandb-base.selectorLabels" . | nindent 4 }}
+    {{- include "wandb-base.selectorLabels" $root | nindent 4 }}
+{{- end }}
+{{- end }}
+
+{{- $defaultService := deepCopy .Values.service -}}
+{{- if not $defaultService.name -}}
+{{- $_ := set $defaultService "name" (include "wandb-base.fullname" .) -}}
+{{- end -}}
+{{- include "wandb-base.serviceResource" (dict "root" . "service" $defaultService) }}
+{{- range $service := .Values.services }}
+{{- include "wandb-base.serviceResource" (dict "root" $ "service" $service) }}
 {{- end }}
