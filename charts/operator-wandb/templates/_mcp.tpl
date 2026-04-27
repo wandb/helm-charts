@@ -34,6 +34,20 @@
 {{- end -}}
 
 {{/*
+  Datadog Autodiscovery log config for the MCP container. The `.tags`
+  annotation only adds metadata; this `.logs` annotation is what tells a
+  Datadog Agent on an allowlisted cluster to collect the mcp-server container
+  stdout and attribute it to the configured service.
+
+  SCOPE NOTE: same as wandb.mcpDatadogTags -- .Values is the "mcp-server"
+  subtree at call time.
+*/}}
+{{- define "wandb.mcpDatadogLogs" -}}
+{{- $entry := dict "source" "python" "service" (include "wandb.mcpDDService" .) -}}
+{{ list $entry | toJson }}
+{{- end -}}
+
+{{/*
   Resolved DD UST label values with safe defaults. Used by mcp-server.podLabels
   so the templated value stays short enough to survive wandb-base.podLabels'
   trunc-63 (which operates on the un-evaluated template text). Falls back to

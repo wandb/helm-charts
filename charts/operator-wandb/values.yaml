@@ -2921,15 +2921,20 @@ mcp-server:
   ## Pod annotations -- always-on entries here. The Datadog autodiscovery
   ## annotation is conditional and lives in podAnnotationsTpls below.
   podAnnotations: {}
-  ## Datadog Autodiscovery tag annotation, gated on datadog.enabled. Uses the
+  ## Datadog Autodiscovery annotations, gated on datadog.enabled. Uses the
   ## existing wandb-base podAnnotationsTpls facility (same pattern as parquet's
-  ## gcsFuseAnnotations) -- when datadog.enabled is false, the annotation key
-  ## is not emitted at all.
+  ## gcsFuseAnnotations) -- when datadog.enabled is false, the annotation keys
+  ## are not emitted at all.
+  ##
+  ## `.tags` adds per-container metadata. `.logs` is required on allowlisted
+  ## clusters (for example QA Azure) where the DD Agent does not run
+  ## containerCollectAll=true; it tells the Agent to collect mcp-server stdout.
   ## See https://docs.datadoghq.com/containers/kubernetes/tag/ for AD tag format.
   podAnnotationsTpls:
     - |
       {{- if index .Values "datadog" "enabled" }}
       ad.datadoghq.com/mcp-server.tags: {{ include "wandb.mcpDatadogTags" . | quote }}
+      ad.datadoghq.com/mcp-server.logs: {{ include "wandb.mcpDatadogLogs" . | quote }}
       {{- end }}
   envFrom:
     "{{ .Release.Name }}-global-configmap": "configMapRef"
