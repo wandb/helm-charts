@@ -109,12 +109,21 @@ override WF_TRACE_SERVER_URL in the mcp-server.env values block.
 */}}
 - name: MCP_LOG_FORMAT
   value: "json"
+{{/*
+  DD_API_KEY only belongs in forwarder mode (the in-app HTTP intake path). In
+  agent mode the DD Agent DaemonSet holds its own API key on the node, and a
+  pod-level DD_API_KEY would be at best redundant and at worst a stale leftover
+  from a chart-default toggle. Gate matches MCP_DATADOG_FORWARD above so the
+  two modes are cleanly exclusive.
+*/}}
+{{- if eq (index .Values "datadog" "mode" | default "agent") "forwarder" }}
 {{- with index .Values "analytics" "datadogApiKeySecret" "name" }}
 - name: DD_API_KEY
   valueFrom:
     secretKeyRef:
       name: {{ . }}
       key: {{ index $.Values "analytics" "datadogApiKeySecret" "key" | default "api-key" }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- if index .Values "otel" "enabled" }}
