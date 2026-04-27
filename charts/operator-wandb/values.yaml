@@ -2893,24 +2893,40 @@ mcp-server:
         port: 8080
         targetPort: 8080
         protocol: TCP
-  ## Pod labels -- always applied. Default set wires Datadog Unified Service Tagging
-  ## (joins logs <-> APM traces) and standard K8s app labels for dashboard grouping.
-  ## These labels are harmless when Datadog is not installed. Override or extend by
-  ## setting mcp-server.podLabels in your values; top-level keys merge over the defaults.
-  ## The template refs below resolve at render time; datadog.env/image.tag always have defaults.
+  ## Pod labels -- always applied. Standard K8s app labels for dashboard grouping
+  ## and `kubectl get pod -l app.kubernetes.io/component=mcp-server` filtering.
+  ## Datadog Unified Service Tagging labels live in podLabelsTpls below so they
+  ## only render when datadog.enabled=true (no DD-prefixed noise on customer pods
+  ## that aren't running the DD Agent).
   podLabels:
-    tags.datadoghq.com/service: '{{ .Values.datadog.service }}'
-    tags.datadoghq.com/env: '{{ .Values.datadog.env }}'
-    tags.datadoghq.com/version: '{{ .Values.image.tag }}'
     app.kubernetes.io/component: mcp-server
     app.kubernetes.io/part-of: wandb-platform
-  ## Pod annotations. `ad.datadoghq.com/mcp-server.tags` surfaces extra DD tags per-container
-  ## (product, component, deployment_type, optional customer + extraTags). The value is
-  ## rendered by the wandb.mcpDatadogTags helper from datadog.deploymentType / customer /
-  ## extraTags in the values below.
-  ## See https://docs.datadoghq.com/containers/kubernetes/tag/ for the Autodiscovery tag format.
-  podAnnotations:
-    ad.datadoghq.com/mcp-server.tags: '{{ include "wandb.mcpDatadogTags" . }}'
+  ## Datadog UST labels, gated on datadog.enabled. Joins agent-collected logs
+  ## with APM traces. Defaults via `| default` so a partial override of
+  ## datadog: {} or image: {} doesn't render empty K8s label values.
+  ##
+  ## NOTE: tags.datadoghq.com/version copies image.tag verbatim. K8s label
+  ## values must match [A-Za-z0-9._-]{0,63} -- digest pins (sha256:...) and
+  ## tags containing `+` or `:` will fail admission. Override
+  ## mcp-server.podLabelsTpls (or unset image.tag) when pinning by digest.
+  podLabelsTpls:
+    - |
+      {{- if index .Values "datadog" "enabled" }}
+      tags.datadoghq.com/service: {{ index .Values "datadog" "service" | default "wandb-mcp-server-onprem" | quote }}
+      tags.datadoghq.com/env: {{ index .Values "datadog" "env" | default "production" | quote }}
+      tags.datadoghq.com/version: {{ .Values.image.tag | default "" | quote }}
+      {{- end }}
+  ## Pod annotations -- always-on entries here.
+  podAnnotations: {}
+  ## Datadog Autodiscovery tag annotation, gated on datadog.enabled. Surfaces
+  ## product/component/deployment_type (+ optional customer + extraTags) for
+  ## per-container tagging. Helper `wandb.mcpDatadogTags` lives in templates/_mcp.tpl.
+  ## See https://docs.datadoghq.com/containers/kubernetes/tag/ for the AD tag format.
+  podAnnotationsTpls:
+    - |
+      {{- if index .Values "datadog" "enabled" }}
+      ad.datadoghq.com/mcp-server.tags: {{ include "wandb.mcpDatadogTags" . | quote }}
+      {{- end }}
   envFrom:
     "{{ .Release.Name }}-global-configmap": "configMapRef"
   envTpls:
