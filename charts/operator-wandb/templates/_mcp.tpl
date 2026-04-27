@@ -34,6 +34,22 @@
 {{- end -}}
 
 {{/*
+  Resolved DD UST label values with safe defaults. Used by mcp-server.podLabels
+  so the templated value stays short enough to survive wandb-base.podLabels'
+  trunc-63 (which operates on the un-evaluated template text). Falls back to
+  the same defaults as DD_SERVICE / DD_ENV in wandb.mcpEnvs.
+
+  SCOPE NOTE: same as wandb.mcpDatadogTags -- .Values is the "mcp-server"
+  subtree at call time.
+*/}}
+{{- define "wandb.mcpDDService" -}}
+{{- index .Values "datadog" "service" | default "wandb-mcp-server-onprem" -}}
+{{- end -}}
+{{- define "wandb.mcpDDEnv" -}}
+{{- index .Values "datadog" "env" | default "production" -}}
+{{- end -}}
+
+{{/*
 Environment variables for the MCP server subchart.
 
 SCOPE NOTE (please keep): wandb.mcpEnvs is invoked via envTpls -> tpl . $.root

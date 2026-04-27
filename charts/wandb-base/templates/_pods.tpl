@@ -14,9 +14,6 @@ metadata:
   labels:
     {{- tpl (include "wandb-base.labels" $.root | nindent 4) $.root }}
     {{- tpl (include "wandb-base.podLabels" $.root | nindent 4) $.root }}
-    {{- range .podData.podLabelsTpls }}
-      {{- tpl . $.root | nindent 4 }}
-    {{- end }}
 spec:
   {{- with .podData.affinity }}
   affinity:
