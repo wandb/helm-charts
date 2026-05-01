@@ -51,17 +51,32 @@ jobs:
         shell: bash
 
       - name: Package charts
+        id: package
         env:
           PR_NUMBER: ${{ github.event.number }}
         run: |
+          set -euo pipefail
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
-          for chart in $(ct list-changed --config ct.yaml); do
-          helm package --version=$(helm show chart ${chart} | yq .version)-PR${PR_NUMBER}-${git_hash} -d .cr-release-packages ${chart}
+          changed=$(ct list-changed --config ct.yaml)
+          if [ -z "$changed" ]; then
+            echo "No changed charts detected; skipping package + release."
+            echo "packaged=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for chart in $changed; do
+            helm package --version=$(helm show chart "${chart}" | yq .version)-PR${PR_NUMBER}-${git_hash} -d .cr-release-packages "${chart}"
           done
+          echo "packaged=true" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.5.0
+        if: steps.package.outputs.packaged == 'true'
+        # Pinned to v1.5.0 because v1.6.0+ regressed with skip_packaging:
+        # https://github.com/helm/chart-releaser-action/issues/171 — cr.sh
+        # references $latest_tag outside the branch that initialises it,
+        # so any run with skip_packaging fails with "latest_tag: unbound
+        # variable" at the end.
+        uses: helm/chart-releaser-action@be16258da8010256c6e82849661221415f031968 # v1.5.0
         with:
           skip_packaging: true
         env:
