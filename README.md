@@ -46,7 +46,13 @@ helm upgrade --namespace=wandb --create-namespace --install wandb wandb/wandb --
 
 Charts are also published as OCI artifacts to `oci://ghcr.io/wandb/helm-charts/<chart>`. No `helm repo add` is needed; reference the chart directly. `--version` is required.
 
-> **Requires wandb/operator v1.22.0 or later** when consumed via the `WeightsAndBiases` CR (`spec.chart.url`). The `oci://` scheme was added in [wandb/operator#147](https://github.com/wandb/operator/pull/147); earlier operator versions cannot parse OCI URLs and must continue to use the HTTPS endpoint above. Direct `helm` CLI usage works on any Helm 3.8+ client.
+> **Requires the W&B operator controller image at tag `1.22.0` or later** when consumed via the `WeightsAndBiases` CR (`spec.chart.url`). The `oci://` scheme was added in [wandb/operator#147](https://github.com/wandb/operator/pull/147), shipped as [`wandb/controller:1.22.0`](https://hub.docker.com/r/wandb/controller/tags) (Docker Hub uses unprefixed semver — no leading `v`). Earlier controller versions cannot parse OCI URLs and must continue to use the HTTPS endpoint above. Check the running version with:
+>
+> ```shell
+> kubectl get pods -A -o jsonpath='{range .items[*]}{.spec.containers[*].image}{"\n"}{end}' | grep wandb/controller
+> ```
+>
+> Direct `helm` CLI usage works on any Helm 3.8+ client.
 
 ```shell
 helm upgrade --namespace=wandb --create-namespace --install wandb \
