@@ -64,6 +64,7 @@ jobs:
         run: |
           set -euo pipefail
           : > pushed-refs.txt
+          pushed_count=0
           for tarball in .cr-release-packages/*.tgz; do
             [ -e "$tarball" ] || continue
             echo "Pushing $tarball to $OCI_REPO"
@@ -76,7 +77,12 @@ jobs:
               exit 1
             fi
             echo "${pushed}@${digest}" >> pushed-refs.txt
+            pushed_count=$((pushed_count + 1))
           done
+          if [ "$pushed_count" -eq 0 ]; then
+            echo "::error::chart-releaser reported changed charts, but no OCI artifacts were found in .cr-release-packages/"
+            exit 1
+          fi
           echo "--- pushed refs ---"
           cat pushed-refs.txt
 
@@ -87,8 +93,6 @@ jobs:
       - name: Sign published OCI charts
         if: steps.releaser.outputs.changed_charts != ''
         shell: bash
-        env:
-          COSIGN_EXPERIMENTAL: "1"
         run: |
           set -euo pipefail
           while IFS= read -r ref; do
