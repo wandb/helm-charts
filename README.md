@@ -66,10 +66,12 @@ Charts published to OCI are signed with [cosign](https://docs.sigstore.dev/cosig
 
 ```shell
 cosign verify \
-  --certificate-identity-regexp 'https://github.com/wandb/helm-charts/.github/workflows/release.yaml' \
+  --certificate-identity-regexp '^https://github\.com/wandb/helm-charts/\.github/workflows/release\.yaml@refs/heads/main$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   ghcr.io/wandb/helm-charts/operator-wandb:<version>
 ```
+
+The identity regex is intentionally strict: signatures must originate from `release.yaml` running on `main`. Anything else (a fork, a feature branch, a different workflow) will fail verification.
 
 ## Install from source
 
