@@ -38,8 +38,31 @@ GRANT ALL ON wandb.* TO 'wandb'@'%' WITH GRANT OPTION;
 ## Install from our helm repo
 
 ```shell
-helm repo add wandb https://wandb.github.io/helm-charts
+helm repo add wandb https://charts.wandb.ai
 helm upgrade --namespace=wandb --create-namespace --install wandb wandb/wandb --version 0.3.7 --set license=$LICENSE --set bucket=$BUCKET --set bucketRegion=$BUCKET_REGION
+```
+
+## Install from our OCI registry
+
+Charts are also published as OCI artifacts to `oci://ghcr.io/wandb/helm-charts/<chart>`. No `helm repo add` is needed; reference the chart directly. `--version` is required.
+
+> **Requires wandb/operator v1.22.0 or later** when consumed via the `WeightsAndBiases` CR (`spec.chart.url`). The `oci://` scheme was added in [wandb/operator#147](https://github.com/wandb/operator/pull/147); earlier operator versions cannot parse OCI URLs and must continue to use the HTTPS endpoint above. Direct `helm` CLI usage works on any Helm 3.8+ client.
+
+```shell
+helm upgrade --namespace=wandb --create-namespace --install wandb \
+  oci://ghcr.io/wandb/helm-charts/wandb --version 0.3.7 \
+  --set license=$LICENSE --set bucket=$BUCKET --set bucketRegion=$BUCKET_REGION
+```
+
+The same applies to the other charts (`operator-wandb`, `operator`, `wandb-base`, `launch-agent`). For the W&B Operator's `WeightsAndBiases` CR, set `spec.chart.url` to the `oci://` URL.
+
+Charts published to OCI are signed with [cosign](https://docs.sigstore.dev/cosign/overview/) using GitHub OIDC keyless signing. Verify with:
+
+```shell
+cosign verify \
+  --certificate-identity-regexp 'https://github.com/wandb/helm-charts/.github/workflows/release.yaml' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  ghcr.io/wandb/helm-charts/operator-wandb:<version>
 ```
 
 ## Install from source
