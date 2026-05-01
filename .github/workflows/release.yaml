@@ -11,6 +11,8 @@ jobs:
 
     permissions:
       contents: write
+      packages: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -41,6 +43,56 @@ jobs:
         shell: bash
 
       - name: Run chart-releaser
+        id: releaser
         uses: helm/chart-releaser-action@v1.5.0
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Login to GHCR
+        if: steps.releaser.outputs.changed_charts != ''
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | helm registry login ghcr.io -u "$GHCR_USER" --password-stdin
+
+      - name: Push charts to OCI registry
+        if: steps.releaser.outputs.changed_charts != ''
+        id: oci_push
+        shell: bash
+        env:
+          OCI_REPO: oci://ghcr.io/${{ github.repository_owner }}/helm-charts
+        run: |
+          set -euo pipefail
+          : > pushed-refs.txt
+          for tarball in .cr-release-packages/*.tgz; do
+            [ -e "$tarball" ] || continue
+            echo "Pushing $tarball to $OCI_REPO"
+            push_output=$(helm push "$tarball" "$OCI_REPO" 2>&1)
+            echo "$push_output"
+            pushed=$(echo "$push_output" | awk '/^Pushed: /{print $2}')
+            digest=$(echo "$push_output" | awk '/^Digest: /{print $2}')
+            if [ -z "$pushed" ] || [ -z "$digest" ]; then
+              echo "::error::failed to parse push output for $tarball"
+              exit 1
+            fi
+            echo "${pushed}@${digest}" >> pushed-refs.txt
+          done
+          echo "--- pushed refs ---"
+          cat pushed-refs.txt
+
+      - name: Install cosign
+        if: steps.releaser.outputs.changed_charts != ''
+        uses: sigstore/cosign-installer@v3.7.0
+
+      - name: Sign published OCI charts
+        if: steps.releaser.outputs.changed_charts != ''
+        shell: bash
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          set -euo pipefail
+          while IFS= read -r ref; do
+            [ -z "$ref" ] && continue
+            echo "Signing $ref"
+            cosign sign --yes "$ref"
+          done < pushed-refs.txt
