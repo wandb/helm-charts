@@ -1,0 +1,59 @@
+global:
+  repositoryPrefix: ""
+
+config:
+  snapshotPrefix: "snapshot"
+  lumenDataRoot: "gs://lumen-test"
+
+rbac:
+  # Set false if the ClusterRole/ClusterRoleBinding are managed out-of-band
+  # (e.g. applied separately by an actor with cluster-admin permissions).
+  create: true
+
+# Subchart values for the lumen alias of wandb-base. This produces the CronJob,
+# ServiceAccount, and pod template.
+lumen:
+  kind: CronJob
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: latest
+    pullPolicy: Always
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: false
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["pods", "configmaps", "secrets"]
+        verbs: ["get", "list"]
+      - apiGroups: ["apps"]
+        resources: ["replicasets", "deployments"]
+        verbs: ["get"]
+      - apiGroups: ["apps.wandb.com"]
+        resources: ["weightsandbiases"]
+        verbs: ["get", "list"]
+  cronJobs:
+    agent:
+      enabled: true
+      schedule: "*/15 * * * *"
+      concurrencyPolicy: "Forbid"
+      failedJobsHistoryLimit: 3
+      successfulJobsHistoryLimit: 5
+      startingDeadlineSeconds: 300
+      containers:
+        collector:
+          command: ["/app/entrypoint.sh", "agent"]
+          args: []
+          envFrom:
+            "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+          resources:
+            requests:
+              cpu: 1
+              memory: 1Gi
+            limits:
+              cpu: 1
+              memory: 1Gi
