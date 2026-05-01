@@ -107,13 +107,6 @@ Global values will override any chart-specific values.
 {{- end }}
 {{- end -}}
 
-{{- define "wandb.lumenEnvs" -}}
-{{- if .Values.global.lumen.enabled }}
-- name: GORILLA_LUMEN_ADDR
-  value: "{{ with .Values.global.lumen.port }}:{{ . }}{{ end }}"
-{{- end }}
-{{- end -}}
-
 {{- define "wandb.mysqlConfigEnvs" -}}
 {{- /*
   ATTENTION!
