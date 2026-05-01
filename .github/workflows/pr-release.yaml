@@ -51,16 +51,26 @@ jobs:
         shell: bash
 
       - name: Package charts
+        id: package
         env:
           PR_NUMBER: ${{ github.event.number }}
         run: |
+          set -euo pipefail
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
-          for chart in $(ct list-changed --config ct.yaml); do
-          helm package --version=$(helm show chart ${chart} | yq .version)-PR${PR_NUMBER}-${git_hash} -d .cr-release-packages ${chart}
+          changed=$(ct list-changed --config ct.yaml)
+          if [ -z "$changed" ]; then
+            echo "No changed charts detected; skipping package + release."
+            echo "packaged=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          for chart in $changed; do
+            helm package --version=$(helm show chart "${chart}" | yq .version)-PR${PR_NUMBER}-${git_hash} -d .cr-release-packages "${chart}"
           done
+          echo "packaged=true" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Run chart-releaser
+        if: steps.package.outputs.packaged == 'true'
         uses: helm/chart-releaser-action@v1.5.0
         with:
           skip_packaging: true
