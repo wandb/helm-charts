@@ -1,0 +1,173 @@
+global:
+  repositoryPrefix: ""
+
+config:
+  snapshotPrefix: "snapshot"
+  lumenDataRoot: "gs://lumen-test"
+
+rbac:
+  # Set false if the ClusterRole/ClusterRoleBinding are managed out-of-band
+  # (e.g. applied separately by an actor with cluster-admin permissions).
+  create: true
+
+# Subchart values for the lumen alias of wandb-base. This produces the CronJob,
+# ServiceAccount, and pod template.
+lumen:
+  kind: CronJob
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: latest
+    pullPolicy: Always
+  serviceAccount:
+    annotations: {}
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: false
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["pods", "configmaps", "secrets"]
+        verbs: ["get", "list"]
+      - apiGroups: ["apps"]
+        resources: ["replicasets", "deployments"]
+        verbs: ["get"]
+      - apiGroups: ["apps.wandb.com"]
+        resources: ["weightsandbiases"]
+        verbs: ["get", "list"]
+  cronJobs:
+    agent:
+      enabled: true
+      schedule: "*/15 * * * *"
+      concurrencyPolicy: "Forbid"
+      failedJobsHistoryLimit: 3
+      successfulJobsHistoryLimit: 5
+      startingDeadlineSeconds: 300
+      containers:
+        collector:
+          command: ["/app/entrypoint.sh", "agent"]
+          args: []
+          env:
+            GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
+            GOMEMLIMIT:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            GOMAXPROCS:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+          volumeMounts:
+            - name: gcp-key
+              mountPath: /var/secrets/google
+              readOnly: true
+          envFrom:
+            "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+          resources:
+            requests:
+              cpu: 1
+              memory: 4Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+      volumes:
+        - name: gcp-key
+          secret:
+            secretName: lumen-gcp-key
+    processor:
+      enabled: true
+      schedule: "0 * * * *"
+      concurrencyPolicy: "Forbid"
+      failedJobsHistoryLimit: 1
+      successfulJobsHistoryLimit: 1
+      startingDeadlineSeconds: 300
+      ttlSecondsAfterFinished: 300
+      backoffLimit: 0
+      containers:
+        collector:
+          command: ["/app/entrypoint.sh", "processor"]
+          args: []
+          env:
+            GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
+            GOMEMLIMIT:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            GOMAXPROCS:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+          volumeMounts:
+            - name: gcp-key
+              mountPath: /var/secrets/google
+              readOnly: true
+          envFrom:
+            "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+          resources:
+            requests:
+              cpu: 1
+              memory: 4Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+      volumes:
+        - name: gcp-key
+          secret:
+            secretName: lumen-processor-key
+
+notebook:
+  kind: Deployment
+  replicaCount: 1
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: latest
+    pullPolicy: Always
+  serviceAccount:
+    annotations: {}
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: true
+    ports:
+      - port: 8080
+        protocol: TCP
+        name: marimo
+  containers:
+    notebook:
+      command: ["/app/entrypoint.sh", "marimo"]
+      args: []
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
+        GOMEMLIMIT:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        GOMAXPROCS:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+      volumeMounts:
+        - name: gcp-key
+          mountPath: /var/secrets/google
+          readOnly: true
+      envFrom:
+        "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+      ports:
+        - containerPort: 8080
+          name: marimo
+      resources:
+        requests:
+          cpu: 1
+          memory: 2Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+  volumes:
+    - name: gcp-key
+      secret:
+        secretName: lumen-processor-key
