@@ -1865,7 +1865,7 @@ data:
   GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
-  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{"system:serviceaccount:default:chartsnap-weave-trace": "https://kubernetes.default.svc.cluster.local"}'
+  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{"system:serviceaccount:default:chartsnap-weave-trace": "https://kubernetes.default.svc.cluster.local", "system:serviceaccount:default:chartsnap-weave-trace-worker": "https://kubernetes.default.svc.cluster.local"}'
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
   GORILLA_LOCAL_SERVICE_BYPASS: 'false'
 ---
@@ -7138,6 +7138,8 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
+        - mountPath: /tmp/weave-trace/internal-jwt
+          name: weave-trace-internal-jwt
       serviceAccountName: chartsnap-weave-trace-worker
       securityContext:
         fsGroup: 0
@@ -7180,6 +7182,13 @@ spec:
           - key: REDIS_CA_CERT
             path: redis_ca.pem
           optional: true
+      - name: weave-trace-internal-jwt
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: internal-service
+              expirationSeconds: 600
+              path: token
 ---
 # Source: operator-wandb/charts/weave-trace/templates/deployment.yaml
 apiVersion: apps/v1
