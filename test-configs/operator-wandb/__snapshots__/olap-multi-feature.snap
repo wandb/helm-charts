@@ -1319,6 +1319,7 @@ data:
   GORILLA_COLLECT_AUDIT_LOGS: "true"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_PORT: "8087"
+  GORILLA_PARQUET_GRPC_PORT: "8088"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648"
   GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
@@ -1698,10 +1699,10 @@ metadata:
   name: chartsnap-parquet-configmap
   labels:
 data:
-  # Port configuration
+  # Legacy net/rpc configuration
   GORILLA_PARQUET_PORT: "8087"
-  # RPC path configuration
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
+  GORILLA_PARQUET_GRPC_PORT: "8088"
   # Task queue configuration
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
   # Parquet-specific configuration
@@ -2469,6 +2470,28 @@ spec:
     app.kubernetes.io/name: parquet
     app.kubernetes.io/instance: chartsnap
 ---
+# Source: operator-wandb/charts/parquet/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-parquet-grpc
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: grpc
+    port: 8088
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: chartsnap
+---
 # Source: operator-wandb/charts/prometheus/charts/instance/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -2796,7 +2819,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: api-0.11.11
+        helm.sh/chart: api-0.12.0
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3427,7 +3450,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.11.11
+        helm.sh/chart: app-0.12.0
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4020,7 +4043,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.11.11
+        helm.sh/chart: console-0.12.0
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4159,7 +4182,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: frontend-0.11.11
+        helm.sh/chart: frontend-0.12.0
         app.kubernetes.io/name: frontend
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4295,7 +4318,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: glue-0.11.11
+        helm.sh/chart: glue-0.12.0
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4899,7 +4922,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: nginx-0.11.11
+        helm.sh/chart: nginx-0.12.0
         app.kubernetes.io/name: nginx
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5026,7 +5049,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.11.11
+        helm.sh/chart: parquet-0.12.0
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5526,7 +5549,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.11.11
+        helm.sh/chart: weave-0.12.0
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5989,7 +6012,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.11.11
+            helm.sh/chart: parquet-0.12.0
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -6535,13 +6558,15 @@ spec:
         echo "OK: TEST_CONNECTION_URL is set"
       fi
       exit $fail
-  restartPolicy: Never---
+  restartPolicy: Never
+---
+# Source: operator-wandb/templates/tests/test-olap.yaml
 apiVersion: v1
 kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-olap-run-store-accelerator"
   labels:
-    helm.sh/chart: operator-wandb-0.42.3
+    helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
