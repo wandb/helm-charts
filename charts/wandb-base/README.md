@@ -552,6 +552,8 @@ autoscaling:
 
 **Important:** KEDA and HPA are mutually exclusive. When KEDA is enabled, it manages its own HPA internally and the chart will not create a separate HPA resource.
 
+**When switching from HPA to KEDA, it is highly recommended to disable HPA and deploy BEFORE enabling KEDA.  Not doing so may block the deployment process and lead to unexpected behavior.**
+
 KEDA enables autoscaling based on external metrics and events such as:
 - Message queue depth (Kafka, RabbitMQ, SQS, etc.)
 - Database query results (PostgreSQL, MySQL, etc.)
