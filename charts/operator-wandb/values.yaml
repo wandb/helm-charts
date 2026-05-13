@@ -279,6 +279,8 @@ global:
     history:
       enabled: false
       database: "history"
+      params:
+        max_open_conns: 300
     # TODO: wire this up when weave trace is ready to be migrated from global.clickhouse. to global.olap.weaveTrace.
     # weaveTrace:
     #   enabled: false
@@ -319,6 +321,7 @@ global:
       port: 587
       user: ""
       password: ""
+      mailFrom: ""
 
   #
   # For Advanced Users:
@@ -347,6 +350,11 @@ global:
   #         secretKeyRef:
   #           name: "email-settings-secret"
   #           key: "password"
+  #     mailFrom:
+  #       valueFrom:
+  #         secretKeyRef:
+  #           name: "email-settings-secret"
+  #           key: "mailFrom"
 
   auth:
     sessionLengthHours: 720
@@ -400,9 +408,11 @@ global:
     project: ""
     instance: ""
 
-  # When enabled, historyStore will only use parquet pods (no mysql/bigtable fallback).
   historyStore:
+    # When enabled, historyStore will only use parquet pods (no mysql/bigtable fallback).
     parquetOnly: false
+    # When enabled, historyStore will use gRPC headless service instead of net/rpc
+    parquetUseGRPC: false
 
   pubSub:
     enabled: false
@@ -578,7 +588,6 @@ api:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.registrySearchEnvs" . }}'
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
-    - '{{ include "wandb.historyEnvs" . }}'
   initContainers:
     init-db:
       enabled: false
@@ -727,6 +736,8 @@ app:
   # TODO(dpanzella) Read from here for backwards compatability, needs to be moved so API can access as well
   internalJWTMap:
     - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace"
+      issuer: "https://kubernetes.default.svc.cluster.local"
+    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace-worker"
       issuer: "https://kubernetes.default.svc.cluster.local"
   env:
     GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
@@ -1312,8 +1323,8 @@ anaconda2:
 filestream:
   install: false
   deploymentPostfix: "bc"
-  pubsub:
-    subscriptions: ""
+  pubSub:
+    subscription: ""
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -1414,9 +1425,9 @@ filestream:
 flat-run-fields-updater:
   install: false
   deploymentPostfix: "bc"
-  pubsub:
-    # pubsub subscription comes from terraform
-    subscriptions: ""
+  pubSub:
+    # pubSub subscription comes from terraform
+    subscription: ""
   kafka:
     # flat-run-fields-updater and metric-observer use different consumer id on same topic
     consumerGroupId: "flat-run-fields-updater"
@@ -1681,6 +1692,280 @@ flat-run-fields-updater:
                   selectPolicy: Max
           # triggers must be provided by user when enabling KEDA
 
+history-updater:
+  install: false
+  pubSub:
+    # pubSub subscription comes from terraform
+    subscription: ""
+  kafka:
+    consumerGroupId: "history-updater"
+  env:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_HISTORY_UPDATER:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-history-updater-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  containers:
+    history-updater:
+      args: ["history-updater"]
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  size: ""
+  # CPU and replicas kept identical to flat-run-fields-updater (similar usage
+  # under load, same queue). Memory set to half of flat-run-fields-updater
+  # based on xxl-perf-testing load test (2026-03-17~20): history-updater
+  # peaked at ~0.5 GiB total across 9 pods (~57 MiB/pod), ~10-13x less
+  # than flat-run-fields-updater (~6.5 GiB peak).
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 1
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 5
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 2
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 1
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 10
+          minReplicas: 3
+        keda:
+          enabled: false
+          minReplicaCount: 3
+          maxReplicaCount: 10
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 5
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 3
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    large:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1536Mi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 15
+          minReplicas: 6
+        keda:
+          enabled: false
+          minReplicaCount: 6
+          maxReplicaCount: 15
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 10
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 4
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    xlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 20
+          minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 20
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 15
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 5
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 30
+          minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 30
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 20
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 6
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+
 frontend:
   install: false
   podSecurityContext:
@@ -1815,7 +2100,6 @@ glue:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.registrySearchEnvs" . }}'
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
-    - '{{ include "wandb.historyEnvs" . }}'
   initContainers:
     init-db:
       enabled: false
@@ -1959,7 +2243,7 @@ metric-observer:
   image:
     repository: wandb/megabinary
     tag: latest
-  pubsub:
+  pubSub:
     subscription: ""
   kafka:
     # metric-observer and flat-run-fields-updater use different consumer group id on same topic
@@ -2099,6 +2383,14 @@ parquet:
       - port: 8087
         protocol: TCP
         name: parquet
+  services:
+    - name: "{{ .Release.Name }}-parquet-grpc"
+      enabled: true
+      headless: true
+      ports:
+        - port: 8088
+          protocol: TCP
+          name: grpc
   fuse:
     enabled: false
     resources:
@@ -2124,6 +2416,7 @@ parquet:
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
@@ -2561,6 +2854,192 @@ weave:
           maxReplicas: 6
           minReplicas: 2
 
+## MCP Server -- Model Context Protocol server for AI agent access to W&B data.
+## Requires weave-trace to be installed (WF_TRACE_SERVER_URL points to in-cluster weave-trace).
+## If weave-trace is disabled, override WF_TRACE_SERVER_URL in the env block below.
+## Disabled by default. Enable with: mcp-server.install: true
+## Docs: https://github.com/wandb/wandb-mcp-server
+mcp-server:
+  install: false
+  image:
+    repository: wandb/mcp-server
+    tag: "0.3.3"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 0
+  containers:
+    mcp-server:
+      args:
+        - "sh"
+        - "entrypoint.sh"
+      livenessProbe:
+        httpGet:
+          path: /mcp/health
+          port: 8080
+        initialDelaySeconds: 10
+        periodSeconds: 30
+      readinessProbe:
+        httpGet:
+          path: /mcp/health
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp/
+  volumes:
+    - name: temp-dir
+      emptyDir: {}
+  service:
+    enabled: true
+    type: ClusterIP
+    ports:
+      - name: http
+        port: 8080
+        targetPort: 8080
+        protocol: TCP
+  ## Pod labels -- always applied. Wires Datadog Unified Service Tagging
+  ## (joins logs <-> APM traces) and standard K8s app labels for dashboard grouping.
+  ## When the DD Agent is not installed the tags.datadoghq.com/* labels are inert.
+  ## Override mcp-server.podLabels in your values to remove them entirely.
+  ##
+  ## All Datadog refs use `| default` so partial overrides of datadog: {} or
+  ## image: {} don't render empty K8s label values.
+  ##
+  ## NOTE: tags.datadoghq.com/version copies image.tag verbatim. K8s label
+  ## values must match [A-Za-z0-9._-]{0,63} -- digest pins (sha256:...) and
+  ## tags containing `+` or `:` will fail admission. Override podLabels
+  ## (or unset image.tag) when pinning by digest.
+  ##
+  ## NOTE on rendering: wandb-base.podLabels passes each value through
+  ## `trunc 63 | quote` BEFORE the outer `tpl` pass. That means the
+  ## un-evaluated template text must be short (<63 chars) AND must not
+  ## contain double-quoted string literals (which become `\"` after `quote`
+  ## and break the second tpl parse). The two helpers below resolve to
+  ## final values short enough to survive both constraints.
+  podLabels:
+    tags.datadoghq.com/service: '{{ include `wandb.mcpDDService` . }}'
+    tags.datadoghq.com/env: '{{ include `wandb.mcpDDEnv` . }}'
+    tags.datadoghq.com/version: '{{ .Values.image.tag }}'
+    app.kubernetes.io/component: mcp-server
+    app.kubernetes.io/part-of: wandb-platform
+  ## Pod annotations -- always-on entries here. The Datadog autodiscovery
+  ## annotation is conditional and lives in podAnnotationsTpls below.
+  podAnnotations: {}
+  ## Datadog Autodiscovery annotations, gated on datadog.enabled. Uses the
+  ## existing wandb-base podAnnotationsTpls facility (same pattern as parquet's
+  ## gcsFuseAnnotations) -- when datadog.enabled is false, the annotation keys
+  ## are not emitted at all.
+  ##
+  ## `.tags` adds per-container metadata. `.logs` is required on allowlisted
+  ## clusters (for example QA Azure) where the DD Agent does not run
+  ## containerCollectAll=true; it tells the Agent to collect mcp-server stdout.
+  ## See https://docs.datadoghq.com/containers/kubernetes/tag/ for AD tag format.
+  podAnnotationsTpls:
+    - |
+      {{- if index .Values "datadog" "enabled" }}
+      ad.datadoghq.com/mcp-server.tags: {{ include "wandb.mcpDatadogTags" . | quote }}
+      ad.datadoghq.com/mcp-server.logs: {{ include "wandb.mcpDatadogLogs" . | quote }}
+      {{- end }}
+  envFrom:
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.mcpEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+  env:
+    WANDB_SILENT: "True"
+    WEAVE_SILENT: "True"
+    WEAVE_DISABLED: "true"
+    MCP_TRANSPORT: "http"
+    ENVIRONMENT: "production"
+    MCP_ANALYTICS_DISABLED: "false"
+    MCP_SEGMENT_FORWARD: "true"
+    MCP_AUTH_DISABLED: "false"
+    MCP_RATE_LIMIT_ENABLED: "true"
+    MCP_RATE_LIMIT_PER_KEY: "60/minute"
+    MCP_RATE_LIMIT_GLOBAL: "1000/minute"
+    # Note: WANDB_CACHE_DIR, WANDB_CONFIG_DIR, WANDB_DATA_DIR, and HOME=/tmp
+    # are already set by the MCP Docker image. The emptyDir volume mounted
+    # at /tmp/ above gives the pod isolated writable scratch space matching
+    # the image's defaults.
+  ## Observability -- all disabled by default, matching other W&B services.
+  ## Prerequisites before enabling:
+  ##   - ddtrace / opentelemetry-distro baked into the MCP server image (>= 0.3.0)
+  ##   - dd-agent DaemonSet running on nodes (for datadog.mode=agent, primary K8s path)
+  ##   - OTEL Collector deployed in-cluster (for otel)
+  ##
+  ## TWO OBSERVABILITY MODES:
+  ##
+  ## 1. AGENT (default, managed K8s) -- recommended for all dedicated-install and self-hosted
+  ##    customers. The Datadog Agent DaemonSet on each node collects pod stdout logs, APM
+  ##    traces (via DD_AGENT_HOST=status.hostIP on :8126), and DogStatsD metrics. The DD API
+  ##    key lives ONLY on the agent (typically in the `datadog-secrets` Secret in the `datadog`
+  ##    namespace, managed by core/charts/datadog Terraform). The MCP pod holds no DD credentials.
+  ##
+  ## 2. FORWARDER (serverless only -- Cloud Run, Lambda) -- the MCP pod POSTs events directly
+  ##    to https://http-intake.logs.<DD_SITE>/api/v2/logs using a DD_API_KEY sourced from
+  ##    analytics.datadogApiKeySecret or GCP Secret Manager (via MCP_SERVER_SECRETS_PROVIDER=gcp
+  ##    at the app level). Not appropriate for K8s -- duplicates what the agent already does.
+  datadog:
+    enabled: false
+    ## Ingestion path: "agent" (preferred on K8s) or "forwarder" (serverless only).
+    ## When mode="agent" (default), MCP_DATADOG_FORWARD is NOT set so the pod does not
+    ## double-ship to DD; the DD Agent DaemonSet handles everything.
+    mode: "agent"
+    ## DD service name for logs, APM traces, and metrics. The default distinguishes
+    ## helm-chart-installed deployments (dedicated-cloud, self-managed, customer K8s)
+    ## from W&B's SaaS-hosted Cloud Run service which owns `wandb-mcp-server`. Keep
+    ## them split so each fleet owns its dashboards/monitors/SLOs cleanly. Override
+    ## if you want a per-install name (e.g. "acme-mcp" for single-tenant branding).
+    service: "wandb-mcp-server-onprem"
+    ## Environment tag (DD_ENV, tags.datadoghq.com/env). Override per-deployment.
+    env: "production"
+    ## Install-type tag for cross-deployment dashboards:
+    ##   "dedicated-cloud" | "self-managed" | "multi-tenant" | "cloud-run"
+    ## Surfaces as `deployment_type:<value>` on every log, metric, and trace.
+    deploymentType: "self-managed"
+    ## Per-customer tag for dedicated installs. Empty = omitted.
+    ## Surfaces as `customer:<value>`. Useful for W&B-operated dashboards spanning customers.
+    customer: ""
+    ## Extra DD tags appended to Autodiscovery. Example:
+    ##   extraTags: ["team:ml-platform", "region:us-west1", "tier:prod"]
+    extraTags: []
+  otel:
+    enabled: false
+  analytics:
+    ## ONLY relevant for serverless/forwarder mode. On managed K8s (mode=agent),
+    ## leave this unset -- the DD Agent holds the API key.
+    datadogApiKeySecret:
+      name: ""
+      key: "api-key"
+  ## Privacy-level gate for customer-supplied content in logs.
+  ## See https://github.com/wandb/wandb-mcp-server/blob/main/docs/OBSERVABILITY.md
+  ##
+  ##   off      - today's behavior: free-text params (query, prompt, description, ...)
+  ##              and identifiers (entity_name, project_name, user_id, email_domain)
+  ##              pass through to logs plaintext. Cloud Run uses this explicitly so its
+  ##              BigQuery analytics pipeline keeps plaintext cohort fields.
+  ##   standard - (default for K8s) redacts free-text param values to
+  ##              "<redacted: text len=N>"; demotes verbose ToolCall/raw-body logs to
+  ##              DEBUG. Customer entity/project names still plaintext so customer
+  ##              operators can still correlate their own telemetry.
+  ##   strict   - additionally hashes entity/project/run/user identifiers to
+  ##              "<h:sha256_prefix>". For regulated customers (HIPAA, FedRAMP, etc.)
+  ##              where even the identifiers should not be retained in plaintext.
+  ##
+  ## Surfaces as env var MCP_LOG_PRIVACY_LEVEL on the pod. Injected by
+  ## templates/_mcp.tpl::wandb.mcpEnvs. Wire-up: wandb/wandb-mcp-server#56.
+  privacy:
+    logLevel: "standard"
+
 weave-trace:
   install: false
   deploymentPostfix: "bc"
@@ -2620,6 +3099,7 @@ weave-trace:
           mountPath: /tmp/weave-trace/internal-jwt
   service:
     enabled: true
+    loadBalancerHealthCheckPath: "/traces/health"
     ports:
       - name: http
         targetPort: 8080
@@ -2728,6 +3208,17 @@ weave-trace-worker:
         - name: http
           containerPort: 8080
           protocol: TCP
+      volumeMounts:
+        - name: weave-trace-internal-jwt
+          mountPath: /tmp/weave-trace/internal-jwt
+  volumes:
+    - name: weave-trace-internal-jwt
+      projected:
+        sources:
+          - serviceAccountToken:
+              audience: internal-service
+              path: token
+              expirationSeconds: 600
   service:
     ports:
       - name: http

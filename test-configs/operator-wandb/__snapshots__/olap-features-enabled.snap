@@ -959,7 +959,7 @@ data:
         - sources:
           - from: connection
       memory_limiter:
-        check_interval: 5s
+        check_interval: 1s
         limit_percentage: 80
         spike_limit_percentage: 25
     receivers:
@@ -1138,8 +1138,8 @@ data:
           exporters:
           - debug
           processors:
-          - batch
           - memory_limiter
+          - batch
           - k8sattributes
           receivers:
           - otlp
@@ -1690,11 +1690,12 @@ data:
   GORILLA_COLLECT_AUDIT_LOGS: "true"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_PORT: "8087"
+  GORILLA_PARQUET_GRPC_PORT: "8088"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648"
   GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
-  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{"system:serviceaccount:default:chartsnap-weave-trace": "https://kubernetes.default.svc.cluster.local"}'
+  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{"system:serviceaccount:default:chartsnap-weave-trace": "https://kubernetes.default.svc.cluster.local", "system:serviceaccount:default:chartsnap-weave-trace-worker": "https://kubernetes.default.svc.cluster.local"}'
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
   GORILLA_LOCAL_SERVICE_BYPASS: 'false'
 ---
@@ -1967,6 +1968,18 @@ data:
   GORILLA_GLUE_CLEAR_TASK_DEDUPE_KEY_ENABLED: "false"
   GORILLA_GLUE_LOCAL_SERVICE_BYPASS: "false"
 ---
+# Source: operator-wandb/templates/history-updater.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-history-updater-configmap
+  labels:
+data:
+  GORILLA_FILE_HOST: "http://localhost:8080"
+  GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
+  GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
+  GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
+---
 # Source: operator-wandb/templates/kafka.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -2061,10 +2074,10 @@ metadata:
   name: chartsnap-parquet-configmap
   labels:
 data:
-  # Port configuration
+  # Legacy net/rpc configuration
   GORILLA_PARQUET_PORT: "8087"
-  # RPC path configuration
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
+  GORILLA_PARQUET_GRPC_PORT: "8088"
   # Task queue configuration
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
   # Parquet-specific configuration
@@ -3015,6 +3028,28 @@ spec:
     app.kubernetes.io/name: parquet
     app.kubernetes.io/instance: chartsnap
 ---
+# Source: operator-wandb/charts/parquet/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-parquet-grpc
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: grpc
+    port: 8088
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: chartsnap
+---
 # Source: operator-wandb/charts/prometheus/charts/instance/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -3230,7 +3265,7 @@ spec:
         wandb.com/app-name: daemonset-0.1.0
         app.kubernetes.io/managed-by: Helm
       annotations:
-        checksum/configmap: fc14657abee2d90189e7f15a05344616103962018473696c62050e52dd81935
+        checksum/configmap: 9a93c1a7e19d470e13c897633e852dbfe03075bfe12f97f73b087cb1b4a5971
     spec:
       serviceAccountName: chartsnap-otel-daemonset
       securityContext:
@@ -3290,6 +3325,8 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: status.podIP
+        - name: GOMEMLIMIT
+          value: "1600MiB"
         livenessProbe:
           httpGet:
             path: /
@@ -3300,8 +3337,7 @@ spec:
             port: 13133
         resources:
           limits:
-            cpu: 1000m
-            memory: 1000Mi
+            memory: 2Gi
           requests:
             cpu: 200m
             memory: 200Mi
@@ -3363,7 +3399,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.11.11
+        helm.sh/chart: anaconda2-0.12.0
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3511,7 +3547,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: api-0.11.11
+        helm.sh/chart: api-0.12.0
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3737,25 +3773,6 @@ spec:
           value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
         - name: MIGRATE_RUNS_ACCELERATOR_DB
           value: $(MIGRATE_RUN_STORE_ACCELERATOR_DB)
-        - name: HISTORY_HOST
-          value: chartsnap-clickhouse-headless
-        - name: HISTORY_PORT
-          value: "9000"
-        - name: HISTORY_DATABASE
-          value: history
-        - name: HISTORY_USER
-          value: default
-        - name: HISTORY_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: HISTORY_PASSWORD
-              name: chartsnap-olap-history
-        - name: HISTORY_PARAMS
-          value: ?tls=false
-        - name: GORILLA_HISTORY_ADDRESS
-          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
-        - name: MIGRATE_HISTORY_DB
-          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -4052,25 +4069,6 @@ spec:
           value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
         - name: MIGRATE_RUNS_ACCELERATOR_DB
           value: $(MIGRATE_RUN_STORE_ACCELERATOR_DB)
-        - name: HISTORY_HOST
-          value: chartsnap-clickhouse-headless
-        - name: HISTORY_PORT
-          value: "9000"
-        - name: HISTORY_DATABASE
-          value: history
-        - name: HISTORY_USER
-          value: default
-        - name: HISTORY_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: HISTORY_PASSWORD
-              name: chartsnap-olap-history
-        - name: HISTORY_PARAMS
-          value: ?tls=false
-        - name: GORILLA_HISTORY_ADDRESS
-          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
-        - name: MIGRATE_HISTORY_DB
-          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -4180,7 +4178,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.11.11
+        helm.sh/chart: app-0.12.0
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4773,7 +4771,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.11.11
+        helm.sh/chart: console-0.12.0
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4909,7 +4907,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: executor-0.11.11
+        helm.sh/chart: executor-0.12.0
         app.kubernetes.io/name: executor
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5194,7 +5192,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: filemeta-0.11.11
+        helm.sh/chart: filemeta-0.12.0
         app.kubernetes.io/name: filemeta
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5459,7 +5457,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: frontend-0.11.11
+        helm.sh/chart: frontend-0.12.0
         app.kubernetes.io/name: frontend
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5595,7 +5593,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: glue-0.11.11
+        helm.sh/chart: glue-0.12.0
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5817,25 +5815,6 @@ spec:
           value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
         - name: MIGRATE_RUNS_ACCELERATOR_DB
           value: $(MIGRATE_RUN_STORE_ACCELERATOR_DB)
-        - name: HISTORY_HOST
-          value: chartsnap-clickhouse-headless
-        - name: HISTORY_PORT
-          value: "9000"
-        - name: HISTORY_DATABASE
-          value: history
-        - name: HISTORY_USER
-          value: default
-        - name: HISTORY_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: HISTORY_PASSWORD
-              name: chartsnap-olap-history
-        - name: HISTORY_PARAMS
-          value: ?tls=false
-        - name: GORILLA_HISTORY_ADDRESS
-          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
-        - name: MIGRATE_HISTORY_DB
-          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -6115,25 +6094,6 @@ spec:
           value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
         - name: MIGRATE_RUNS_ACCELERATOR_DB
           value: $(MIGRATE_RUN_STORE_ACCELERATOR_DB)
-        - name: HISTORY_HOST
-          value: chartsnap-clickhouse-headless
-        - name: HISTORY_PORT
-          value: "9000"
-        - name: HISTORY_DATABASE
-          value: history
-        - name: HISTORY_USER
-          value: default
-        - name: HISTORY_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: HISTORY_PASSWORD
-              name: chartsnap-olap-history
-        - name: HISTORY_PARAMS
-          value: ?tls=false
-        - name: GORILLA_HISTORY_ADDRESS
-          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
-        - name: MIGRATE_HISTORY_DB
-          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -6237,7 +6197,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: nginx-0.11.11
+        helm.sh/chart: nginx-0.12.0
         app.kubernetes.io/name: nginx
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6364,7 +6324,7 @@ spec:
     metadata:
       annotations:
       labels:
-        helm.sh/chart: parquet-0.11.11
+        helm.sh/chart: parquet-0.12.0
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6505,6 +6465,25 @@ spec:
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
           value: kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
+        - name: HISTORY_HOST
+          value: chartsnap-clickhouse-headless
+        - name: HISTORY_PORT
+          value: "9000"
+        - name: HISTORY_DATABASE
+          value: history
+        - name: HISTORY_USER
+          value: default
+        - name: HISTORY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: HISTORY_PASSWORD
+              name: chartsnap-olap-history
+        - name: HISTORY_PARAMS
+          value: ?max_open_conns=300&tls=false
+        - name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
+          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+        - name: MIGRATE_HISTORY_DB
+          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
         - name: GORILLA_HISTORY_STORE
           value: http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
@@ -6864,7 +6843,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-trace-0.11.11
+        helm.sh/chart: weave-trace-0.12.0
         app.kubernetes.io/name: weave-trace
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -7111,7 +7090,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.11.11
+        helm.sh/chart: weave-0.12.0
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -7921,7 +7900,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.11.11
+            helm.sh/chart: parquet-0.12.0
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -8064,6 +8043,25 @@ spec:
               value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
             - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
               value: kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
+            - name: HISTORY_HOST
+              value: chartsnap-clickhouse-headless
+            - name: HISTORY_PORT
+              value: "9000"
+            - name: HISTORY_DATABASE
+              value: history
+            - name: HISTORY_USER
+              value: default
+            - name: HISTORY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: HISTORY_PASSWORD
+                  name: chartsnap-olap-history
+            - name: HISTORY_PARAMS
+              value: ?max_open_conns=300&tls=false
+            - name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
+              value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+            - name: MIGRATE_HISTORY_DB
+              value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
             - name: GORILLA_HISTORY_STORE
               value: http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
             - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
@@ -8516,7 +8514,7 @@ spec:
           name: "chartsnap-olap-history"
           key: "HISTORY_PASSWORD"
     - name: HISTORY_PARAMS
-      value: "?tls=false"
+      value: "?max_open_conns=300&tls=false"
     - name: TEST_CONNECTION_URL
       value: "clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)"
     - name: "MIGRATE_HISTORY_DB"
@@ -8543,13 +8541,15 @@ spec:
         echo "OK: TEST_CONNECTION_URL is set"
       fi
       exit $fail
-  restartPolicy: Never---
+  restartPolicy: Never
+---
+# Source: operator-wandb/templates/tests/test-olap.yaml
 apiVersion: v1
 kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-olap-registry-search"
   labels:
-    helm.sh/chart: operator-wandb-0.41.3
+    helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -8602,13 +8602,15 @@ spec:
         echo "OK: TEST_CONNECTION_URL is set"
       fi
       exit $fail
-  restartPolicy: Never---
+  restartPolicy: Never
+---
+# Source: operator-wandb/templates/tests/test-olap.yaml
 apiVersion: v1
 kind: Pod
 metadata:
   name: "chartsnap-operator-wandb-test-olap-run-store-accelerator"
   labels:
-    helm.sh/chart: operator-wandb-0.41.3
+    helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: operator-wandb
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
