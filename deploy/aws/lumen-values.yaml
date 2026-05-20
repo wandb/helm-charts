@@ -1,0 +1,78 @@
+# Overlay: AWS / EKS — standalone Lumen chart (processor + notebook only).
+#
+# Usage:
+#   helm upgrade --install lumen ./charts/lumen \
+#     --namespace wandb-qa-aws \
+#     -f deploy/aws/lumen-values.yaml
+#
+# The agent runs as part of operator-wandb (gated by global.lumen.enabled).
+#
+# Auth: pods authenticate to GCS via GCP Workload Identity Federation (NOT IRSA).
+# The chart presents three things to each pod:
+#   1. Projected K8s SA token, audience-bound to the GCP WIF provider
+#   2. external_account credential-config JSON (templates/wif-configmap.yaml)
+#   3. GOOGLE_APPLICATION_CREDENTIALS env var pointing at the JSON
+#
+# Prereqs (in the GCP project hosting the bucket — see iam-lumen-gcp.tf):
+#   - Workload identity pool + provider trusting the EKS OIDC issuer
+#   - attribute_condition: assertion.sub == "system:serviceaccount:<ns>:lumen"
+#   - principal://.../subject/system:serviceaccount:<ns>:lumen has
+#     roles/storage.objectUser on the data-root bucket (needs list+get+create+
+#     delete since the processor MOVES exports → inbound → completed).
+
+global:
+  lumen:
+    bucket: "gs://lumen-test"
+
+lumen-processor:
+  serviceAccount:
+    # MUST match the WIF principal binding (see iam-lumen-gcp.tf).
+    name: lumen
+  cronJobs:
+    processor:
+      volumes:
+        - name: gcp-ksa
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+                  audience: '{{ .Values.global.lumen.gcpWorkloadIdentity.audience }}'
+        - name: gcp-wif-config
+          configMap:
+            name: "{{ .Release.Name }}-gcp-wif"
+      containers:
+        collector:
+          env:
+            GOMEMLIMIT:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            GOMAXPROCS:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/gcp/credential-config.json
+          volumeMounts:
+            - name: gcp-ksa
+              mountPath: /var/run/secrets/tokens/gcp-ksa
+              readOnly: true
+            - name: gcp-wif-config
+              mountPath: /var/secrets/gcp
+              readOnly: true
+
+# Notebook intentionally left without WIF: its SA is `<release>-lumen-notebook`,
+# which does NOT match the attribute_condition `assertion.sub == "...:lumen"`
+# in iam-lumen-gcp.tf. Add a separate TF binding or unify the SAs before wiring.
+lumen-notebook:
+  containers:
+    notebook:
+      env:
+        GOMEMLIMIT:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        GOMAXPROCS:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
