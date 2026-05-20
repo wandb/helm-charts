@@ -1,18 +1,16 @@
 global:
   repositoryPrefix: ""
+  # USER-FACING value: global.lumen.bucket — the data-root URL (e.g. gs://lumen-test).
+  # snapshotPrefix and gcpWorkloadIdentity.audience are chart-internal constants.
+  lumen:
+    bucket: ""
+    snapshotPrefix: "snapshot"
+    gcpWorkloadIdentity:
+      audience: "//iam.googleapis.com/projects/281760294016/locations/global/workloadIdentityPools/default-pool/providers/default-provider"
 
-config:
-  snapshotPrefix: "snapshot"
-  lumenDataRoot: "gs://lumen-test"
-
-rbac:
-  # Set false if the ClusterRole/ClusterRoleBinding are managed out-of-band
-  # (e.g. applied separately by an actor with cluster-admin permissions).
-  create: true
-
-# Subchart values for the lumen alias of wandb-base. This produces the CronJob,
-# ServiceAccount, and pod template.
-lumen:
+# Processor: hourly CronJob that moves agent exports to inbound, processes,
+# and writes parquet to the data root.
+lumen-processor:
   kind: CronJob
   image:
     repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
@@ -26,57 +24,7 @@ lumen:
     enabled: false
   service:
     enabled: false
-  role:
-    create: true
-    rules:
-      - apiGroups: [""]
-        resources: ["pods", "configmaps", "secrets"]
-        verbs: ["get", "list"]
-      - apiGroups: ["apps"]
-        resources: ["replicasets", "deployments"]
-        verbs: ["get"]
-      - apiGroups: ["apps.wandb.com"]
-        resources: ["weightsandbiases"]
-        verbs: ["get", "list"]
   cronJobs:
-    agent:
-      enabled: true
-      schedule: "*/15 * * * *"
-      concurrencyPolicy: "Forbid"
-      failedJobsHistoryLimit: 3
-      successfulJobsHistoryLimit: 5
-      startingDeadlineSeconds: 300
-      containers:
-        collector:
-          command: ["/app/entrypoint.sh", "agent"]
-          args: []
-          env:
-            GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
-            GOMEMLIMIT:
-              valueFrom:
-                resourceFieldRef:
-                  resource: limits.memory
-            GOMAXPROCS:
-              valueFrom:
-                resourceFieldRef:
-                  resource: limits.cpu
-          volumeMounts:
-            - name: gcp-key
-              mountPath: /var/secrets/google
-              readOnly: true
-          envFrom:
-            "{{ .Release.Name }}-lumen-configmap": "configMapRef"
-          resources:
-            requests:
-              cpu: 1
-              memory: 4Gi
-            limits:
-              cpu: 2
-              memory: 4Gi
-      volumes:
-        - name: gcp-key
-          secret:
-            secretName: lumen-gcp-key
     processor:
       enabled: true
       schedule: "0 * * * *"
@@ -91,7 +39,6 @@ lumen:
           command: ["/app/entrypoint.sh", "processor"]
           args: []
           env:
-            GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
             GOMEMLIMIT:
               valueFrom:
                 resourceFieldRef:
@@ -100,10 +47,6 @@ lumen:
               valueFrom:
                 resourceFieldRef:
                   resource: limits.cpu
-          volumeMounts:
-            - name: gcp-key
-              mountPath: /var/secrets/google
-              readOnly: true
           envFrom:
             "{{ .Release.Name }}-lumen-configmap": "configMapRef"
           resources:
@@ -113,12 +56,9 @@ lumen:
             limits:
               cpu: 2
               memory: 4Gi
-      volumes:
-        - name: gcp-key
-          secret:
-            secretName: lumen-processor-key
 
-notebook:
+# Notebook: marimo UI for browsing the parquet data root.
+lumen-notebook:
   kind: Deployment
   replicaCount: 1
   image:
@@ -142,7 +82,6 @@ notebook:
       command: ["/app/entrypoint.sh", "marimo"]
       args: []
       env:
-        GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
         GOMEMLIMIT:
           valueFrom:
             resourceFieldRef:
@@ -151,10 +90,6 @@ notebook:
           valueFrom:
             resourceFieldRef:
               resource: limits.cpu
-      volumeMounts:
-        - name: gcp-key
-          mountPath: /var/secrets/google
-          readOnly: true
       envFrom:
         "{{ .Release.Name }}-lumen-configmap": "configMapRef"
       ports:
@@ -167,7 +102,3 @@ notebook:
         limits:
           cpu: 2
           memory: 4Gi
-  volumes:
-    - name: gcp-key
-      secret:
-        secretName: lumen-processor-key
