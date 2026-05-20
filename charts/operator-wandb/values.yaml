@@ -425,9 +425,11 @@ global:
     project: ""
     instance: ""
 
-  # When enabled, historyStore will only use parquet pods (no mysql/bigtable fallback).
   historyStore:
+    # When enabled, historyStore will only use parquet pods (no mysql/bigtable fallback).
     parquetOnly: false
+    # When enabled, historyStore will use gRPC headless service instead of net/rpc
+    parquetUseGRPC: false
 
   pubSub:
     enabled: false
@@ -752,6 +754,8 @@ app:
   # TODO(dpanzella) Read from here for backwards compatability, needs to be moved so API can access as well
   internalJWTMap:
     - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace"
+      issuer: "https://kubernetes.default.svc.cluster.local"
+    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace-worker"
       issuer: "https://kubernetes.default.svc.cluster.local"
   env:
     GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
@@ -2404,6 +2408,14 @@ parquet:
       - port: 8087
         protocol: TCP
         name: parquet
+  services:
+    - name: "{{ .Release.Name }}-parquet-grpc"
+      enabled: true
+      headless: true
+      ports:
+        - port: 8088
+          protocol: TCP
+          name: grpc
   fuse:
     enabled: false
     resources:
@@ -3222,6 +3234,17 @@ weave-trace-worker:
         - name: http
           containerPort: 8080
           protocol: TCP
+      volumeMounts:
+        - name: weave-trace-internal-jwt
+          mountPath: /tmp/weave-trace/internal-jwt
+  volumes:
+    - name: weave-trace-internal-jwt
+      projected:
+        sources:
+          - serviceAccountToken:
+              audience: internal-service
+              path: token
+              expirationSeconds: 600
   service:
     ports:
       - name: http

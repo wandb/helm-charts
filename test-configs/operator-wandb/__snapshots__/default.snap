@@ -1250,6 +1250,7 @@ data:
   GORILLA_COLLECT_AUDIT_LOGS: "true"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_PORT: "8087"
+  GORILLA_PARQUET_GRPC_PORT: "8088"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648"
   GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
@@ -1637,10 +1638,10 @@ metadata:
     global-common-label: "global-common-label-value"
     helm.sh/chart: '###CHART_VERSION###'
 data:
-  # Port configuration
+  # Legacy net/rpc configuration
   GORILLA_PARQUET_PORT: "8087"
-  # RPC path configuration
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
+  GORILLA_PARQUET_GRPC_PORT: "8088"
   # Task queue configuration
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
   # Parquet-specific configuration
@@ -2314,6 +2315,31 @@ spec:
     app.kubernetes.io/name: parquet
     app.kubernetes.io/instance: chartsnap
 ---
+# Source: operator-wandb/charts/parquet/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-parquet-grpc
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+    global-common-label: "global-common-label-value"
+  annotations:
+    global-common-annotation: global-common-annotation-value
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: grpc
+    port: 8088
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: chartsnap
+---
 # Source: operator-wandb/charts/prometheus/charts/instance/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -2667,7 +2693,7 @@ spec:
         app-common-annotation: app-common-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: app-0.11.11
+        helm.sh/chart: app-0.12.0
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3267,7 +3293,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: console-0.11.11
+        helm.sh/chart: console-0.12.0
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3415,7 +3441,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: nginx-0.11.11
+        helm.sh/chart: nginx-0.12.0
         app.kubernetes.io/name: nginx
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3550,7 +3576,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: parquet-0.11.11
+        helm.sh/chart: parquet-0.12.0
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4059,7 +4085,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: weave-0.11.11
+        helm.sh/chart: weave-0.12.0
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4532,7 +4558,7 @@ spec:
             global-pod-annotation: global-pod-annotation-value
             global-common-annotation: global-common-annotation-value
           labels:
-            helm.sh/chart: parquet-0.11.11
+            helm.sh/chart: parquet-0.12.0
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
