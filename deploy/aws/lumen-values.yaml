@@ -1,25 +1,3 @@
-# Overlay: AWS / EKS — standalone Lumen chart (processor + notebook only).
-#
-# Usage:
-#   helm upgrade --install lumen ./charts/lumen \
-#     --namespace wandb-qa-aws \
-#     -f deploy/aws/lumen-values.yaml
-#
-# The agent runs as part of operator-wandb (gated by global.lumen.enabled).
-#
-# Auth: pods authenticate to GCS via GCP Workload Identity Federation (NOT IRSA).
-# The chart presents three things to each pod:
-#   1. Projected K8s SA token, audience-bound to the GCP WIF provider
-#   2. external_account credential-config JSON (templates/wif-configmap.yaml)
-#   3. GOOGLE_APPLICATION_CREDENTIALS env var pointing at the JSON
-#
-# Prereqs (in the GCP project hosting the bucket — see iam-lumen-gcp.tf):
-#   - Workload identity pool + provider trusting the EKS OIDC issuer
-#   - attribute_condition: assertion.sub == "system:serviceaccount:<ns>:lumen"
-#   - principal://.../subject/system:serviceaccount:<ns>:lumen has
-#     roles/storage.objectUser on the data-root bucket (needs list+get+create+
-#     delete since the processor MOVES exports → inbound → completed).
-
 global:
   lumen:
     bucket: "gs://lumen-test"
