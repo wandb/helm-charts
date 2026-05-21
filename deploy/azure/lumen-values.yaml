@@ -1,0 +1,53 @@
+global:
+  cloudProvider: "azure"
+  lumen:
+    bucket: "gs://lumen-test"
+
+lumen-processor:
+  serviceAccount:
+    name: lumen
+  cronJobs:
+    processor:
+      volumes:
+        - name: gcp-ksa
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+                  audience: '{{ include "lumen.audience" . }}'
+        - name: gcp-wif-config
+          configMap:
+            name: "{{ .Release.Name }}-gcp-wif"
+      containers:
+        collector:
+          env:
+            GOMEMLIMIT:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            GOMAXPROCS:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/gcp/credential-config.json
+          volumeMounts:
+            - name: gcp-ksa
+              mountPath: /var/run/secrets/tokens/gcp-ksa
+              readOnly: true
+            - name: gcp-wif-config
+              mountPath: /var/secrets/gcp
+              readOnly: true
+
+lumen-notebook:
+  containers:
+    notebook:
+      env:
+        GOMEMLIMIT:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        GOMAXPROCS:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu

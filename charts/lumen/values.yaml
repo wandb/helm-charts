@@ -1,0 +1,104 @@
+global:
+  repositoryPrefix: ""
+  # USER-FACING value: global.lumen.bucket — the data-root URL (e.g. gs://lumen-test).
+  # The WIF audience is selected from global.cloudProvider by the
+  # lumen.audience helper (templates/_lumen.tpl) and is not user-configurable.
+  # cloudProvider should be set per-overlay (see deploy/<cloud>/lumen-values.yaml).
+  lumen:
+    bucket: ""
+    snapshotPrefix: "snapshot"
+
+# Processor: hourly CronJob that moves agent exports to inbound, processes,
+# and writes parquet to the data root.
+lumen-processor:
+  kind: CronJob
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: latest
+    pullPolicy: Always
+  serviceAccount:
+    annotations: {}
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: false
+  cronJobs:
+    lumen-processor:
+      enabled: true
+      schedule: "0 * * * *"
+      concurrencyPolicy: "Forbid"
+      failedJobsHistoryLimit: 1
+      successfulJobsHistoryLimit: 1
+      startingDeadlineSeconds: 300
+      ttlSecondsAfterFinished: 300
+      backoffLimit: 0
+      containers:
+        collector:
+          command: ["/app/entrypoint.sh", "processor"]
+          args: []
+          env:
+            GOMEMLIMIT:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            GOMAXPROCS:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+          envFrom:
+            "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+          resources:
+            requests:
+              cpu: 1
+              memory: 4Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+
+# Notebook: marimo UI for browsing the parquet data root.
+lumen-notebook:
+  kind: Deployment
+  replicaCount: 1
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: latest
+    pullPolicy: Always
+  serviceAccount:
+    annotations: {}
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: true
+    ports:
+      - port: 8080
+        protocol: TCP
+        name: marimo
+  containers:
+    notebook:
+      command: ["/app/entrypoint.sh", "marimo"]
+      args: []
+      env:
+        GOMEMLIMIT:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        GOMAXPROCS:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+      envFrom:
+        "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+      ports:
+        - containerPort: 8080
+          name: marimo
+      resources:
+        requests:
+          cpu: 1
+          memory: 2Gi
+        limits:
+          cpu: 2
+          memory: 4Gi

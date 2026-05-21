@@ -1,0 +1,131 @@
+{{- if .Values.global.lumen.install -}}
+{{/*
+  Replaces the image-baked /app/definitions/collector/managed-install.yaml
+  with one whose scrapers target the operator-wandb release namespace.
+  Mounted via subPath on the agent CronJob so the rest of /app/definitions
+  (keyrules, batch CSVs) stays intact from the image.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-lumen-managed-install
+data:
+  managed-install.yaml: |
+    imports:
+      - definitions/keyrules/k8s-metadata-noise.yaml
+      - definitions/keyrules/k8s-pod-noise.yaml
+      - definitions/keyrules/standard-redactions.yaml
+
+    scrapers:
+      - name: wandb-configmaps
+        connection:
+          kubernetes:
+            discover:
+              kind: ConfigMap
+              namespace: {{ .Release.Namespace }}
+              nameRegex: "^wandb-.*-configmap$"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-secrets
+        connection:
+          kubernetes:
+            discover:
+              kind: Secret
+              namespace: {{ .Release.Namespace }}
+              nameRegex: "^wandb-(bucket|clickhouse|global|gorilla|internal-signer|kafka|license|mysql|parquet|redis|smtp)"
+              nameExceptions:
+                - "-backup"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "type"
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-pods
+        connection:
+          kubernetes:
+            discover:
+              kind: Pod
+              namespace: {{ .Release.Namespace }}
+              nameRegex: "^wandb-(anaconda2|api|app|executor|filemeta|flat-run-fields-updater|frontend|glue|parquet|weave).*"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise, k8s-pod-noise ]
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-pull-with-httpget
+        connection:
+          kubernetes:
+            discover:
+              kind: Pod
+              namespace: {{ .Release.Namespace }}
+              annotations:
+                - key: lumen.wandb.ai/agent
+                  value: "true"
+            pull:
+              type: k8sHttpGet
+              httpGet:
+                portName: http
+                listPath: /lumen/list
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-specs
+        connection:
+          kubernetes:
+            discover:
+              kind: Secret
+              namespace: {{ .Release.Namespace }}
+              nameRegex: "wandb-spec-(active|user)$"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "status"
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-cr
+        connection:
+          kubernetes:
+            discover:
+              kind: WeightsAndBiases
+              namespace: {{ .Release.Namespace }}
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "status"
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+{{- end }}
