@@ -39,15 +39,13 @@ global:
   #   global.lumen.install   — bool, gates all 3 components (agent, processor, notebook)
   #   global.lumen.bucket    — string, the data-root URL (e.g. gs://lumen-test)
   #
-  # The two values below are chart-internal constants — fixed wandb
-  # infrastructure (see iam-lumen-gcp.tf). Don't override unless you're
-  # changing the underlying WIF setup.
+  # The WIF audience is selected from global.cloudProvider by the
+  # operator-wandb.lumen.audience helper (templates/_lumen.tpl) and is not
+  # user-configurable.
   lumen:
     install: false
     bucket: ""
     snapshotPrefix: "snapshot"
-    gcpWorkloadIdentity:
-      audience: "//iam.googleapis.com/projects/281760294016/locations/global/workloadIdentityPools/default-pool/providers/default-provider"
 
   banners: {}
     # banner1:
@@ -3712,7 +3710,7 @@ lumen-agent:
               - serviceAccountToken:
                   path: token
                   expirationSeconds: 3600
-                  audience: '{{ .Values.global.lumen.gcpWorkloadIdentity.audience }}'
+                  audience: '{{ include "operator-wandb.lumen.audience" . }}'
         - name: gcp-wif-config
           configMap:
             name: "{{ .Release.Name }}-lumen-gcp-wif"
@@ -3789,7 +3787,7 @@ lumen-processor:
               - serviceAccountToken:
                   path: token
                   expirationSeconds: 3600
-                  audience: '{{ .Values.global.lumen.gcpWorkloadIdentity.audience }}'
+                  audience: '{{ include "operator-wandb.lumen.audience" . }}'
         - name: gcp-wif-config
           configMap:
             name: "{{ .Release.Name }}-lumen-gcp-wif"
