@@ -18,7 +18,8 @@
 {{- end -}}
 {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
 {{- $mcpEnv := index $mcp "env" | default dict -}}
-{{- $hasExplicitTraceURL := hasKey $mcpEnv "WF_TRACE_SERVER_URL" -}}
+{{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
+{{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
 {{- $hasBundledTrace := or (index .Values "weave-trace" "install") (index $globalWeaveTrace "enabled") -}}
 {{- $hasTraceBackend := or $hasExplicitTraceURL $hasBundledTrace -}}
 {{- if and (eq $weaveMode "true") (not $hasTraceBackend) -}}
@@ -107,8 +108,12 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
 {{- $mcpWeave := index .Values "weave" | default dict -}}
 {{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
 {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
-{{- $hasExplicitTraceURL := hasKey $mcpEnv "WF_TRACE_SERVER_URL" -}}
+{{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
+{{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
 {{- $hasTraceBackend := or $hasExplicitTraceURL (index $globalWeaveTrace "enabled") -}}
+{{- if and (eq $weaveMode "true") (not $hasTraceBackend) -}}
+{{- fail "mcp-server.weave.tools=true requires global.weave-trace.enabled=true or mcp-server.env.WF_TRACE_SERVER_URL" -}}
+{{- end -}}
 {{- $enableWeaveTools := or (eq $weaveMode "true") (and (eq $weaveMode "auto") $hasTraceBackend) -}}
 - name: WANDB_MCP_ENABLE_WEAVE_TOOLS
   value: {{ ternary "true" "false" $enableWeaveTools | quote }}
