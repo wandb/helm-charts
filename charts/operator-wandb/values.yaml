@@ -3683,6 +3683,8 @@ lumen-agent:
       - apiGroups: ["apps.wandb.com"]
         resources: ["weightsandbiases"]
         verbs: ["get", "list"]
+  envTpls:
+    - '{{ include "wandb.bucketEnvs" . }}'
   cronJobs:
     lumen-agent:
       enabled: true
@@ -3723,6 +3725,7 @@ lumen-agent:
             GOOGLE_APPLICATION_CREDENTIALS: '{{ include `operator-wandb.lumen.googleCredsPath` . }}'
           envFrom:
             "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+            "{{ .Release.Name }}-bucket-configmap": "configMapRef"
           volumeMounts:
             - name: gcp-ksa
               mountPath: /var/run/secrets/tokens/gcp-ksa
@@ -3760,6 +3763,8 @@ lumen-processor:
     enabled: false
   service:
     enabled: false
+  envTpls:
+    - '{{ include "wandb.bucketEnvs" . }}'
   cronJobs:
     lumen-processor:
       enabled: true
@@ -3797,6 +3802,7 @@ lumen-processor:
             GOOGLE_APPLICATION_CREDENTIALS: '{{ include `operator-wandb.lumen.googleCredsPath` . }}'
           envFrom:
             "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+            "{{ .Release.Name }}-bucket-configmap": "configMapRef"
           volumeMounts:
             - name: gcp-ksa
               mountPath: /var/run/secrets/tokens/gcp-ksa
@@ -3831,6 +3837,8 @@ lumen-notebook:
       - port: 8080
         protocol: TCP
         name: marimo
+  envTpls:
+    - '{{ include "wandb.bucketEnvs" . }}'
   containers:
     notebook:
       command: ["/app/entrypoint.sh", "marimo"]
@@ -3846,6 +3854,7 @@ lumen-notebook:
               resource: limits.cpu
       envFrom:
         "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+        "{{ .Release.Name }}-bucket-configmap": "configMapRef"
       ports:
         - containerPort: 8080
           name: marimo
