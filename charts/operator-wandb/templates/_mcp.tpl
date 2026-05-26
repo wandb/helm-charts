@@ -1,33 +1,4 @@
 {{/*
-  Validate explicit MCP Weave trace tool configuration at parent chart scope.
-  The wandb.mcpEnvs helper below resolves the auto/default value in subchart
-  scope, where .Values.global.* and mcp-server.* values are available.
-
-  mcp-server.weave.tools:
-    auto  - enable when bundled weave-trace is installed or an explicit
-            mcp-server.env.WF_TRACE_SERVER_URL is set; otherwise disable.
-    true  - require a trace backend and expose Weave tools.
-    false - hide Weave tools and do not default WF_TRACE_SERVER_URL.
-*/}}
-{{- $mcp := index .Values "mcp-server" | default dict -}}
-{{- if index $mcp "install" -}}
-{{- $mcpWeave := index $mcp "weave" | default dict -}}
-{{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
-{{- if not (has $weaveMode (list "auto" "true" "false")) -}}
-{{- fail "mcp-server.weave.tools must be one of: auto, true, false" -}}
-{{- end -}}
-{{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
-{{- $mcpEnv := index $mcp "env" | default dict -}}
-{{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
-{{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
-{{- $hasBundledTrace := or (index .Values "weave-trace" "install") (index $globalWeaveTrace "enabled") -}}
-{{- $hasTraceBackend := or $hasExplicitTraceURL $hasBundledTrace -}}
-{{- if and (eq $weaveMode "true") (not $hasTraceBackend) -}}
-{{- fail "mcp-server.weave.tools=true requires weave-trace.install=true, global.weave-trace.enabled=true, or mcp-server.env.WF_TRACE_SERVER_URL" -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
   Datadog Autodiscovery tag JSON for the MCP container. Invoked from the mcp-server
   subchart's podAnnotations[ad.datadoghq.com/mcp-server.tags].
 
@@ -111,9 +82,6 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
 {{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
 {{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
 {{- $hasTraceBackend := or $hasExplicitTraceURL (index $globalWeaveTrace "enabled") -}}
-{{- if and (eq $weaveMode "true") (not $hasTraceBackend) -}}
-{{- fail "mcp-server.weave.tools=true requires global.weave-trace.enabled=true or mcp-server.env.WF_TRACE_SERVER_URL" -}}
-{{- end -}}
 {{- $enableWeaveTools := or (eq $weaveMode "true") (and (eq $weaveMode "auto") $hasTraceBackend) -}}
 - name: WANDB_MCP_ENABLE_WEAVE_TOOLS
   value: {{ ternary "true" "false" $enableWeaveTools | quote }}
