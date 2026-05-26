@@ -1,12 +1,29 @@
 {{/*
-  Fail fast if mcp-server is enabled without a reachable weave-trace.
-  Runs at PARENT chart parse scope, where .Values["mcp-server"] resolves to
-  the subchart block. Do NOT replicate this access pattern inside the helper
-  defines below -- see scope note on wandb.mcpEnvs.
+  Validate explicit MCP Weave trace tool configuration at parent chart scope.
+  The wandb.mcpEnvs helper below resolves the auto/default value in subchart
+  scope, where .Values.global.* and mcp-server.* values are available.
+
+  mcp-server.weave.tools:
+    auto  - enable when bundled weave-trace is installed or an explicit
+            mcp-server.env.WF_TRACE_SERVER_URL is set; otherwise disable.
+    true  - require a trace backend and expose Weave tools.
+    false - hide Weave tools and do not default WF_TRACE_SERVER_URL.
 */}}
-{{- if and (index .Values "mcp-server" "install") (not (index .Values "weave-trace" "install")) -}}
-{{- if not (index .Values "mcp-server" "env" "WF_TRACE_SERVER_URL") -}}
-{{- fail "mcp-server requires weave-trace.install=true or mcp-server.env.WF_TRACE_SERVER_URL to be set" -}}
+{{- $mcp := index .Values "mcp-server" | default dict -}}
+{{- if index $mcp "install" -}}
+{{- $mcpWeave := index $mcp "weave" | default dict -}}
+{{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
+{{- if not (has $weaveMode (list "auto" "true" "false")) -}}
+{{- fail "mcp-server.weave.tools must be one of: auto, true, false" -}}
+{{- end -}}
+{{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
+{{- $mcpEnv := index $mcp "env" | default dict -}}
+{{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
+{{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
+{{- $hasBundledTrace := or (index .Values "weave-trace" "install") (index $globalWeaveTrace "enabled") -}}
+{{- $hasTraceBackend := or $hasExplicitTraceURL $hasBundledTrace -}}
+{{- if and (eq $weaveMode "true") (not $hasTraceBackend) -}}
+{{- fail "mcp-server.weave.tools=true requires weave-trace.install=true, global.weave-trace.enabled=true, or mcp-server.env.WF_TRACE_SERVER_URL" -}}
 {{- end -}}
 {{- end -}}
 
@@ -75,6 +92,7 @@ directly; .Values.global.* is auto-propagated by helm. Do NOT use
 fails helm render with "index of nil pointer".
 
 Resolves:
+- WANDB_MCP_ENABLE_WEAVE_TOOLS: whether trace-dependent MCP tools are exposed.
 - WF_TRACE_SERVER_URL: public weave-trace URL via ingress (global.host + /traces).
   The chart's weave-trace subchart mounts the FastAPI app under API_PATH_PREFIX=/traces
   (see templates/weave-trace.yaml), so the in-cluster Service path http://<release>-weave-trace:8722
@@ -82,11 +100,24 @@ Resolves:
   internal consumers use (see weave-trace.yaml WF_TRACE_SERVER_URL line).
 - WANDB_BASE_URL: the W&B instance URL (from global.host)
 
-Requires weave-trace to be installed. If weave-trace is disabled,
-override WF_TRACE_SERVER_URL in the mcp-server.env values block.
+MCP can run without weave-trace. When WANDB_MCP_ENABLE_WEAVE_TOOLS=false,
+trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
 */}}
 {{- define "wandb.mcpEnvs" -}}
-{{- if not (index .Values "env" "WF_TRACE_SERVER_URL") }}
+{{- $mcpEnv := index .Values "env" | default dict -}}
+{{- $mcpWeave := index .Values "weave" | default dict -}}
+{{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
+{{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
+{{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
+{{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
+{{- $hasTraceBackend := or $hasExplicitTraceURL (index $globalWeaveTrace "enabled") -}}
+{{- if and (eq $weaveMode "true") (not $hasTraceBackend) -}}
+{{- fail "mcp-server.weave.tools=true requires global.weave-trace.enabled=true or mcp-server.env.WF_TRACE_SERVER_URL" -}}
+{{- end -}}
+{{- $enableWeaveTools := or (eq $weaveMode "true") (and (eq $weaveMode "auto") $hasTraceBackend) -}}
+- name: WANDB_MCP_ENABLE_WEAVE_TOOLS
+  value: {{ ternary "true" "false" $enableWeaveTools | quote }}
+{{- if and $enableWeaveTools (not $hasExplicitTraceURL) }}
 - name: WF_TRACE_SERVER_URL
   value: "{{ .Values.global.host }}/traces"
 {{- end }}
