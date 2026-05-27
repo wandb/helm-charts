@@ -20,3 +20,11 @@
 /var/secrets/gcp/credential-config.json
 {{- end -}}
 {{- end -}}
+
+{{- define "wandb.lumen.stagingPath" -}}
+/vol/staging
+{{- end -}}
+
+{{- define "wandb.lumen.rulePath" -}}
+/app/definitions/collector/managed-install.yaml
+{{- end -}}

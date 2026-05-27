@@ -72,3 +72,53 @@
     secretName: "{{ .Release.Name }}-internal-signer"
 {{- end }}
 {{- end }}
+
+
+{{- define "wandb.lumenStagingVolumeMount" }}
+- name: lumen-staging-dir
+  mountPath: {{ include "wandb.lumen.stagingPath" . }}
+{{- end }}
+
+{{- define "wandb.lumenStagingVolume" }}
+- name: lumen-staging-dir
+  emptyDir: { }
+{{- end }}
+
+{{- define "wandb.lumenWifVolumes" }}
+{{- if .Values.global.lumen.dataRoot }}
+- name: gcp-ksa
+  projected:
+    sources:
+      - serviceAccountToken:
+          path: token
+          expirationSeconds: 3600
+          audience: '{{ include `operator-wandb.lumen.audience` . }}'
+- name: gcp-wif-config
+  configMap:
+    name: "{{ .Release.Name }}-lumen-gcp-wif"
+{{- end }}
+{{- end }}
+
+{{- define "wandb.lumenWifVolumeMounts" }}
+{{- if .Values.global.lumen.dataRoot }}
+- name: gcp-ksa
+  mountPath: /var/run/secrets/tokens/gcp-ksa
+  readOnly: true
+- name: gcp-wif-config
+  mountPath: /var/secrets/gcp
+  readOnly: true
+{{- end }}
+{{- end }}
+
+{{- define "wandb.lumenRulesVolume" }}
+- name: lumen-managed-install
+  configMap:
+    name: "{{ .Release.Name }}-lumen-rules"
+{{- end }}
+
+{{- define "wandb.lumenRulesVolumeMount" }}
+- name: lumen-managed-install
+  mountPath: {{ include "wandb.lumen.rulePath" . }}
+  subPath: managed-install.yaml
+  readOnly: true
+{{- end }}
