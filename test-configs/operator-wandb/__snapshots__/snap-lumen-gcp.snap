@@ -1460,14 +1460,14 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: chartsnap-lumen-env
+  name: chartsnap-lumen-configmap
   labels:
     helm.sh/chart: '###CHART_VERSION###'
 data:
   LUMEN_AGENT_CONFIG_PATH: "/app/definitions/collector/managed-install.yaml"
   LUMEN_CUSTOMER_NAME: "chartsnap"
   LUMEN_DATA_ROOT: "gs://lumen-test"
-  LUMEN_STAGING_PATH: "file://"
+  LUMEN_STAGING_ROOT: "file:///vol/staging"
 ---
 # Source: operator-wandb/templates/lumen.yaml
 apiVersion: v1
@@ -1628,27 +1628,6 @@ data:
             - use: [ standard-redactions ]
           valueHooks:
             - URIPassword
----
-# Source: operator-wandb/templates/lumen.yaml
-# WIF only needed for lumen dataRoot, not when using standard wandb-bucket
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-lumen-gcp-wif
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-data:
-  credential-config.json: |
-    {
-      "type": "external_account",
-      "audience": "lumen-gcp-adc-unused",
-      "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
-      "token_url": "https://sts.googleapis.com/v1/token",
-      "credential_source": {
-        "file": "/var/run/secrets/tokens/gcp-ksa/token",
-        "format": { "type": "text" }
-      }
-    }
 ---
 # Source: operator-wandb/templates/nginx.yaml
 apiVersion: v1
@@ -3304,7 +3283,7 @@ spec:
         - marimo
         envFrom:
         - configMapRef:
-            name: chartsnap-bucket-configmap
+            name: chartsnap-lumen-configmap
         env:
         - name: AZURE_STORAGE_KEY
           valueFrom:
@@ -4242,7 +4221,7 @@ spec:
             - configMapRef:
                 name: chartsnap-bucket-configmap
             - configMapRef:
-                name: chartsnap-lumen-env
+                name: chartsnap-lumen-configmap
             env:
             - name: AZURE_STORAGE_KEY
               valueFrom:
@@ -4299,12 +4278,6 @@ spec:
             volumeMounts:
             - name: lumen-staging-dir
               mountPath: /vol/staging
-            - name: gcp-ksa
-              mountPath: /var/run/secrets/tokens/gcp-ksa
-              readOnly: true
-            - name: gcp-wif-config
-              mountPath: /var/secrets/gcp
-              readOnly: true
             - name: lumen-managed-install
               mountPath: /app/definitions/collector/managed-install.yaml
               subPath: managed-install.yaml
@@ -4337,16 +4310,6 @@ spec:
           volumes:
           - name: lumen-staging-dir
             emptyDir: {}
-          - name: gcp-ksa
-            projected:
-              sources:
-              - serviceAccountToken:
-                  path: token
-                  expirationSeconds: 3600
-                  audience: 'lumen-gcp-adc-unused'
-          - name: gcp-wif-config
-            configMap:
-              name: "chartsnap-lumen-gcp-wif"
           - name: lumen-managed-install
             configMap:
               name: "chartsnap-lumen-rules"
@@ -4390,7 +4353,7 @@ spec:
             - configMapRef:
                 name: chartsnap-bucket-configmap
             - configMapRef:
-                name: chartsnap-lumen-env
+                name: chartsnap-lumen-configmap
             env:
             - name: AZURE_STORAGE_KEY
               valueFrom:
@@ -4447,12 +4410,6 @@ spec:
             volumeMounts:
             - name: lumen-staging-dir
               mountPath: /vol/staging
-            - name: gcp-ksa
-              mountPath: /var/run/secrets/tokens/gcp-ksa
-              readOnly: true
-            - name: gcp-wif-config
-              mountPath: /var/secrets/gcp
-              readOnly: true
           restartPolicy: Never
           serviceAccountName: lumen
           securityContext:
@@ -4481,16 +4438,6 @@ spec:
           volumes:
           - name: lumen-staging-dir
             emptyDir: {}
-          - name: gcp-ksa
-            projected:
-              sources:
-              - serviceAccountToken:
-                  path: token
-                  expirationSeconds: 3600
-                  audience: 'lumen-gcp-adc-unused'
-          - name: gcp-wif-config
-            configMap:
-              name: "chartsnap-lumen-gcp-wif"
 ---
 # Source: operator-wandb/charts/parquet/templates/cronjob.yaml
 apiVersion: batch/v1
