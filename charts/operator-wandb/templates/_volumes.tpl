@@ -85,7 +85,7 @@
 {{- end }}
 
 {{- define "wandb.lumenWifVolumes" }}
-{{- if .Values.global.lumen.dataRoot }}
+{{- if include "operator-wandb.lumen.audience" . }}
 - name: gcp-ksa
   projected:
     sources:
@@ -100,7 +100,7 @@
 {{- end }}
 
 {{- define "wandb.lumenWifVolumeMounts" }}
-{{- if .Values.global.lumen.dataRoot }}
+{{- if include "operator-wandb.lumen.audience" . }}
 - name: gcp-ksa
   mountPath: /var/run/secrets/tokens/gcp-ksa
   readOnly: true
