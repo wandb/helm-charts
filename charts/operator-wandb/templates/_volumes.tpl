@@ -92,7 +92,7 @@
       - serviceAccountToken:
           path: token
           expirationSeconds: 3600
-          audience: '{{ include `operator-wandb.lumen.audience` . }}'
+          audience: {{ include "operator-wandb.lumen.audience" . }}
 - name: gcp-wif-config
   configMap:
     name: "{{ .Release.Name }}-lumen-gcp-wif"
