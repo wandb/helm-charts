@@ -1,0 +1,30 @@
+{{/*
+  Validate MCP Weave trace tool configuration at parent chart scope.
+
+  This template intentionally emits no Kubernetes resources. It exists because
+  the mcp-server subchart env helper runs in subchart scope and cannot see
+  parent-only values such as weave-trace.install.
+
+  mcp-server.weave.tools:
+    auto  - enable when global.weave-trace.enabled or an explicit
+            mcp-server.env.WF_TRACE_SERVER_URL is set; otherwise disable.
+    true  - require a trace backend and expose Weave tools.
+    false - hide Weave tools and do not default WF_TRACE_SERVER_URL.
+*/}}
+{{- $mcp := index .Values "mcp-server" | default dict -}}
+{{- if index $mcp "install" -}}
+{{- $mcpWeave := index $mcp "weave" | default dict -}}
+{{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
+{{- if not (has $weaveMode (list "auto" "true" "false")) -}}
+{{- fail "mcp-server.weave.tools must be one of: auto, true, false" -}}
+{{- end -}}
+{{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
+{{- $mcpEnv := index $mcp "env" | default dict -}}
+{{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
+{{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
+{{- $hasBundledTrace := or (index .Values "weave-trace" "install") (index $globalWeaveTrace "enabled") -}}
+{{- $hasTraceBackend := or $hasExplicitTraceURL $hasBundledTrace -}}
+{{- if and (eq $weaveMode "true") (not $hasTraceBackend) -}}
+{{- fail "mcp-server.weave.tools=true requires weave-trace.install=true, global.weave-trace.enabled=true, or mcp-server.env.WF_TRACE_SERVER_URL" -}}
+{{- end -}}
+{{- end -}}
