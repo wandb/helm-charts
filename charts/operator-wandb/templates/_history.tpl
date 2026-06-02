@@ -2,8 +2,9 @@
     {{- $stores := list -}}
     {{- if .Values.global.historyStore.parquetUseGRPC -}}
         {{- $stores = append $stores (printf "grpc://%s-parquet-grpc:8088" .Release.Name) -}}
+    {{- else -}}
+        {{- $stores = append $stores (printf "http://%s-parquet:8087/_goRPC_" .Release.Name) -}}
     {{- end -}}
-    {{- $stores = append $stores (printf "http://%s-parquet:8087/_goRPC_" .Release.Name) -}}
 
     {{- if not .Values.global.historyStore.parquetOnly -}}
         {{- if .Values.global.bigtable.v3.enabled -}}
