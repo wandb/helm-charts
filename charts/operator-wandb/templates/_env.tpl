@@ -59,6 +59,14 @@ Global values will override any chart-specific values.
       name: {{ (include "wandb.bucket" . | fromYaml).secretName | quote }}
       key: {{ (include "wandb.bucket" . | fromYaml).accessKeyName | quote }}
       optional: true
+{{- if (include "wandb.bucket" . | fromYaml).azureTenantId }}
+- name: AZURE_STORAGE_TENANT_ID
+  value: {{ (include "wandb.bucket" . | fromYaml).azureTenantId | quote }}
+{{- end }}
+{{- if (include "wandb.bucket" . | fromYaml).azureClientId }}
+- name: AZURE_STORAGE_CLIENT_ID
+  value: {{ (include "wandb.bucket" . | fromYaml).azureClientId | quote }}
+{{- end }}
 - name: BUCKET_ACCESS_KEY
   valueFrom:
     secretKeyRef:
