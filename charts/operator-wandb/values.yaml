@@ -34,8 +34,9 @@ global:
 
   lumen:
     install: false
-    bucket: "wandb-lumen"
-    snapshotPrefix: "snapshot"
+    dataRoot: ""
+    gcpWorkloadIdentity:
+      audience: ""
 
   banners: {}
     # banner1:
@@ -3690,30 +3691,22 @@ lumen-agent:
       - apiGroups: ["apps.wandb.com"]
         resources: ["weightsandbiases"]
         verbs: ["get", "list"]
+  envTpls:
+    - '{{ include "wandb.bucketEnvs" . }}'
   cronJobs:
     lumen-agent:
       enabled: true
-      schedule: "*/15 * * * *"
+      schedule: "0 * * * *"
       concurrencyPolicy: "Forbid"
       failedJobsHistoryLimit: 3
       restartPolicy: "OnFailure"
       backoffLimit: 5
       successfulJobsHistoryLimit: 5
       startingDeadlineSeconds: 300
-      volumes:
-        - name: gcp-ksa
-          projected:
-            sources:
-              - serviceAccountToken:
-                  path: token
-                  expirationSeconds: 3600
-                  audience: '{{ include `operator-wandb.lumen.audience` . }}'
-        - name: gcp-wif-config
-          configMap:
-            name: "{{ .Release.Name }}-lumen-gcp-wif"
-        - name: lumen-managed-install
-          configMap:
-            name: "{{ .Release.Name }}-lumen-managed-install"
+      volumesTpls:
+        - '{{ include "wandb.lumenStagingVolume" . }}'
+        - '{{ include "wandb.lumenWifVolumes" . }}'
+        - '{{ include "wandb.lumenRulesVolume" . }}'
       containers:
         collector:
           command: ["/app/entrypoint.sh", "agent"]
@@ -3730,19 +3723,11 @@ lumen-agent:
             GOOGLE_APPLICATION_CREDENTIALS: '{{ include `operator-wandb.lumen.googleCredsPath` . }}'
           envFrom:
             "{{ .Release.Name }}-lumen-configmap": "configMapRef"
-          volumeMounts:
-            - name: gcp-ksa
-              mountPath: /var/run/secrets/tokens/gcp-ksa
-              readOnly: true
-            - name: gcp-wif-config
-              mountPath: /var/secrets/gcp
-              readOnly: true
-            # Replace the image's baked-in managed-install.yaml with one whose
-            # scrapers target .Release.Namespace (the wandb namespace).
-            - name: lumen-managed-install
-              mountPath: /app/definitions/collector/managed-install.yaml
-              subPath: managed-install.yaml
-              readOnly: true
+            "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+          volumeMountsTpls:
+            - '{{ include "wandb.lumenStagingVolumeMount" . }}'
+            - '{{ include "wandb.lumenWifVolumeMounts" . }}'
+            - '{{ include "wandb.lumenRulesVolumeMount" . }}'
           resources:
             requests:
               cpu: 1
@@ -3767,6 +3752,8 @@ lumen-processor:
     enabled: false
   service:
     enabled: false
+  envTpls:
+    - '{{ include "wandb.bucketEnvs" . }}'
   cronJobs:
     lumen-processor:
       enabled: true
@@ -3777,17 +3764,9 @@ lumen-processor:
       startingDeadlineSeconds: 300
       ttlSecondsAfterFinished: 300
       backoffLimit: 0
-      volumes:
-        - name: gcp-ksa
-          projected:
-            sources:
-              - serviceAccountToken:
-                  path: token
-                  expirationSeconds: 3600
-                  audience: '{{ include `operator-wandb.lumen.audience` . }}'
-        - name: gcp-wif-config
-          configMap:
-            name: "{{ .Release.Name }}-lumen-gcp-wif"
+      volumesTpls:
+        - '{{ include "wandb.lumenStagingVolume" . }}'
+        - '{{ include "wandb.lumenWifVolumes" . }}'
       containers:
         collector:
           command: ["/app/entrypoint.sh", "processor"]
@@ -3804,13 +3783,10 @@ lumen-processor:
             GOOGLE_APPLICATION_CREDENTIALS: '{{ include `operator-wandb.lumen.googleCredsPath` . }}'
           envFrom:
             "{{ .Release.Name }}-lumen-configmap": "configMapRef"
-          volumeMounts:
-            - name: gcp-ksa
-              mountPath: /var/run/secrets/tokens/gcp-ksa
-              readOnly: true
-            - name: gcp-wif-config
-              mountPath: /var/secrets/gcp
-              readOnly: true
+            "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+          volumeMountsTpls:
+            - '{{ include "wandb.lumenStagingVolumeMount" . }}'
+            - '{{ include "wandb.lumenWifVolumeMounts" . }}'
           resources:
             requests:
               cpu: 1
@@ -3833,11 +3809,14 @@ lumen-notebook:
   podDisruptionBudget:
     enabled: false
   service:
-    enabled: true
+    enabled: false
     ports:
       - port: 8080
         protocol: TCP
         name: marimo
+  envTpls:
+    # lumen notebook on helm-charts supported with wandb.bucket access only
+    - '{{ include "wandb.bucketEnvs" . }}'
   containers:
     notebook:
       command: ["/app/entrypoint.sh", "marimo"]

@@ -69,27 +69,6 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
-# Source: operator-wandb/charts/mcp-server/templates/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: chartsnap-mcp-server
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: mcp-server
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "0.3.5"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  selector:
-    matchExpressions:
-    - key: batch.kubernetes.io/job-name
-      operator: DoesNotExist
-    matchLabels:
-      app.kubernetes.io/name: mcp-server
-      app.kubernetes.io/instance: chartsnap
-  maxUnavailable: 1
----
 # Source: operator-wandb/charts/parquet/templates/pdb.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -158,16 +137,29 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
-# Source: operator-wandb/charts/mcp-server/templates/serviceaccount.yaml
+# Source: operator-wandb/charts/lumen-agent/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: chartsnap-mcp-server
+  name: lumen
   labels:
     helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: mcp-server
+    app.kubernetes.io/name: lumen-agent
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "0.3.5"
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: operator-wandb/charts/lumen-notebook/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-lumen-notebook
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: lumen-notebook
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -246,6 +238,8 @@ metadata:
   name: chartsnap-bucket
   labels:
 data:
+  ACCESS_KEY: bWluaW8=
+  SECRET_KEY: dGVzdHBhc3N3b3Jk
 ---
 # Source: operator-wandb/templates/clickhouse.yaml
 apiVersion: v1
@@ -1131,8 +1125,8 @@ metadata:
 data:
   GORILLA_PORT: "8081"
   # GORILLA_FILE_HOST is confusingly used for the oidc client host and must be set to the public host.
-  GORILLA_FILE_HOST: "https://wandb.example.com"
-  GORILLA_FRONTEND_HOST: "https://wandb.example.com"
+  GORILLA_FILE_HOST: "http://localhost:8080"
+  GORILLA_FRONTEND_HOST: "http://localhost:8080"
   GORILLA_LICENSE_CERT_PATH: "/jwks.json"
   GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL: "true"
   GORILLA_SESSION_LENGTH: "720h"
@@ -1180,9 +1174,9 @@ metadata:
   name: chartsnap-bucket-configmap
   labels:
 data:
-  BUCKET_NAME: ""
+  BUCKET_NAME: "minio:9000/bucket"
   BUCKET_PATH: ""
-  AWS_REGION: ""
+  AWS_REGION: "us-east-1"
   AWS_S3_KMS_ID: ""
   GORILLA_DEFAULT_REGION: "minio-local"
 ---
@@ -1249,7 +1243,7 @@ metadata:
   name: chartsnap-flat-run-fields-updater-configmap
   labels:
 data:
-  GORILLA_FILE_HOST: "https://wandb.example.com"
+  GORILLA_FILE_HOST: "http://localhost:8080"
   GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
@@ -1266,7 +1260,7 @@ data:
   FRONTEND_LOCAL_BACKEND: "chartsnap-app:8083"
   FRONTEND_WEAVE_BACKEND: "chartsnap-weave:9994"
   REACT_APP_GIT_TAG: "HEAD"
-  REACT_APP_HOST: "https://wandb.example.com"
+  REACT_APP_HOST: "http://localhost:8080"
   REACT_APP_ENVIRONMENT_NAME: "local"
   REACT_APP_ENVIRONMENT_IS_PRIVATE: "true"
   REACT_APP_ANALYTICS_DISABLED: "true"
@@ -1387,7 +1381,7 @@ metadata:
 data:
   # Basic service configuration
   GORILLA_GLUE_CONTAINER_PORT: "8080"
-  GORILLA_GLUE_FRONTEND_HOST: "https://wandb.example.com"
+  GORILLA_GLUE_FRONTEND_HOST: "http://localhost:8080"
   GORILLA_GLUE_LICENSE_CERT_PATH: "/jwks.json"
   # Values that correspond to existing configurations from gorilla.yaml
   GORILLA_GLUE_SWEEP_PROVIDER: "http://chartsnap-app:8082"
@@ -1428,7 +1422,7 @@ metadata:
   name: chartsnap-history-updater-configmap
   labels:
 data:
-  GORILLA_FILE_HOST: "https://wandb.example.com"
+  GORILLA_FILE_HOST: "http://localhost:8080"
   GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
@@ -1460,9 +1454,182 @@ metadata:
 data:
   GLUE_ENABLED: "true"
   GORILLA_GLUE_CONTAINER_PORT: "9173"
-  HOST: "https://wandb.example.com"
+  HOST: "http://localhost:8080"
   LOCAL_K8S_SIGNER_SECRET_NAME: "chartsnap-internal-signer"
   LOCAL_K8S_SIGNER_NAMESPACE: "default"
+---
+# Source: operator-wandb/templates/lumen.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-lumen-configmap
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+data:
+  LUMEN_AGENT_CONFIG_PATH: "/app/definitions/collector/managed-install.yaml"
+  LUMEN_CUSTOMER_NAME: "chartsnap"
+  LUMEN_DATA_ROOT: "s3://minio:9000/bucket/lumen"
+  LUMEN_STAGING_ROOT: "file:///vol/staging"
+---
+# Source: operator-wandb/templates/lumen.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-lumen-rules
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+data:
+  managed-install.yaml: |
+    keyRuleSets:
+      - name: k8s-metadata-noise
+        keyRules:
+          - keyRegex: "^metadata__managedFields"
+          - keyRegex: "^metadata__resourceVersion$"
+          - keyRegex: "^metadata__uid$"
+          - keyRegex: "^metadata__generation$"
+          - keyRegex: "^metadata__creationTimestamp$"
+          - keyRegex: "^metadata__selfLink$"
+          - keyRegex: "^metadata__annotations__kubectl\\.kubernetes\\.io/last-applied-configuration$"
+          - keyRegex: "^status$"
+          - keyRegex: "^status__"
+      - name: k8s-pod-noise
+        keyRules:
+          - keyRegex: "^spec__(containers|initContainers)__[^_]+__env__"
+          - keyRegex: "^spec__(containers|initContainers)__[^_]+__envFrom__"
+          - keyRegex: "^spec__(containers|initContainers)__[^_]+__volumeMounts__"
+          - keyRegex: "^spec__containers__[^_]+__(startup|liveness|readiness)Probe__"
+          - keyRegex: "^spec__tolerations"
+          - keyRegex: "^spec__topology"
+          - keyRegex: "^spec__volumes"
+          - keyRegex: "^status$"
+          - keyRegex: "^status__"
+      - name: standard-redactions
+        keyRules:
+          - keyRegex: "secret"
+          - ignoreCase: true
+          - keyRegex: "password"
+          - ignoreCase: true
+          - keyRegex: "key$"
+          - ignoreCase: true
+          - keyRegex: "token$"
+          - ignoreCase: true
+          - keyRegex: "license$"
+          - ignoreCase: true
+          - keyRegex: "cert$"
+          - ignoreCase: true
+
+    scrapers:
+      - name: wandb-configmaps
+        connection:
+          kubernetes:
+            discover:
+              kind: ConfigMap
+              namespace: default
+              nameRegex: "^wandb-.*-configmap$"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-secrets
+        connection:
+          kubernetes:
+            discover:
+              kind: Secret
+              namespace: default
+              nameRegex: "^wandb-(bucket|clickhouse|global|gorilla|internal-signer|kafka|license|mysql|parquet|redis|smtp)"
+              nameExceptions:
+                - "-backup"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "type"
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-pods
+        connection:
+          kubernetes:
+            discover:
+              kind: Pod
+              namespace: default
+              nameRegex: "^wandb-(anaconda2|api|app|executor|filemeta|flat-run-fields-updater|frontend|glue|parquet|weave).*"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise, k8s-pod-noise ]
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-pull-with-httpget
+        connection:
+          kubernetes:
+            discover:
+              kind: Pod
+              namespace: default
+              annotations:
+                - key: lumen.wandb.ai/agent
+                  value: "true"
+            pull:
+              type: k8sHttpGet
+              httpGet:
+                portName: http
+                listPath: /lumen/list
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-specs
+        connection:
+          kubernetes:
+            discover:
+              kind: Secret
+              namespace: default
+              nameRegex: "wandb-spec-(active|user)$"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "status"
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-cr
+        connection:
+          kubernetes:
+            discover:
+              kind: WeightsAndBiases
+              namespace: default
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "status"
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
 ---
 # Source: operator-wandb/templates/nginx.yaml
 apiVersion: v1
@@ -1497,15 +1664,6 @@ data:
         }
         location /console {
           proxy_pass http://chartsnap-console:8082;
-        }
-        location /mcp {
-          proxy_pass http://chartsnap-mcp-server:8080;
-          proxy_buffering off;
-          proxy_cache off;
-          proxy_read_timeout 86400s;
-          proxy_set_header Connection '';
-          proxy_http_version 1.1;
-          chunked_transfer_encoding off;
         }
       }
     }
@@ -1554,13 +1712,13 @@ metadata:
 data:
   PORT: "8080"
   API_PATH_PREFIX: "/traces"
-  WANDB_PUBLIC_BASE_URL: "https://wandb.example.com"
+  WANDB_PUBLIC_BASE_URL: "http://localhost:8080"
   WANDB_BASE_URL: "http://chartsnap-app:8080/"
-  WF_TRACE_SERVER_URL: "https://wandb.example.com/traces"
+  WF_TRACE_SERVER_URL: "http://localhost:8080/traces"
   WF_ENFORCE_PASSWORD_LENGTH: "false"
   WEAVE_ENABLE_ONLINE_EVAL: "false"
   WEAVE_ENABLE_EVALUATE_MODEL_WORKER: "false"
-  WEAVE_TRACE_SERVER_BASE_URL: "https://wandb.example.com/traces"
+  WEAVE_TRACE_SERVER_BASE_URL: "http://localhost:8080/traces"
   WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME: "weave-worker-auth"
   KAFKA_BROKER_HOST: "bufstream.bufstream.svc.cluster.local"
   KAFKA_BROKER_PORT: "9092"
@@ -1576,7 +1734,7 @@ data:
   GORILLA_ONPREM: "true"
   PORT: "9994"
   WANDB_BASE_URL: "http://chartsnap-app:8080/"
-  WANDB_PUBLIC_BASE_URL: "https://wandb.example.com"
+  WANDB_PUBLIC_BASE_URL: "http://localhost:8080"
   WEAVE_LOG_FORMAT: "json"
   WEAVE_SERVER_NUM_WORKERS: "4"
   WEAVE_SERVER_URL: "http://127.0.0.1:9994"
@@ -1865,6 +2023,42 @@ rules:
   verbs:
   - get
 ---
+# Source: operator-wandb/charts/lumen-agent/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chartsnap-lumen-agent
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: lumen-agent
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - configmaps
+  - secrets
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  - deployments
+  verbs:
+  - get
+- apiGroups:
+  - apps.wandb.com
+  resources:
+  - weightsandbiases
+  verbs:
+  - get
+  - list
+---
 # Source: operator-wandb/charts/app/templates/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -1883,6 +2077,26 @@ subjects:
 roleRef:
   kind: Role
   name: chartsnap-app
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: operator-wandb/charts/lumen-agent/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chartsnap-lumen-agent
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: lumen-agent
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+- kind: ServiceAccount
+  name: lumen
+  namespace: default
+roleRef:
+  kind: Role
+  name: chartsnap-lumen-agent
   apiGroup: rbac.authorization.k8s.io
 ---
 # Source: operator-wandb/charts/app/templates/service.yaml
@@ -1934,28 +2148,6 @@ spec:
     protocol: TCP
   selector:
     app.kubernetes.io/name: console
-    app.kubernetes.io/instance: chartsnap
----
-# Source: operator-wandb/charts/mcp-server/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-mcp-server
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: mcp-server
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "0.3.5"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  type: ClusterIP
-  ports:
-  - name: http
-    port: 8080
-    protocol: TCP
-    targetPort: 8080
-  selector:
-    app.kubernetes.io/name: mcp-server
     app.kubernetes.io/instance: chartsnap
 ---
 # Source: operator-wandb/charts/otel/charts/daemonset/templates/service.yaml
@@ -2450,13 +2642,13 @@ spec:
               name: chartsnap-bucket
               optional: true
         - name: BUCKET
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: GORILLA_FILE_STORE
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: GORILLA_STORAGE_BUCKET
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -2723,13 +2915,13 @@ spec:
               name: chartsnap-bucket
               optional: true
         - name: BUCKET
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: GORILLA_FILE_STORE
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: GORILLA_STORAGE_BUCKET
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -3041,16 +3233,16 @@ spec:
             path: redis_ca.pem
           optional: true
 ---
-# Source: operator-wandb/charts/mcp-server/templates/deployment.yaml
+# Source: operator-wandb/charts/lumen-notebook/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: chartsnap-mcp-server
+  name: chartsnap-lumen-notebook
   labels:
     helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: mcp-server
+    app.kubernetes.io/name: lumen-notebook
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "0.3.5"
+    app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
   annotations:
     reloader.stakater.com/auto: "true"
@@ -3063,74 +3255,60 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app.kubernetes.io/name: mcp-server
+      app.kubernetes.io/name: lumen-notebook
       app.kubernetes.io/instance: chartsnap
   template:
     metadata:
-      annotations:
       labels:
-        helm.sh/chart: mcp-server-0.12.1
-        app.kubernetes.io/name: mcp-server
+        helm.sh/chart: lumen-notebook-0.12.1
+        app.kubernetes.io/name: lumen-notebook
         app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "0.3.5"
+        app.kubernetes.io/version: "latest"
         app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/component: "mcp-server"
-        app.kubernetes.io/part-of: "wandb-platform"
-        tags.datadoghq.com/env: "production"
-        tags.datadoghq.com/service: "wandb-mcp-server-onprem"
-        tags.datadoghq.com/version: "0.3.5"
     spec:
       containers:
-      - name: mcp-server
-        args:
-        - sh
-        - entrypoint.sh
+      - name: notebook
+        command:
+        - /app/entrypoint.sh
+        - marimo
         envFrom:
         - configMapRef:
-            name: chartsnap-global-configmap
+            name: chartsnap-lumen-configmap
         env:
-        - name: WANDB_MCP_ENABLE_WEAVE_TOOLS
-          value: "false"
-        - name: WANDB_BASE_URL
-          value: https://wandb.example.com
-        - name: MCP_LOG_PRIVACY_LEVEL
-          value: standard
-        - name: SSL_CERT_FILE
-          value: /etc/ssl/certs/ca-certificates.crt
-        - name: SSL_CERT_DIR
-          value: /etc/ssl/certs
-        - name: REQUESTS_CA_BUNDLE
-          value: /etc/ssl/certs/ca-certificates.crt
-        - name: GORILLA_STATSIG_KEY
+        - name: AZURE_STORAGE_KEY
           valueFrom:
             secretKeyRef:
-              key: GORILLA_STATSIG_KEY
-              name: gorilla-statsig
+              key: ACCESS_KEY
+              name: chartsnap-bucket
               optional: true
-        - name: ENVIRONMENT
-          value: "production"
-        - name: MCP_ANALYTICS_DISABLED
-          value: "false"
-        - name: MCP_AUTH_DISABLED
-          value: "false"
-        - name: MCP_RATE_LIMIT_ENABLED
-          value: "true"
-        - name: MCP_RATE_LIMIT_GLOBAL
-          value: "1000/minute"
-        - name: MCP_RATE_LIMIT_PER_KEY
-          value: "60/minute"
-        - name: MCP_SEGMENT_FORWARD
-          value: "true"
-        - name: MCP_TRANSPORT
-          value: "http"
-        - name: WANDB_SILENT
-          value: "True"
-        - name: WEAVE_DISABLED
-          value: "true"
-        - name: WEAVE_SILENT
-          value: "True"
-        - name: WF_TRACE_SERVER_URL
-          value: ""
+        - name: BUCKET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: ACCESS_KEY
+              name: chartsnap-bucket
+              optional: true
+        - name: BUCKET_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: SECRET_KEY
+              name: chartsnap-bucket
+              optional: true
+        - name: BUCKET
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+        - name: GORILLA_FILE_STORE
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+        - name: GORILLA_STORAGE_BUCKET
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -3138,46 +3316,25 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/mcp-server:0.3.5"
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          httpGet:
-            path: /mcp/health
-            port: 8080
-          initialDelaySeconds: 10
-          periodSeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /mcp/health
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 10
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/lumen:latest"
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: marimo
         resources:
           limits:
             cpu: 2
             memory: 4Gi
           requests:
-            cpu: 500m
-            memory: 1Gi
-        volumeMounts:
-        - name: wandb-ca-certs-root
-          mountPath: /usr/local/share/ca-certificates/
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
-        - mountPath: /tmp/
-          name: temp-dir
-      serviceAccountName: chartsnap-mcp-server
+            cpu: 1
+            memory: 2Gi
+      serviceAccountName: chartsnap-lumen-notebook
       securityContext:
         fsGroup: 0
         fsGroupChangePolicy: OnRootMismatch
         runAsGroup: 0
         runAsNonRoot: true
-        runAsUser: 1000
+        runAsUser: 999
         seccompProfile:
           type: RuntimeDefault
       terminationGracePeriodSeconds: 60
@@ -3185,36 +3342,17 @@ spec:
       - labelSelector:
           matchLabels:
             app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: mcp-server
+            app.kubernetes.io/name: lumen-notebook
         maxSkew: 1
         topologyKey: topology.kubernetes.io/zone
         whenUnsatisfiable: ScheduleAnyway
       - labelSelector:
           matchLabels:
             app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/name: mcp-server
+            app.kubernetes.io/name: lumen-notebook
         maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
-      volumes:
-      - name: wandb-ca-certs-root
-        emptyDir: {}
-      - name: wandb-ca-certs
-        configMap:
-          name: "chartsnap-ca-certs"
-      - name: wandb-ca-certs-user
-        configMap:
-          name: 'noCertProvided'
-          optional: true
-      - name: redis-ca
-        secret:
-          secretName: 'chartsnap-redis-secret'
-          items:
-          - key: REDIS_CA_CERT
-            path: redis_ca.pem
-          optional: true
-      - emptyDir: {}
-        name: temp-dir
 ---
 # Source: operator-wandb/charts/parquet/templates/deployment.yaml
 apiVersion: apps/v1
@@ -3319,13 +3457,13 @@ spec:
               name: chartsnap-bucket
               optional: true
         - name: BUCKET
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: GORILLA_FILE_STORE
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: GORILLA_STORAGE_BUCKET
-          value: s3://$(BUCKET_NAME)
+          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
         - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -4034,6 +4172,263 @@ spec:
         requests:
           storage: "8Gi"
 ---
+# Source: operator-wandb/charts/lumen-agent/templates/cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chartsnap-lumen-agent
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: lumen-agent
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  concurrencyPolicy: Forbid
+  schedule: "0 * * * *"
+  suspend: false
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 5
+      template:
+        metadata:
+          labels:
+            helm.sh/chart: lumen-agent-0.12.1
+            app.kubernetes.io/name: lumen-agent
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/version: "latest"
+            app.kubernetes.io/managed-by: Helm
+        spec:
+          containers:
+          - name: collector
+            command:
+            - /app/entrypoint.sh
+            - agent
+            envFrom:
+            - configMapRef:
+                name: chartsnap-bucket-configmap
+            - configMapRef:
+                name: chartsnap-lumen-configmap
+            env:
+            - name: AZURE_STORAGE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: ACCESS_KEY
+                  name: chartsnap-bucket
+                  optional: true
+            - name: BUCKET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: ACCESS_KEY
+                  name: chartsnap-bucket
+                  optional: true
+            - name: BUCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: SECRET_KEY
+                  name: chartsnap-bucket
+                  optional: true
+            - name: BUCKET
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+            - name: GORILLA_FILE_STORE
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+            - name: GORILLA_STORAGE_BUCKET
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: ""
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                add: []
+                drop: []
+              privileged: false
+              readOnlyRootFilesystem: false
+            image: "us-docker.pkg.dev/wandb-production/public/wandb/lumen:latest"
+            imagePullPolicy: Always
+            resources:
+              limits:
+                cpu: 2
+                memory: 4Gi
+              requests:
+                cpu: 1
+                memory: 4Gi
+            volumeMounts:
+            - name: lumen-staging-dir
+              mountPath: /vol/staging
+            - name: lumen-managed-install
+              mountPath: /app/definitions/collector/managed-install.yaml
+              subPath: managed-install.yaml
+              readOnly: true
+          restartPolicy: OnFailure
+          serviceAccountName: lumen
+          securityContext:
+            fsGroup: 0
+            fsGroupChangePolicy: OnRootMismatch
+            runAsGroup: 0
+            runAsNonRoot: true
+            runAsUser: 999
+            seccompProfile:
+              type: RuntimeDefault
+          topologySpreadConstraints:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: chartsnap
+                app.kubernetes.io/name: lumen-agent
+            maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: ScheduleAnyway
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: chartsnap
+                app.kubernetes.io/name: lumen-agent
+            maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+          volumes:
+          - name: lumen-staging-dir
+            emptyDir: {}
+          - name: lumen-managed-install
+            configMap:
+              name: "chartsnap-lumen-rules"
+---
+# Source: operator-wandb/charts/lumen-processor/templates/cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chartsnap-lumen-processor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: lumen-processor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  concurrencyPolicy: Forbid
+  schedule: "0 * * * *"
+  suspend: false
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 300
+      template:
+        metadata:
+          labels:
+            helm.sh/chart: lumen-processor-0.12.1
+            app.kubernetes.io/name: lumen-processor
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/version: "latest"
+            app.kubernetes.io/managed-by: Helm
+        spec:
+          containers:
+          - name: collector
+            command:
+            - /app/entrypoint.sh
+            - processor
+            envFrom:
+            - configMapRef:
+                name: chartsnap-bucket-configmap
+            - configMapRef:
+                name: chartsnap-lumen-configmap
+            env:
+            - name: AZURE_STORAGE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: ACCESS_KEY
+                  name: chartsnap-bucket
+                  optional: true
+            - name: BUCKET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: ACCESS_KEY
+                  name: chartsnap-bucket
+                  optional: true
+            - name: BUCKET_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: SECRET_KEY
+                  name: chartsnap-bucket
+                  optional: true
+            - name: BUCKET
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+            - name: GORILLA_FILE_STORE
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+            - name: GORILLA_STORAGE_BUCKET
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: ""
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                add: []
+                drop: []
+              privileged: false
+              readOnlyRootFilesystem: false
+            image: "us-docker.pkg.dev/wandb-production/public/wandb/lumen:latest"
+            imagePullPolicy: Always
+            resources:
+              limits:
+                cpu: 2
+                memory: 4Gi
+              requests:
+                cpu: 1
+                memory: 4Gi
+            volumeMounts:
+            - name: lumen-staging-dir
+              mountPath: /vol/staging
+          restartPolicy: Never
+          serviceAccountName: lumen
+          securityContext:
+            fsGroup: 0
+            fsGroupChangePolicy: OnRootMismatch
+            runAsGroup: 0
+            runAsNonRoot: true
+            runAsUser: 999
+            seccompProfile:
+              type: RuntimeDefault
+          topologySpreadConstraints:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: chartsnap
+                app.kubernetes.io/name: lumen-processor
+            maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: ScheduleAnyway
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: chartsnap
+                app.kubernetes.io/name: lumen-processor
+            maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+          volumes:
+          - name: lumen-staging-dir
+            emptyDir: {}
+---
 # Source: operator-wandb/charts/parquet/templates/cronjob.yaml
 apiVersion: batch/v1
 kind: CronJob
@@ -4131,13 +4526,13 @@ spec:
                   name: chartsnap-bucket
                   optional: true
             - name: BUCKET
-              value: s3://$(BUCKET_NAME)
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
             - name: GORILLA_FILE_STORE
-              value: s3://$(BUCKET_NAME)
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
             - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-              value: s3://$(BUCKET_NAME)
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
             - name: GORILLA_STORAGE_BUCKET
-              value: s3://$(BUCKET_NAME)
+              value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
             - name: MYSQL_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -4310,6 +4705,34 @@ spec:
               - key: REDIS_CA_CERT
                 path: redis_ca.pem
               optional: true
+---
+# Source: operator-wandb/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chartsnap
+  labels:
+spec:
+  ingressClassName:
+  tls: []
+  rules:
+  - host: localhost:8080
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: chartsnap-app
+            port:
+              number: 8080
+      - pathType: Prefix
+        path: /console
+        backend:
+          service:
+            name: chartsnap-console
+            port:
+              number: 8082
 ---
 # Source: operator-wandb/charts/appRenamePostHook/templates/serviceaccount.yaml
 apiVersion: v1
@@ -4529,27 +4952,6 @@ spec:
     - sh
     - -c
     - "pip install wandb && wandb verify"
-  restartPolicy: Never
----
-# Source: operator-wandb/templates/tests/test-mcp.yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: "chartsnap-operator-wandb-test-mcp"
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: operator-wandb
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "1.0.0"
-    app.kubernetes.io/managed-by: Helm
-  annotations:
-    "helm.sh/hook": test
-spec:
-  containers:
-  - name: mcp-health
-    image: busybox:1.36
-    command: ['wget', '--spider', '-q']
-    args: ['http://chartsnap-mcp-server:8080/health']
   restartPolicy: Never
 ---
 # Source: operator-wandb/charts/appRenamePostHook/templates/job.yaml

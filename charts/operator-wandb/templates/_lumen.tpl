@@ -1,22 +1,32 @@
 
 {{- define "operator-wandb.lumen.audience" -}}
-{{- $cloud := .Values.global.cloudProvider | default "" | lower -}}
-{{- if eq $cloud "aws" -}}
-  //iam.googleapis.com/projects/281760294016/locations/global/workloadIdentityPools/default-pool/providers/default-provider
-{{- else if eq $cloud "azure" -}}
-  //iam.googleapis.com/projects/281760294016/locations/global/workloadIdentityPools/aks-default-pool/providers/aks-default-provider
-{{- else if eq $cloud "gcp" -}}
-  lumen-gcp-adc-unused
-{{- else -}}
-  {{- fail (printf "lumen: unknown global.cloudProvider=%q (expected aws|azure|gcp)" $cloud) -}}
-{{- end -}}
+{{- dig "lumen" "gcpWorkloadIdentity" "audience" "" .Values.global -}}
 {{- end -}}
 
 {{- define "operator-wandb.lumen.googleCredsPath" -}}
-{{- $cloud := .Values.global.cloudProvider | default "" | lower -}}
-{{- if eq $cloud "gcp" -}}
-{{/* empty: rely on ADC */}}
-{{- else -}}
+{{- if dig "lumen" "gcpWorkloadIdentity" "audience" "" .Values.global -}}
 /var/secrets/gcp/credential-config.json
 {{- end -}}
+{{- end -}}
+
+{{- define "wandb.lumen.dataRoot" -}}
+{{- $explicit := dig "lumen" "dataRoot" "" .Values.global -}}
+{{- if $explicit -}}
+{{- $explicit -}}
+{{- else -}}
+{{- $b := (include "wandb.bucket" . | fromYaml) -}}
+{{- $schemes := dict "s3" "s3" "gcs" "gs" "az" "azure" "cw" "s3" "local" "file" -}}
+{{- $scheme := index $schemes ($b.provider | default "") -}}
+{{- if not $scheme }}{{ fail (printf "wandb.lumen.dataRoot: unknown bucket provider %q" $b.provider) }}{{ end -}}
+{{- $path := $b.path | default "" | trimSuffix "/" -}}
+{{- printf "%s://%s%s/lumen" $scheme $b.name $path -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "wandb.lumen.stagingPath" -}}
+/vol/staging
+{{- end -}}
+
+{{- define "wandb.lumen.rulePath" -}}
+/app/definitions/collector/managed-install.yaml
 {{- end -}}

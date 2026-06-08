@@ -1,20 +1,60 @@
 {{- if .Values.global.lumen.install -}}
-{{/*
-  Replaces the image-baked /app/definitions/collector/managed-install.yaml
-  with one whose scrapers target the operator-wandb release namespace.
-  Mounted via subPath on the agent CronJob so the rest of /app/definitions
-  (keyrules, batch CSVs) stays intact from the image.
-*/}}
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ .Release.Name }}-lumen-managed-install
+  name: {{ .Release.Name }}-lumen-configmap
+data:
+  LUMEN_AGENT_CONFIG_PATH: "{{ include "wandb.lumen.rulePath" . }}"
+  LUMEN_CUSTOMER_NAME: "{{ .Release.Name }}"
+  LUMEN_DATA_ROOT: "{{ include "wandb.lumen.dataRoot" . }}"
+  LUMEN_STAGING_ROOT: "file://{{ include "wandb.lumen.stagingPath" . }}"
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-lumen-rules
 data:
   managed-install.yaml: |
-    imports:
-      - definitions/keyrules/k8s-metadata-noise.yaml
-      - definitions/keyrules/k8s-pod-noise.yaml
-      - definitions/keyrules/standard-redactions.yaml
+    keyRuleSets:
+      - name: k8s-metadata-noise
+        keyRules:
+          - keyRegex: "^metadata__managedFields"
+          - keyRegex: "^metadata__resourceVersion$"
+          - keyRegex: "^metadata__uid$"
+          - keyRegex: "^metadata__generation$"
+          - keyRegex: "^metadata__creationTimestamp$"
+          - keyRegex: "^metadata__selfLink$"
+          - keyRegex: "^metadata__annotations__kubectl\\.kubernetes\\.io/last-applied-configuration$"
+          - keyRegex: "^status$"
+          - keyRegex: "^status__"
+      - name: k8s-pod-noise
+        keyRules:
+          - keyRegex: "^spec__(containers|initContainers)__[^_]+__env__"
+          - keyRegex: "^spec__(containers|initContainers)__[^_]+__envFrom__"
+          - keyRegex: "^spec__(containers|initContainers)__[^_]+__volumeMounts__"
+          - keyRegex: "^spec__containers__[^_]+__(startup|liveness|readiness)Probe__"
+          - keyRegex: "^spec__tolerations"
+          - keyRegex: "^spec__topology"
+          - keyRegex: "^spec__volumes"
+          - keyRegex: "^status$"
+          - keyRegex: "^status__"
+      - name: standard-redactions
+        keyRules:
+          - keyRegex: "secret"
+          - ignoreCase: true
+          - keyRegex: "password"
+          - ignoreCase: true
+          - keyRegex: "key$"
+          - ignoreCase: true
+          - keyRegex: "token$"
+          - ignoreCase: true
+          - keyRegex: "license$"
+          - ignoreCase: true
+          - keyRegex: "cert$"
+          - ignoreCase: true
 
     scrapers:
       - name: wandb-configmaps
@@ -128,4 +168,29 @@ data:
             - use: [ standard-redactions ]
           valueHooks:
             - URIPassword
+
+---
+
+{{- if include "operator-wandb.lumen.audience" . }}
+{{- $audience := include "operator-wandb.lumen.audience" . -}}
+# WIF only needed for lumen dataRoot, not when using standard wandb-bucket
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-lumen-gcp-wif
+data:
+  credential-config.json: |
+    {
+      "type": "external_account",
+      "audience": {{ $audience | quote }},
+      "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+      "token_url": "https://sts.googleapis.com/v1/token",
+      "credential_source": {
+        "file": "/var/run/secrets/tokens/gcp-ksa/token",
+        "format": { "type": "text" }
+      }
+    }
+
+{{- end }}
+
 {{- end }}
