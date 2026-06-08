@@ -458,6 +458,14 @@ global:
   weave-trace:
     enabled: false
 
+  # List of weave worker value keys to render as deployments.
+  # Each entry references a top-level values block (e.g. weave-trace-worker).
+  # To add a new worker, add its name here and define its values block below.
+  weaveWorkers:
+    - weave-trace-worker
+    - weave-evaluate-model-worker
+    - weave-trace-alert-worker
+
   # As part of the migration away from using local, the `bypass` setting will
   # control whether the gorilla services will use the app service (and, thus, local)
   localService:
@@ -3395,6 +3403,93 @@ weave-evaluate-model-worker:
         horizontal:
           enabled: true
           maxReplicas: 6
+          minReplicas: 2
+
+weave-trace-alert-worker:
+  install: false
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/weave-trace
+    tag: latest
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  env:
+    WANDB_INTERNAL_SERVICE_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: weave-worker-auth
+          key: key
+  containers:
+    weave-trace-alert-worker:
+      args:
+        - "python"
+        - "-m"
+        - "src.workers.alert_worker.alert_worker"
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 2
+    large:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 8
           minReplicas: 2
 
 nginx:
