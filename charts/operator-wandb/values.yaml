@@ -32,6 +32,12 @@ global:
 
   storageClass: ""
 
+  lumen:
+    install: false
+    dataRoot: ""
+    gcpWorkloadIdentity:
+      audience: ""
+
   banners: {}
     # banner1:
     #   type: warning | error | info
@@ -659,6 +665,7 @@ api:
   volumes:
     - name: temp-dir
       emptyDir: {}
+  podAnnotationsTpls:
   size: ""
   sizing:
     small:
@@ -1086,6 +1093,7 @@ executor:
   env:
     GORILLA_TASK_QUEUE:
       value: '{{ include "wandb.executor.taskQueue" . }}'
+  podAnnotationsTpls:
   containers:
     executor:
       args: ["executor"]
@@ -1183,6 +1191,7 @@ filemeta:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  podAnnotationsTpls:
   containers:
     filemeta:
       args: ["filemeta"]
@@ -1348,6 +1357,7 @@ filestream:
   env:
     GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
       value: '{{ include "wandb.fileStreamStoreConsumer" . }}'
+  podAnnotationsTpls:
   containers:
     filestream:
       args: ["filestream"]
@@ -1459,6 +1469,7 @@ flat-run-fields-updater:
   image:
     repository: wandb/megabinary
     tag: latest
+  podAnnotationsTpls:
   size: ""
   sizing:
     small:
@@ -1722,6 +1733,7 @@ history-updater:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  podAnnotationsTpls:
   containers:
     history-updater:
       args: ["history-updater"]
@@ -2147,6 +2159,7 @@ glue:
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
+  podAnnotationsTpls:
   image:
     repository: wandb/megabinary
     tag: latest
@@ -2273,6 +2286,7 @@ metric-observer:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  podAnnotationsTpls:
   containers:
     metric-observer:
       args: ["metric-observer"]
@@ -2575,6 +2589,7 @@ parquet-metadata-cache:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+  podAnnotationsTpls:
   containers:
     parquet-metadata-cache:
       args: ["parquet-metadata-cache"]
@@ -3647,6 +3662,185 @@ bufstream:
       resources:
         requests:
           cpu: "1"
+          memory: 4Gi
+
+lumen-agent:
+  kind: CronJob
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: latest
+    pullPolicy: Always
+  serviceAccount:
+    name: lumen
+    annotations: {}
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: false
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["pods", "configmaps", "secrets"]
+        verbs: ["get", "list"]
+      - apiGroups: ["apps"]
+        resources: ["replicasets", "deployments"]
+        verbs: ["get"]
+      - apiGroups: ["apps.wandb.com"]
+        resources: ["weightsandbiases"]
+        verbs: ["get", "list"]
+  envTpls:
+    - '{{ include "wandb.bucketEnvs" . }}'
+  cronJobs:
+    lumen-agent:
+      enabled: true
+      schedule: "0 * * * *"
+      concurrencyPolicy: "Forbid"
+      failedJobsHistoryLimit: 3
+      restartPolicy: "OnFailure"
+      backoffLimit: 5
+      successfulJobsHistoryLimit: 5
+      startingDeadlineSeconds: 300
+      volumesTpls:
+        - '{{ include "wandb.lumenStagingVolume" . }}'
+        - '{{ include "wandb.lumenWifVolumes" . }}'
+        - '{{ include "wandb.lumenRulesVolume" . }}'
+      containers:
+        collector:
+          command: ["/app/entrypoint.sh", "agent"]
+          args: []
+          env:
+            GOMEMLIMIT:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            GOMAXPROCS:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            GOOGLE_APPLICATION_CREDENTIALS: '{{ include `operator-wandb.lumen.googleCredsPath` . }}'
+          envFrom:
+            "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+            "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+          volumeMountsTpls:
+            - '{{ include "wandb.lumenStagingVolumeMount" . }}'
+            - '{{ include "wandb.lumenWifVolumeMounts" . }}'
+            - '{{ include "wandb.lumenRulesVolumeMount" . }}'
+          resources:
+            requests:
+              cpu: 1
+              memory: 4Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+
+lumen-processor:
+  kind: CronJob
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: latest
+    pullPolicy: Always
+  serviceAccount:
+    # Reference the SA created by lumen-agent — do NOT create a duplicate.
+    create: false
+    name: lumen
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: false
+  envTpls:
+    - '{{ include "wandb.bucketEnvs" . }}'
+  cronJobs:
+    lumen-processor:
+      enabled: true
+      schedule: "0 * * * *"
+      concurrencyPolicy: "Forbid"
+      failedJobsHistoryLimit: 1
+      successfulJobsHistoryLimit: 1
+      startingDeadlineSeconds: 300
+      ttlSecondsAfterFinished: 300
+      backoffLimit: 0
+      volumesTpls:
+        - '{{ include "wandb.lumenStagingVolume" . }}'
+        - '{{ include "wandb.lumenWifVolumes" . }}'
+      containers:
+        collector:
+          command: ["/app/entrypoint.sh", "processor"]
+          args: []
+          env:
+            GOMEMLIMIT:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            GOMAXPROCS:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            GOOGLE_APPLICATION_CREDENTIALS: '{{ include `operator-wandb.lumen.googleCredsPath` . }}'
+          envFrom:
+            "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+            "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+          volumeMountsTpls:
+            - '{{ include "wandb.lumenStagingVolumeMount" . }}'
+            - '{{ include "wandb.lumenWifVolumeMounts" . }}'
+          resources:
+            requests:
+              cpu: 1
+              memory: 4Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+
+lumen-notebook:
+  kind: Deployment
+  replicaCount: 1
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: latest
+    pullPolicy: Always
+  serviceAccount:
+    annotations: {}
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: false
+    ports:
+      - port: 8080
+        protocol: TCP
+        name: marimo
+  envTpls:
+    # lumen notebook on helm-charts supported with wandb.bucket access only
+    - '{{ include "wandb.bucketEnvs" . }}'
+  containers:
+    notebook:
+      command: ["/app/entrypoint.sh", "marimo"]
+      args: []
+      env:
+        GOMEMLIMIT:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        GOMAXPROCS:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+      envFrom:
+        "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+      ports:
+        - containerPort: 8080
+          name: marimo
+      resources:
+        requests:
+          cpu: 1
+          memory: 2Gi
+        limits:
+          cpu: 2
           memory: 4Gi
 
 reloader:
