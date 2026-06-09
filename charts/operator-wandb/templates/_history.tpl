@@ -6,8 +6,9 @@
         ClickHouse-resident runs are served from it; parquet + bigtable/mysql
         remain as fallbacks for runs not yet migrated.
     */ -}}
-    {{- if .Values.global.historyStore.historyReaderEnabled -}}
+    {{- if and .Values.global.historyStore.historyReaderEnabled (index .Values "history-reader" "install") -}}
         {{- $stores = append $stores (printf "historyreader://%s-history-reader:9244" .Release.Name) -}}
+    {{- end -}}
     {{- end -}}
     {{- if .Values.global.historyStore.parquetUseGRPC -}}
         {{- $stores = append $stores (printf "grpc://%s-parquet-grpc:8088" .Release.Name) -}}
