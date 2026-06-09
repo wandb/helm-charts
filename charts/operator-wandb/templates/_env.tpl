@@ -96,6 +96,57 @@ Global values will override any chart-specific values.
       optional: true
 {{- end -}}
 
+{{/*
+  weave-trace file-payload storage. Reuses the wandb bucket (global.bucket /
+  global.defaultBucket) for the URI and credentials. S3/Azure reuse the bucket
+  secret; GCS uses workload identity (ADC) since its client needs a service
+  account, not the S3-interop HMAC key gorilla uses. CoreWeave/MinIO
+  S3-compatible endpoints are unsupported (the server has no endpoint override).
+*/}}
+{{- define "wandb.weave.fileStorageEnvs" -}}
+{{- if .Values.global.weave.fileStorage.enabled -}}
+{{- $bucket := include "wandb.bucket" . | fromYaml -}}
+{{- $scheme := dict "s3" "s3" "gcs" "gs" "az" "az" | dig $bucket.provider "" -}}
+{{- if and $scheme $bucket.name -}}
+{{- $uri := printf "%s://%s" $scheme $bucket.name -}}
+{{- if $bucket.path -}}{{- $uri = printf "%s/%s" $uri $bucket.path -}}{{- end }}
+- name: WF_FILE_STORAGE_URI
+  value: {{ $uri | quote }}
+{{- if eq $bucket.provider "s3" }}
+- name: WF_FILE_STORAGE_AWS_ACCESS_KEY_ID
+  valueFrom:
+    secretKeyRef:
+      name: {{ $bucket.secretName | quote }}
+      key: {{ $bucket.accessKeyName | quote }}
+      optional: true
+- name: WF_FILE_STORAGE_AWS_SECRET_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ $bucket.secretName | quote }}
+      key: {{ $bucket.secretKeyName | quote }}
+      optional: true
+{{- if $bucket.region }}
+- name: WF_FILE_STORAGE_AWS_REGION
+  value: {{ $bucket.region | quote }}
+{{- end }}
+{{- if $bucket.kmsKey }}
+- name: WF_FILE_STORAGE_AWS_KMS_KEY
+  value: {{ $bucket.kmsKey | quote }}
+{{- end }}
+{{- else if eq $bucket.provider "az" }}
+- name: WF_FILE_STORAGE_AZURE_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ $bucket.secretName | quote }}
+      key: {{ $bucket.accessKeyName | quote }}
+      optional: true
+{{- else if eq $bucket.provider "gcs" }}
+{{- /* GCS authenticates via workload identity (ADC); bind the weave-trace SA. */ -}}
+{{- end }}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "wandb.statsigEnvs" -}}
 {{- if eq .Values.global.statsig.apiKey "" }}
 - name: GORILLA_STATSIG_KEY

@@ -385,6 +385,19 @@ global:
       accessKeyName: "ACCESS_KEY"
       secretKeyName: "SECRET_KEY"
 
+  weave:
+    # weave-trace file-payload (attachment) storage. Reuses the bucket above for
+    # the URI + creds. GCS authenticates via workload identity; bind the
+    # weave-trace service account to a GCP SA with object read/write.
+    # Opt-in: the server talks to real AWS S3 / GCS / Azure only (no endpoint
+    # override), so leave disabled for MinIO or S3-compatible object stores.
+    fileStorage:
+      enabled: false
+      # Percent of projects (0-100) that route file payloads to the bucket.
+      projectRampPct: 100
+      # Project IDs always routed to the bucket regardless of ramp.
+      projectAllowList: []
+
   redis:
     host: ""
     port: 6379
@@ -3062,6 +3075,7 @@ weave-trace:
   envTpls:
     - '{{ include "wandb.clickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.weave.fileStorageEnvs" . }}'
   initContainers:
     weave-trace-migrate:
       args: ["python", "migrator.py"]
@@ -3199,6 +3213,7 @@ weave-trace-worker:
   envTpls:
     - '{{ include "wandb.clickhouseConfigEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.weave.fileStorageEnvs" . }}'
   env:
     WANDB_INTERNAL_SERVICE_TOKEN:
       valueFrom:
@@ -3308,6 +3323,7 @@ weave-evaluate-model-worker:
   envTpls:
     - '{{ include "wandb.clickhouseConfigEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.weave.fileStorageEnvs" . }}'
   env:
     WANDB_INTERNAL_SERVICE_TOKEN:
       valueFrom:
