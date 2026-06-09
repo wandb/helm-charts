@@ -1,5 +1,7 @@
 # Getting Started
 
+<!-- Verify declarative environment setup -->
+
 ## Prerequisites
 
 - Helm v3.16.3 or later
