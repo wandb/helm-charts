@@ -385,6 +385,8 @@ global:
       accessKeyName: "ACCESS_KEY"
       secretKeyName: "SECRET_KEY"
 
+  # The top level redis is the default that will be used when no more specific redis is specified.
+  # Most caches can be overridden at the application level, except settings cache, metadata cache, and task queue.
   redis:
     host: ""
     port: 6379
@@ -394,9 +396,16 @@ global:
     parameters: {}
     params: {}
     caCert: ""
+    certPath: "redis_ca.pem"
     secret:
       secretName: ""
       secretKey: "REDIS_PASSWORD"
+
+  # (Optional) These (settingsCache, metadataCache, or taskQueue) almost never need to be set, do not set these unless you understand the risks.
+  # Settings cache and metadata cache allow specifying a non-default redis instance for these caches.  Defaults to global.redis if not specified.
+  settingsCache: {}
+  metadataCache: {}
+  taskQueue: {}
 
   bigtable:
     v3:
@@ -726,6 +735,19 @@ api:
           enabled: true
           maxReplicas: 2
           minReplicas: 2
+    fmb:
+      resources:
+        limits:
+          cpu: "6"
+          memory: 16Gi
+        requests:
+          cpu: "6"
+          memory: 16Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 2
 
 app:
   install: true
@@ -893,6 +915,14 @@ app:
         requests:
           cpu: "4"
           memory: 8Gi
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "4"
+          memory: 8Gi
 
 appRenamePreHook:
   install: true
@@ -1010,13 +1040,6 @@ console:
         initialDelaySeconds: 20
         periodSeconds: 5
         failureThreshold: 120
-      resources:
-        requests:
-          cpu: "1"
-          memory: "1Gi"
-        limits:
-          cpu: "2"
-          memory: "2Gi"
   role:
     create: true
     type: ClusterRole
@@ -1058,6 +1081,15 @@ console:
       - apiGroups: ["apps.wandb.com"]
         resources: ["weightsandbiases"]
         verbs: ["get"]
+  sizing:
+    default:
+      resources:
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"
 
 executor:
   install: false
@@ -1161,6 +1193,19 @@ executor:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+    fmb:
+      resources:
+        limits:
+          cpu: "10"
+          memory: 96Gi
+        requests:
+          cpu: "10"
+          memory: 96Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
 
 filemeta:
   install: false
@@ -1243,6 +1288,19 @@ filemeta:
           maxReplicas: 2
           minReplicas: 1
     xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    fmb:
       resources:
         limits:
           cpu: "2"
@@ -1421,6 +1479,19 @@ filestream:
           enabled: true
           maxReplicas: 6
           minReplicas: 1
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 1
 
 flat-run-fields-updater:
   install: false
@@ -1461,161 +1532,10 @@ flat-run-fields-updater:
     tag: latest
   size: ""
   sizing:
-    small:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
+    default:
       autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 5
-          minReplicas: 1
         keda:
           enabled: false
-          minReplicaCount: 1
-          maxReplicaCount: 5
-          pollingInterval: 15
-          cooldownPeriod: 300
-          fallback:
-            failureThreshold: 5
-            replicas: 2
-          advanced:
-            horizontalPodAutoscalerConfig:
-              behavior:
-                scaleDown:
-                  stabilizationWindowSeconds: 300
-                  policies:
-                    - type: Percent
-                      value: 25
-                      periodSeconds: 60
-                    - type: Pods
-                      value: 1
-                      periodSeconds: 60
-                  selectPolicy: Min
-                scaleUp:
-                  stabilizationWindowSeconds: 0
-                  policies:
-                    - type: Percent
-                      value: 100
-                      periodSeconds: 30
-                    - type: Pods
-                      value: 2
-                      periodSeconds: 30
-                  selectPolicy: Max
-          # triggers must be provided by user when enabling KEDA
-    medium:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 2Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 10
-          minReplicas: 3
-        keda:
-          enabled: false
-          minReplicaCount: 3
-          maxReplicaCount: 10
-          pollingInterval: 15
-          cooldownPeriod: 300
-          fallback:
-            failureThreshold: 5
-            replicas: 5
-          advanced:
-            horizontalPodAutoscalerConfig:
-              behavior:
-                scaleDown:
-                  stabilizationWindowSeconds: 300
-                  policies:
-                    - type: Percent
-                      value: 25
-                      periodSeconds: 60
-                    - type: Pods
-                      value: 2
-                      periodSeconds: 60
-                  selectPolicy: Min
-                scaleUp:
-                  stabilizationWindowSeconds: 0
-                  policies:
-                    - type: Percent
-                      value: 100
-                      periodSeconds: 30
-                    - type: Pods
-                      value: 3
-                      periodSeconds: 30
-                  selectPolicy: Max
-          # triggers must be provided by user when enabling KEDA
-    large:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 4Gi
-        requests:
-          cpu: "1"
-          memory: 3Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 15
-          minReplicas: 6
-        keda:
-          enabled: false
-          minReplicaCount: 6
-          maxReplicaCount: 15
-          pollingInterval: 15
-          cooldownPeriod: 300
-          fallback:
-            failureThreshold: 5
-            replicas: 10
-          advanced:
-            horizontalPodAutoscalerConfig:
-              behavior:
-                scaleDown:
-                  stabilizationWindowSeconds: 300
-                  policies:
-                    - type: Percent
-                      value: 25
-                      periodSeconds: 60
-                    - type: Pods
-                      value: 2
-                      periodSeconds: 60
-                  selectPolicy: Min
-                scaleUp:
-                  stabilizationWindowSeconds: 0
-                  policies:
-                    - type: Percent
-                      value: 100
-                      periodSeconds: 30
-                    - type: Pods
-                      value: 4
-                      periodSeconds: 30
-                  selectPolicy: Max
-          # triggers must be provided by user when enabling KEDA
-    xlarge:
-      resources:
-        limits:
-          cpu: "2"
-          memory: 8Gi
-        requests:
-          cpu: "1"
-          memory: 6Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 20
-          minReplicas: 9
-        keda:
-          enabled: false
-          minReplicaCount: 9
-          maxReplicaCount: 20
           pollingInterval: 15
           cooldownPeriod: 300
           fallback:
@@ -1644,7 +1564,74 @@ flat-run-fields-updater:
                       value: 5
                       periodSeconds: 30
                   selectPolicy: Max
-          # triggers must be provided by user when enabling KEDA
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 1
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 5
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 10
+          minReplicas: 3
+        keda:
+          enabled: false
+          minReplicaCount: 3
+          maxReplicaCount: 10
+    large:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 15
+          minReplicas: 6
+        keda:
+          enabled: false
+          minReplicaCount: 6
+          maxReplicaCount: 15
+    xlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 20
+          minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 20
     xxlarge:
       resources:
         limits:
@@ -1662,36 +1649,23 @@ flat-run-fields-updater:
           enabled: false
           minReplicaCount: 9
           maxReplicaCount: 30
-          pollingInterval: 15
-          cooldownPeriod: 300
-          fallback:
-            failureThreshold: 5
-            replicas: 20
-          advanced:
-            horizontalPodAutoscalerConfig:
-              behavior:
-                scaleDown:
-                  stabilizationWindowSeconds: 300
-                  policies:
-                    - type: Percent
-                      value: 25
-                      periodSeconds: 60
-                    - type: Pods
-                      value: 2
-                      periodSeconds: 60
-                  selectPolicy: Min
-                scaleUp:
-                  stabilizationWindowSeconds: 0
-                  policies:
-                    - type: Percent
-                      value: 100
-                      periodSeconds: 30
-                    - type: Pods
-                      value: 6
-                      periodSeconds: 30
-                  selectPolicy: Max
-          # triggers must be provided by user when enabling KEDA
-
+      fmb:
+        resources:
+          limits:
+            cpu: "2"
+            memory: 8Gi
+          requests:
+            cpu: "1"
+            memory: 6Gi
+        autoscaling:
+          horizontal:
+            enabled: true
+            maxReplicas: 30
+            minReplicas: 9
+          keda:
+            enabled: false
+            minReplicaCount: 9
+            maxReplicaCount: 30
 history-updater:
   install: false
   pubSub:
@@ -2076,6 +2050,19 @@ frontend:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+    fmb:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
 
 glue:
   envFrom:
@@ -2208,6 +2195,14 @@ glue:
         requests:
           cpu: "3"
           memory: 6Gi
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
 
 internalSignerPreHook:
   install: true
@@ -2278,6 +2273,8 @@ metric-observer:
       args: ["metric-observer"]
       env: {}
       envFrom: {}
+      volumeMountsTpls:
+        - '{{ include "wandb.caCertsVolumeMounts" . }}'
   role:
     create: true
     rules:
@@ -2287,6 +2284,8 @@ metric-observer:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
+  volumesTpls:
+    - '{{ include "wandb.caCertsVolumes" . }}'
   size: ""
   sizing:
     default:
@@ -2530,6 +2529,19 @@ parquet:
           maxReplicas: 3
           minReplicas: 2
     xxlarge:
+      resources:
+        limits:
+          cpu: "15"
+          memory: 64Gi
+        requests:
+          cpu: "15"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    fmb:
       resources:
         limits:
           cpu: "15"
@@ -2841,6 +2853,19 @@ weave:
           maxReplicas: 5
           minReplicas: 2
     xxlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 64Gi
+        requests:
+          cpu: "3"
+          memory: 48Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+    fmb:
       resources:
         limits:
           cpu: "4"
@@ -3184,6 +3209,19 @@ weave-trace:
           enabled: true
           maxReplicas: 20
           minReplicas: 6
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 20
+          minReplicas: 2
 
 weave-trace-worker:
   install: false
@@ -3396,6 +3434,19 @@ weave-evaluate-model-worker:
           enabled: true
           maxReplicas: 6
           minReplicas: 2
+    fmb:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "3"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
 
 nginx:
   install: false
@@ -3465,7 +3516,7 @@ redis:
   auth:
     enabled: false
     existingSecret: '{{ include "wandb.redis.passwordSecret" . }}'
-    existingSecretPasswordKey: "{{ .Values.global.redis.secret.secretKey }}"
+    existingSecretPasswordKey: '{{ include "wandb.redis.passwordSecretKey" . }}'
   metrics:
     enabled: false
     service:
