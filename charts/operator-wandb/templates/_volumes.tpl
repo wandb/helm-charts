@@ -23,6 +23,7 @@
   mountPath: /etc/ssl/certs/{{ include "wandb.redis.certPath" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") }}
   subPath: {{ include "wandb.redis.certPath" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") }}
 {{- end }}
+{{ include "wandb.mysql.caCertVolumeMount" . }}
 {{- end -}}
 
 {{- define "wandb.caCertsVolumes" -}}
@@ -69,6 +70,7 @@
         path: '{{ include "wandb.redis.certPath" (dict "Values" .Values "Release" .Release "redisName" "settingsCache") }}'
     optional: true
 {{- end }}
+{{ include "wandb.mysql.caCertVolume" . }}
 {{- end -}}
 
 {{- define "wandb.gcsFuseVolumeMounts" }}
@@ -94,5 +96,21 @@
 {{- else }}
   emptyDir: {}
 {{- end }}
+{{- end }}
+{{- end }}
+
+
+{{- define "wandb.internalSignerVolumeMounts" }}
+{{- if .Values.global.localService.bypass }}
+- name: wandb-internal-signer-root
+  mountPath: /vol/env
+{{- end }}
+{{- end }}
+
+{{- define "wandb.internalSignerVolumes" }}
+{{- if .Values.global.localService.bypass }}
+- name: wandb-internal-signer-root
+  secret:
+    secretName: "{{ .Release.Name }}-internal-signer"
 {{- end }}
 {{- end }}

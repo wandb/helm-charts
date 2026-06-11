@@ -214,6 +214,61 @@ The following Terraform (IaC) options use this approach:
 
 For production-grade implementation, the appropriate chart parameters should be used to point to prebuilt, externalized state stores.
 
+## Using External Secrets
+
+The chart supports referencing existing Kubernetes Secrets for sensitive credentials. This allows you to manage secrets externally using tools like External Secrets Operator, Sealed Secrets, or other secret management systems.
+
+### Supported Secret References
+
+The following credentials can be pulled from external Kubernetes Secrets:
+
+| Component | Configuration Path | Secret Fields |
+|-----------|-------------------|---------------|
+| Component | Configuration Path | Secret Reference Method |
+|-----------|-------------------|------------------------|
+| **MySQL** | `global.mysql.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
+| **Redis** | `global.redis.secret` | `secretName`, `secretKey` |
+| **ClickHouse** | `global.clickhouse.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
+| **Kafka** | `global.kafka.passwordSecret` | `name`, `passwordKey` |
+| **OIDC** | `global.auth.oidc.oidcSecret` | `name`, `secretKey` |
+| **SMTP** | `global.email.smtp.*` | Each field (host, port, user, password) can be a string or a map with `valueFrom` |
+
+### Example: Using External Secrets with MySQL/ClickHouse/SMTP
+
+For MySQL, ClickHouse, and SMTP, each field can be configured as either a simple value or a Kubernetes secret reference:
+
+```yaml
+global:
+  email:
+    smtp:
+      host: "smtp.example.com"
+      port: 587
+      user: "noreply@example.com"
+      password:
+        valueFrom:
+          secretKeyRef:
+            name: "my-smtp-secret"
+            key: "password"
+  
+  mysql:
+    host: "mysql.example.com"
+    port: 3306
+    database: "wandb_local"
+    user:
+      valueFrom:
+        secretKeyRef:
+          name: "my-mysql-secret"
+          key: "username"
+    password:
+      valueFrom:
+        secretKeyRef:
+          name: "my-mysql-secret"
+          key: "password"
+```
+
+For complete examples with secrets and additional configurations, see:
+- Values: [test-configs/operator-wandb/user-defined-secrets.yaml](../../test-configs/operator-wandb/user-defined-secrets.yaml)
+- Secrets: [test-configs/additional-resources/user-defined-secrets/](../../test-configs/additional-resources/user-defined-secrets/)
 
 ## Chart Relationship
 

@@ -13,10 +13,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Helm
+      - name: Install Helm
         uses: azure/setup-helm@v4.2.0
         with:
-          version: v3.17.0
+          version: v3.20.1
       - name: Helm snapshot build and test
         run: |
           pushd ./charts/operator-wandb/
@@ -40,21 +40,29 @@ jobs:
     name: Test Chart
     strategy:
       fail-fast: false
+      max-parallel: 39
       matrix:
         k8s-version: ["v1.32.2", "v1.31.6", "v1.30.10"]
         configuration:
           [
             "default",
             "fmb",
-            "oidc-enabled",
+            "oidc-secret-from-k8s",
             "runs-v2-bufstream",
-            "separate-pods",
+            "local-bypass-no-app",
+            "local-bypass-with-app",
+            "no-local-bypass",
             "url-encoded-password",
             "user-defined-secrets",
+            "olap-features-enabled",
             "weave-trace",
-            "weave-trace-with-worker"
+            "weave-trace-with-worker",
+            "historystore-parquet-only",
           ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.k8s-version }}-${{ matrix.configuration }}-${{ github.ref }}
+      cancel-in-progress: true
     environment: Helm Charts
     steps:
       - name: Checkout
@@ -65,7 +73,7 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v4.2.0
         with:
-          version: v3.17.0
+          version: v3.20.1
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -73,7 +81,7 @@ jobs:
           python-version: "3.10"
 
       - name: Set up chart-testing
-        uses: helm/chart-testing-action@v2.7.0
+        uses: helm/chart-testing-action@v2.8.0
         with:
           version: v3.12.0
 

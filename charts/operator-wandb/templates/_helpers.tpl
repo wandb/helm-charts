@@ -1,4 +1,13 @@
 {{/*
+  Next Section purposely causes helm failures  to prevent known invalid configs.
+*/}}
+
+{{- if and .Values.mysql.install (kindIs "map" .Values.global.mysql.user) -}}
+{{- fail "Custom configuration secret of the mysql user is not possible when using the internal mysql chart" -}}
+{{- end -}}
+
+
+{{/*
 Expand the name of the chart.
 */}}
 {{- define "wandb.name" -}}
@@ -82,12 +91,4 @@ otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset
 {{- end -}}
 {{- join ", " $items -}}
 }'
-{{- end -}}
-
-{{- define "wandb.emailSink" -}}
-{{- if ne .Values.global.email.smtp.host "" -}}
-smtp://{{ .Values.global.email.smtp.user }}:{{ .Values.global.email.smtp.password }}@{{ .Values.global.email.smtp.host }}:{{ .Values.global.email.smtp.port }}
-{{- else -}}
-https://api.wandb.ai/email/dispatch
-{{- end -}}
 {{- end -}}

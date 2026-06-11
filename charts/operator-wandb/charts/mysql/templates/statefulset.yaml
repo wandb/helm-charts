@@ -1,5 +1,9 @@
 {{- if .Values.enabled }}
-{{- $imageCfg := dict "global" $.Values.global.image "local" $.Values.image -}}
+{{- $image := $.Values.image -}}
+
+{{- if .Values.global.repositoryPrefix }}
+{{- $_ := set $image "repository" (printf "%s/%s" .Values.global.repositoryPrefix $image.repository) }}
+{{- end }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -32,31 +36,19 @@ spec:
       {{- end }}
       containers:
         - name: mysql
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ $image.repository }}:{{ $image.tag }}"
           {{- include "wandb.podSecurityContext" .Values.container.securityContext | nindent 10 }}
           ports:
           - name: mysql
             containerPort: 3306
             protocol: TCP
           env:
-            - name: MYSQL_PORT
-              value: "{{ include "wandb.mysql.port" . }}"
-            - name: MYSQL_HOST
-              value: "{{ include "wandb.mysql.host" . }}"
-            - name: MYSQL_DATABASE
-              value: "{{ include "wandb.mysql.database" . }}"
-            - name: MYSQL_USER
-              value: "{{ include "wandb.mysql.user" . }}"
+            {{ include "wandb.mysqlConfigEnvs" . | nindent 12 }}
             - name: MYSQL_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "wandb.mysql.passwordSecret" . }}
                   key: {{ .Values.global.mysql.passwordSecret.rootPasswordKey }}
-            - name: MYSQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "wandb.mysql.passwordSecret" . }}
-                  key: {{ .Values.global.mysql.passwordSecret.passwordKey }}
             {{- include "mysql.extraEnv" (dict "global" .Values.global "local" .Values) | nindent 12 }}
             {{- include "wandb.extraEnvFrom" (dict "root" $ "local" .) | nindent 12 }}
           livenessProbe:

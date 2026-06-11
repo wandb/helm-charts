@@ -61,7 +61,10 @@ Return the kafka broker url port
 {{- if .Values.kafka.install -}}
 {{ printf "%s-%s" .Release.Name "kafka" }}
 {{- else if .Values.bufstream.install -}}
-bufstream
+{{- $bufstreamNamespace := default .Release.Namespace .Values.bufstream.namespaceOverride -}}
+{{ printf "bufstream.%s.svc.cluster.local" $bufstreamNamespace }}
+{{- else -}}
+bufstream.bufstream.svc.cluster.local
 {{- end -}}
 {{- else -}}
 {{ .Values.global.kafka.brokerHost }}
@@ -107,9 +110,9 @@ TODO(Zachary B) - Check with dpanzella to see if this is correct.
 {{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}/{{ .Values.pubSub.subscription }}
 {{- else if .Values.global.bufstream.enabled -}}
-kafka://$(KAFKA_BROKER_HOST):9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=flat-run-fields-updater&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
+kafka://$(KAFKA_BROKER_HOST):9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id={{ .Values.kafka.consumerGroupId }}&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
 {{- else -}}
-kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id=flat-run-fields-updater&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
+kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id={{ .Values.kafka.consumerGroupId }}&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
 {{- end -}}
 {{- end -}}
 

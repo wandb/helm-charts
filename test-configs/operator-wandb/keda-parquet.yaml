@@ -1,0 +1,38 @@
+# Example: Using KEDA to auto-scale the parquet service based on Redis queue depth
+# The parquet service processes file conversion tasks from Redis queues.
+
+parquet:
+  install: true
+  size: "production"
+  sizing:
+    production:
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 4000m
+          memory: 8Gi
+      autoscaling:
+        # Disable standard HPA in favor of KEDA
+        horizontal:
+          enabled: false
+        # Enable KEDA for event-driven autoscaling
+        keda:
+          enabled: true
+          minReplicaCount: 1      # Keep at least 1 replica for immediate response
+          maxReplicaCount: 15     # Scale up to 15 replicas under high load
+          idleReplicaCount: 0     # Scale to zero if no work (optional)
+          pollingInterval: 30     # Check Redis every 30 seconds
+          cooldownPeriod: 600     # Wait 10 minutes before scaling down to zero
+          triggers:
+            # Scale based on Redis list length
+            - type: redis
+              metadata:
+                address: redis.default.svc.cluster.local:6379
+                listName: parquet-tasks
+                listLength: "5"        # Scale up if more than 5 items per replica
+                databaseIndex: "0"
+                # Optional: Add authentication if Redis requires it
+                # passwordFromEnv: REDIS_PASSWORD
+

@@ -1,0 +1,33 @@
+{{/*
+  Dynamically creates a Secret for each OLAP feature defined under global.olap.
+  Iterates over all keys in global.olap, skips "default", and for each enabled
+  feature where the password is a plain value (not a K8s ref map), creates a
+  Secret with the password.
+
+  Adding a new feature only requires adding its key to global.olap in values.yaml
+  and a wrapper template in _env.tpl — no changes needed here.
+*/}}
+{{- range $featureName, $featureConfig := .Values.global.olap }}
+  {{- if ne $featureName "default" }}
+    {{- $config := include "wandb.olapConfig" (dict "root" $ "featureName" $featureName) | fromYaml }}
+    {{- if and $config.enabled (not (kindIs "map" $config.password)) }}
+      {{- $envVarPrefix := $featureName | snakecase | upper }}
+      {{- $secretName := include "wandb.olapSecretName" (dict "root" $ "featureName" $featureName) }}
+      {{- $secretKey := include "wandb.olapSecretKey" (dict "envVarPrefix" $envVarPrefix) }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName | quote }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "{{ $.Release.Name }}-.*"
+  labels:
+    {{- include "wandb.commonLabels" $ | nindent 4 }}
+data:
+  {{ $secretKey }}: {{ $config.password | b64enc }}
+    {{- end }}
+  {{- end }}
+{{- end }}

@@ -137,7 +137,7 @@ create_user() {
     -X POST "$API/users" \
     -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H 'Content-Type: application/json' \
-    -d "$(jq -n --arg u "$username" --arg e "$email" '{username:$u, email:$e, enabled:true, emailVerified:true}')" >/tmp/kc_http_code
+    -d "$(jq -n --arg u "$username" --arg e "$email" '{username:$u, email:$e, firstName: "Wandb", lastName: "User", enabled:true, emailVerified:true}')" >/tmp/kc_http_code
 }
 
 set_user_password() {
@@ -176,6 +176,7 @@ create_client() {
     -d "$(jq -n --arg cid "$cid" '{
       clientId:$cid,
       protocol:"openid-connect",
+      secret: "test-secret",
       enabled:true,
       publicClient:false,
       standardFlowEnabled:true,
@@ -183,7 +184,6 @@ create_client() {
       redirectUris:["http://localhost:8080/*"],
       rootUrl:"http://localhost:8080",
       baseUrl:"http://localhost:8080",
-
       webOrigins:["*"]
     }')" >/dev/null
 }

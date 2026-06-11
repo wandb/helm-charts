@@ -311,6 +311,9 @@ metadata:
   name: chartsnap-clickhouse
   annotations:
     "helm.sh/resource-policy": "keep"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
   labels:
     global-common-label: "global-common-label-value"
     helm.sh/chart: '###CHART_VERSION###'
@@ -325,9 +328,12 @@ metadata:
   labels:
     global-common-label: "global-common-label-value"
     helm.sh/chart: '###CHART_VERSION###'
+  annotations:
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
 data:
   GORILLA_STATSIG_KEY:
-  GORILLA_EMAIL_SINK: aHR0cHM6Ly9hcGkud2FuZGIuYWkvZW1haWwvZGlzcGF0Y2g=
   GORILLA_SLACK_CLIENT_ID:
   GORILLA_SLACK_SECRET:
   SLACK_CLIENT_ID:
@@ -409,6 +415,18 @@ data:
   # Set $gorillaSessionKey to existing secret data or generate a random one when not exists
   GORILLA_SESSION_KEY: "###DYNAMIC_FIELD###"
   GORILLA_AUTH_JWK_URL: "aHR0cDovL2NoYXJ0c25hcC1hcHA6ODA4My9hcGkvandrcy5qc29u"
+---
+# Source: operator-wandb/templates/smtp.yaml
+# Any time the password is not a map, we need to create this secret manually
+apiVersion: v1
+kind: Secret
+metadata:
+  name: "chartsnap-smtp-secret"
+  labels:
+    global-common-label: "global-common-label-value"
+    helm.sh/chart: '###CHART_VERSION###'
+data:
+  SMTP_PASSWORD: ""
 ---
 # Source: operator-wandb/charts/mysql/templates/configmap.yaml
 apiVersion: v1
@@ -499,7 +517,7 @@ data:
         - sources:
           - from: connection
       memory_limiter:
-        check_interval: 5s
+        check_interval: 1s
         limit_percentage: 80
         spike_limit_percentage: 25
     receivers:
@@ -678,8 +696,8 @@ data:
           exporters:
           - debug
           processors:
-          - batch
           - memory_limiter
+          - batch
           - k8sattributes
           receivers:
           - otlp
@@ -1226,18 +1244,19 @@ data:
   GORILLA_SESSION_LENGTH: "720h"
   GORILLA_SWEEP_PROVIDER: "http://chartsnap-app:8082"
   GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
-  GORILLA_LIMITER: "noop://"
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
   GORILLA_ONPREM_API_KEY_PREFIX: "local"
   GORILLA_SCHEMA_FILE: "/schema.graphql"
+  GORILLA_COLLECT_AUDIT_LOGS: "true"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_PORT: "8087"
+  GORILLA_PARQUET_GRPC_PORT: "8088"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648"
   GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
-  GORILLA_AUTH_METHOD: implicit
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
+  GORILLA_LOCAL_SERVICE_BYPASS: 'false'
 ---
 # Source: operator-wandb/templates/app.yaml
 apiVersion: v1
@@ -1287,21 +1306,6 @@ metadata:
     app.kubernetes.io/version: "1.0.0"
     app.kubernetes.io/managed-by: Helm
 data:
----
-# Source: operator-wandb/templates/clickhouse.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-clickhouse-configmap
-  labels:
-    global-common-label: "global-common-label-value"
-    helm.sh/chart: '###CHART_VERSION###'
-data:
-  WF_CLICKHOUSE_PORT: "8443"
-  WF_CLICKHOUSE_HOST: "chartsnap-clickhouse-headless"
-  WF_CLICKHOUSE_DATABASE: "weave_trace_db"
-  WF_CLICKHOUSE_USER: "default"
-  WF_CLICKHOUSE_REPLICATED: "false"
 ---
 # Source: operator-wandb/templates/console.yaml
 apiVersion: v1
@@ -1373,8 +1377,8 @@ metadata:
 data:
   FRONTEND_APP_BACKEND: "chartsnap-app:8080"
   FRONTEND_AUTH_BACKEND: "chartsnap-app:8080"
-  FRONTEND_WEAVE_BACKEND: "chartsnap-weave:9994"
   FRONTEND_LOCAL_BACKEND: "chartsnap-app:8083"
+  FRONTEND_WEAVE_BACKEND: "chartsnap-weave:9994"
   REACT_APP_GIT_TAG: "HEAD"
   REACT_APP_HOST: "http://localhost:8080"
   REACT_APP_ENVIRONMENT_NAME: "local"
@@ -1478,6 +1482,10 @@ metadata:
   labels:
     global-common-label: "global-common-label-value"
     helm.sh/chart: '###CHART_VERSION###'
+  annotations:
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-.*"
 data:
   # Statsd configuration (matches existing GORILLA_STATSD_PORT from gorilla.yaml)
   GORILLA_STATSD_HOST: ""
@@ -1531,6 +1539,21 @@ data:
 
   # Clear task dedupe key configuration
   GORILLA_GLUE_CLEAR_TASK_DEDUPE_KEY_ENABLED: "false"
+  GORILLA_GLUE_LOCAL_SERVICE_BYPASS: "false"
+---
+# Source: operator-wandb/templates/history-updater.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-history-updater-configmap
+  labels:
+    global-common-label: "global-common-label-value"
+    helm.sh/chart: '###CHART_VERSION###'
+data:
+  GORILLA_FILE_HOST: "http://localhost:8080"
+  GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
+  GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
+  GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
 ---
 # Source: operator-wandb/templates/kafka.yaml
 apiVersion: v1
@@ -1541,7 +1564,7 @@ metadata:
     global-common-label: "global-common-label-value"
     helm.sh/chart: '###CHART_VERSION###'
 data:
-  KAFKA_BROKER_HOST: ""
+  KAFKA_BROKER_HOST: "bufstream.bufstream.svc.cluster.local"
   KAFKA_BROKER_PORT: "9092"
   KAFKA_CLIENT_USER: ""
   KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE: "chartsnap-run-updates-shadow"
@@ -1562,20 +1585,8 @@ data:
   GLUE_ENABLED: "true"
   GORILLA_GLUE_CONTAINER_PORT: "9173"
   HOST: "http://localhost:8080"
----
-# Source: operator-wandb/templates/mysql.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-mysql-configmap
-  labels:
-    global-common-label: "global-common-label-value"
-    helm.sh/chart: '###CHART_VERSION###'
-data:
-  MYSQL_PORT: "3306"
-  MYSQL_HOST: "chartsnap-mysql"
-  MYSQL_DATABASE: "wandb_local"
-  MYSQL_USER: "wandb"
+  LOCAL_K8S_SIGNER_SECRET_NAME: "chartsnap-internal-signer"
+  LOCAL_K8S_SIGNER_NAMESPACE: "default"
 ---
 # Source: operator-wandb/templates/nginx.yaml
 apiVersion: v1
@@ -1627,16 +1638,18 @@ metadata:
     global-common-label: "global-common-label-value"
     helm.sh/chart: '###CHART_VERSION###'
 data:
-  # Port configuration
+  # Legacy net/rpc configuration
   GORILLA_PARQUET_PORT: "8087"
-  # RPC path configuration
   GORILLA_PARQUET_RPC_PATH: "/_goRPC_"
+  GORILLA_PARQUET_GRPC_PORT: "8088"
   # Task queue configuration
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
   # Parquet-specific configuration
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648" # 2GB
   GORILLA_COLLECT_AUDIT_LOGS: "true"
+
+# Parquet metadata cache configuration
 ---
 # Source: operator-wandb/templates/redis.yaml
 apiVersion: v1
@@ -1653,6 +1666,10 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: chartsnap-weave-trace-configmap
+  annotations:
+    "reflector.v1.k8s.emberstack.com/reflection-allowed": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-auto-enabled": "true"
+    "reflector.v1.k8s.emberstack.com/reflection-allowed-namespaces": "chartsnap-weave-trace"
   labels:
     global-common-label: "global-common-label-value"
     helm.sh/chart: '###CHART_VERSION###'
@@ -1664,10 +1681,12 @@ data:
   WF_TRACE_SERVER_URL: "http://localhost:8080/traces"
   WF_ENFORCE_PASSWORD_LENGTH: "false"
   WEAVE_ENABLE_ONLINE_EVAL: "false"
+  WEAVE_ENABLE_EVALUATE_MODEL_WORKER: "false"
   WEAVE_TRACE_SERVER_BASE_URL: "http://localhost:8080/traces"
   WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME: "weave-worker-auth"
   KAFKA_BROKER_HOST: "bufstream.bufstream.svc.cluster.local"
   KAFKA_BROKER_PORT: "9092"
+  WEAVE_REDIS_URL: "redis://$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)"
 ---
 # Source: operator-wandb/templates/weave.yaml
 apiVersion: v1
@@ -1956,6 +1975,23 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: chartsnap-prometheus-server
+---
+# Source: operator-wandb/templates/oidc.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chartsnap-oidc-reviewer
+  labels:
+    global-common-label: "global-common-label-value"
+    helm.sh/chart: '###CHART_VERSION###'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:service-account-issuer-discovery
+subjects:
+- kind: Group
+  name: system:unauthenticated
+  apiGroup: rbac.authorization.k8s.io
 ---
 # Source: operator-wandb/charts/app/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -2276,6 +2312,31 @@ spec:
     app.kubernetes.io/name: parquet
     app.kubernetes.io/instance: chartsnap
 ---
+# Source: operator-wandb/charts/parquet/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-parquet-grpc
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+    global-common-label: "global-common-label-value"
+  annotations:
+    global-common-annotation: global-common-annotation-value
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - name: grpc
+    port: 8088
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: parquet
+    app.kubernetes.io/instance: chartsnap
+---
 # Source: operator-wandb/charts/prometheus/charts/instance/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -2482,7 +2543,7 @@ spec:
         wandb.com/app-name: daemonset-0.1.0
         app.kubernetes.io/managed-by: Helm
       annotations:
-        checksum/configmap: f4c5258cc5f3838f88bb03d11fac900cfb7593eefa8588dc99d81b3ac35234a
+        checksum/configmap: fb292914a84732d6a85d1713db8c55d808408a91b0996bb3eef346fcf904082
     spec:
       serviceAccountName: chartsnap-otel-daemonset
       securityContext:
@@ -2493,7 +2554,7 @@ spec:
         runAsNonRoot: true
       containers:
       - name: daemonset
-        image: "otel/opentelemetry-collector-contrib:0.97.0"
+        image: "us-docker.pkg.dev/wandb-production/public/otel/opentelemetry-collector-contrib:0.97.0"
         securityContext:
           capabilities:
           allowPrivilegeEscalation: false
@@ -2520,6 +2581,11 @@ spec:
           protocol: TCP
           hostPort: 8125
         env:
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -2528,11 +2594,6 @@ spec:
           value: "wandb_local"
         - name: MYSQL_USER
           value: "wandb"
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-mysql
-              key: MYSQL_PASSWORD
         - name: K8S_NODE_NAME
           valueFrom:
             fieldRef:
@@ -2542,6 +2603,8 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: status.podIP
+        - name: GOMEMLIMIT
+          value: "1600MiB"
         livenessProbe:
           httpGet:
             path: /
@@ -2552,8 +2615,7 @@ spec:
             port: 13133
         resources:
           limits:
-            cpu: 1000m
-            memory: 1000Mi
+            memory: 2Gi
           requests:
             cpu: 200m
             memory: 200Mi
@@ -2628,7 +2690,7 @@ spec:
         app-common-annotation: app-common-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: app-0.11.3
+        helm.sh/chart: app-0.12.0
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -2661,8 +2723,6 @@ spec:
             name: chartsnap-kafka-configmap
         - configMapRef:
             name: chartsnap-local-configmap
-        - configMapRef:
-            name: chartsnap-mysql-configmap
         - configMapRef:
             name: chartsnap-redis-configmap
         env:
@@ -2727,6 +2787,14 @@ spec:
             secretKeyRef:
               key: MYSQL_PASSWORD
               name: chartsnap-mysql
+        - name: MYSQL_PORT
+          value: "3306"
+        - name: MYSQL_HOST
+          value: chartsnap-mysql
+        - name: MYSQL_DATABASE
+          value: wandb_local
+        - name: MYSQL_USER
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -2827,6 +2895,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -2837,12 +2918,20 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -2874,7 +2963,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -2934,7 +3023,7 @@ spec:
         command:
         - bash
         - -c
-        - until mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --execute="SELECT 1"; do echo waiting for db; sleep 2; done
+        - until if [ -f "$MYSQL_CA_CERT_PATH" ]; then mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=VERIFY_CA --ssl-ca="$MYSQL_CA_CERT_PATH" --execute="SELECT 1"; else mysql -h$MYSQL_HOST -u$MYSQL_USER -p"$(python -c "import sys; from urllib import parse; print(parse.unquote_plus(sys.argv[1]))" $MYSQL_PASSWORD)" -D$MYSQL_DATABASE -P$MYSQL_PORT --ssl-mode=PREFERRED --execute="SELECT 1"; fi; do echo waiting for db; sleep 2; done
         envFrom:
         - configMapRef:
             name: chartsnap-api-configmap
@@ -2956,8 +3045,6 @@ spec:
             name: chartsnap-kafka-configmap
         - configMapRef:
             name: chartsnap-local-configmap
-        - configMapRef:
-            name: chartsnap-mysql-configmap
         - configMapRef:
             name: chartsnap-redis-configmap
         env:
@@ -3022,6 +3109,14 @@ spec:
             secretKeyRef:
               key: MYSQL_PASSWORD
               name: chartsnap-mysql
+        - name: MYSQL_PORT
+          value: "3306"
+        - name: MYSQL_HOST
+          value: chartsnap-mysql
+        - name: MYSQL_DATABASE
+          value: wandb_local
+        - name: MYSQL_USER
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -3122,6 +3217,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3132,12 +3240,20 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: GORILLA_LIMITER
+          value: noop://
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: BUCKET_QUEUE
           value: "internal://"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_COREWEAVE_OBSERVABILITY_API_KEY
           valueFrom:
             secretKeyRef:
@@ -3169,8 +3285,18 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/local:latest"
-        imagePullPolicy:
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/local:latest"
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       serviceAccountName: chartsnap-app
       securityContext:
         fsGroup: 0
@@ -3248,7 +3374,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: console-0.11.3
+        helm.sh/chart: console-0.12.0
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3265,7 +3391,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -3279,7 +3405,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/console:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/console:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8082
@@ -3309,6 +3435,16 @@ spec:
           requests:
             cpu: "1"
             memory: 1Gi
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
       serviceAccountName: chartsnap-console
       securityContext:
         fsGroup: 0
@@ -3334,6 +3470,23 @@ spec:
         maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/nginx/templates/deployment.yaml
 apiVersion: apps/v1
@@ -3369,7 +3522,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: nginx-0.11.3
+        helm.sh/chart: nginx-0.12.0
         app.kubernetes.io/name: nginx
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3384,7 +3537,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -3398,7 +3551,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "nginxinc/nginx-unprivileged:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/nginxinc/nginx-unprivileged:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -3412,6 +3565,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /etc/nginx/nginx.conf
           name: nginx-config
           subPath: nginx.conf
@@ -3441,6 +3603,22 @@ spec:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
       volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
       - configMap:
           name: 'chartsnap-nginx-configmap'
         name: nginx-config
@@ -3479,7 +3657,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: parquet-0.11.3
+        helm.sh/chart: parquet-0.12.0
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3500,8 +3678,6 @@ spec:
             name: chartsnap-global-secret
         - configMapRef:
             name: chartsnap-kafka-configmap
-        - configMapRef:
-            name: chartsnap-mysql-configmap
         - configMapRef:
             name: chartsnap-parquet-configmap
         - configMapRef:
@@ -3570,6 +3746,14 @@ spec:
             secretKeyRef:
               key: MYSQL_PASSWORD
               name: chartsnap-mysql
+        - name: MYSQL_PORT
+          value: "3306"
+        - name: MYSQL_HOST
+          value: chartsnap-mysql
+        - name: MYSQL_DATABASE
+          value: wandb_local
+        - name: MYSQL_USER
+          value: wandb
         - name: MYSQL
           value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
         - name: GORILLA_ANALYTICS_SINK
@@ -3670,6 +3854,19 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
+        - name: SMTP_HOST
+          value: ""
+        - name: SMTP_PORT
+          value: "587"
+        - name: SMTP_USER
+          value: ""
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: SMTP_PASSWORD
+              name: chartsnap-smtp-secret
+        - name: GORILLA_EMAIL_SINK
+          value: https://api.wandb.ai/email/dispatch
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3680,10 +3877,16 @@ spec:
             secretKeyRef:
               key: license
               name: chartsnap-license
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -3697,7 +3900,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8087
@@ -3921,7 +4124,7 @@ spec:
         version: v1.3.0
     spec:
       containers:
-      - image: "ghcr.io/stakater/reloader:v1.3.0"
+      - image: "us-docker.pkg.dev/wandb-production/public/stakater/reloader:v1.3.0"
         imagePullPolicy: IfNotPresent
         name: chartsnap-reloader
         env:
@@ -4005,7 +4208,7 @@ spec:
         global-pod-annotation: global-pod-annotation-value
         global-common-annotation: global-common-annotation-value
       labels:
-        helm.sh/chart: weave-0.11.3
+        helm.sh/chart: weave-0.12.0
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4019,10 +4222,16 @@ spec:
         - configMapRef:
             name: chartsnap-weave-configmap
         env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -4036,7 +4245,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/weave-python:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-python:latest"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 9994
@@ -4082,10 +4291,16 @@ spec:
         - configMapRef:
             name: chartsnap-weave-configmap
         env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -4099,7 +4314,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "wandb/weave-python:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/weave-python:latest"
         imagePullPolicy: IfNotPresent
         resources:
           limits:
@@ -4109,6 +4324,15 @@ spec:
             cpu: 100m
             memory: 128Mi
         volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
         - mountPath: /tmp/
           name: temp-dir
         - mountPath: /vol/weave/cache
@@ -4206,7 +4430,7 @@ spec:
         runAsNonRoot: true
       containers:
       - name: mysql
-        image: "mysql:latest"
+        image: "us-docker.pkg.dev/wandb-production/public/mysql:latest"
         securityContext:
           allowPrivilegeEscalation: false
         ports:
@@ -4214,6 +4438,11 @@ spec:
           containerPort: 3306
           protocol: TCP
         env:
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "chartsnap-mysql"
+              key: "MYSQL_PASSWORD"
         - name: MYSQL_PORT
           value: "3306"
         - name: MYSQL_HOST
@@ -4227,11 +4456,6 @@ spec:
             secretKeyRef:
               name: chartsnap-mysql
               key: MYSQL_ROOT_PASSWORD
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: chartsnap-mysql
-              key: MYSQL_PASSWORD
         livenessProbe:
           tcpSocket:
             port: 3306
@@ -4330,7 +4554,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: redis
-        image: docker.io/bitnamilegacy/redis:7.2.4-debian-12-r9
+        image: us-docker.pkg.dev/wandb-production/public/bitnamilegacy/redis:7.2.4-debian-12-r9
         imagePullPolicy: "IfNotPresent"
         securityContext:
           allowPrivilegeEscalation: false
@@ -4341,6 +4565,7 @@ spec:
           runAsGroup: 0
           runAsNonRoot: true
           runAsUser: 1001
+          seLinuxOptions: null
           seccompProfile:
             type: RuntimeDefault
         command:
@@ -4456,7 +4681,7 @@ spec:
             global-pod-annotation: global-pod-annotation-value
             global-common-annotation: global-common-annotation-value
           labels:
-            helm.sh/chart: parquet-0.11.3
+            helm.sh/chart: parquet-0.12.0
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -4479,8 +4704,6 @@ spec:
                 name: chartsnap-glue-configmap
             - configMapRef:
                 name: chartsnap-kafka-configmap
-            - configMapRef:
-                name: chartsnap-mysql-configmap
             - configMapRef:
                 name: chartsnap-parquet-configmap
             - configMapRef:
@@ -4549,6 +4772,14 @@ spec:
                 secretKeyRef:
                   key: MYSQL_PASSWORD
                   name: chartsnap-mysql
+            - name: MYSQL_PORT
+              value: "3306"
+            - name: MYSQL_HOST
+              value: chartsnap-mysql
+            - name: MYSQL_DATABASE
+              value: wandb_local
+            - name: MYSQL_USER
+              value: wandb
             - name: MYSQL
               value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
             - name: GORILLA_ANALYTICS_SINK
@@ -4649,6 +4880,19 @@ spec:
                   key: GORILLA_STATSIG_KEY
                   name: gorilla-statsig
                   optional: true
+            - name: SMTP_HOST
+              value: ""
+            - name: SMTP_PORT
+              value: "587"
+            - name: SMTP_USER
+              value: ""
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: SMTP_PASSWORD
+                  name: chartsnap-smtp-secret
+            - name: GORILLA_EMAIL_SINK
+              value: https://api.wandb.ai/email/dispatch
             - name: LICENSE
               valueFrom:
                 secretKeyRef:
@@ -4659,10 +4903,16 @@ spec:
                 secretKeyRef:
                   key: license
                   name: chartsnap-license
+            - name: SSL_CERT_FILE
+              value: /etc/ssl/certs/ca-certificates.crt
+            - name: SSL_CERT_DIR
+              value: /etc/ssl/certs
+            - name: REQUESTS_CA_BUNDLE
+              value: /etc/ssl/certs/ca-certificates.crt
             - name: BUCKET_PROXY
               value: "true"
             - name: GLOBAL_ADMIN_API_KEY
-              value: "local-123456789-123456789-123456789-1234"
+              value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
             - name: GORILLA_FILE_STORE_IS_PROXIED
               value: "true"
             - name: GORILLA_GLUE_EXECUTE
@@ -4680,7 +4930,7 @@ spec:
                 drop: []
               privileged: false
               readOnlyRootFilesystem: false
-            image: "wandb/megabinary:latest"
+            image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
             imagePullPolicy: IfNotPresent
             resources:
               limits:
@@ -4962,12 +5212,12 @@ metadata:
 spec:
   containers:
   - name: wandb-verify
-    image: python:3.12
+    image: us-docker.pkg.dev/wandb-production/public/python:3.12
     env:
     - name: WANDB_BASE_URL
       value: "http://chartsnap-nginx:8080"
     - name: WANDB_API_KEY
-      value: "local-123456789-123456789-123456789-1234"
+      value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
     command:
     - sh
     - -c
@@ -5017,7 +5267,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -5031,7 +5281,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "alpine/k8s:1.31.12"
+        image: "us-docker.pkg.dev/wandb-production/public/alpine/k8s:1.31.12"
         imagePullPolicy: IfNotPresent
         resources:
           requests:
@@ -5114,7 +5364,7 @@ spec:
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
-          value: "local-123456789-123456789-123456789-1234"
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
         - name: GORILLA_FILE_STORE_IS_PROXIED
           value: "true"
         - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
@@ -5128,7 +5378,7 @@ spec:
             drop: []
           privileged: false
           readOnlyRootFilesystem: false
-        image: "alpine/k8s:1.31.12"
+        image: "us-docker.pkg.dev/wandb-production/public/alpine/k8s:1.31.12"
         imagePullPolicy: IfNotPresent
         resources:
           requests:

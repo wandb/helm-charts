@@ -1,0 +1,47 @@
+{{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
+{{- $kedaSizing := mergeOverwrite $sizingInfo.autoscaling.keda .Values.autoscaling.keda }}
+{{- if $kedaSizing.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "wandb-base.fullname" . }}
+  labels:
+    {{- include "wandb-base.labels" . | nindent 4 }}
+  {{- if (include "wandb-base.commonAnnotations" .) }}
+  annotations:
+    {{- tpl (include "wandb-base.commonAnnotations" . | nindent 4) . }}
+  {{- end }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: {{ .Values.kind }}
+    name: {{ include "wandb-base.fullname" . }}{{ include "wandb-base.deploymentPostfix" . }}
+  {{- if $kedaSizing.pollingInterval }}
+  pollingInterval: {{ $kedaSizing.pollingInterval }}
+  {{- end }}
+  {{- if $kedaSizing.cooldownPeriod }}
+  cooldownPeriod: {{ $kedaSizing.cooldownPeriod }}
+  {{- end }}
+  {{- if $kedaSizing.idleReplicaCount }}
+  idleReplicaCount: {{ $kedaSizing.idleReplicaCount }}
+  {{- end }}
+  {{- if $kedaSizing.minReplicaCount }}
+  minReplicaCount: {{ $kedaSizing.minReplicaCount }}
+  {{- end }}
+  {{- if $kedaSizing.maxReplicaCount }}
+  maxReplicaCount: {{ $kedaSizing.maxReplicaCount }}
+  {{- end }}
+  {{- if $kedaSizing.fallback }}
+  fallback:
+    {{- toYaml $kedaSizing.fallback | nindent 4 }}
+  {{- end }}
+  {{- if $kedaSizing.advanced }}
+  advanced:
+    {{- toYaml $kedaSizing.advanced | nindent 4 }}
+  {{- end }}
+  {{- with $kedaSizing.triggers }}
+  triggers:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+

@@ -1,0 +1,48 @@
+global:
+  volumes:
+    - name: data
+      emptyDir: {}
+  volumeMounts:
+    - name: data
+      mountPath: /data/
+
+kind: Job
+jobs:
+  test:
+    volumes:
+      - name: test
+        emptyDir: {}
+    initContainers:
+      start:
+        image:
+          repository: debian
+          tag: 12-slim
+        command:
+          - /bin/bash
+        args:
+          - -c
+          - |
+            echo "hello world" > /data/test
+    containers:
+      test:
+        image:
+          repository: debian
+          tag: 12-slim
+        command:
+          - /bin/bash
+        args:
+          - -c
+          - |
+            EXPECTED="hello world"
+            RESULT=$(cat /data/test)
+
+            ls -hal /test/
+
+            if [ "$RESULT" = "$EXPECTED" ]; then
+              exit 0
+            else
+              exit 1
+            fi
+        volumeMounts:
+          - name: test
+            mountPath: /test/
