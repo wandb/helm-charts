@@ -1,5 +1,4 @@
 load('ext://namespace', 'namespace_create')
-
 #default values
 settings = {
     "allowedContexts": [
