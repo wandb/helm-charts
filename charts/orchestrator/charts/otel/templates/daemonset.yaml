@@ -1,0 +1,21 @@
+{{- if ne (default "DaemonSet" .Values.workload.kind) "Deployment" }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "otel.fullname" . }}
+  labels:
+    {{- include "otel.labels" . | nindent 4 }}
+    {{- if .Values.daemonset.labels -}}
+    {{-   toYaml .Values.daemonset.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.daemonset.annotations -}}
+    {{-   toYaml .Values.daemonset.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "otel.selectorLabels" . | nindent 6 }}
+  template:
+{{ include "otel.podTemplate" . }}
+{{- end }}
