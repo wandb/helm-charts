@@ -1,0 +1,60 @@
+{{- if .Values.ingress.create }}
+{{- $fqdn := .Values.global.fqdn | trimPrefix "https://" | trimPrefix "http://" | trimSuffix "/" -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "orchestrator.fullname" . }}
+  labels:
+    {{- include "orchestrator.labels" . | nindent 4 }}
+    {{- with .Values.ingress.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.class }}
+  ingressClassName: {{ .Values.ingress.class }}
+  {{- end }}
+  {{- if and $fqdn .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ $fqdn }}
+      secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "orchestrator.fullname" .)) }}
+  {{- end }}
+  defaultBackend:
+    service:
+      name: {{ .Release.Name }}-web
+      port:
+        number: 3000
+  rules:
+    - {{- if $fqdn }}
+      host: {{ $fqdn }}
+      {{- end }}
+      http:
+        paths:
+          - pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: {{ .Release.Name }}-web
+                port:
+                  number: 3000
+          - pathType: Prefix
+            path: /api
+            backend:
+              service:
+                name: {{ .Release.Name }}-api
+                port:
+                  number: 8081
+          # The workspace-engine serves its Connect API under /engine natively
+          # (engine base-path config), so the ingress only routes — no rewrite.
+          - pathType: Prefix
+            path: /engine
+            backend:
+              service:
+                name: {{ .Release.Name }}-workspace-engine
+                port:
+                  number: 8081
+{{- end }}
