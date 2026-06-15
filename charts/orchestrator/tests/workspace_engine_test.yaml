@@ -1,0 +1,172 @@
+suite: workspace-engine deployment
+templates:
+  - charts/workspace-engine/templates/deployment.yaml
+  - templates/secrets.yaml
+release:
+  name: orchestrator
+
+tests:
+  - it: renders a Deployment by default
+    template: charts/workspace-engine/templates/deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: Deployment
+
+  - it: sets the workspace-engine container image
+    template: charts/workspace-engine/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: orchestrator/workspace-engine:latest
+
+  - it: overrides the workspace-engine image tag
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      workspace-engine:
+        image:
+          tag: v2.0.0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: orchestrator/workspace-engine:v2.0.0
+
+  - it: exposes http and pprof ports
+    template: charts/workspace-engine/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: http
+            containerPort: 8081
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: pprof
+            containerPort: 6060
+          any: true
+
+  - it: sets GITHUB_URL from global integrations
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        integrations:
+          github:
+            url: "https://github.example.com"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_URL
+            value: "https://github.example.com"
+          any: true
+
+  - it: points workspace-engine at the auto-generated encryption-key secret
+    template: charts/workspace-engine/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VARIABLES_AES_256_KEY
+            valueFrom:
+              secretKeyRef:
+                name: orchestrator-encryption-key
+                key: AES_256_KEY
+          any: true
+
+  - it: wires workspace-engine to an external encryption key via valueFrom
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        secrets:
+          encryptionKey:
+            valueFrom:
+              secretKeyRef:
+                name: my-ext-aes
+                key: MY_AES
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VARIABLES_AES_256_KEY
+            valueFrom:
+              secretKeyRef:
+                name: my-ext-aes
+                key: MY_AES
+          any: true
+
+  - it: includes github bot env vars as plain strings
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        integrations:
+          github:
+            bot:
+              name: my-bot
+              clientId: bot-cid
+              appId: "999"
+              clientSecret: bot-secret
+              privateKey: bot-key
+              webhookSecret: wh-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_NAME
+            value: my-bot
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_APP_ID
+            value: "999"
+          any: true
+
+  - it: includes postgres env vars
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        postgresql:
+          user: we-user
+          host: db.internal
+          port: "5432"
+          database: we-db
+          password: we-pass
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_USER
+            value: we-user
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            value: db.internal
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_URL
+            value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DATABASE)
+          any: true
+
+  - it: sets resource requests and limits
+    template: charts/workspace-engine/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 8
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: 16Gi
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: 32
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 64Gi

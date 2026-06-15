@@ -1,0 +1,54 @@
+suite: otel selectors are stable across chart versions
+templates:
+  - charts/otel/templates/daemonset.yaml
+  - charts/otel/templates/deployment.yaml
+  - charts/otel/templates/service.yaml
+  - charts/otel/templates/configmap.yaml
+release:
+  name: orchestrator
+
+tests:
+  - it: daemonset selector contains only stable identity labels
+    template: charts/otel/templates/daemonset.yaml
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: otel
+            app.kubernetes.io/instance: orchestrator
+
+  - it: daemonset pod labels still include chart-version labels
+    template: charts/otel/templates/daemonset.yaml
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: otel
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/instance"]
+          value: orchestrator
+      - exists:
+          path: spec.template.metadata.labels["helm.sh/chart"]
+      - exists:
+          path: spec.template.metadata.labels["orchestrator.com/app-name"]
+
+  - it: deployment selector contains only stable identity labels
+    template: charts/otel/templates/deployment.yaml
+    set:
+      otel:
+        workload:
+          kind: Deployment
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels
+          value:
+            app.kubernetes.io/name: otel
+            app.kubernetes.io/instance: orchestrator
+
+  - it: service selector contains only stable identity labels
+    template: charts/otel/templates/service.yaml
+    asserts:
+      - equal:
+          path: spec.selector
+          value:
+            app.kubernetes.io/name: otel
+            app.kubernetes.io/instance: orchestrator

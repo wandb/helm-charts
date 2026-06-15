@@ -1,0 +1,275 @@
+suite: auth providers
+templates:
+  - charts/api/templates/deployment.yaml
+  - templates/secrets.yaml
+release:
+  name: orchestrator
+set:
+  global:
+    authProviders:
+      oidc:
+        issuer: ""
+        clientId: ""
+        clientSecret: ""
+tests:
+  - it: sets google and okta env vars on api deployment
+    template: charts/api/templates/deployment.yaml
+    set:
+      global:
+        authProviders:
+          google:
+            clientId: google-client-id
+            clientSecret: google-client-secret
+          okta:
+            issuer: https://example.okta.com/oauth2/default
+            clientId: okta-client-id
+            clientSecret: okta-client-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_OKTA_ISSUER
+            value: https://example.okta.com/oauth2/default
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_GOOGLE_CLIENT_ID
+            value: google-client-id
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_GOOGLE_CLIENT_SECRET
+            value: google-client-secret
+          any: true
+  - it: uses valueFrom for okta secrets
+    template: charts/api/templates/deployment.yaml
+    set:
+      global:
+        authProviders:
+          okta:
+            issuer: https://example.okta.com/oauth2/default
+            clientId:
+              valueFrom:
+                secretKeyRef:
+                  name: okta-oauth-secret
+                  key: client-id
+            clientSecret:
+              valueFrom:
+                secretKeyRef:
+                  name: okta-oauth-secret
+                  key: client-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_OKTA_ISSUER
+            value: https://example.okta.com/oauth2/default
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_OKTA_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                key: client-id
+                name: okta-oauth-secret
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_OKTA_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: client-secret
+                name: okta-oauth-secret
+          any: true
+  - it: sets github bot env vars as plain strings
+    template: charts/api/templates/deployment.yaml
+    set:
+      global:
+        integrations:
+          github:
+            bot:
+              name: github-bot
+              clientId: github-client-id
+              appId: "12345"
+              clientSecret: github-client-secret
+              privateKey: github-bot-cert
+              webhookSecret: github-webhook-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_PRIVATE_KEY
+            value: github-bot-cert
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_NAME
+            value: github-bot
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_CLIENT_ID
+            value: github-client-id
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_APP_ID
+            value: "12345"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_CLIENT_SECRET
+            value: github-client-secret
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_WEBHOOK_SECRET
+            value: github-webhook-secret
+          any: true
+  - it: uses valueFrom for google auth secrets
+    template: charts/api/templates/deployment.yaml
+    set:
+      global:
+        authProviders:
+          google:
+            clientId:
+              valueFrom:
+                secretKeyRef:
+                  name: google-oauth-secret
+                  key: client-id
+            clientSecret:
+              valueFrom:
+                secretKeyRef:
+                  name: google-oauth-secret
+                  key: client-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_GOOGLE_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: google-oauth-secret
+                key: client-id
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_GOOGLE_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: google-oauth-secret
+                key: client-secret
+          any: true
+  - it: uses valueFrom for github bot secrets
+    template: charts/api/templates/deployment.yaml
+    set:
+      global:
+        integrations:
+          github:
+            bot:
+              name: my-github-bot
+              clientId:
+                valueFrom:
+                  secretKeyRef:
+                    name: github-bot-secret
+                    key: client-id
+              appId:
+                valueFrom:
+                  secretKeyRef:
+                    name: github-bot-secret
+                    key: app-id
+              clientSecret:
+                valueFrom:
+                  secretKeyRef:
+                    name: github-bot-secret
+                    key: client-secret
+              privateKey:
+                valueFrom:
+                  secretKeyRef:
+                    name: github-bot-secret
+                    key: private-key
+              webhookSecret:
+                valueFrom:
+                  secretKeyRef:
+                    name: github-bot-secret
+                    key: webhook-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_NAME
+            value: my-github-bot
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-bot-secret
+                key: client-id
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: github-bot-secret
+                key: app-id
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_BOT_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: github-bot-secret
+                key: private-key
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: github-bot-secret
+                key: webhook-secret
+          any: true
+  - it: sets BASE_URL and GITHUB_URL from global values
+    template: charts/api/templates/deployment.yaml
+    set:
+      global:
+        fqdn: "https://app.orchestrator.dev"
+        integrations:
+          github:
+            url: "https://github.example.com"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASE_URL
+            value: "https://app.orchestrator.dev"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_URL
+            value: "https://app.orchestrator.dev"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GITHUB_URL
+            value: "https://github.example.com"
+          any: true
