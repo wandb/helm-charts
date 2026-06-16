@@ -1,12 +1,6 @@
 {{- define "wandb.historyStore" -}}
     {{- $stores := list -}}
-    {{- /*
-        history-reader is a gRPC service backed by ClickHouse (via the
-        history-updater write path). When enabled it is queried first so
-        ClickHouse-resident runs are served from it; parquet + bigtable/mysql
-        remain as fallbacks for runs not yet migrated.
-    */ -}}
-    {{- if and .Values.global.historyStore.historyReaderEnabled (index .Values "history-reader" "install") -}}
+    {{- if .Values.global.historyStore.historyReaderEnabled -}}
         {{- $stores = append $stores (printf "historyreader://%s-history-reader:9244" .Release.Name) -}}
     {{- end -}}
     {{- if .Values.global.historyStore.parquetUseGRPC -}}
