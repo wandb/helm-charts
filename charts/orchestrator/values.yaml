@@ -78,6 +78,52 @@ global:
     port: "5432"
     database: "orchestrator"
 
+  # Identity service's better-auth database (ctrlplane_auth). AUTH_DATABASE_URL is
+  # assembled from these. It's a separate DB on the main instance with its own user;
+  # reference an ExternalSecret-materialized secret for the password via valueFrom.
+  authDatabase:
+    user: "auth"
+    host: ""            # the main instance host (same Cloud SQL instance)
+    port: "5432"
+    database: "ctrlplane_auth"
+    password: ""
+    # password:
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: "ctrlplane-auth-db"   # materialized by an ExternalSecret
+    #       key: "password"
+
+  # SpiceDB (authorization). Shared by the identity service (writes membership
+  # grants over gRPC) and the workspace-engine (enforces them). The preshared key
+  # lives in the spicedb namespace; reference an ExternalSecret-materialized secret
+  # for the token via valueFrom.
+  spicedb:
+    addr: ""            # e.g. ctrlplane.spicedb:50051 (svc.namespace:port)
+    insecure: "true"    # plaintext gRPC in-cluster; "false" for TLS
+    token: ""
+    # token:
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: "spicedb-config"   # materialized by an ExternalSecret
+    #       key: "preshared_key"
+
+  # JWT audience — identity stamps it on issued tokens (AUTH_JWT_AUDIENCE) and the
+  # engine pins it for verification (AUTH_AUDIENCE). One value so they can't drift.
+  jwt:
+    audience: "workspace-engine"
+
+  # Redis — used by identity + engine for cross-pod SpiceDB read-after-write
+  # (REDIS_URL is assembled from these).
+  redis:
+    host: ""
+    port: "6379"
+    password: ""
+    # password:
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: "redis-secret"
+    #       key: "password"
+
   integrations:
     github:
       url: "https://github.com"
@@ -128,6 +174,61 @@ ingress:
 
 otel:
   install: true
+
+identity:
+  install: true
+
+  image:
+    repository: orchestrator/identity
+    tag: latest
+
+  env:
+    BASE_URL: "{{ .Values.global.fqdn }}"
+    AUTH_URL: "{{ .Values.global.fqdn }}"
+    PORT: "8080"
+    # Engine Connect API for tRPC engine calls.
+    CONNECT_URL: "http://{{ .Release.Name }}-workspace-engine:8081"
+    # Audience stamped on issued JWTs; the engine pins the same value (AUTH_AUDIENCE).
+    AUTH_JWT_AUDIENCE: "{{ .Values.global.jwt.audience }}"
+
+  envTpls:
+    - '{{ include "orchestrator.authProviderEnvVars" . }}'
+    - '{{ include "orchestrator.authDatabaseEnvVars" . }}'
+    - '{{ include "orchestrator.spicedbEnvVars" . }}'
+    - '{{ include "orchestrator.redisEnvVars" . }}'
+
+  containers:
+    identity:
+      ports:
+        - name: http
+          containerPort: 8080
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+      livenessProbe:
+        httpGet:
+          path: /api/healthz
+          port: http
+      readinessProbe:
+        httpGet:
+          path: /api/healthz
+          port: http
+      startupProbe:
+        httpGet:
+          path: /api/healthz
+          port: http
+
+  service:
+    enabled: true
+    ports:
+      - port: 8080
+        targetPort: http
+        protocol: TCP
+        name: http
 
 api:
   install: true
@@ -249,6 +350,9 @@ workspace-engine:
     - '{{ include "orchestrator.githubBotEnvVars" . }}'
     - '{{ include "orchestrator.postgresqlEnvVars" . }}'
     - '{{ include "orchestrator.encryptionKeyEnvVars" . }}'
+    - '{{ include "orchestrator.spicedbEnvVars" . }}'
+    - '{{ include "orchestrator.authJwtEnvVars" . }}'
+    - '{{ include "orchestrator.redisEnvVars" . }}'
 
   containers:
     workspace-engine:
