@@ -23,6 +23,16 @@ global:
     #     secretKeyRef:
     #       name: "my-encryption-secret"
     #       key: "AES_256_KEY"
+    # identity<->engine SyncUser RPC shared secret (AUTH_SYNC_SECRET). Wired to
+    # identity + workspace-engine ONLY. Unlike authSecret/encryptionKey it is NOT
+    # auto-generated: empty => the env var is omitted => user-mirror sync stays off
+    # (fail-open). Must be the SAME value on both services; override in prod.
+    authSyncSecret: ""
+    # authSyncSecret:
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: "my-auth-sync-secret"
+    #       key: "AUTH_SYNC_SECRET"
 
   authProviders:
     google:
@@ -195,6 +205,7 @@ identity:
 
   envTpls:
     - '{{ include "orchestrator.authProviderEnvVars" . }}'
+    - '{{ include "orchestrator.authSyncSecretEnvVars" . }}'
     - '{{ include "orchestrator.authDatabaseEnvVars" . }}'
     - '{{ include "orchestrator.spicedbEnvVars" . }}'
     - '{{ include "orchestrator.redisEnvVars" . }}'
@@ -348,6 +359,16 @@ workspace-engine:
     BASE_URL: "{{ .Values.global.fqdn }}"
     GITHUB_URL: "{{ .Values.global.integrations.github.url }}"
 
+    GRPC_PORT: "8081"
+    HTTP_PREFIX_PATH: "/engine"
+
+    AUTH_ALLOW_UNVERIFIED_JWT_CLAIMS: "false"
+    AUTHZ_ALLOW_DISABLED: "false"
+
+    SERVICES: ""
+
+    TRACE_ADDRESS: "{{ .Release.Name }}-otel:4317"
+
   envTpls:
     - '{{ include "orchestrator.githubBotEnvVars" . }}'
     - '{{ include "orchestrator.postgresqlEnvVars" . }}'
@@ -355,6 +376,7 @@ workspace-engine:
     - '{{ include "orchestrator.spicedbEnvVars" . }}'
     - '{{ include "orchestrator.authJwtEnvVars" . }}'
     - '{{ include "orchestrator.redisEnvVars" . }}'
+    - '{{ include "orchestrator.authSyncSecretEnvVars" . }}'
 
   containers:
     workspace-engine:
