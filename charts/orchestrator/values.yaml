@@ -93,7 +93,7 @@ global:
   # reference an ExternalSecret-materialized secret for the password via valueFrom.
   authDatabase:
     user: "auth"
-    host: ""            # the main instance host (same Cloud SQL instance)
+    host: ""
     port: "5432"
     database: "ctrlplane_auth"
     password: ""
@@ -108,8 +108,8 @@ global:
   # lives in the spicedb namespace; reference an ExternalSecret-materialized secret
   # for the token via valueFrom.
   spicedb:
-    addr: ""            # e.g. ctrlplane.spicedb:50051 (svc.namespace:port)
-    insecure: "true"    # plaintext gRPC in-cluster; "false" for TLS
+    addr: ""
+    insecure: "true"
     token: ""
     # token:
     #   valueFrom:
@@ -181,7 +181,7 @@ ingress:
   annotations: {}
   tls:
     enabled: false
-    secretName: ""  # defaults to <fullname>-tls when empty
+    secretName: ""
 
 otel:
   install: true
@@ -288,15 +288,15 @@ workspace-engine:
 
   service:
     enabled: true
+    healthCheck:
+      type: HTTP
+      requestPath: /readyz
+      port: 8089
     ports:
       - port: 8086
         targetPort: http
         protocol: TCP
         name: http
-      - port: 6060
-        targetPort: pprof
-        protocol: TCP
-        name: pprof
 
   env:
     BASE_URL: "{{ .Values.global.fqdn }}"
@@ -326,8 +326,6 @@ workspace-engine:
       ports:
         - name: http
           containerPort: 8086
-        - name: pprof
-          containerPort: 6060
         - name: health
           containerPort: 8089
       resources:
