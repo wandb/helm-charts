@@ -48,5 +48,4 @@ Generate all auth provider environment variables
 {{ include "orchestrator.googleAuthEnvVars" . }}
 {{ include "orchestrator.oktaAuthEnvVars" . }}
 {{ include "orchestrator.authSecretEnvVars" . }}
-{{ include "orchestrator.encryptionKeyEnvVars" . }}
 {{- end -}}
