@@ -111,6 +111,10 @@ global:
   # engine pins it for verification (AUTH_AUDIENCE). One value so they can't drift.
   jwt:
     audience: "workspace-engine"
+    # Port the identity service listens on / serves JWKS. Drives the engine's
+    # AUTH_JWKS_URL and the identity PORT env. (The identity container/service
+    # ports are static values — keep them equal to this if you override it.)
+    identityPort: 8081
 
   # Redis — used by identity + engine for cross-pod SpiceDB read-after-write
   # (REDIS_URL is assembled from these).
@@ -183,7 +187,7 @@ identity:
   env:
     BASE_URL: "{{ .Values.global.fqdn }}"
     AUTH_URL: "{{ .Values.global.fqdn }}"
-    PORT: "8080"
+    PORT: "{{ .Values.global.jwt.identityPort }}"
     # Engine Connect API for tRPC engine calls.
     CONNECT_URL: "http://{{ .Release.Name }}-workspace-engine:8081"
     # Audience stamped on issued JWTs; the engine pins the same value (AUTH_AUDIENCE).
@@ -199,7 +203,7 @@ identity:
     identity:
       ports:
         - name: http
-          containerPort: 8080
+          containerPort: 8081
       resources:
         requests:
           cpu: 250m
@@ -223,7 +227,7 @@ identity:
   service:
     enabled: true
     ports:
-      - port: 8080
+      - port: 8081
         targetPort: http
         protocol: TCP
         name: http
