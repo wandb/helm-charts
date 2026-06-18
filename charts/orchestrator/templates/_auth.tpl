@@ -37,6 +37,10 @@ Generate Okta OAuth environment variables using the new valueFrom pattern
 {{- end -}}
 {{- end -}}
 
+{{- define "orchestrator.authSyncSecretEnvVars" -}}
+{{ include "orchestrator.envVar" (dict "name" "AUTH_SYNC_SECRET" "value" .Values.global.secrets.authSyncSecret) }}
+{{- end -}}
+
 {{/*
 Generate all auth provider environment variables
 */}}
