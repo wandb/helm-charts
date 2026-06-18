@@ -6,7 +6,7 @@ identity stamps (its BASE_URL = global.fqdn); AUTH_AUDIENCE must equal identity'
 AUTH_JWT_AUDIENCE (both sourced from global.jwt.audience).
 */}}
 {{- define "orchestrator.authJwtEnvVars" -}}
-{{ include "orchestrator.envVar" (dict "name" "AUTH_JWKS_URL" "value" (printf "http://%s-identity:8080/api/auth/jwks" .Release.Name)) }}
+{{ include "orchestrator.envVar" (dict "name" "AUTH_JWKS_URL" "value" (printf "http://%s-identity:8081/api/auth/jwks" .Release.Name)) }}
 {{ include "orchestrator.envVar" (dict "name" "AUTH_VALID_ISSUERS" "value" .Values.global.fqdn) }}
 {{ include "orchestrator.envVar" (dict "name" "AUTH_AUDIENCE" "value" .Values.global.jwt.audience) }}
 {{- end -}}
