@@ -199,6 +199,11 @@ identity:
     CONNECT_URL: "http://{{ .Release.Name }}-workspace-engine:8086"
     # Audience stamped on issued JWTs; the engine pins the same value (AUTH_AUDIENCE).
     AUTH_JWT_AUDIENCE: "{{ .Values.global.jwt.audience }}"
+    # OTel (identity uses OTLP/HTTP). OTEL_EXPORTER_OTLP_ENDPOINT is wired
+    # node-local via the telemetry envTpl below. Service name + sampler ratio are
+    # plain overrideable defaults.
+    OTEL_SERVICE_NAME: "ctrlplane/identity"
+    OTEL_SAMPLER_RATIO: "0.1"
 
   envTpls:
     - '{{ include "orchestrator.authProviderEnvVars" . }}'
@@ -206,6 +211,7 @@ identity:
     - '{{ include "orchestrator.authDatabaseEnvVars" . }}'
     - '{{ include "orchestrator.spicedbEnvVars" . }}'
     - '{{ include "orchestrator.redisEnvVars" . }}'
+    - '{{ include "orchestrator.identityTelemetryEnvVars" . }}'
 
   containers:
     identity:
@@ -301,6 +307,16 @@ workspace-engine:
   env:
     BASE_URL: "{{ .Values.global.fqdn }}"
     GITHUB_URL: "{{ .Values.global.integrations.github.url }}"
+    # Datadog unified service tagging (Go/airframe). DD_SERVICE -> service.name,
+    # DD_ENV -> deployment.environment, TRACE_SAMPLE_RATE -> app-side trace sampling
+    # (the collector does not sample). All overrideable per environment. DD_ENV
+    # defaults to "local"; deployments override it (e.g. "qa"). DD_VERSION is left
+    # unset so the binary's build-stamped version.Version is used unless a
+    # deployment passes a concrete build tag. TRACE_ADDRESS / METRICS_ADDRESS are
+    # wired node-local via the telemetry envTpl below.
+    DD_SERVICE: "ctrlplane/workspace-engine"
+    DD_ENV: "local"
+    TRACE_SAMPLE_RATE: "0.1"
 
     GRPC_PORT: "8086"
     HTTP_PREFIX_PATH: "/engine"
@@ -310,8 +326,6 @@ workspace-engine:
 
     SERVICES: ""
 
-    TRACE_ADDRESS: "{{ .Release.Name }}-otel:4317"
-
   envTpls:
     - '{{ include "orchestrator.githubBotEnvVars" . }}'
     - '{{ include "orchestrator.postgresqlEnvVars" . }}'
@@ -320,6 +334,7 @@ workspace-engine:
     - '{{ include "orchestrator.authJwtEnvVars" . }}'
     - '{{ include "orchestrator.redisEnvVars" . }}'
     - '{{ include "orchestrator.authSyncSecretEnvVars" . }}'
+    - '{{ include "orchestrator.workspaceEngineTelemetryEnvVars" . }}'
 
   containers:
     workspace-engine:
