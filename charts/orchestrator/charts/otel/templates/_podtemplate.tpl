@@ -24,12 +24,19 @@
           command:
             - /otelcol-contrib
             - --config=/conf/config.yaml
+          {{- $hostPorts := and (eq (default "DaemonSet" .Values.workload.kind) "DaemonSet") (default dict .Values.daemonset.hostPorts).enabled }}
           ports:
             - name: otlp
               containerPort: 4317
+              {{- if $hostPorts }}
+              hostPort: 4317
+              {{- end }}
               protocol: TCP
             - name: otlp-http
               containerPort: 4318
+              {{- if $hostPorts }}
+              hostPort: 4318
+              {{- end }}
               protocol: TCP
             - name: prometheus
               containerPort: 9109
