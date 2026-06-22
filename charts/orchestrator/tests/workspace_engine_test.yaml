@@ -155,6 +155,75 @@ tests:
             value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DATABASE)
           any: true
 
+  - it: sets Datadog unified service tagging defaults
+    template: charts/workspace-engine/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DD_SERVICE
+            value: "ctrlplane/workspace-engine"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DD_ENV
+            value: "local"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TRACE_SAMPLE_RATE
+            value: "0.1"
+          any: true
+
+  - it: does not set DD_VERSION by default (binary stamps version.Version)
+    template: charts/workspace-engine/templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DD_VERSION
+          any: true
+
+  - it: overrides DD_ENV per environment
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      workspace-engine:
+        env:
+          DD_ENV: qa
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DD_ENV
+            value: "qa"
+          any: true
+
+  - it: wires node-local collector addresses via host IP
+    template: charts/workspace-engine/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TRACE_ADDRESS
+            value: "$(OTEL_HOST_IP):4317"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: METRICS_ADDRESS
+            value: "$(OTEL_HOST_IP):4317"
+          any: true
+
   - it: sets resource requests and limits
     template: charts/workspace-engine/templates/deployment.yaml
     asserts:
