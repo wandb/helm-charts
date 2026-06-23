@@ -1,0 +1,68 @@
+suite: otel OTLP ports exposed via hostPort for node-local routing
+templates:
+  - charts/otel/templates/daemonset.yaml
+  - charts/otel/templates/deployment.yaml
+  - charts/otel/templates/configmap.yaml
+release:
+  name: orchestrator
+
+tests:
+  - it: DaemonSet exposes OTLP gRPC/HTTP on the node via hostPort by default
+    template: charts/otel/templates/daemonset.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: otlp
+            containerPort: 4317
+            hostPort: 4317
+            protocol: TCP
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: otlp-http
+            containerPort: 4318
+            hostPort: 4318
+            protocol: TCP
+          any: true
+
+  - it: hostPort can be disabled
+    template: charts/otel/templates/daemonset.yaml
+    set:
+      otel:
+        daemonset:
+          hostPorts:
+            enabled: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: otlp
+            containerPort: 4317
+            protocol: TCP
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: otlp
+            containerPort: 4317
+            hostPort: 4317
+            protocol: TCP
+          any: true
+
+  - it: Deployment workload never sets hostPort
+    template: charts/otel/templates/deployment.yaml
+    set:
+      otel:
+        workload:
+          kind: Deployment
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: otlp
+            containerPort: 4317
+            hostPort: 4317
+            protocol: TCP
+          any: true
