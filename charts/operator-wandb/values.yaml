@@ -2037,71 +2037,78 @@ history-reader:
         failureThreshold: 3
         successThreshold: 1
   size: ""
+  # Sizing grounded in the June 2026 load test (Datadog,
+  # kube_container_name:history-reader): active pods peaked at ~150 MiB and
+  # ~0.26 CPU each (avg ~100 MiB, <25 mCPU). Tiers are set well above that to
+  # leave headroom for the per-pod in-memory cache (cache.size 10000, 5m TTL)
+  # to fill under production read volume. Replica counts are kept below
+  # history-updater because each pod holds its own cache, so we favor fewer,
+  # longer-lived pods over wide fan-out.
   sizing:
     small:
       resources:
         limits:
-          cpu: "4"
-          memory: 8Gi
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: 500m
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
         requests:
           cpu: "1"
           memory: 2Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 2
-          minReplicas: 2
-    medium:
-      resources:
-        limits:
-          cpu: "6"
-          memory: 16Gi
-        requests:
-          cpu: "6"
-          memory: 16Gi
-      autoscaling:
-        horizontal:
-          enabled: true
-          maxReplicas: 2
+          maxReplicas: 4
           minReplicas: 2
     large:
       resources:
         limits:
-          cpu: "6"
-          memory: 16Gi
+          cpu: "4"
+          memory: 8Gi
         requests:
-          cpu: "6"
-          memory: 16Gi
+          cpu: "2"
+          memory: 4Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 2
+          maxReplicas: 4
           minReplicas: 2
     xlarge:
       resources:
         limits:
-          cpu: "6"
+          cpu: "4"
           memory: 16Gi
         requests:
-          cpu: "6"
-          memory: 16Gi
+          cpu: "2"
+          memory: 8Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 2
+          maxReplicas: 4
           minReplicas: 2
     xxlarge:
       resources:
         limits:
-          cpu: "6"
-          memory: 16Gi
+          cpu: "8"
+          memory: 32Gi
         requests:
-          cpu: "6"
+          cpu: "4"
           memory: 16Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 2
+          maxReplicas: 4
           minReplicas: 2
 
 frontend:
