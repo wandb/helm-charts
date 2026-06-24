@@ -413,6 +413,9 @@ global:
     parquetOnly: false
     # When enabled, historyStore will use gRPC headless service instead of net/rpc
     parquetUseGRPC: false
+    # When enabled, historyStore will query the history-reader gRPC service
+    # first (backed by ClickHouse).
+    historyReaderEnabled: false
 
   pubSub:
     enabled: false
@@ -1966,6 +1969,148 @@ history-updater:
                   selectPolicy: Max
           # triggers must be provided by user when enabling KEDA
 
+# history-reader is a gRPC service that serves run history from ClickHouse.
+history-reader:
+  install: false
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  service:
+    enabled: true
+    # Headless so gRPC clients resolve to all pod IPs and do client-side
+    # load balancing.
+    headless: true
+    ports:
+      - port: 9244
+        protocol: TCP
+        name: grpc
+  grpc:
+    maxRecvMsgSize: 4194304
+    maxSendMsgSize: 4194304
+  cache:
+    size: 10000
+    ttl: 5m
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-history-reader-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucket.cwIdentity" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  env:
+    GORILLA_HISTORY_READER_HISTORY_STORE:
+      value: "$(GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS)"
+  containers:
+    history-reader:
+      args: ["history-reader"]
+      ports:
+        - name: grpc
+          containerPort: 9244
+          protocol: TCP
+      livenessProbe:
+        grpc:
+          port: 9244
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        grpc:
+          port: 9244
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+  size: ""
+  # Sizing grounded in the June 2026 load test (Datadog,
+  # kube_container_name:history-reader): active pods peaked at ~150 MiB and
+  # ~0.26 CPU each (avg ~100 MiB, <25 mCPU). Tiers are set well above that to
+  # leave headroom for the per-pod in-memory cache (cache.size 10000, 5m TTL)
+  # to fill under production read volume. Replica counts are kept below
+  # history-updater because each pod holds its own cache, so we favor fewer,
+  # longer-lived pods over wide fan-out.
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: 500m
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 16Gi
+        requests:
+          cpu: "2"
+          memory: 8Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "8"
+          memory: 32Gi
+        requests:
+          cpu: "4"
+          memory: 16Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+
 frontend:
   install: false
   podSecurityContext:
@@ -2932,9 +3077,9 @@ mcp-server:
   ## and break the second tpl parse). The two helpers below resolve to
   ## final values short enough to survive both constraints.
   podLabels:
-    tags.datadoghq.com/service: '{{ include `wandb.mcpDDService` . }}'
-    tags.datadoghq.com/env: '{{ include `wandb.mcpDDEnv` . }}'
-    tags.datadoghq.com/version: '{{ .Values.image.tag }}'
+    tags.datadoghq.com/service: "{{ include `wandb.mcpDDService` . }}"
+    tags.datadoghq.com/env: "{{ include `wandb.mcpDDEnv` . }}"
+    tags.datadoghq.com/version: "{{ .Values.image.tag }}"
     app.kubernetes.io/component: mcp-server
     app.kubernetes.io/part-of: wandb-platform
   ## Pod annotations -- always-on entries here. The Datadog autodiscovery
