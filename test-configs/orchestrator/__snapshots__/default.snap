@@ -1,0 +1,939 @@
+# chartsnap: snapshot_version=v3
+---
+# Source: orchestrator/charts/identity/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-identity
+  labels:
+    helm.sh/chart: identity-0.12.1
+    app.kubernetes.io/name: identity
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: identity
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
+# Source: orchestrator/charts/web/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-web
+  labels:
+    helm.sh/chart: web-0.12.1
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: web
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
+# Source: orchestrator/charts/workspace-engine/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-workspace-engine
+  labels:
+    helm.sh/chart: workspace-engine-0.12.1
+    app.kubernetes.io/name: workspace-engine
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: workspace-engine
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
+# Source: orchestrator/charts/identity/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-identity
+  labels:
+    helm.sh/chart: identity-0.12.1
+    app.kubernetes.io/name: identity
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: orchestrator/charts/otel/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-otel
+  labels:
+    helm.sh/chart: otel-0.2.4
+    app.kubernetes.io/name: otel
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.126.0"
+    orchestrator.com/app-name: otel-0.2.4
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: orchestrator/charts/web/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-web
+  labels:
+    helm.sh/chart: web-0.12.1
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: orchestrator/charts/workspace-engine/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-workspace-engine
+  labels:
+    helm.sh/chart: workspace-engine-0.12.1
+    app.kubernetes.io/name: workspace-engine
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: orchestrator/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chartsnap-encryption-key
+  labels:
+    helm.sh/chart: orchestrator-1.2.1
+    app.kubernetes.io/name: orchestrator
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+type: Opaque
+data:
+  AES_256_KEY: '###DYNAMIC_FIELD###'
+---
+# Source: orchestrator/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chartsnap-auth-secret
+  labels:
+    helm.sh/chart: orchestrator-1.2.1
+    app.kubernetes.io/name: orchestrator
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+type: Opaque
+data:
+  AUTH_SECRET: '###DYNAMIC_FIELD###'
+---
+# Source: orchestrator/charts/otel/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-otel
+  labels:
+    helm.sh/chart: otel-0.2.4
+    app.kubernetes.io/name: otel
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.126.0"
+    orchestrator.com/app-name: otel-0.2.4
+    app.kubernetes.io/managed-by: Helm
+data:
+  config: |
+    exporters:
+      debug: {}
+      debug/detailed:
+        verbosity: detailed
+      prometheus:
+        endpoint: 0.0.0.0:9109
+    extensions:
+      health_check: {}
+    processors:
+      batch: {}
+      k8sattributes:
+        extract:
+          annotations:
+          - from: pod
+            key_regex: (.*)
+            tag_name: $$1
+          labels:
+          - from: pod
+            key_regex: (.*)
+            tag_name: $$1
+          metadata:
+          - k8s.namespace.name
+          - k8s.deployment.name
+          - k8s.statefulset.name
+          - k8s.daemonset.name
+          - k8s.cronjob.name
+          - k8s.job.name
+          - k8s.node.name
+          - k8s.pod.name
+          - k8s.pod.uid
+          - k8s.pod.start_time
+        filter:
+          node_from_env_var: K8S_NODE_NAME
+        passthrough: false
+        pod_association:
+        - sources:
+          - from: resource_attribute
+            name: k8s.pod.ip
+        - sources:
+          - from: resource_attribute
+            name: k8s.pod.uid
+        - sources:
+          - from: connection
+      memory_limiter:
+        check_interval: 5s
+        limit_percentage: 80
+        spike_limit_percentage: 25
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+      statsd:
+        endpoint: 0.0.0.0:8125
+    service:
+      extensions:
+      - health_check
+      pipelines:
+        traces:
+          exporters:
+          - debug
+          processors:
+          - batch
+          - memory_limiter
+          receivers:
+          - otlp
+      telemetry:
+        metrics:
+          address: ${env:POD_IP}:8888
+---
+# Source: orchestrator/charts/otel/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: chartsnap-otel
+  namespace: default
+  labels:
+    helm.sh/chart: otel-0.2.4
+    app.kubernetes.io/name: otel
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.126.0"
+    orchestrator.com/app-name: otel-0.2.4
+    app.kubernetes.io/managed-by: Helm
+rules:
+# kubernetesAttributes
+- apiGroups: [""]
+  resources: ["pods", "namespaces"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["replicasets"]
+  verbs: ["get", "list", "watch"]
+# clusterMetrics
+- apiGroups: [""]
+  resources: ["events", "namespaces", "namespaces/status", "nodes", "nodes/spec", "pods", "pods/status", "replicationcontrollers", "replicationcontrollers/status", "resourcequotas", "services"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets", "deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["daemonsets", "deployments", "replicasets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch"]
+# kubeletMetrics
+- apiGroups: [""]
+  resources: ["nodes/stats"]
+  verbs: ["get", "watch", "list"]
+# kubernetesEvents
+- apiGroups: ["events.k8s.io"]
+  resources: ["events"]
+  verbs: ["watch", "list"]
+# leaderElection (k8s_leader_elector extension)
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+# Source: orchestrator/charts/otel/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: chartsnap-otel
+  labels:
+    helm.sh/chart: otel-0.2.4
+    app.kubernetes.io/name: otel
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.126.0"
+    orchestrator.com/app-name: otel-0.2.4
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: chartsnap-otel
+subjects:
+- kind: ServiceAccount
+  name: chartsnap-otel
+  namespace: default
+---
+# Source: orchestrator/charts/identity/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-identity
+  labels:
+    helm.sh/chart: identity-0.12.1
+    app.kubernetes.io/name: identity
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8081
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/name: identity
+    app.kubernetes.io/instance: chartsnap
+---
+# Source: orchestrator/charts/otel/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-otel
+  labels:
+    helm.sh/chart: otel-0.2.4
+    app.kubernetes.io/name: otel
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.126.0"
+    orchestrator.com/app-name: otel-0.2.4
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '9109'
+spec:
+  type:
+  internalTrafficPolicy: Local
+  ports:
+  - port: 9109
+    protocol: TCP
+    name: otel-exporter
+  - port: 8125
+    protocol: TCP
+    name: statsd
+  - port: 4317
+    protocol: TCP
+    name: otlp-grpc
+  - port: 4318
+    protocol: TCP
+    name: otlp-http
+  selector:
+    app.kubernetes.io/name: otel
+    app.kubernetes.io/instance: chartsnap
+---
+# Source: orchestrator/charts/web/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-web
+  labels:
+    helm.sh/chart: web-0.12.1
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 3000
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: chartsnap
+---
+# Source: orchestrator/charts/workspace-engine/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: chartsnap-workspace-engine
+  labels:
+    helm.sh/chart: workspace-engine-0.12.1
+    app.kubernetes.io/name: workspace-engine
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8086
+    protocol: TCP
+    targetPort: http
+  selector:
+    app.kubernetes.io/name: workspace-engine
+    app.kubernetes.io/instance: chartsnap
+---
+# Source: orchestrator/charts/otel/templates/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: chartsnap-otel
+  labels:
+    helm.sh/chart: otel-0.2.4
+    app.kubernetes.io/name: otel
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "0.126.0"
+    orchestrator.com/app-name: otel-0.2.4
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: otel
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: otel-0.2.4
+        app.kubernetes.io/name: otel
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "0.126.0"
+        orchestrator.com/app-name: otel-0.2.4
+        app.kubernetes.io/managed-by: Helm
+      annotations:
+        checksum/configmap: 2afd4e65137d7a0ab44fdc556d4a39bf5c41bd4da7f6860f5584f8794478718
+    spec:
+      serviceAccountName: chartsnap-otel
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+      - name: otel
+        image: "otel/opentelemetry-collector-contrib:0.126.0"
+        command:
+        - /otelcol-contrib
+        - --config=/conf/config.yaml
+        ports:
+        - name: otlp
+          containerPort: 4317
+          hostPort: 4317
+          protocol: TCP
+        - name: otlp-http
+          containerPort: 4318
+          hostPort: 4318
+          protocol: TCP
+        - name: prometheus
+          containerPort: 9109
+          protocol: TCP
+        - name: statsd
+          containerPort: 8125
+          protocol: TCP
+        env:
+        - name: K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 750Mi
+          requests:
+            cpu: 500m
+            memory: 300Mi
+        volumeMounts:
+        - mountPath: /conf
+          name: config
+      volumes:
+      - name: config
+        configMap:
+          name: chartsnap-otel
+          items:
+          - key: config
+            path: config.yaml
+      hostNetwork: false
+---
+# Source: orchestrator/charts/identity/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-identity
+  labels:
+    helm.sh/chart: identity-0.12.1
+    app.kubernetes.io/name: identity
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: identity
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: identity-0.12.1
+        app.kubernetes.io/name: identity
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: identity
+        envFrom:
+        env:
+        - name: AUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: AUTH_SECRET
+              name: chartsnap-auth-secret
+        - name: AUTH_DB_USER
+          value: auth
+        - name: AUTH_DB_PORT
+          value: "5432"
+        - name: AUTH_DB_NAME
+          value: ctrlplane_auth
+        - name: AUTH_DATABASE_URL
+          value: postgresql://$(AUTH_DB_USER):$(AUTH_DB_PASSWORD)@$(AUTH_DB_HOST):$(AUTH_DB_PORT)/$(AUTH_DB_NAME)
+        - name: SPICEDB_INSECURE
+          value: "true"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_URL
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)
+        - name: OTEL_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://$(OTEL_HOST_IP):4318
+        - name: AUTH_JWT_AUDIENCE
+          value: "workspace-engine"
+        - name: AUTH_URL
+          value: "https://orchestrator.example.test"
+        - name: BASE_URL
+          value: "https://orchestrator.example.test"
+        - name: CONNECT_URL
+          value: "http://chartsnap-workspace-engine:8086"
+        - name: OTEL_SAMPLER_RATIO
+          value: "0.1"
+        - name: OTEL_SERVICE_NAME
+          value: "ctrlplane/identity"
+        - name: PORT
+          value: "8081"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "orchestrator/identity:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8081
+          name: http
+        livenessProbe:
+          httpGet:
+            path: /api/healthz
+            port: http
+        readinessProbe:
+          httpGet:
+            path: /api/healthz
+            port: http
+        startupProbe:
+          httpGet:
+            path: /api/healthz
+            port: http
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+      serviceAccountName: chartsnap-identity
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: identity
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: identity
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+---
+# Source: orchestrator/charts/web/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-web
+  labels:
+    helm.sh/chart: web-0.12.1
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: web-0.12.1
+        app.kubernetes.io/name: web
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: web
+        envFrom:
+        env:
+        - name: AUTH_URL
+          value: "https://orchestrator.example.test"
+        - name: BASE_URL
+          value: "https://orchestrator.example.test"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "orchestrator/web:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+        resources:
+          limits:
+            cpu: 4000m
+            memory: 4Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+      serviceAccountName: chartsnap-web
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: web
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: web
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+---
+# Source: orchestrator/charts/workspace-engine/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-workspace-engine
+  labels:
+    helm.sh/chart: workspace-engine-0.12.1
+    app.kubernetes.io/name: workspace-engine
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: workspace-engine
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: workspace-engine-0.12.1
+        app.kubernetes.io/name: workspace-engine
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: workspace-engine
+        envFrom:
+        env:
+        - name: POSTGRES_USER
+          value: orchestrator
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DATABASE
+          value: orchestrator
+        - name: POSTGRES_PASSWORD
+          value: orchestrator
+        - name: POSTGRES_URL
+          value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DATABASE)
+        - name: VARIABLES_AES_256_KEY
+          valueFrom:
+            secretKeyRef:
+              key: AES_256_KEY
+              name: chartsnap-encryption-key
+        - name: SPICEDB_INSECURE
+          value: "true"
+        - name: AUTH_JWKS_URL
+          value: http://chartsnap-identity:8081/api/auth/jwks
+        - name: AUTH_VALID_ISSUERS
+          value: https://orchestrator.example.test
+        - name: AUTH_AUDIENCE
+          value: workspace-engine
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_URL
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)
+        - name: OTEL_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: TRACE_ADDRESS
+          value: $(OTEL_HOST_IP):4317
+        - name: METRICS_ADDRESS
+          value: $(OTEL_HOST_IP):4317
+        - name: AUTHZ_ALLOW_DISABLED
+          value: "false"
+        - name: AUTH_ALLOW_UNVERIFIED_JWT_CLAIMS
+          value: "false"
+        - name: BASE_URL
+          value: "https://orchestrator.example.test"
+        - name: DD_ENV
+          value: "local"
+        - name: DD_SERVICE
+          value: "ctrlplane/workspace-engine"
+        - name: GITHUB_URL
+          value: "https://github.com"
+        - name: GRPC_PORT
+          value: "8086"
+        - name: HTTP_PREFIX_PATH
+          value: "/engine"
+        - name: SERVICES
+          value: ""
+        - name: TRACE_SAMPLE_RATE
+          value: "0.1"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "orchestrator/workspace-engine:latest"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8086
+          name: http
+        - containerPort: 8089
+          name: health
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: health
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: health
+        startupProbe:
+          httpGet:
+            path: /readyz
+            port: health
+        resources:
+          limits:
+            cpu: 32
+            memory: 64Gi
+          requests:
+            cpu: 8
+            memory: 16Gi
+      serviceAccountName: chartsnap-workspace-engine
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: workspace-engine
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: workspace-engine
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+---
+# Source: orchestrator/charts/web/templates/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: chartsnap-web
+  labels:
+    helm.sh/chart: web-0.12.1
+    app.kubernetes.io/name: web
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: chartsnap-web
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+# Source: orchestrator/templates/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chartsnap-orchestrator
+  labels:
+    helm.sh/chart: orchestrator-1.2.1
+    app.kubernetes.io/name: orchestrator
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  defaultBackend:
+    service:
+      name: chartsnap-web
+      port:
+        number: 3000
+  rules:
+  - host: orchestrator.example.test
+    http:
+      paths:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: chartsnap-web
+            port:
+              number: 3000
+      # Identity (apps/identity) owns /api/* — better-auth (/api/auth),
+      # /api/trpc, webhooks (/api/github|tfe|argo), and /api/healthz|version.
+      - pathType: Prefix
+        path: /api
+        backend:
+          service:
+            name: chartsnap-identity
+            port:
+              number: 8081
+      # The workspace-engine serves its Connect API under /engine natively
+      # (engine base-path config), so the ingress only routes — no rewrite.
+      - pathType: Prefix
+        path: /engine
+        backend:
+          service:
+            name: chartsnap-workspace-engine
+            port:
+              number: 8086

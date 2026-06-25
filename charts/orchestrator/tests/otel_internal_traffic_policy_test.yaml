@@ -1,0 +1,31 @@
+suite: otel service internalTrafficPolicy is set for DaemonSet only
+templates:
+  - charts/otel/templates/service.yaml
+release:
+  name: orchestrator
+
+tests:
+  - it: service has internalTrafficPolicy=Local in default (DaemonSet) mode
+    asserts:
+      - equal:
+          path: spec.internalTrafficPolicy
+          value: Local
+
+  - it: service has internalTrafficPolicy=Local when workload.kind is set explicitly to DaemonSet
+    set:
+      otel:
+        workload:
+          kind: DaemonSet
+    asserts:
+      - equal:
+          path: spec.internalTrafficPolicy
+          value: Local
+
+  - it: service does NOT set internalTrafficPolicy when workload.kind is Deployment
+    set:
+      otel:
+        workload:
+          kind: Deployment
+    asserts:
+      - notExists:
+          path: spec.internalTrafficPolicy
