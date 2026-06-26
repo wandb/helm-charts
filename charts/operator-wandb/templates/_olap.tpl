@@ -41,6 +41,30 @@ Returns: e.g. "REGISTRY_SEARCH_PASSWORD"
 {{- end -}}
 
 {{/*
+wandb.olapFieldRef renders an OLAP env-var field that was supplied as a map
+(a `valueFrom` K8s ref, or an inline `value`), injecting `optional: true` into
+any secretKeyRef / configMapKeyRef.
+
+Rationale: without `optional`, a missing Secret/ConfigMap (e.g. the ClickHouse
+password secret not provisioned on an instance) makes the kubelet fail to
+resolve the env var, so the pod never schedules (CreateContainerConfigError)
+Marking the ref optional leaves the env var unset
+instead, so Gorilla sees an invalid connection string and degrades gracefully
+(registry search becomes a no-op) rather than the whole pod failing.
+
+Usage:
+  include "wandb.olapFieldRef" (dict "ref" $config.host)
+*/}}
+{{- define "wandb.olapFieldRef" -}}
+{{- $ref := deepCopy .ref -}}
+{{- if and (kindIs "map" $ref) (hasKey $ref "valueFrom") -}}
+{{- if $ref.valueFrom.secretKeyRef -}}{{- $_ := set $ref.valueFrom.secretKeyRef "optional" true -}}{{- end -}}
+{{- if $ref.valueFrom.configMapKeyRef -}}{{- $_ := set $ref.valueFrom.configMapKeyRef "optional" true -}}{{- end -}}
+{{- end -}}
+{{- toYaml $ref -}}
+{{- end -}}
+
+{{/*
 wandb.olapParamsQuery serializes a params map into a URL query string.
 Following the redis wandb.redis.parametersQuery pattern.
 
