@@ -1,5 +1,6 @@
-{{- if .Values.global.lumen.install -}}
-
+{{- $lumenInstalled := (include "wandb.lumen.installed" .)  }}
+{{- if $lumenInstalled -}}
+{{- $dataRoot := (include "wandb.lumen.dataRoot" .) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,7 +8,9 @@ metadata:
 data:
   LUMEN_AGENT_CONFIG_PATH: "{{ include "wandb.lumen.rulePath" . }}"
   LUMEN_CUSTOMER_NAME: "{{ .Release.Name }}"
+  {{- if $dataRoot }}
   LUMEN_DATA_ROOT: "{{ include "wandb.lumen.dataRoot" . }}"
+  {{- end }}
   LUMEN_STAGING_ROOT: "file://{{ include "wandb.lumen.stagingPath" . }}"
 
 ---
@@ -171,8 +174,8 @@ data:
 
 ---
 
-{{- if include "operator-wandb.lumen.audience" . }}
-{{- $audience := include "operator-wandb.lumen.audience" . -}}
+{{- if include "wandb.lumen.audience" . }}
+{{- $audience := include "wandb.lumen.audience" . -}}
 # WIF only needed for lumen dataRoot, not when using standard wandb-bucket
 apiVersion: v1
 kind: ConfigMap

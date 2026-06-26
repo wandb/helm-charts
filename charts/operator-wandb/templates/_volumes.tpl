@@ -85,14 +85,14 @@
 {{- end }}
 
 {{- define "wandb.lumenWifVolumes" }}
-{{- if include "operator-wandb.lumen.audience" . }}
+{{- if include "wandb.lumen.audience" . }}
 - name: gcp-ksa
   projected:
     sources:
       - serviceAccountToken:
           path: token
           expirationSeconds: 3600
-          audience: {{ include "operator-wandb.lumen.audience" . }}
+          audience: {{ include "wandb.lumen.audience" . }}
 - name: gcp-wif-config
   configMap:
     name: "{{ .Release.Name }}-lumen-gcp-wif"
@@ -100,7 +100,7 @@
 {{- end }}
 
 {{- define "wandb.lumenWifVolumeMounts" }}
-{{- if include "operator-wandb.lumen.audience" . }}
+{{- if include "wandb.lumen.audience" . }}
 - name: gcp-ksa
   mountPath: /var/run/secrets/tokens/gcp-ksa
   readOnly: true
