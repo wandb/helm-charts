@@ -638,3 +638,15 @@ Global values will override any chart-specific values.
   value: "noop://"
 {{- end }}
 {{- end -}}
+
+{{- define "wandb.lumen.gorillaEnvs" -}}
+{{- if include "wandb.lumen.publish.gorilla" . }}
+- name: GORILLA_LUMEN_ADDR
+  value: ":16060"
+{{- if include "wandb.lumen.publish.gorillaEnvVars" . }}
+- name: GORILLA_LUMEN_ENV_VARS_EXPOSED
+  value: "true"
+{{- end }}
+{{- end }}
+{{- end -}}
+
