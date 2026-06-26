@@ -1,0 +1,103 @@
+global:
+  repositoryPrefix: "us-docker.pkg.dev/wandb-production/public"
+  imageRegistry: "us-docker.pkg.dev/wandb-production/public"
+  bucket:
+    provider: "s3"
+    name: "minio:9000/bucket"
+    region: "us-east-1"
+    accessKey: "minio"
+    secretKey: "testpassword"
+  env:
+    GLOBAL_ADMIN_API_KEY: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+    GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS: "true"
+    BUCKET_PROXY: "true"
+    GORILLA_GLUE_FILE_STORE_IS_PROXIED: "true"
+    GORILLA_FILE_STORE_IS_PROXIED: "true"
+  api:
+    enabled: true
+  glue:
+    enabled: true
+  # Test: OLAP fields supplied as external K8s refs (valueFrom maps) rather than
+  # plain values — i.e. the chart does NOT auto-create the password secret; it
+  # references a pre-provisioned ConfigMap/Secret. This exercises the
+  # wandb.olapFieldRef helper, which must inject `optional: true` into every
+  # secretKeyRef/configMapKeyRef so a missing object leaves the env var unset
+  # instead of blocking the pod from scheduling (CreateContainerConfigError).
+  olap:
+    default:
+      host:
+        valueFrom:
+          configMapKeyRef:
+            name: clickhouse-olap
+            key: host
+      port:
+        valueFrom:
+          configMapKeyRef:
+            name: clickhouse-olap
+            key: port
+      user:
+        valueFrom:
+          configMapKeyRef:
+            name: clickhouse-olap
+            key: user
+      password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-olap-password
+            key: password
+    registrySearch:
+      enabled: true
+      database: "registry_search"
+    runStoreAccelerator:
+      enabled: true
+      database: "runs_accelerator"
+  size: "testing"
+
+app:
+  env:
+    GORILLA_STORAGE_BUCKET: "s3://local-files"
+    GORILLA_FILEMETA_ENABLED: "false"
+
+frontend:
+  install: true
+
+console:
+  containers:
+    console:
+      resources:
+        requests:
+          cpu: 40m
+          memory: 64Mi
+
+nginx:
+  install: true
+  additionalServices:
+    bucket:
+      host: "http://minio:9000"
+      headers:
+        Host: "minio:9000"
+
+ingress:
+  install: false
+  create: false
+
+mysql:
+  install: true
+  resources:
+    requests:
+      cpu: "40m"
+      memory: "64Mi"
+
+redis:
+  install: true
+  resources:
+    requests:
+      cpu: "40m"
+      memory: "64Mi"
+
+reloader:
+  install: true
+  resources:
+    requests:
+      cpu: "40m"
+      memory: "64Mi"
