@@ -21,10 +21,22 @@
 /app/definitions/collector/managed-install.yaml
 {{- end -}}
 
+{{- define "wandb.lumen.publish.gorilla" -}}
+{{- if eq (dig "lumen" "publish" "gorilla" "enabled" false .Values.global | toString) "true" -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{- define "wandb.lumen.publish.gorillaEnvVars" -}}
+{{- if eq (dig "lumen" "publish" "gorilla" "includeEnvVars" false .Values.global | toString) "true" -}}
+true
+{{- end -}}
+{{- end -}}
+
 {{- define "wandb.lumen.installed" -}}
-{{- $agent := eq (dig "install" false (index .Values "lumen-agent" | default dict) | toString) "true" -}}
-{{- $processor := eq (dig "install" false (index .Values "lumen-processor" | default dict) | toString) "true" -}}
-{{- $notebook := eq (dig "install" false (index .Values "lumen-notebook" | default dict) | toString) "true" -}}
+{{- $agent := eq (dig "install" false (index .Values "lumenAgent" | default dict) | toString) "true" -}}
+{{- $processor := eq (dig "install" false (index .Values "lumenProcessor" | default dict) | toString) "true" -}}
+{{- $notebook := eq (dig "install" false (index .Values "lumenNotebook" | default dict) | toString) "true" -}}
 {{- if or $agent $processor $notebook -}}
 true
 {{- end -}}

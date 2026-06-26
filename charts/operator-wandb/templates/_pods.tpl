@@ -87,8 +87,3 @@ securityContext:
   {{- toYaml .Values.init.containerSecurityContext | nindent 2 }}
 {{- end }}
 {{- end }}
-
-
-{{- define "wandb.lumen.agent.target" }}
-lumen.wandb.ai/agent: true
-{{- end }}
