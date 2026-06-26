@@ -68,5 +68,5 @@ gke-gcsfuse/metadata-prefetch-memory-limit: "{{ .Values.fuse.resources.limits.me
 
 
 {{- define "wandb.lumen.agent.target" -}}
-lumen.wandb.ai/agent: true
+lumen.wandb.ai/agent: "true"
 {{- end -}}
