@@ -359,35 +359,35 @@ Global values will override any chart-specific values.
   {{- $secretKey := include "wandb.olapSecretKey" (dict "envVarPrefix" $prefix) -}}
 {{- if kindIs "map" $config.host }}
 - name: {{ $prefix }}_HOST
-{{- toYaml $config.host | nindent 2 }}
+{{- include "wandb.olapFieldRef" (dict "ref" $config.host) | nindent 2 }}
 {{- else }}
 - name: {{ $prefix }}_HOST
   value: {{ tpl ($config.host | toString) .root | quote }}
 {{- end }}
 {{- if kindIs "map" $config.port }}
 - name: {{ $prefix }}_PORT
-{{- toYaml $config.port | nindent 2 }}
+{{- include "wandb.olapFieldRef" (dict "ref" $config.port) | nindent 2 }}
 {{- else }}
 - name: {{ $prefix }}_PORT
   value: {{ $config.port | toString | quote }}
 {{- end }}
 {{- if kindIs "map" $config.database }}
 - name: {{ $prefix }}_DATABASE
-{{- toYaml $config.database | nindent 2 }}
+{{- include "wandb.olapFieldRef" (dict "ref" $config.database) | nindent 2 }}
 {{- else }}
 - name: {{ $prefix }}_DATABASE
   value: {{ $config.database | quote }}
 {{- end }}
 {{- if kindIs "map" $config.user }}
 - name: {{ $prefix }}_USER
-{{- toYaml $config.user | nindent 2 }}
+{{- include "wandb.olapFieldRef" (dict "ref" $config.user) | nindent 2 }}
 {{- else }}
 - name: {{ $prefix }}_USER
   value: {{ $config.user | quote }}
 {{- end }}
 {{- if kindIs "map" $config.password }}
 - name: {{ $prefix }}_PASSWORD
-{{- toYaml $config.password | nindent 2 }}
+{{- include "wandb.olapFieldRef" (dict "ref" $config.password) | nindent 2 }}
 {{- else }}
 - name: {{ $prefix }}_PASSWORD
   valueFrom:
