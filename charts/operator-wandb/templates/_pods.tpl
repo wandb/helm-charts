@@ -88,3 +88,7 @@ securityContext:
 {{- end }}
 {{- end }}
 
+
+{{- define "wandb.lumen.agent.target" }}
+lumen.wandb.ai/agent: true
+{{- end }}
