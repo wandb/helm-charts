@@ -27,6 +27,10 @@ true
 {{- end -}}
 {{- end -}}
 
+{{- define "wandb.lumen.customer" -}}
+{{- dig "lumen" "customer" "" .Values.global -}}
+{{- end -}}
+
 {{- define "wandb.lumen.installed" -}}
 {{- $agent := eq (dig "install" false (index .Values "lumen-agent" | default dict) | toString) "true" -}}
 {{- $processor := eq (dig "install" false (index .Values "lumen-processor" | default dict) | toString) "true" -}}
