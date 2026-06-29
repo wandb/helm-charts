@@ -20,11 +20,15 @@
 {{- $provider := "" -}}
 {{- $accessKey := "" -}}
 {{- $secretKey := "" -}}
+{{- $azureTenantId := "" -}}
+{{- $azureClientId := "" -}}
 {{- if .Values.global.bucket.name -}}
 {{- $provider = .Values.global.bucket.provider -}}
 {{- $path = .Values.global.bucket.path -}}
 {{- $accessKey = default "" .Values.global.bucket.accessKey -}}
 {{- $secretKey = default "" .Values.global.bucket.secretKey -}}
+{{- $azureTenantId = default "" .Values.global.bucket.azureTenantId -}}
+{{- $azureClientId = default "" .Values.global.bucket.azureClientId -}}
 name: {{ .Values.global.bucket.name }}
 region: {{ .Values.global.bucket.region }}
 kmsKey: {{ .Values.global.bucket.kmsKey }}
@@ -33,6 +37,8 @@ kmsKey: {{ .Values.global.bucket.kmsKey }}
 {{- $path = .Values.global.defaultBucket.path -}}
 {{- $accessKey = default "" .Values.global.defaultBucket.accessKey -}}
 {{- $secretKey = default "" .Values.global.defaultBucket.secretKey -}}
+{{- $azureTenantId = default "" .Values.global.defaultBucket.azureTenantId -}}
+{{- $azureClientId = default "" .Values.global.defaultBucket.azureClientId -}}
 name: {{ .Values.global.defaultBucket.name }}
 region: {{ .Values.global.defaultBucket.region }}
 kmsKey: {{ .Values.global.defaultBucket.kmsKey }}
@@ -41,6 +47,8 @@ provider: {{ $provider }}
 path: {{ $path }}
 accessKey: {{ $accessKey }}
 secretKey: {{ $secretKey }}
+azureTenantId: {{ $azureTenantId }}
+azureClientId: {{ $azureClientId }}
 accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
 secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}
