@@ -21,14 +21,8 @@
 /app/definitions/collector/managed-install.yaml
 {{- end -}}
 
-{{- define "wandb.lumen.publish.gorilla" -}}
-{{- if eq (dig "lumen" "publish" "gorilla" "enabled" false .Values.global | toString) "true" -}}
-true
-{{- end -}}
-{{- end -}}
-
-{{- define "wandb.lumen.publish.gorillaEnvVars" -}}
-{{- if eq (dig "lumen" "publish" "gorilla" "includeEnvVars" false .Values.global | toString) "true" -}}
+{{- define "wandb.lumen.publish.envVars" -}}
+{{- if eq (dig "lumen" "publish" "envVars" false .Values.global | toString) "true" -}}
 true
 {{- end -}}
 {{- end -}}

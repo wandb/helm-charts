@@ -640,13 +640,11 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.lumen.gorillaEnvs" -}}
-{{- if include "wandb.lumen.publish.gorilla" . }}
 - name: GORILLA_LUMEN_ADDR
   value: ":16060"
-{{- if include "wandb.lumen.publish.gorillaEnvVars" . }}
+{{- if include "wandb.lumen.publish.envVars" . }}
 - name: GORILLA_LUMEN_ENV_VARS_EXPOSED
   value: "true"
-{{- end }}
 {{- end }}
 {{- end -}}
 
