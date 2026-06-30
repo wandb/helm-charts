@@ -32,10 +32,5 @@ true
 {{- end -}}
 
 {{- define "wandb.lumen.installed" -}}
-{{- $agent := eq (dig "install" false (index .Values "lumen-agent" | default dict) | toString) "true" -}}
-{{- $processor := eq (dig "install" false (index .Values "lumen-processor" | default dict) | toString) "true" -}}
-{{- $notebook := eq (dig "install" false (index .Values "lumen-notebook" | default dict) | toString) "true" -}}
-{{- if or $agent $processor $notebook -}}
-true
-{{- end -}}
+{{- eq (dig "install" false (index .Values "lumen-agent" | default dict) | toString) "true" -}}
 {{- end -}}

@@ -69,6 +69,46 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
+# Source: operator-wandb/charts/lumen-notebook/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-lumen-notebook
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: lumen-notebook
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: lumen-notebook
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
+# Source: operator-wandb/charts/lumen-processor/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-lumen-processor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: lumen-processor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: lumen-processor
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
 # Source: operator-wandb/charts/parquet/templates/pdb.yaml
 apiVersion: policy/v1
 kind: PodDisruptionBudget
@@ -159,7 +199,18 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: lumen-notebook
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: operator-wandb/charts/lumen-processor/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-lumen-processor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: lumen-processor
+    app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
@@ -2149,27 +2200,6 @@ spec:
     app.kubernetes.io/name: console
     app.kubernetes.io/instance: chartsnap
 ---
-# Source: operator-wandb/charts/lumen-notebook/templates/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: chartsnap-lumen-notebook
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: lumen-notebook
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  type: ClusterIP
-  ports:
-  - name: marimo
-    port: 8080
-    protocol: TCP
-  selector:
-    app.kubernetes.io/name: lumen-notebook
-    app.kubernetes.io/instance: chartsnap
----
 # Source: operator-wandb/charts/otel/charts/daemonset/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -3262,7 +3292,6 @@ metadata:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: lumen-notebook
     app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
   annotations:
     reloader.stakater.com/auto: "true"
@@ -3283,71 +3312,9 @@ spec:
         helm.sh/chart: lumen-notebook-0.12.3
         app.kubernetes.io/name: lumen-notebook
         app.kubernetes.io/instance: chartsnap
-        app.kubernetes.io/version: "latest"
         app.kubernetes.io/managed-by: Helm
     spec:
       containers:
-      - name: notebook
-        command:
-        - /app/entrypoint.sh
-        - marimo
-        envFrom:
-        - configMapRef:
-            name: chartsnap-lumen-configmap
-        env:
-        - name: AZURE_STORAGE_KEY
-          valueFrom:
-            secretKeyRef:
-              key: ACCESS_KEY
-              name: chartsnap-bucket
-              optional: true
-        - name: BUCKET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              key: ACCESS_KEY
-              name: chartsnap-bucket
-              optional: true
-        - name: BUCKET_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              key: SECRET_KEY
-              name: chartsnap-bucket
-              optional: true
-        - name: BUCKET
-          value: s3://$(BUCKET_NAME)
-        - name: GORILLA_FILE_STORE
-          value: s3://$(BUCKET_NAME)
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: s3://$(BUCKET_NAME)
-        - name: GORILLA_STORAGE_BUCKET
-          value: s3://$(BUCKET_NAME)
-        - name: GOMAXPROCS
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.cpu
-        - name: GOMEMLIMIT
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.memory
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "us-docker.pkg.dev/wandb-production/public/wandb/lumen:latest"
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 8080
-          name: marimo
-        resources:
-          limits:
-            cpu: 2
-            memory: 4Gi
-          requests:
-            cpu: 1
-            memory: 2Gi
       serviceAccountName: chartsnap-lumen-notebook
       securityContext:
         fsGroup: 0
@@ -3373,6 +3340,98 @@ spec:
         maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
+---
+# Source: operator-wandb/charts/lumen-processor/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-lumen-processor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: lumen-processor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lumen-processor
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: lumen-processor-0.12.3
+        app.kubernetes.io/name: lumen-processor
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      serviceAccountName: chartsnap-lumen-processor
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: lumen-processor
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: lumen-processor
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
 ---
 # Source: operator-wandb/charts/parquet/templates/deployment.yaml
 apiVersion: apps/v1
@@ -4329,131 +4388,6 @@ spec:
           - name: lumen-managed-install
             configMap:
               name: "chartsnap-lumen-rules"
----
-# Source: operator-wandb/charts/lumen-processor/templates/cronjob.yaml
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  name: chartsnap-lumen-processor
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: lumen-processor
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-spec:
-  concurrencyPolicy: Forbid
-  schedule: "0 * * * *"
-  suspend: false
-  successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 1
-  startingDeadlineSeconds: 300
-  jobTemplate:
-    spec:
-      ttlSecondsAfterFinished: 300
-      template:
-        metadata:
-          labels:
-            helm.sh/chart: lumen-processor-0.12.3
-            app.kubernetes.io/name: lumen-processor
-            app.kubernetes.io/instance: chartsnap
-            app.kubernetes.io/version: "latest"
-            app.kubernetes.io/managed-by: Helm
-        spec:
-          containers:
-          - name: collector
-            command:
-            - /app/entrypoint.sh
-            - processor
-            envFrom:
-            - configMapRef:
-                name: chartsnap-bucket-configmap
-            - configMapRef:
-                name: chartsnap-lumen-configmap
-            env:
-            - name: AZURE_STORAGE_KEY
-              valueFrom:
-                secretKeyRef:
-                  key: ACCESS_KEY
-                  name: chartsnap-bucket
-                  optional: true
-            - name: BUCKET_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  key: ACCESS_KEY
-                  name: chartsnap-bucket
-                  optional: true
-            - name: BUCKET_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  key: SECRET_KEY
-                  name: chartsnap-bucket
-                  optional: true
-            - name: BUCKET
-              value: s3://$(BUCKET_NAME)
-            - name: GORILLA_FILE_STORE
-              value: s3://$(BUCKET_NAME)
-            - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-              value: s3://$(BUCKET_NAME)
-            - name: GORILLA_STORAGE_BUCKET
-              value: s3://$(BUCKET_NAME)
-            - name: GOMAXPROCS
-              valueFrom:
-                resourceFieldRef:
-                  resource: limits.cpu
-            - name: GOMEMLIMIT
-              valueFrom:
-                resourceFieldRef:
-                  resource: limits.memory
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: ""
-            securityContext:
-              allowPrivilegeEscalation: false
-              capabilities:
-                add: []
-                drop: []
-              privileged: false
-              readOnlyRootFilesystem: false
-            image: "us-docker.pkg.dev/wandb-production/public/wandb/lumen:latest"
-            imagePullPolicy: Always
-            resources:
-              limits:
-                cpu: 2
-                memory: 4Gi
-              requests:
-                cpu: 1
-                memory: 4Gi
-            volumeMounts:
-            - name: lumen-staging-dir
-              mountPath: /vol/staging
-          restartPolicy: Never
-          serviceAccountName: lumen
-          securityContext:
-            fsGroup: 0
-            fsGroupChangePolicy: OnRootMismatch
-            runAsGroup: 0
-            runAsNonRoot: true
-            runAsUser: 999
-            seccompProfile:
-              type: RuntimeDefault
-          topologySpreadConstraints:
-          - labelSelector:
-              matchLabels:
-                app.kubernetes.io/instance: chartsnap
-                app.kubernetes.io/name: lumen-processor
-            maxSkew: 1
-            topologyKey: topology.kubernetes.io/zone
-            whenUnsatisfiable: ScheduleAnyway
-          - labelSelector:
-              matchLabels:
-                app.kubernetes.io/instance: chartsnap
-                app.kubernetes.io/name: lumen-processor
-            maxSkew: 1
-            topologyKey: kubernetes.io/hostname
-            whenUnsatisfiable: ScheduleAnyway
-          volumes:
-          - name: lumen-staging-dir
-            emptyDir: {}
 ---
 # Source: operator-wandb/charts/parquet/templates/cronjob.yaml
 apiVersion: batch/v1
