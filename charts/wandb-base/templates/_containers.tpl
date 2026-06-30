@@ -65,6 +65,19 @@
       {{- end -}}
       {{- $_ = set $container "envTpls" $envTpls -}}
 
+      {{- /* Prerender portsTpls and merge them into the static ports list so that
+             conditional ports (e.g. lumen) can be omitted entirely when empty */ -}}
+      {{- $ports := default list $container.ports }}
+      {{- if $container.portsTpls -}}
+        {{- range $container.portsTpls }}
+          {{- $renderedPorts := tpl . $.root }}
+          {{- if trim $renderedPorts }}
+            {{- $ports = concat $ports ($renderedPorts | fromYamlArray) -}}
+          {{- end }}
+        {{- end -}}
+      {{- end -}}
+      {{- $_ = set $container "ports" $ports -}}
+
       {{ include "wandb-base.container" $container }}
     {{- end -}}
   {{- end -}}
