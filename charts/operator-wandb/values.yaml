@@ -3266,6 +3266,16 @@ weave-trace:
   envTpls:
     - '{{ include "wandb.clickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  # Use jemalloc instead of glibc malloc. Without this, glibc holds onto
+  # freed memory for hours after a load spike, leading to OOMKill cascades
+  # when load picks back up. jemalloc's dirty_decay_ms / muzzy_decay_ms
+  # return pages to the OS automatically. Validated 2026-05-20: post-load
+  # RSS drops from ~7 GiB to ~1 GiB within 30s with these settings, versus
+  # glibc holding 7 GiB indefinitely. Requires image >= 2026-05-21
+  # (wandb/weave-trace must bundle jemalloc at /usr/lib/libjemalloc.so.2).
+  env:
+    LD_PRELOAD: "/usr/lib/libjemalloc.so.2"
+    MALLOC_CONF: "background_thread:true,dirty_decay_ms:10000,muzzy_decay_ms:30000,narenas:8"
   initContainers:
     weave-trace-migrate:
       args: ["python", "migrator.py"]
@@ -3403,7 +3413,18 @@ weave-trace-worker:
   envTpls:
     - '{{ include "wandb.clickhouseConfigEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  # Use jemalloc instead of glibc malloc. Without this, glibc holds onto
+  # freed memory for hours after a load spike, leading to OOMKill cascades
+  # when load picks back up. jemalloc's dirty_decay_ms / muzzy_decay_ms
+  # return pages to the OS automatically. Validated 2026-05-20 on the
+  # weave-trace deployment: post-load RSS drops from ~7 GiB to ~1 GiB
+  # within 30s with these settings, versus glibc holding 7 GiB
+  # indefinitely. Worker shares the same image and benefits from the same
+  # allocator behavior. Requires image >= 2026-05-21 (wandb/weave-trace
+  # must bundle jemalloc at /usr/lib/libjemalloc.so.2).
   env:
+    LD_PRELOAD: "/usr/lib/libjemalloc.so.2"
+    MALLOC_CONF: "background_thread:true,dirty_decay_ms:10000,muzzy_decay_ms:30000,narenas:8"
     WANDB_INTERNAL_SERVICE_TOKEN:
       valueFrom:
         secretKeyRef:
@@ -3512,7 +3533,18 @@ weave-evaluate-model-worker:
   envTpls:
     - '{{ include "wandb.clickhouseConfigEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+  # Use jemalloc instead of glibc malloc. Without this, glibc holds onto
+  # freed memory for hours after a load spike, leading to OOMKill cascades
+  # when load picks back up. jemalloc's dirty_decay_ms / muzzy_decay_ms
+  # return pages to the OS automatically. Validated 2026-05-20 on the
+  # weave-trace deployment: post-load RSS drops from ~7 GiB to ~1 GiB
+  # within 30s with these settings, versus glibc holding 7 GiB
+  # indefinitely. Worker shares the same image and benefits from the same
+  # allocator behavior. Requires image >= 2026-05-21 (wandb/weave-trace
+  # must bundle jemalloc at /usr/lib/libjemalloc.so.2).
   env:
+    LD_PRELOAD: "/usr/lib/libjemalloc.so.2"
+    MALLOC_CONF: "background_thread:true,dirty_decay_ms:10000,muzzy_decay_ms:30000,narenas:8"
     WANDB_INTERNAL_SERVICE_TOKEN:
       valueFrom:
         secretKeyRef:
