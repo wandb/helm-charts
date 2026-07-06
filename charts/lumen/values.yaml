@@ -9,7 +9,7 @@ global:
 
 # Processor: hourly CronJob that moves agent exports to inbound, processes,
 # and writes parquet to the data root.
-lumen-processor:
+processor:
   kind: CronJob
   image:
     repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
@@ -24,10 +24,12 @@ lumen-processor:
   service:
     enabled: false
   cronJobs:
-    lumen-processor:
+    processor:
       enabled: true
       schedule: "15 * * * *"
       concurrencyPolicy: "Forbid"
+      volumesTpls:
+        - '{{ include "wandb.lumenStagingVolume" . }}'
       failedJobsHistoryLimit: 1
       successfulJobsHistoryLimit: 1
       startingDeadlineSeconds: 300
@@ -47,7 +49,9 @@ lumen-processor:
                 resourceFieldRef:
                   resource: limits.cpu
           envFrom:
-            "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+            "{{ .Release.Name }}-configmap": "configMapRef"
+          volumeMountsTpls:
+            - '{{ include "wandb.lumenStagingVolumeMount" . }}'
           resources:
             requests:
               cpu: 1
@@ -57,7 +61,7 @@ lumen-processor:
               memory: 4Gi
 
 # Notebook: marimo UI for browsing the parquet data root.
-lumen-notebook:
+notebook:
   kind: Deployment
   replicaCount: 1
   image:
@@ -70,6 +74,8 @@ lumen-notebook:
     volumes: true
   podDisruptionBudget:
     enabled: false
+  volumesTpls:
+    - '{{ include "wandb.lumenStagingVolume" . }}'
   service:
     enabled: true
     ports:
@@ -90,7 +96,10 @@ lumen-notebook:
             resourceFieldRef:
               resource: limits.cpu
       envFrom:
-        "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+        "{{ .Release.Name }}-configmap": "configMapRef"
+        "{{ .Release.Name }}-marimo-configmap": "configMapRef"
+      volumeMountsTpls:
+        - '{{ include "wandb.lumenStagingVolumeMount" . }}'
       ports:
         - containerPort: 8080
           name: marimo
