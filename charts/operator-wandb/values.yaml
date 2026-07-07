@@ -619,6 +619,12 @@ api:
     - '{{ include "wandb.registrySearchEnvs" . }}'
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
+  # Serializes migrate-db against other concurrent migrate copies in the
+  # namespace via a Kubernetes Lease. leaseName must match the migrate
+  # binary's lease name.
+  leaderElection:
+    enabled: false
+    leaseName: gorilla-migrate-leader
   initContainers:
     init-db:
       enabled: false
@@ -640,6 +646,12 @@ api:
             fi
             exit $EXIT_CODE
           fi
+      env:
+        GORILLA_LEADER_ELECTION_ENABLED: '{{ .Values.leaderElection.enabled }}'
+        GORILLA_LEADER_ELECTION_NAMESPACE:
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
@@ -2303,6 +2315,12 @@ glue:
     - '{{ include "wandb.registrySearchEnvs" . }}'
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
+  # Serializes migrate-db against other concurrent migrate copies in the
+  # namespace via a Kubernetes Lease. leaseName must match the migrate
+  # binary's lease name.
+  leaderElection:
+    enabled: false
+    leaseName: gorilla-migrate-leader
   initContainers:
     init-db:
       enabled: false
@@ -2324,6 +2342,12 @@ glue:
             fi
             exit $EXIT_CODE
           fi
+      env:
+        GORILLA_LEADER_ELECTION_ENABLED: '{{ .Values.leaderElection.enabled }}'
+        GORILLA_LEADER_ELECTION_NAMESPACE:
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
