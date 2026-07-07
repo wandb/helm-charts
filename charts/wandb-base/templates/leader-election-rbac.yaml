@@ -1,0 +1,50 @@
+{{- if .Values.leaderElection.enabled }}
+# Grants the component's ServiceAccount the Lease permissions used by
+# client-go leader election. `create` cannot be scoped by resourceName,
+# so it is granted in a separate unscoped rule.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "wandb-base.fullname" . }}-leader-election
+  labels:
+    {{- include "wandb-base.labels" . | nindent 4 }}
+  {{- if (or .Values.helmHook.enabled (include "wandb-base.commonAnnotations" .)) }}
+  annotations:
+    {{- tpl (include "wandb-base.commonAnnotations" . | nindent 4) . }}
+    {{- if .Values.helmHook.enabled }}
+      {{- include "wandb-base.helmHookAnnotations" . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["create"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    {{- with .Values.leaderElection.leaseName }}
+    resourceNames: ["{{ . }}"]
+    {{- end }}
+    verbs: ["get", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "wandb-base.fullname" . }}-leader-election
+  labels:
+    {{- include "wandb-base.labels" . | nindent 4 }}
+  {{- if (or .Values.helmHook.enabled (include "wandb-base.commonAnnotations" .)) }}
+  annotations:
+    {{- tpl (include "wandb-base.commonAnnotations" . | nindent 4) . }}
+    {{- if .Values.helmHook.enabled }}
+      {{- include "wandb-base.helmHookAnnotations" . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "wandb-base.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "wandb-base.fullname" . }}-leader-election
+{{- end }}
