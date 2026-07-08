@@ -1,0 +1,61 @@
+# Renders the chart at the "medium" t-shirt size so the per-size resource
+# profiles (WB-36925) are covered by a snapshot. In particular this pins
+# parquet's medium+ request at 13 CPU / limit 15 CPU so the schedulability
+# fix cannot silently regress (a 15-CPU request does not fit the default
+# 16-vCPU node pool). The existing test-configs only use the "testing"/
+# "production" sizes, which fall back to base defaults and never exercise the
+# t-shirt sizing blocks.
+global:
+  host: "http://localhost:8080"
+  repositoryPrefix: "us-docker.pkg.dev/wandb-production/public"
+  imageRegistry: "us-docker.pkg.dev/wandb-production/public"
+  bucket:
+    provider: "s3"
+    name: "minio:9000/bucket"
+    region: "us-east-1"
+    accessKey: "minio"
+    secretKey: "testpassword"
+  env:
+    GLOBAL_ADMIN_API_KEY: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+    GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS: "true"
+    BUCKET_PROXY: "true"
+    GORILLA_GLUE_FILE_STORE_IS_PROXIED: "true"
+    GORILLA_FILE_STORE_IS_PROXIED: "true"
+  size: "medium"
+
+app:
+  env:
+    GORILLA_STORAGE_BUCKET: "s3://local-files"
+
+nginx:
+  install: true
+  additionalServices:
+    bucket:
+      host: "http://minio:9000"
+      headers:
+        Host: "minio:9000"
+
+ingress:
+  install: false
+  create: false
+
+mysql:
+  install: true
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+
+redis:
+  install: true
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+
+reloader:
+  install: true
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
