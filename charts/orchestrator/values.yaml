@@ -191,6 +191,36 @@ identity:
     repository: orchestrator/identity
     tag: latest
 
+  # Run the auth DB (Drizzle better-auth) migrations before the identity
+  # Deployment rolls. helmHook only annotates jobs, so the Deployment/Service
+  # render normally.
+  helmHook:
+    enabled: true
+    hook: "pre-install,pre-upgrade"
+    hookWeight: "-5"
+    hookDeletePolicy: "before-hook-creation,hook-succeeded"
+
+  # The job container inherits the identity image (same tag as the deployment) and
+  # AUTH_DATABASE_URL from envTpls below via wandb-base. It runs the same compiled
+  # migrate the old dedicated migrations image ran. SKIP_AUTH_DB_CREATE assumes the
+  # auth DB is pre-provisioned (like the engine assumes its DB exists).
+  jobs:
+    auth-migrate:
+      backoffLimit: 3
+      ttlSecondsAfterFinished: 300
+      containers:
+        auth-migrate:
+          command: ["node", "/app/packages/db/dist/migrate.js"]
+          env:
+            SKIP_AUTH_DB_CREATE: "true"
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
   env:
     BASE_URL: "{{ .Values.global.fqdn }}"
     AUTH_URL: "{{ .Values.global.fqdn }}"
