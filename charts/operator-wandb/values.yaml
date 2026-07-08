@@ -2939,6 +2939,18 @@ settingsMigrationJob:
   podDisruptionBudget:
     enabled: false
 
+# Runs ClickHouse schema migrations once per helm operation as a hook Job
+# (templates/clickhouse-migration-job.yaml), so concurrent migrate-db
+# initContainers cannot race on ClickHouse, which has no DB-level locking.
+# The migrate binary skips any schema whose MIGRATE_*_DB env var is unset, so
+# this needs no per-feature gating; MySQL schemas stay with the initContainers.
+clickhouseMigrationJob:
+  install: false
+  # Defaults to api.image so the job applies the schema files shipped with the
+  # code version being deployed. Override only to pin a different build.
+  image: {}
+  activeDeadlineSeconds: 900
+
 weave:
   install: true
   deploymentPostfix: "bc"
