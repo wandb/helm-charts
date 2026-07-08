@@ -7649,8 +7649,12 @@ spec:
         - bash
         - -c
         - |
+          # No --db/--runs-db/--usage-db flags: without them the MySQL
+          # schemas are skipped (their env vars are unset here) and only the
+          # ClickHouse schemas run, keyed off the MIGRATE_*_DB env vars.
+          # MySQL migrations remain with the migrate-db initContainers.
           LOG_FILE="/tmp/migrate.log"
-          ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
+          ./megabinary migrate 2>&1 | tee -a $LOG_FILE
           EXIT_CODE=${PIPESTATUS[0]}
           MIGRATION_FILE_MISSING_ERROR_CODE=101
           if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
@@ -7663,29 +7667,6 @@ spec:
             exit $EXIT_CODE
           fi
         env:
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: "chartsnap-mysql"
-              key: "MYSQL_PASSWORD"
-        - name: MYSQL_PORT
-          value: "3306"
-        - name: MYSQL_HOST
-          value: "chartsnap-mysql"
-        - name: MYSQL_DATABASE
-          value: "wandb_local"
-        - name: MYSQL_USER
-          value: "wandb"
-        - name: MYSQL
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_ANALYTICS_SINK
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_METADATA_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_RUN_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
-        - name: GORILLA_USAGE_STORE
-          value: "mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred"
         - name: SSL_CERT_FILE
           value: "/etc/ssl/certs/ca-certificates.crt"
         - name: SSL_CERT_DIR

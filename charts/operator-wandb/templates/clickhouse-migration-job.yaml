@@ -81,8 +81,12 @@ spec:
             - bash
             - -c
             - |
+              # No --db/--runs-db/--usage-db flags: without them the MySQL
+              # schemas are skipped (their env vars are unset here) and only the
+              # ClickHouse schemas run, keyed off the MIGRATE_*_DB env vars.
+              # MySQL migrations remain with the migrate-db initContainers.
               LOG_FILE="/tmp/migrate.log"
-              ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
+              ./megabinary migrate 2>&1 | tee -a $LOG_FILE
               EXIT_CODE=${PIPESTATUS[0]}
               MIGRATION_FILE_MISSING_ERROR_CODE=101
               if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
@@ -95,7 +99,6 @@ spec:
                 exit $EXIT_CODE
               fi
           env:
-            {{- include "wandb.mysqlEnvs" . | nindent 12 }}
             {{- include "wandb.sslCertEnvs" . | nindent 12 }}
             {{- include "wandb.historyEnvs" . | nindent 12 }}
             {{- include "wandb.registrySearchEnvs" . | nindent 12 }}
