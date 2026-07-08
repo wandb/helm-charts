@@ -102,26 +102,13 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 ---
-# Source: orchestrator/charts/workspace-engine/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-workspace-engine
-  labels:
-    helm.sh/chart: workspace-engine-0.12.3
-    app.kubernetes.io/name: workspace-engine
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
 # Source: orchestrator/templates/secrets.yaml
 apiVersion: v1
 kind: Secret
 metadata:
   name: chartsnap-encryption-key
   labels:
-    helm.sh/chart: orchestrator-1.2.2
+    helm.sh/chart: orchestrator-1.3.0
     app.kubernetes.io/name: orchestrator
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -136,7 +123,7 @@ kind: Secret
 metadata:
   name: chartsnap-auth-secret
   labels:
-    helm.sh/chart: orchestrator-1.2.2
+    helm.sh/chart: orchestrator-1.3.0
     app.kubernetes.io/name: orchestrator
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -897,7 +884,7 @@ kind: Ingress
 metadata:
   name: chartsnap-orchestrator
   labels:
-    helm.sh/chart: orchestrator-1.2.2
+    helm.sh/chart: orchestrator-1.3.0
     app.kubernetes.io/name: orchestrator
     app.kubernetes.io/instance: chartsnap
     app.kubernetes.io/version: "1.0.0"
@@ -937,3 +924,152 @@ spec:
             name: chartsnap-workspace-engine
             port:
               number: 8086
+---
+# Source: orchestrator/charts/workspace-engine/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-workspace-engine
+  labels:
+    helm.sh/chart: workspace-engine-0.12.3
+    app.kubernetes.io/name: workspace-engine
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+automountServiceAccountToken: true
+---
+# Source: orchestrator/charts/workspace-engine/templates/job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chartsnap-migrate
+  labels:
+    helm.sh/chart: workspace-engine-0.12.3
+    app.kubernetes.io/name: workspace-engine
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: workspace-engine-0.12.3
+        app.kubernetes.io/name: workspace-engine
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: migrate
+        command:
+        - ./engine
+        - migrate
+        - up
+        envFrom:
+        env:
+        - name: POSTGRES_USER
+          value: orchestrator
+        - name: POSTGRES_PORT
+          value: "5432"
+        - name: POSTGRES_DATABASE
+          value: orchestrator
+        - name: POSTGRES_PASSWORD
+          value: orchestrator
+        - name: POSTGRES_URL
+          value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DATABASE)
+        - name: VARIABLES_AES_256_KEY
+          valueFrom:
+            secretKeyRef:
+              key: AES_256_KEY
+              name: chartsnap-encryption-key
+        - name: SPICEDB_INSECURE
+          value: "true"
+        - name: AUTH_JWKS_URL
+          value: http://chartsnap-identity:8081/api/auth/jwks
+        - name: AUTH_VALID_ISSUERS
+          value: https://orchestrator.example.test
+        - name: AUTH_AUDIENCE
+          value: workspace-engine
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_URL
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)
+        - name: OTEL_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: TRACE_ADDRESS
+          value: $(OTEL_HOST_IP):4317
+        - name: METRICS_ADDRESS
+          value: $(OTEL_HOST_IP):4317
+        - name: AUTHZ_ALLOW_DISABLED
+          value: "false"
+        - name: AUTH_ALLOW_UNVERIFIED_JWT_CLAIMS
+          value: "false"
+        - name: BASE_URL
+          value: "https://orchestrator.example.test"
+        - name: DD_ENV
+          value: "local"
+        - name: DD_SERVICE
+          value: "ctrlplane/workspace-engine"
+        - name: GITHUB_URL
+          value: "https://github.com"
+        - name: GRPC_PORT
+          value: "8086"
+        - name: HTTP_PREFIX_PATH
+          value: "/engine"
+        - name: SERVICES
+          value: ""
+        - name: TRACE_SAMPLE_RATE
+          value: "0.1"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "orchestrator/workspace-engine:latest"
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+      restartPolicy: Never
+      serviceAccountName: chartsnap-workspace-engine
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: workspace-engine
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: workspace-engine
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
