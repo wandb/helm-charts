@@ -2939,79 +2939,16 @@ settingsMigrationJob:
   podDisruptionBudget:
     enabled: false
 
-# Runs ClickHouse (OLAP) migrations once per helm operation as a hook Job,
-# instead of racing in per-pod initContainers. post-install so an in-release
-# ClickHouse exists before the first run; pre-upgrade so migrations complete
-# before new pods roll. Requires reachable ClickHouse at hook time.
+# Runs database schema migrations once per helm operation as a hook Job
+# (templates/clickhouse-migration-job.yaml), so concurrent migrate-db
+# initContainers cannot race on ClickHouse, which has no DB-level locking.
+# Only rendered when a ClickHouse-backed OLAP feature is enabled.
 clickhouseMigrationJob:
   install: false
-  kind: Job
-  globalOptOut:
-    volumes: true
-  podDisruptionBudget:
-    enabled: false
-  serviceAccount:
-    create: false
-  image:
-    repository: wandb/megabinary
-    tag: latest
-  helmHook:
-    enabled: true
-    hook: "post-install,pre-upgrade"
-  envTpls:
-    - '{{ include "wandb.mysqlEnvs" . }}'
-    - '{{ include "wandb.sslCertEnvs" . }}'
-    - '{{ include "wandb.registrySearchEnvs" . }}'
-    - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
-  jobs:
-    ch-migrate:
-      enabled: '{{ include "wandb.olapAnyFeatureEnabled" . }}'
-      backoffLimit: 0
-      activeDeadlineSeconds: 900
-      volumes:
-        - name: temp-dir
-          emptyDir: {}
-      initContainers:
-        wait-for-clickhouse:
-          command:
-            - bash
-            - -c
-            - |
-              wait_for() {
-                until (exec 3<>"/dev/tcp/$1/$2") 2>/dev/null; do
-                  echo "waiting for clickhouse at $1:$2"
-                  sleep 5
-                done
-                echo "clickhouse reachable at $1:$2"
-              }
-              if [[ -n "$REGISTRY_SEARCH_HOST" ]]; then
-                wait_for "$REGISTRY_SEARCH_HOST" "$REGISTRY_SEARCH_PORT"
-              fi
-              if [[ -n "$RUN_STORE_ACCELERATOR_HOST" ]]; then
-                wait_for "$RUN_STORE_ACCELERATOR_HOST" "$RUN_STORE_ACCELERATOR_PORT"
-              fi
-      containers:
-        ch-migrate:
-          command:
-            - bash
-            - -c
-            - |
-              LOG_FILE="/tmp/migrate.log"
-              ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
-              EXIT_CODE=${PIPESTATUS[0]}
-              MIGRATION_FILE_MISSING_ERROR_CODE=101
-              if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
-                exit 0
-              else
-                # missing migration error log from golang-migrate@v4 -- older versions of megabinary
-                if grep -q "no migration found for version" $LOG_FILE; then
-                  exit 0
-                fi
-                exit $EXIT_CODE
-              fi
-          volumeMounts:
-            - name: temp-dir
-              mountPath: /tmp/
+  # Defaults to api.image so the job applies the schema files shipped with the
+  # code version being deployed. Override only to pin a different build.
+  image: {}
+  activeDeadlineSeconds: 900
 
 weave:
   install: true
