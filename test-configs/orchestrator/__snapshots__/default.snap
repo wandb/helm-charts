@@ -63,19 +63,6 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
-# Source: orchestrator/charts/identity/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-identity
-  labels:
-    helm.sh/chart: identity-0.12.3
-    app.kubernetes.io/name: identity
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
 # Source: orchestrator/charts/otel/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -925,6 +912,23 @@ spec:
             port:
               number: 8086
 ---
+# Source: orchestrator/charts/identity/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-identity
+  labels:
+    helm.sh/chart: identity-0.12.3
+    app.kubernetes.io/name: identity
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+automountServiceAccountToken: true
+---
 # Source: orchestrator/charts/workspace-engine/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -941,6 +945,123 @@ metadata:
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
 automountServiceAccountToken: true
+---
+# Source: orchestrator/charts/identity/templates/job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chartsnap-auth-migrate
+  labels:
+    helm.sh/chart: identity-0.12.3
+    app.kubernetes.io/name: identity
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: identity-0.12.3
+        app.kubernetes.io/name: identity
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: auth-migrate
+        command:
+        - node
+        - /app/packages/db/dist/migrate.js
+        envFrom:
+        env:
+        - name: AUTH_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: AUTH_SECRET
+              name: chartsnap-auth-secret
+        - name: AUTH_DB_USER
+          value: auth
+        - name: AUTH_DB_PORT
+          value: "5432"
+        - name: AUTH_DB_NAME
+          value: ctrlplane_auth
+        - name: AUTH_DATABASE_URL
+          value: postgresql://$(AUTH_DB_USER):$(AUTH_DB_PASSWORD)@$(AUTH_DB_HOST):$(AUTH_DB_PORT)/$(AUTH_DB_NAME)
+        - name: SPICEDB_INSECURE
+          value: "true"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_URL
+          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)
+        - name: OTEL_HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://$(OTEL_HOST_IP):4318
+        - name: AUTH_JWT_AUDIENCE
+          value: "workspace-engine"
+        - name: AUTH_URL
+          value: "https://orchestrator.example.test"
+        - name: BASE_URL
+          value: "https://orchestrator.example.test"
+        - name: CONNECT_URL
+          value: "http://chartsnap-workspace-engine:8086"
+        - name: OTEL_SAMPLER_RATIO
+          value: "0.1"
+        - name: OTEL_SERVICE_NAME
+          value: "ctrlplane/identity"
+        - name: PORT
+          value: "8081"
+        - name: SKIP_AUTH_DB_CREATE
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "orchestrator/identity:latest"
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+      restartPolicy: Never
+      serviceAccountName: chartsnap-identity
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: identity
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: identity
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
 ---
 # Source: orchestrator/charts/workspace-engine/templates/job.yaml
 apiVersion: batch/v1
