@@ -33,6 +33,21 @@ spec:
       restartPolicy: Never
       {{- include "wandb.nodeSelector" . | nindent 6 }}
       {{- include "wandb.tolerations" . | nindent 6 }}
+      {{- include "wandb.priorityClassName" . | nindent 6 }}
+      {{- $pullSecretNames := list }}
+      {{- range (default list .Values.global.imagePullSecrets) }}
+        {{- if kindIs "string" . }}
+          {{- $pullSecretNames = append $pullSecretNames . }}
+        {{- else if hasKey . "name" }}
+          {{- $pullSecretNames = append $pullSecretNames .name }}
+        {{- end }}
+      {{- end }}
+      {{- with compact (uniq $pullSecretNames) }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ tpl . $ }}
+        {{- end }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 999
