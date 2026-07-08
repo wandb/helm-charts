@@ -28,7 +28,7 @@ Returns: "true" or "false"
 {{- define "wandb.olapAnyFeatureEnabled" -}}
 {{- $olap := default (dict) .Values.global.olap -}}
 {{- $enabled := false -}}
-{{- range list "registrySearch" "runStoreAccelerator" -}}
+{{- range list "history" "registrySearch" "runStoreAccelerator" -}}
   {{- if dig . "enabled" false $olap -}}
     {{- $enabled = true -}}
   {{- end -}}
