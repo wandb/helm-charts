@@ -2950,6 +2950,8 @@ clickhouseMigrationJob:
     volumes: true
   podDisruptionBudget:
     enabled: false
+  serviceAccount:
+    create: false
   image:
     repository: wandb/megabinary
     tag: latest
@@ -2963,8 +2965,7 @@ clickhouseMigrationJob:
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
   jobs:
     ch-migrate:
-      # Only render when at least one ClickHouse-backed feature is enabled.
-      enabled: '{{ or (dig "olap" "registrySearch" "enabled" false .Values.global) (dig "olap" "runStoreAccelerator" "enabled" false .Values.global) }}'
+      enabled: '{{ include "wandb.olapAnyFeatureEnabled" . }}'
       backoffLimit: 0
       activeDeadlineSeconds: 900
       volumes:
