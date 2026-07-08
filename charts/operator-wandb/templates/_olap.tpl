@@ -16,27 +16,6 @@ missing keys fall through from default.
 {{- end -}}
 
 {{/*
-wandb.olapAnyFeatureEnabled returns "true" when at least one ClickHouse-backed
-OLAP feature is enabled, i.e. there are migrations for the migration job to run.
-Add new migratable OLAP features to this list.
-
-Usage:
-  include "wandb.olapAnyFeatureEnabled" .
-
-Returns: "true" or "false"
-*/}}
-{{- define "wandb.olapAnyFeatureEnabled" -}}
-{{- $olap := default (dict) .Values.global.olap -}}
-{{- $enabled := false -}}
-{{- range list "history" "registrySearch" "runStoreAccelerator" -}}
-  {{- if dig . "enabled" false $olap -}}
-    {{- $enabled = true -}}
-  {{- end -}}
-{{- end -}}
-{{- $enabled -}}
-{{- end -}}
-
-{{/*
 wandb.olapSecretName returns the internal K8s secret name for an OLAP feature.
 
 Usage:
