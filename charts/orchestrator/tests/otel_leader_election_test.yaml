@@ -1,0 +1,64 @@
+suite: otel leader election wiring for k8s_cluster receiver
+release:
+  name: orchestrator
+  namespace: orchestrator
+
+tests:
+  - it: clusterrole grants leases permissions (always — preset-independent)
+    template: charts/otel/templates/clusterrole.yaml
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["coordination.k8s.io"]
+            resources: ["leases"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  - it: configmap does NOT include k8s_leader_elector when kubernetesCluster preset is off (default)
+    template: charts/otel/templates/configmap.yaml
+    asserts:
+      - notMatchRegex:
+          path: data.config
+          pattern: 'k8s_leader_elector'
+
+  - it: configmap includes k8s_leader_elector extension when kubernetesCluster preset is on
+    template: charts/otel/templates/configmap.yaml
+    set:
+      otel:
+        presets:
+          receivers:
+            kubernetesCluster: true
+    asserts:
+      - matchRegex:
+          path: data.config
+          pattern: 'k8s_leader_elector:\s+auth_type: serviceAccount'
+      - matchRegex:
+          path: data.config
+          pattern: 'lease_name: orchestrator-otel-leader'
+      - matchRegex:
+          path: data.config
+          pattern: 'lease_namespace: orchestrator'
+
+  - it: k8s_cluster receiver references the elector when kubernetesCluster preset is on
+    template: charts/otel/templates/configmap.yaml
+    set:
+      otel:
+        presets:
+          receivers:
+            kubernetesCluster: true
+    asserts:
+      - matchRegex:
+          path: data.config
+          pattern: 'k8s_cluster:[\s\S]*k8s_leader_elector: k8s_leader_elector'
+
+  - it: service.extensions includes k8s_leader_elector when kubernetesCluster preset is on
+    template: charts/otel/templates/configmap.yaml
+    set:
+      otel:
+        presets:
+          receivers:
+            kubernetesCluster: true
+    asserts:
+      - matchRegex:
+          path: data.config
+          pattern: 'extensions:\s*\n\s+- health_check\s*\n\s+- k8s_leader_elector'

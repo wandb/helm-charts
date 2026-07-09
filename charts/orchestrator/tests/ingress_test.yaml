@@ -1,0 +1,185 @@
+suite: ingress
+templates:
+  - templates/ingress.yaml
+release:
+  name: orchestrator
+
+tests:
+  - it: creates an ingress by default
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: Ingress
+
+  - it: does not create an ingress when disabled
+    set:
+      ingress:
+        create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: strips the https scheme from the fqdn for the host
+    set:
+      global:
+        fqdn: "https://orchestrator.example.com"
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: orchestrator.example.com
+
+  - it: strips the http scheme from the fqdn for the host
+    set:
+      global:
+        fqdn: "http://orchestrator.example.com"
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: orchestrator.example.com
+
+  - it: strips a trailing slash from the fqdn
+    set:
+      global:
+        fqdn: "https://orchestrator.example.com/"
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: orchestrator.example.com
+
+  - it: leaves out the host when fqdn is empty
+    set:
+      global:
+        fqdn: ""
+    asserts:
+      - isNull:
+          path: spec.rules[0].host
+
+  - it: renders a TLS block when fqdn and tls are both set
+    set:
+      global:
+        fqdn: "https://orchestrator.example.com"
+      ingress:
+        tls:
+          enabled: true
+    asserts:
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: orchestrator.example.com
+      - equal:
+          path: spec.tls[0].secretName
+          value: orchestrator-tls
+
+  - it: honours a custom TLS secret name
+    set:
+      global:
+        fqdn: "https://orchestrator.example.com"
+      ingress:
+        tls:
+          enabled: true
+          secretName: my-custom-tls-cert
+    asserts:
+      - equal:
+          path: spec.tls[0].secretName
+          value: my-custom-tls-cert
+
+  - it: omits TLS when tls.enabled is false
+    set:
+      global:
+        fqdn: "https://orchestrator.example.com"
+      ingress:
+        tls:
+          enabled: false
+    asserts:
+      - isNull:
+          path: spec.tls
+
+  - it: omits TLS when fqdn is empty even if tls is enabled
+    set:
+      global:
+        fqdn: ""
+      ingress:
+        tls:
+          enabled: true
+    asserts:
+      - isNull:
+          path: spec.tls
+
+  - it: sets the ingressClassName when a class is provided
+    set:
+      ingress:
+        class: traefik-internal
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: traefik-internal
+
+  - it: leaves out ingressClassName when class is empty
+    set:
+      ingress:
+        class: ""
+    asserts:
+      - isNull:
+          path: spec.ingressClassName
+
+  - it: applies annotations when provided
+    set:
+      ingress:
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    asserts:
+      - equal:
+          path: metadata.annotations["cert-manager.io/cluster-issuer"]
+          value: letsencrypt-prod
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/ssl-redirect"]
+          value: "true"
+
+  - it: applies extra labels when provided
+    set:
+      ingress:
+        labels:
+          env: production
+    asserts:
+      - equal:
+          path: metadata.labels.env
+          value: production
+
+  - it: routes / to web on port 3000
+    asserts:
+      - contains:
+          path: spec.rules[0].http.paths
+          content:
+            pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: orchestrator-web
+                port:
+                  number: 3000
+          any: true
+
+  - it: routes /api to api on port 8081
+    asserts:
+      - contains:
+          path: spec.rules[0].http.paths
+          content:
+            pathType: Prefix
+            path: /api
+            backend:
+              service:
+                name: orchestrator-api
+                port:
+                  number: 8081
+          any: true
+
+  - it: falls back to web via defaultBackend
+    asserts:
+      - equal:
+          path: spec.defaultBackend.service.name
+          value: orchestrator-web
+      - equal:
+          path: spec.defaultBackend.service.port.number
+          value: 3000

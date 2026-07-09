@@ -1,0 +1,110 @@
+global:
+  repositoryPrefix: ""
+  lumen:
+    dataRoot: ""
+    # Terraform-provided per cluster aws-eks / azure-aks / google-gke.
+    # It can be empty for GCP-direct deployments, where no WIF is rendered.
+    gcpWorkloadIdentity:
+      audience: ""
+
+# Processor: hourly CronJob that moves agent exports to inbound, processes,
+# and writes parquet to the data root.
+processor:
+  kind: CronJob
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: v0.1.5
+  serviceAccount:
+    annotations: {}
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: false
+  cronJobs:
+    processor:
+      enabled: true
+      schedule: "15 * * * *"
+      concurrencyPolicy: "Forbid"
+      volumesTpls:
+        - '{{ include "wandb.lumenStagingVolume" . }}'
+      failedJobsHistoryLimit: 1
+      successfulJobsHistoryLimit: 1
+      startingDeadlineSeconds: 300
+      ttlSecondsAfterFinished: 300
+      backoffLimit: 0
+      containers:
+        collector:
+          command: ["/app/entrypoint.sh", "processor"]
+          args: []
+          env:
+            GOMEMLIMIT:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            GOMAXPROCS:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+          envFrom:
+            "{{ .Release.Name }}-configmap": "configMapRef"
+          volumeMountsTpls:
+            - '{{ include "wandb.lumenStagingVolumeMount" . }}'
+          resources:
+            requests:
+              cpu: 1
+              memory: 4Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
+
+# Notebook: marimo UI for browsing the parquet data root.
+notebook:
+  kind: Deployment
+  replicaCount: 1
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: v0.1.5
+  serviceAccount:
+    annotations: {}
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  volumesTpls:
+    - '{{ include "wandb.lumenStagingVolume" . }}'
+  service:
+    enabled: true
+    ports:
+      - port: 8080
+        protocol: TCP
+        name: marimo
+  containers:
+    notebook:
+      command: ["/app/entrypoint.sh", "marimo"]
+      args: []
+      env:
+        GOMEMLIMIT:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        GOMAXPROCS:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+      envFrom:
+        "{{ .Release.Name }}-configmap": "configMapRef"
+        "{{ .Release.Name }}-marimo-configmap": "configMapRef"
+      volumeMountsTpls:
+        - '{{ include "wandb.lumenStagingVolumeMount" . }}'
+      ports:
+        - containerPort: 8080
+          name: marimo
+      resources:
+        requests:
+          cpu: 1
+          memory: 2Gi
+        limits:
+          cpu: 2
+          memory: 4Gi

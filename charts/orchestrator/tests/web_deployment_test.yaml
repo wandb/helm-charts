@@ -1,0 +1,113 @@
+suite: web deployment
+templates:
+  - charts/web/templates/deployment.yaml
+  - templates/secrets.yaml
+release:
+  name: orchestrator
+
+tests:
+  - it: renders a Deployment by default
+    template: charts/web/templates/deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: Deployment
+
+  - it: sets the web container image
+    template: charts/web/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: orchestrator/web:latest
+
+  - it: overrides the web image tag
+    template: charts/web/templates/deployment.yaml
+    set:
+      web:
+        image:
+          tag: v1.2.3
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: orchestrator/web:v1.2.3
+
+  - it: exposes port 3000
+    template: charts/web/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: http
+            containerPort: 3000
+          any: true
+
+  - it: sets BASE_URL and AUTH_URL from global fqdn
+    template: charts/web/templates/deployment.yaml
+    set:
+      global:
+        fqdn: "https://app.orchestrator.dev"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASE_URL
+            value: "https://app.orchestrator.dev"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_URL
+            value: "https://app.orchestrator.dev"
+          any: true
+
+  - it: points web at the auto-generated auth secret
+    template: charts/web/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: orchestrator-auth-secret
+                key: AUTH_SECRET
+          any: true
+
+  - it: wires web to an external auth secret via valueFrom
+    template: charts/web/templates/deployment.yaml
+    set:
+      global:
+        secrets:
+          authSecret:
+            valueFrom:
+              secretKeyRef:
+                name: my-ext-auth
+                key: MY_AUTH
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: my-ext-auth
+                key: MY_AUTH
+          any: true
+
+  - it: sets resource requests and limits
+    template: charts/web/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 500m
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: 1Gi
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: "4000m"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 4Gi
