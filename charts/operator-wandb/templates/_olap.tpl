@@ -16,6 +16,26 @@ missing keys fall through from default.
 {{- end -}}
 
 {{/*
+wandb.olapAnyFeatureEnabled returns "true" when any feature under global.olap
+(every key except "default") is enabled. Iterates the config map itself, so
+new OLAP features are picked up without changes here.
+
+Usage:
+  include "wandb.olapAnyFeatureEnabled" .
+
+Returns: "true" or "false"
+*/}}
+{{- define "wandb.olapAnyFeatureEnabled" -}}
+{{- $any := false -}}
+{{- range $name, $cfg := omit (default (dict) .Values.global.olap) "default" -}}
+  {{- if and (kindIs "map" $cfg) $cfg.enabled -}}
+    {{- $any = true -}}
+  {{- end -}}
+{{- end -}}
+{{- $any -}}
+{{- end -}}
+
+{{/*
 wandb.olapSecretName returns the internal K8s secret name for an OLAP feature.
 
 Usage:
