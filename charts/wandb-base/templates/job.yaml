@@ -4,7 +4,11 @@
   we create a dictionary with enabled=true and mergeOverwrite the provided values
 */}}
 {{- $job := mergeOverwrite (dict "enabled" true) $job}}
-{{- if $job.enabled }}
+{{- $enabled := $job.enabled }}
+{{- if kindIs "string" $enabled }}
+  {{- $enabled = eq (tpl $enabled $ | trim) "true" }}
+{{- end }}
+{{- if $enabled }}
   {{- $_ := set $job "restartPolicy" (default "Never" $job.restartPolicy ) }}
 apiVersion: batch/v1
 kind: Job
@@ -26,8 +30,11 @@ spec:
   {{- with $job.ttlSecondsAfterFinished }}
   ttlSecondsAfterFinished: {{ . }}
   {{- end }}
-  {{- with $job.backoffLimit }}
-  backoffLimit: {{ . }}
+  {{- if hasKey $job "backoffLimit" }}
+  backoffLimit: {{ $job.backoffLimit }}
+  {{- end }}
+  {{- with $job.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
   {{- end }}
   template:
     {{- include "wandb-base.pod" (dict "podData" $job "root" $) | nindent 8 }}

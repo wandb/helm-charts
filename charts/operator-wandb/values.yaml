@@ -2939,6 +2939,101 @@ settingsMigrationJob:
   podDisruptionBudget:
     enabled: false
 
+# Runs ClickHouse schema migrations once per helm operation as a hook Job, so
+# concurrent migrate-db initContainers cannot race on ClickHouse, which has no
+# DB-level locking. The migrate binary skips any schema whose MIGRATE_*_DB env
+# var is unset, so the job is a fast no-op unless OLAP features are enabled;
+# MySQL schemas stay with the initContainers. The image must carry the same
+# migration files as the deployed code -- keep its tag in lockstep with api.
+# TODO: default to true once the deployer stamps this job's image tag
+# alongside api's (wandb/deployments user-spec/deploy.py).
+clickhouseMigrationJob:
+  install: false
+  kind: Job
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  # The job needs no k8s API access. This also avoids a helm hook ordering
+  # deadlock: same-weight hooks run sorted by name, so a dedicated
+  # ServiceAccount would be created after the Job that references it.
+  serviceAccount:
+    create: false
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  helmHook:
+    enabled: true
+    hook: "post-install,pre-upgrade"
+  envTpls:
+    - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.historyEnvs" . }}'
+    - '{{ include "wandb.registrySearchEnvs" . }}'
+    - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
+  jobs:
+    ch-migrate:
+      # Only render when at least one global.olap feature is enabled.
+      enabled: '{{ include "wandb.olapAnyFeatureEnabled" . }}'
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      volumes:
+        - name: temp-dir
+          emptyDir: {}
+      initContainers:
+        # Blocks until every configured ClickHouse endpoint accepts a TCP
+        # connection; activeDeadlineSeconds bounds the overall wait. NOTE: a
+        # pre-upgrade hook cannot see resources created by the same apply, so
+        # enabling OLAP features together with an in-release ClickHouse in one
+        # upgrade will time out here -- create ClickHouse first, or disable
+        # this job for that one upgrade.
+        wait-for-clickhouse:
+          command:
+            - bash
+            - -c
+            - |
+              wait_for() {
+                until (exec 3<>"/dev/tcp/$1/$2") 2>/dev/null; do
+                  echo "waiting for clickhouse at $1:$2"
+                  sleep 5
+                done
+                echo "clickhouse reachable at $1:$2"
+              }
+              if [[ -n "$HISTORY_HOST" ]]; then
+                wait_for "$HISTORY_HOST" "$HISTORY_PORT"
+              fi
+              if [[ -n "$REGISTRY_SEARCH_HOST" ]]; then
+                wait_for "$REGISTRY_SEARCH_HOST" "$REGISTRY_SEARCH_PORT"
+              fi
+              if [[ -n "$RUN_STORE_ACCELERATOR_HOST" ]]; then
+                wait_for "$RUN_STORE_ACCELERATOR_HOST" "$RUN_STORE_ACCELERATOR_PORT"
+              fi
+              exit 0
+      containers:
+        ch-migrate:
+          command:
+            - bash
+            - -c
+            - |
+              # No --db/--runs-db/--usage-db flags: without them the MySQL
+              # schemas are skipped (their env vars are unset here) and only the
+              # ClickHouse schemas run, keyed off the MIGRATE_*_DB env vars.
+              LOG_FILE="/tmp/migrate.log"
+              ./megabinary migrate 2>&1 | tee -a $LOG_FILE
+              EXIT_CODE=${PIPESTATUS[0]}
+              MIGRATION_FILE_MISSING_ERROR_CODE=101
+              if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
+                exit 0
+              else
+                # missing migration error log from golang-migrate@v4 -- older versions of megabinary
+                if grep -q "no migration found for version" $LOG_FILE; then
+                  exit 0
+                fi
+                exit $EXIT_CODE
+              fi
+          volumeMounts:
+            - name: temp-dir
+              mountPath: /tmp/
+
 weave:
   install: true
   deploymentPostfix: "bc"
