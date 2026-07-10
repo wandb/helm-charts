@@ -11,6 +11,26 @@ Features:
 
 Get started with orchestratordev/orchestrator-charts today and supercharge your Kubernetes deployments!
 
+## SpiceDB (authorization)
+
+The chart does not install SpiceDB — like PostgreSQL and Redis, it is an external dependency. Deploy it separately (Authzed's [spicedb-operator](https://github.com/authzed/spicedb-operator) is the recommended way to run it, with a PostgreSQL datastore) and wire the connection via `global.spicedb`:
+
+```yaml
+global:
+  spicedb:
+    addr: "spicedb.spicedb:50051"
+    insecure: "true"
+    token:
+      valueFrom:
+        secretKeyRef:
+          name: spicedb-config # e.g. materialized by an ExternalSecret
+          key: preshared_key
+```
+
+Both the identity service (writes membership grants) and the workspace-engine (enforces them) connect to it. The workspace-engine additionally **fails closed at boot** when `global.spicedb.addr` is unset, so SpiceDB must be up before the app pods start.
+
+The authorization schema is applied by the `authz-apply-schema` pre-install/pre-upgrade hook job, which runs `engine authz apply-schema` — the SpiceDB analog of the `migrate` job. The write is idempotent (an unchanged schema is a no-op) and keeps the schema in lockstep with the engine image on upgrades. SpiceDB must be reachable at install/upgrade time, same as PostgreSQL for the migration jobs. A schema change that would orphan existing relationship data is rejected by SpiceDB, failing the hook and stopping the upgrade before the app rolls out.
+
 ## Workspace-engine topology
 
 By default the chart runs a single `workspace-engine` Deployment in which every pod serves the Connect API **and** runs all reconcile controllers (`SERVICES` is empty, which the engine treats as "run everything").
