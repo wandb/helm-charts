@@ -50,7 +50,17 @@ jobs:
           ./helm-dep-build.sh
         shell: bash
 
+      - name: Run chart-testing (list-changed)
+        id: list-changed
+        run: |
+          changed=$(ct list-changed --config ct.yaml)
+          if [[ -n "$changed" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+
       - name: Package charts
+        if: steps.list-changed.outputs.changed == 'true'
         env:
           PR_NUMBER: ${{ github.event.number }}
         run: |
@@ -61,6 +71,7 @@ jobs:
         shell: bash
 
       - name: Run chart-releaser
+        if: steps.list-changed.outputs.changed == 'true'
         uses: helm/chart-releaser-action@be16258da8010256c6e82849661221415f031968 # v1.5.0
         with:
           skip_packaging: true
