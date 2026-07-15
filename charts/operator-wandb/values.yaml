@@ -2357,6 +2357,34 @@ glue:
   image:
     repository: wandb/megabinary
     tag: latest
+  # Leader election lets glue run as a multi-replica Deployment (HA) while
+  # keeping its scheduled task runner a singleton: replicas compete for a
+  # Kubernetes Lease and only the leader runs tasks. Disabled by default, which
+  # preserves the historical single-pod behaviour.
+  #
+  # To run glue in HA, the only settings you need are a replica count and this
+  # flag; the PodDisruptionBudget (maxUnavailable: 1) is already on by default:
+  #   glue:
+  #     replicaCount: 2
+  #     leaderElection:
+  #       enabled: true
+  #
+  # Optional tuning (all have working defaults):
+  #   - strategy: defaults to Recreate. This is the correct default when leader
+  #     election is off (it prevents two task runners from ever overlapping).
+  #     With leader election on, overlap is already prevented by the Lease, so
+  #     you may switch to RollingUpdate for zero-downtime rollouts:
+  #       strategy:
+  #         type: RollingUpdate
+  #         rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  #   - affinity: empty by default (replicas may co-locate). For resilience to
+  #     node loss, add pod anti-affinity so replicas spread across nodes; note a
+  #     "required" rule needs enough schedulable nodes to place every replica.
+  leaderElection:
+    enabled: false
+    # Name of the coordination.k8s.io/Lease glue replicas compete for. Must be a
+    # DNS-1123 subdomain and unique per glue Deployment in the namespace.
+    leaseName: gorilla-glue-leader
   role:
     create: true
     rules:
@@ -2366,6 +2394,15 @@ glue:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
+      # Leader election acquires and renews a coordination.k8s.io/Lease as its
+      # lock, and records leadership transitions as Events. These are only used
+      # when leaderElection.enabled is true; harmless (namespaced) otherwise.
+      - apiGroups: ["coordination.k8s.io"]
+        resources: ["leases"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: [""]
+        resources: ["events"]
+        verbs: ["create", "patch"]
   strategy:
     type: Recreate
   volumesTpls:
