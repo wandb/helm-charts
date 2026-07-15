@@ -1,3 +1,11 @@
+# Exercises glue leader election in its simplest form: the only settings a user
+# needs to run glue as a highly-available, multi-replica Deployment are
+# glue.replicaCount and glue.leaderElection.enabled. The PodDisruptionBudget
+# (maxUnavailable: 1) is already on by default, and the default Recreate
+# strategy is safe with leader election, so neither is set here.
+#
+# Based on the local-bypass-no-app layout so glue installs as a standalone
+# Deployment (rather than running inside the all-in-one app binary).
 global:
   repositoryPrefix: "us-docker.pkg.dev/wandb-production/public"
   imageRegistry: "us-docker.pkg.dev/wandb-production/public"
@@ -13,37 +21,32 @@ global:
     BUCKET_PROXY: "true"
     GORILLA_GLUE_FILE_STORE_IS_PROXIED: "true"
     GORILLA_FILE_STORE_IS_PROXIED: "true"
-  clickhouse:
-    port: "8123"
-    password: "test-clickhouse-password"
+  redis:
+    password: "redis123"
   glue:
     enabled: true
+  localService:
+    bypass: true
   api:
     enabled: true
   executor:
     enabled: true
-  weave-trace:
-    enabled: true
-  olap:
-    default:
-      host: "{{ .Release.Name }}-clickhouse-headless"
-      port: "9000"
-      password: "test-clickhouse-password"
-      params:
-        tls: "false"
-    registrySearch:
-      enabled: true
-    runStoreAccelerator:
-      enabled: true
-    history:
-      enabled: true
   size: "testing"
+  email:
+    smtp:
+      host: "smtp.example.com"
+      port: 587
+      user: "noreply@example.com"
+      password: "" # intentionally empty
 
 app:
   install: false
-  env:
-    GORILLA_STORAGE_BUCKET: "s3://local-files"
-    GORILLA_FILEMETA_ENABLED: "false"
+
+# The complete set of settings required to run glue in HA mode.
+glue:
+  replicaCount: 2
+  leaderElection:
+    enabled: true
 
 executor:
   install: true
@@ -54,16 +57,10 @@ filemeta:
 frontend:
   install: true
 
-console:
-  containers:
-    console:
-      resources:
-        requests:
-          cpu: 40m
-          memory: 64Mi
-
-weave-trace:
-  install: true
+internalSignerPreHook:
+  image:
+    tag: 0.78.0-rc.1771864722
+    # this tag override may be removed once 0.78.0 is fully released
 
 nginx:
   install: true
@@ -81,39 +78,21 @@ mysql:
   install: true
   resources:
     requests:
-      cpu: "40m"
+      cpu: "50m"
       memory: "64Mi"
 
 redis:
   install: true
   resources:
     requests:
-      cpu: "40m"
-      memory: "64Mi"
-
-clickhouse:
-  install: true
-  clickhouse:
-    port: "8123"
-  persistence:
-    size: 2Gi
-  keeper:
-    persistence:
-      size: 2Gi
-    resources:
-      requests:
-        cpu: "40m"
-        memory: "64Mi"
-  resources:
-    requests:
-      cpu: "40m"
+      cpu: "50m"
       memory: "64Mi"
 
 reloader:
   install: true
   resources:
     requests:
-      cpu: "40m"
+      cpu: "50m"
       memory: "64Mi"
 
 anaconda2:

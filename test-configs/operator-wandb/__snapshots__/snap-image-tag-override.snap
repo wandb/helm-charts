@@ -2274,6 +2274,25 @@ rules:
   - namespaces
   verbs:
   - get
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
 ---
 # Source: operator-wandb/charts/api/templates/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -3230,6 +3249,22 @@ spec:
         - bash
         - -c
         - |
+          wait_for() {
+            until (exec 3<>"/dev/tcp/$1/$2") 2>/dev/null; do
+              echo "waiting for clickhouse at $1:$2"
+              sleep 5
+            done
+            echo "clickhouse reachable at $1:$2"
+          }
+          if [[ -n "$HISTORY_HOST" ]]; then
+            wait_for "$HISTORY_HOST" "$HISTORY_PORT"
+          fi
+          if [[ -n "$REGISTRY_SEARCH_HOST" ]]; then
+            wait_for "$REGISTRY_SEARCH_HOST" "$REGISTRY_SEARCH_PORT"
+          fi
+          if [[ -n "$RUN_STORE_ACCELERATOR_HOST" ]]; then
+            wait_for "$RUN_STORE_ACCELERATOR_HOST" "$RUN_STORE_ACCELERATOR_PORT"
+          fi
           LOG_FILE="/tmp/migrate.log"
           ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
           EXIT_CODE=${PIPESTATUS[0]}
@@ -5296,219 +5331,6 @@ spec:
         - mountPath: /tmp/
           name: temp-dir
       initContainers:
-      - name: migrate-db
-        command:
-        - bash
-        - -c
-        - |
-          LOG_FILE="/tmp/migrate.log"
-          ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
-          EXIT_CODE=${PIPESTATUS[0]}
-          MIGRATION_FILE_MISSING_ERROR_CODE=101
-          if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
-            exit 0
-          else
-            # missing migration error log from golang-migrate@v4 -- older versions of megabinary
-            if grep -q "no migration found for version" $LOG_FILE; then
-              exit 0
-            fi
-            exit $EXIT_CODE
-          fi
-        envFrom:
-        - configMapRef:
-            name: chartsnap-bucket-configmap
-        - configMapRef:
-            name: chartsnap-global-configmap
-        - secretRef:
-            name: chartsnap-global-secret
-        - configMapRef:
-            name: chartsnap-glue-configmap
-        - configMapRef:
-            name: chartsnap-kafka-configmap
-        - configMapRef:
-            name: chartsnap-redis-configmap
-        env:
-        - name: G_HOST_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        - name: GOMEMLIMIT
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.memory
-        - name: GOMAXPROCS
-          valueFrom:
-            resourceFieldRef:
-              resource: limits.cpu
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: GORILLA_CUSTOMER_SECRET_STORE_K8S_CONFIG_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
-          valueFrom:
-            secretKeyRef:
-              key: GORILLA_COREWEAVE_WANDB_INTEGRATION_ACCESS_ID
-              name: gorilla-coreweave-caios
-              optional: true
-        - name: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              key: GORILLA_COREWEAVE_WANDB_INTEGRATION_SECRET_KEY
-              name: gorilla-coreweave-caios
-              optional: true
-        - name: AZURE_STORAGE_KEY
-          valueFrom:
-            secretKeyRef:
-              key: ACCESS_KEY
-              name: chartsnap-bucket
-              optional: true
-        - name: BUCKET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              key: ACCESS_KEY
-              name: chartsnap-bucket
-              optional: true
-        - name: BUCKET_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              key: SECRET_KEY
-              name: chartsnap-bucket
-              optional: true
-        - name: BUCKET
-          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
-        - name: GORILLA_FILE_STORE
-          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
-        - name: GORILLA_STORAGE_BUCKET
-          value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: MYSQL_PASSWORD
-              name: chartsnap-mysql
-        - name: MYSQL_PORT
-          value: "3306"
-        - name: MYSQL_HOST
-          value: chartsnap-mysql
-        - name: MYSQL_DATABASE
-          value: wandb_local
-        - name: MYSQL_USER
-          value: wandb
-        - name: MYSQL
-          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-        - name: GORILLA_ANALYTICS_SINK
-          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-        - name: GORILLA_METADATA_STORE
-          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-        - name: GORILLA_RUN_STORE
-          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-        - name: GORILLA_USAGE_STORE
-          value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: REDIS_PASSWORD
-              name: chartsnap-redis-secret
-              optional: true
-        - name: REDIS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_AUDITOR_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_FILE_METADATA_SOURCE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_LOCKER
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_METADATA_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_SETTINGS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_USAGE_METRICS_CACHE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: GORILLA_TASK_QUEUE
-          value: redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)$(REDIS_PARAMS)
-        - name: KAFKA_CLIENT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: KAFKA_CLIENT_PASSWORD
-              name: chartsnap-kafka
-              optional: true
-        - name: GORILLA_FILE_STREAM_STORE_ADDRESS
-          value: pubsub:/playground-111/filestream
-        - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_ADDR
-          value: pubsub:/playground-111/run-updates-shadow
-        - name: GORILLA_HISTORY_STORE
-          value: http://chartsnap-parquet:8087/_goRPC_,bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
-        - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-          value: bigtablev3://playground-111/fmbtest,bigtablev2://playground-111/fmbtest
-        - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
-          value: bigtablev2://playground-111/fmbtest,bigtablev3://playground-111/fmbtest
-        - name: GORILLA_STATSIG_KEY
-          valueFrom:
-            secretKeyRef:
-              key: GORILLA_STATSIG_KEY
-              name: gorilla-statsig
-              optional: true
-        - name: SMTP_HOST
-          value: ""
-        - name: SMTP_PORT
-          value: "587"
-        - name: SMTP_USER
-          value: ""
-        - name: SMTP_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              key: SMTP_PASSWORD
-              name: chartsnap-smtp-secret
-        - name: GORILLA_EMAIL_SINK
-          value: https://api.wandb.ai/email/dispatch
-        - name: LICENSE
-          valueFrom:
-            secretKeyRef:
-              key: license
-              name: chartsnap-license
-        - name: GORILLA_LICENSE
-          valueFrom:
-            secretKeyRef:
-              key: license
-              name: chartsnap-license
-        - name: SSL_CERT_FILE
-          value: /etc/ssl/certs/ca-certificates.crt
-        - name: SSL_CERT_DIR
-          value: /etc/ssl/certs
-        - name: REQUESTS_CA_BUNDLE
-          value: /etc/ssl/certs/ca-certificates.crt
-        - name: GORILLA_LUMEN_ADDR
-          value: :16060
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add: []
-            drop: []
-          privileged: false
-          readOnlyRootFilesystem: false
-        image: "wandb/megabinary:latest"
-        imagePullPolicy: IfNotPresent
-        volumeMounts:
-        - name: wandb-ca-certs-root
-          mountPath: /usr/local/share/ca-certificates/
-        - name: wandb-ca-certs
-          mountPath: /usr/local/share/ca-certificates/inline
-        - name: wandb-ca-certs-user
-          mountPath: /usr/local/share/ca-certificates/configmap
-        - name: redis-ca
-          mountPath: /etc/ssl/certs/redis_ca.pem
-          subPath: redis_ca.pem
-        - mountPath: /tmp/
-          name: temp-dir
       serviceAccountName: chartsnap-glue
       securityContext:
         fsGroup: 0
