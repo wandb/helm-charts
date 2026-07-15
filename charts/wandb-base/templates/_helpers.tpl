@@ -1,7 +1,13 @@
-{{/* Resolve parent-provided Azure workload identity only for opted-in workloads. */}}
+{{/* Resolve Azure workload identity for workloads that consume bucket envs. */}}
 {{- define "wandb-base.azureWorkloadIdentity" -}}
 {{- $identity := dict "enabled" false -}}
-{{- if .Values.azureWorkloadIdentity.enabled -}}
+{{- $usesBucketEnvs := false -}}
+{{- range (default (list) .Values.envTpls) -}}
+  {{- if contains "wandb.bucketEnvs" . -}}
+    {{- $usesBucketEnvs = true -}}
+  {{- end -}}
+{{- end -}}
+{{- if $usesBucketEnvs -}}
   {{- $identity = include "wandb.azureStorageIdentity" . | fromYaml -}}
 {{- end -}}
 {{- $identity | toYaml -}}

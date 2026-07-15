@@ -64,9 +64,17 @@ Global values will override any chart-specific values.
 {{- end }}
 {{- if $azureIdentity.enabled }}
 - name: AZURE_STORAGE_TENANT_ID
+{{- if kindIs "map" $azureIdentity.tenantId }}
+{{- toYaml $azureIdentity.tenantId | nindent 2 }}
+{{- else }}
   value: {{ $azureIdentity.tenantId | quote }}
+{{- end }}
 - name: AZURE_STORAGE_CLIENT_ID
+{{- if kindIs "map" $azureIdentity.clientId }}
+{{- toYaml $azureIdentity.clientId | nindent 2 }}
+{{- else }}
   value: {{ $azureIdentity.clientId | quote }}
+{{- end }}
 {{- end }}
 - name: BUCKET_ACCESS_KEY
   valueFrom:
