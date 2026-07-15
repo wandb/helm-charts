@@ -1,0 +1,68 @@
+# chartsnap: snapshot_version=v3
+---
+# Source: wandb-base/templates/job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chartsnap-zero-fields
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": "post-install,pre-upgrade"
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+spec:
+  ttlSecondsAfterFinished: 0
+  backoffLimit: 0
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: '###CHART_VERSION###'
+        app.kubernetes.io/name: wandb-base
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: main
+        command:
+        - /bin/true
+        envFrom:
+        env:
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "debian:12-slim"
+        imagePullPolicy:
+      restartPolicy: Never
+      serviceAccountName: default
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway

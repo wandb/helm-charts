@@ -1860,6 +1860,8 @@ data:
   GORILLA_SCHEMA_FILE: "/schema.graphql"
   GORILLA_COLLECT_AUDIT_LOGS: "true"
   GORILLA_USE_PARQUET_HISTORY_STORE: "true"
+  GORILLA_ACTIVITY_STORE_ENABLE: "true"
+  GORILLA_ACTIVITY_STORE_SERVE: "true"
   GORILLA_PARQUET_PORT: "8087"
   GORILLA_PARQUET_GRPC_PORT: "8088"
   GORILLA_PARQUET_ARROW_BUFFER_SIZE: "2147483648"
@@ -1867,6 +1869,7 @@ data:
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
   GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{"system:serviceaccount:default:chartsnap-weave-trace": "https://kubernetes.default.svc.cluster.local", "system:serviceaccount:default:chartsnap-weave-trace-worker": "https://kubernetes.default.svc.cluster.local"}'
+  GORILLA_WEAVE_TRACE_SERVER_URL: "http://localhost:8080/traces"
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
   GORILLA_LOCAL_SERVICE_BYPASS: 'false'
 ---
@@ -2129,7 +2132,7 @@ data:
   GORILLA_GLUE_TASK_STORE: "memory://"
   # ClickHouse configuration using existing clickhouse variables
   GORILLA_GLUE_CLICKHOUSE_ADDRESS: "http://$(WF_CLICKHOUSE_HOST):$(WF_CLICKHOUSE_PORT)"
-  # Activity store configuration
+  # Activity store configuration (see global.activityStore)
   GORILLA_GLUE_ACTIVITY_STORE_ENABLE: "true"
   GORILLA_GLUE_ACTIVITY_STORE_SERVE: "true"
   GORILLA_GLUE_ACTIVITY_STORE_BACKFILL_ENABLE: "true"
@@ -2181,6 +2184,179 @@ data:
   HOST: "http://localhost:8080"
   LOCAL_K8S_SIGNER_SECRET_NAME: "chartsnap-internal-signer"
   LOCAL_K8S_SIGNER_NAMESPACE: "default"
+---
+# Source: operator-wandb/templates/lumen.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-lumen-configmap
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+data:
+  LUMEN_AGENT_CONFIG_PATH: "/app/definitions/collector/managed-install.yaml"
+  LUMEN_CUSTOMER_NAME: ""
+  LUMEN_DATA_ROOT: ""
+  LUMEN_STAGING_ROOT: "file:///vol/staging"
+---
+# Source: operator-wandb/templates/lumen.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-lumen-rules
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+data:
+  managed-install.yaml: |
+    keyRuleSets:
+      - name: k8s-metadata-noise
+        keyRules:
+          - keyRegex: "^metadata__managedFields"
+          - keyRegex: "^metadata__resourceVersion$"
+          - keyRegex: "^metadata__uid$"
+          - keyRegex: "^metadata__generation$"
+          - keyRegex: "^metadata__creationTimestamp$"
+          - keyRegex: "^metadata__selfLink$"
+          - keyRegex: "^metadata__annotations__kubectl\\.kubernetes\\.io/last-applied-configuration$"
+          - keyRegex: "^status$"
+          - keyRegex: "^status__"
+      - name: k8s-pod-noise
+        keyRules:
+          - keyRegex: "^spec__(containers|initContainers)__[^_]+__env__"
+          - keyRegex: "^spec__(containers|initContainers)__[^_]+__envFrom__"
+          - keyRegex: "^spec__(containers|initContainers)__[^_]+__volumeMounts__"
+          - keyRegex: "^spec__containers__[^_]+__(startup|liveness|readiness)Probe__"
+          - keyRegex: "^spec__tolerations"
+          - keyRegex: "^spec__topology"
+          - keyRegex: "^spec__volumes"
+          - keyRegex: "^status$"
+          - keyRegex: "^status__"
+      - name: standard-redactions
+        keyRules:
+          - keyRegex: "secret"
+            ignoreCase: true
+          - keyRegex: "password"
+            ignoreCase: true
+          - keyRegex: "key$"
+            ignoreCase: true
+          - keyRegex: "token$"
+            ignoreCase: true
+          - keyRegex: "license$"
+            ignoreCase: true
+          - keyRegex: "cert$"
+            ignoreCase: true
+
+    scrapers:
+      - name: wandb-configmaps
+        connection:
+          kubernetes:
+            discover:
+              kind: ConfigMap
+              namespace: default
+              nameRegex: "^wandb-.*-configmap$"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-secrets
+        connection:
+          kubernetes:
+            discover:
+              kind: Secret
+              namespace: default
+              nameRegex: "^wandb-(bucket|clickhouse|global|gorilla|internal-signer|kafka|license|mysql|parquet|redis|smtp)"
+              nameExceptions:
+                - "-backup"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "type"
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-pods
+        connection:
+          kubernetes:
+            discover:
+              kind: Pod
+              namespace: default
+              nameRegex: "^wandb-(anaconda2|api|app|executor|filemeta|flat-run-fields-updater|frontend|glue|parquet|weave).*"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise, k8s-pod-noise ]
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-pull-with-httpget
+        connection:
+          kubernetes:
+            discover:
+              kind: Pod
+              namespace: default
+              annotations:
+                - key: lumen.wandb.ai/agent
+                  value: "true"
+            pull:
+              type: k8sHttpGet
+              httpGet:
+                portName: lumen
+                listPath: /lumen/list
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-specs
+        connection:
+          kubernetes:
+            discover:
+              kind: Secret
+              namespace: default
+              nameRegex: "wandb-spec-(active|user)$"
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "status"
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
+
+      - name: wandb-cr
+        connection:
+          kubernetes:
+            discover:
+              kind: WeightsAndBiases
+              namespace: default
+        prune:
+          keyRules:
+            - use: [ k8s-metadata-noise ]
+            - keyRegex: "status"
+            - keyRegex: "apiVersion"
+        redact:
+          keyRules:
+            - use: [ standard-redactions ]
+          valueHooks:
+            - URIPassword
 ---
 # Source: operator-wandb/templates/nginx.yaml
 apiVersion: v1
@@ -2288,6 +2464,7 @@ data:
   WF_ENFORCE_PASSWORD_LENGTH: "false"
   WEAVE_ENABLE_ONLINE_EVAL: "true"
   WEAVE_ENABLE_EVALUATE_MODEL_WORKER: "true"
+  WEAVE_ENABLE_AGENT_SCORING: "false"
   WEAVE_TRACE_SERVER_BASE_URL: "http://localhost:8080/traces"
   WANDB_INTERNAL_SERVICE_TOKEN_SECRET_NAME: "weave-worker-auth"
   KAFKA_BROKER_HOST: "bufstream.default.svc.cluster.local"
@@ -2310,6 +2487,9 @@ data:
   WEAVE_SERVER_URL: "http://127.0.0.1:9994"
   WEAVE_LOCAL_ARTIFACT_DIR: "/vol/weave/cache"
   WEAVE_CACHE_CLEAR_INTERVAL: "24"
+  WEAVE_CACHE_CHECK_INTERVAL: "60"
+  WEAVE_CACHE_SIZE_LIMIT: "20Gi"
+  WEAVE_CACHE_CLEAR_PERCENT: "80"
 ---
 # Source: operator-wandb/charts/mysql/templates/pvc.yaml
 apiVersion: v1
@@ -3664,7 +3844,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: anaconda2-0.12.0
+        helm.sh/chart: anaconda2-0.12.4
         app.kubernetes.io/name: anaconda2
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3811,8 +3991,10 @@ spec:
       app.kubernetes.io/instance: chartsnap
   template:
     metadata:
+      annotations:
+        lumen.wandb.ai/agent: "true"
       labels:
-        helm.sh/chart: api-0.12.0
+        helm.sh/chart: api-0.12.4
         app.kubernetes.io/name: api
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -3998,6 +4180,8 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
+        - name: GORILLA_LUMEN_ADDR
+          value: :16060
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -4026,6 +4210,9 @@ spec:
         ports:
         - containerPort: 8081
           name: api
+          protocol: TCP
+        - containerPort: 16060
+          name: lumen
           protocol: TCP
         livenessProbe:
           failureThreshold: 3
@@ -4254,6 +4441,8 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
+        - name: GORILLA_LUMEN_ADDR
+          value: :16060
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -4363,7 +4552,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: app-0.12.0
+        helm.sh/chart: app-0.12.4
         app.kubernetes.io/name: app
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -4956,7 +5145,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: console-0.12.0
+        helm.sh/chart: console-0.12.4
         app.kubernetes.io/name: console
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5091,8 +5280,10 @@ spec:
       app.kubernetes.io/instance: chartsnap
   template:
     metadata:
+      annotations:
+        lumen.wandb.ai/agent: "true"
       labels:
-        helm.sh/chart: executor-0.12.0
+        helm.sh/chart: executor-0.12.4
         app.kubernetes.io/name: executor
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5272,6 +5463,8 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
+        - name: GORILLA_LUMEN_ADDR
+          value: :16060
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -5293,6 +5486,10 @@ spec:
           readOnlyRootFilesystem: false
         image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 16060
+          name: lumen
+          protocol: TCP
         resources:
           requests:
             cpu: 100m
@@ -5376,8 +5573,10 @@ spec:
       app.kubernetes.io/instance: chartsnap
   template:
     metadata:
+      annotations:
+        lumen.wandb.ai/agent: "true"
       labels:
-        helm.sh/chart: filemeta-0.12.0
+        helm.sh/chart: filemeta-0.12.4
         app.kubernetes.io/name: filemeta
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5539,6 +5738,8 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
+        - name: GORILLA_LUMEN_ADDR
+          value: :16060
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -5558,6 +5759,10 @@ spec:
           readOnlyRootFilesystem: false
         image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
         imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 16060
+          name: lumen
+          protocol: TCP
         resources:
           requests:
             cpu: 100m
@@ -5642,7 +5847,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: frontend-0.12.0
+        helm.sh/chart: frontend-0.12.4
         app.kubernetes.io/name: frontend
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5777,8 +5982,10 @@ spec:
       app.kubernetes.io/instance: chartsnap
   template:
     metadata:
+      annotations:
+        lumen.wandb.ai/agent: "true"
       labels:
-        helm.sh/chart: glue-0.12.0
+        helm.sh/chart: glue-0.12.4
         app.kubernetes.io/name: glue
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -5960,6 +6167,8 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
+        - name: GORILLA_LUMEN_ADDR
+          value: :16060
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -5982,6 +6191,9 @@ spec:
         ports:
         - containerPort: 8080
           name: http
+          protocol: TCP
+        - containerPort: 16060
+          name: lumen
           protocol: TCP
         livenessProbe:
           failureThreshold: 3
@@ -6199,6 +6411,8 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
+        - name: GORILLA_LUMEN_ADDR
+          value: :16060
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -6302,7 +6516,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: nginx-0.12.0
+        helm.sh/chart: nginx-0.12.4
         app.kubernetes.io/name: nginx
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6428,8 +6642,9 @@ spec:
   template:
     metadata:
       annotations:
+        lumen.wandb.ai/agent: "true"
       labels:
-        helm.sh/chart: parquet-0.12.0
+        helm.sh/chart: parquet-0.12.4
         app.kubernetes.io/name: parquet
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -6611,6 +6826,8 @@ spec:
           value: /etc/ssl/certs
         - name: REQUESTS_CA_BUNDLE
           value: /etc/ssl/certs/ca-certificates.crt
+        - name: GORILLA_LUMEN_ADDR
+          value: :16060
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -6633,6 +6850,9 @@ spec:
         ports:
         - containerPort: 8087
           name: parquet
+          protocol: TCP
+        - containerPort: 16060
+          name: lumen
           protocol: TCP
         livenessProbe:
           failureThreshold: 3
@@ -6929,7 +7149,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-evaluate-model-worker-0.12.0
+        helm.sh/chart: weave-evaluate-model-worker-0.12.4
         app.kubernetes.io/name: weave-evaluate-model-worker
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -7080,7 +7300,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-trace-worker-0.12.0
+        helm.sh/chart: weave-trace-worker-0.12.4
         app.kubernetes.io/name: weave-trace-worker
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -7240,7 +7460,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-trace-0.12.0
+        helm.sh/chart: weave-trace-0.12.4
         app.kubernetes.io/name: weave-trace
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -7487,7 +7707,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: weave-0.12.0
+        helm.sh/chart: weave-0.12.4
         app.kubernetes.io/name: weave
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/version: "latest"
@@ -8597,7 +8817,7 @@ spec:
       template:
         metadata:
           labels:
-            helm.sh/chart: parquet-0.12.0
+            helm.sh/chart: parquet-0.12.4
             app.kubernetes.io/name: parquet
             app.kubernetes.io/instance: chartsnap
             app.kubernetes.io/version: "latest"
@@ -8781,6 +9001,8 @@ spec:
               value: /etc/ssl/certs
             - name: REQUESTS_CA_BUNDLE
               value: /etc/ssl/certs/ca-certificates.crt
+            - name: GORILLA_LUMEN_ADDR
+              value: :16060
             - name: BUCKET_PROXY
               value: "true"
             - name: GLOBAL_ADMIN_API_KEY

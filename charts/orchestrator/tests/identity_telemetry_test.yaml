@@ -1,0 +1,54 @@
+suite: identity telemetry env
+templates:
+  - charts/identity/templates/deployment.yaml
+release:
+  name: orchestrator
+
+tests:
+  - it: sets OTel service name and sampler ratio defaults
+    template: charts/identity/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_SERVICE_NAME
+            value: "ctrlplane/identity"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_SAMPLER_RATIO
+            value: "0.1"
+          any: true
+
+  - it: wires the node-local OTLP HTTP endpoint via host IP
+    template: charts/identity/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_EXPORTER_OTLP_ENDPOINT
+            value: "http://$(OTEL_HOST_IP):4318"
+          any: true
+
+  - it: overrides OTEL_SAMPLER_RATIO per environment
+    template: charts/identity/templates/deployment.yaml
+    set:
+      identity:
+        env:
+          OTEL_SAMPLER_RATIO: "1"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OTEL_SAMPLER_RATIO
+            value: "1"
+          any: true

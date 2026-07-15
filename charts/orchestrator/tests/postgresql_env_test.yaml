@@ -1,0 +1,163 @@
+suite: postgresql env vars
+templates:
+  - charts/api/templates/deployment.yaml
+  - charts/migrations/templates/job.yaml
+  - charts/workspace-engine/templates/deployment.yaml
+  - templates/secrets.yaml
+release:
+  name: orchestrator
+tests:
+  - it: api uses direct postgres env vars
+    template: charts/api/templates/deployment.yaml
+    set:
+      global:
+        postgresql:
+          user: orchestrator-user
+          host: db.example.local
+          port: "6432"
+          database: orchestrator-db
+          password: direct-password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_USER
+            value: orchestrator-user
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            value: db.example.local
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PORT
+            value: "6432"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_DATABASE
+            value: orchestrator-db
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PASSWORD
+            value: direct-password
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_URL
+            value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DATABASE)
+          any: true
+  - it: migrations uses direct postgres env vars
+    template: charts/migrations/templates/job.yaml
+    set:
+      global:
+        postgresql:
+          user: orchestrator-user
+          host: db.example.local
+          port: "6432"
+          database: orchestrator-db
+          password: direct-password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_USER
+            value: orchestrator-user
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_HOST
+            value: db.example.local
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PORT
+            value: "6432"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_DATABASE
+            value: orchestrator-db
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PASSWORD
+            value: direct-password
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_URL
+            value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DATABASE)
+          any: true
+  - it: api uses valueFrom postgres password
+    template: charts/api/templates/deployment.yaml
+    set:
+      global:
+        postgresql:
+          user: orchestrator-user
+          host: db.example.local
+          port: "6432"
+          database: orchestrator-db
+          password:
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secret
+                key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secret
+                key: password
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_URL
+            value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DATABASE)
+          any: true
+  - it: migrations uses valueFrom postgres password
+    template: charts/migrations/templates/job.yaml
+    set:
+      global:
+        postgresql:
+          user: orchestrator-user
+          host: db.example.local
+          port: "6432"
+          database: orchestrator-db
+          password:
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secret
+                key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: postgres-secret
+                key: password
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_URL
+            value: postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DATABASE)
+          any: true
