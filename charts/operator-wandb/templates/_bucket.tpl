@@ -15,7 +15,8 @@
 
 {{/*
 Returns the effective Azure storage identity. The dedicated global override is
-owned by the deployment and takes precedence over the CR/user bucket values.
+supplied by the customer's infrastructure and takes precedence over the
+W&B-managed CR bucket values.
 */}}
 {{- define "wandb.azureStorageIdentity" -}}
 {{- $bucket := include "wandb.bucket" . | fromYaml -}}
@@ -36,6 +37,11 @@ owned by the deployment and takes precedence over the CR/user bucket values.
 {{- end -}}
 {{- $enabled := and (eq $bucket.provider "az") (not (empty $tenantId)) (not (empty $clientId)) -}}
 {{- dict "enabled" $enabled "tenantId" $tenantId "clientId" $clientId | toYaml -}}
+{{- end }}
+
+{{/* Return whether the effective Azure storage identity is configured. */}}
+{{- define "wandb.azureStorageIdentityEnabled" -}}
+{{- (include "wandb.azureStorageIdentity" . | fromYaml).enabled -}}
 {{- end }}
 
 
