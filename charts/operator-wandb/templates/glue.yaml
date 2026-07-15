@@ -58,3 +58,13 @@ data:
   GORILLA_GLUE_CLEAR_TASK_DEDUPE_KEY_ENABLED: "false"
 
   GORILLA_GLUE_LOCAL_SERVICE_BYPASS: "{{ .Values.global.localService.bypass }}"
+  {{- if .Values.glue.leaderElection.enabled }}
+  # Leader election (see glue.leaderElection in values.yaml). glue runs as a
+  # multi-replica Deployment while keeping scheduled tasks a singleton: only the
+  # pod holding the coordination.k8s.io/Lease runs the task runner. Identity is
+  # resolved from POD_NAME (provided by wandb.downwardEnvs), and the namespace is
+  # pinned to the release namespace so it matches the glue Role/RoleBinding scope.
+  GORILLA_GLUE_LEADER_ELECTION_ENABLED: "true"
+  GORILLA_GLUE_LEADER_ELECTION_LEASE_NAME: "{{ .Values.glue.leaderElection.leaseName }}"
+  GORILLA_GLUE_LEADER_ELECTION_NAMESPACE: "{{ .Release.Namespace }}"
+  {{- end }}
