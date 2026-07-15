@@ -1,3 +1,12 @@
+{{/* Resolve parent-provided Azure workload identity only for opted-in workloads. */}}
+{{- define "wandb-base.azureWorkloadIdentity" -}}
+{{- $identity := dict "enabled" false -}}
+{{- if .Values.azureWorkloadIdentity.enabled -}}
+  {{- $identity = include "wandb.azureStorageIdentity" . | fromYaml -}}
+{{- end -}}
+{{- $identity | toYaml -}}
+{{- end -}}
+
 {{/*
 Expand the name of the chart.
 */}}
