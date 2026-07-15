@@ -70,11 +70,7 @@ Handles merging a set of pod annotations
 Handles merging a set of non-selector labels
 */}}
 {{- define "wandb-base.podLabels" -}}
-{{- $allLabels := merge (deepCopy .Values.podLabels) .Values.pod.labels .Values.global.pod.labels -}}
-{{- $azureIdentity := include "wandb-base.azureWorkloadIdentity" . | fromYaml -}}
-{{- if $azureIdentity.enabled -}}
-{{- $_ := set $allLabels "azure.workload.identity/use" "true" -}}
-{{- end -}}
+{{- $allLabels := merge .Values.podLabels .Values.pod.labels .Values.global.pod.labels -}}
 {{- if $allLabels -}}
 {{-   range $key, $value := $allLabels }}
 {{ $key }}: {{ $value | trunc 63 | quote }}
