@@ -1,5 +1,4 @@
 {{- define "wandb-base.pod" }}
-{{- $azureIdentity := include "wandb-base.azureWorkloadIdentity" $.root | fromYaml -}}
 metadata:
   {{- if or .podData.podAnnotations .podData.podAnnotationsTpls (include "wandb-base.podAnnotations" $.root) (include "wandb-base.commonAnnotations" $.root) }}
   annotations:
@@ -15,9 +14,6 @@ metadata:
   labels:
     {{- tpl (include "wandb-base.labels" $.root | nindent 4) $.root }}
     {{- tpl (include "wandb-base.podLabels" $.root | nindent 4) $.root }}
-    {{- if $azureIdentity.enabled }}
-    azure.workload.identity/use: "true"
-    {{- end }}
 spec:
   {{- with .podData.affinity }}
   affinity:
