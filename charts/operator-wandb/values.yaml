@@ -627,6 +627,22 @@ api:
         - bash
         - -c
         - |
+          wait_for() {
+            until (exec 3<>"/dev/tcp/$1/$2") 2>/dev/null; do
+              echo "waiting for clickhouse at $1:$2"
+              sleep 5
+            done
+            echo "clickhouse reachable at $1:$2"
+          }
+          if [[ -n "$HISTORY_HOST" ]]; then
+            wait_for "$HISTORY_HOST" "$HISTORY_PORT"
+          fi
+          if [[ -n "$REGISTRY_SEARCH_HOST" ]]; then
+            wait_for "$REGISTRY_SEARCH_HOST" "$REGISTRY_SEARCH_PORT"
+          fi
+          if [[ -n "$RUN_STORE_ACCELERATOR_HOST" ]]; then
+            wait_for "$RUN_STORE_ACCELERATOR_HOST" "$RUN_STORE_ACCELERATOR_PORT"
+          fi
           LOG_FILE="/tmp/migrate.log"
           ./megabinary migrate --db=$GORILLA_METADATA_STORE --runs-db=$GORILLA_RUN_STORE --usage-db=$GORILLA_USAGE_STORE 2>&1 | tee -a $LOG_FILE
           EXIT_CODE=${PIPESTATUS[0]}

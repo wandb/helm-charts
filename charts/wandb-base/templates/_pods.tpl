@@ -40,11 +40,8 @@ spec:
     {{- end }}
   {{- end }}
   {{- if .podData.initContainers }}
-  {{- $initContainers := include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers") | trim }}
-  {{- if $initContainers }}
   initContainers:
-    {{- $initContainers | nindent 4 }}
-  {{- end }}
+    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers") | nindent 4 }}
   {{- end }}
   {{- $nodeSelector := coalesce .podData.nodeSelector $.root.Values.nodeSelector $.root.Values.global.nodeSelector -}}
   {{- if $nodeSelector }}
