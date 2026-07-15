@@ -3032,6 +3032,52 @@ clickhouseMigrationJob:
             - name: temp-dir
               mountPath: /tmp/
 
+# Runs one allowlisted MySQL online schema change through the dedicated Core
+# runner contract. This is an ordinary retained Job, not a Helm hook. Keep it
+# disabled during normal application releases; see the README for the required
+# dry-run/execute rollout sequence.
+mysqlOnlineSchemaChange:
+  enabled: false
+  # Stable identifier understood by the Core runner. SQL, table names, and raw
+  # pt-online-schema-change arguments are intentionally not chart inputs.
+  migrationId: ""
+  # Increment for every new Job, including the dry-run to execute transition.
+  # Execute retries require database review/manual ledger recovery first.
+  # Must be 1-999999; it is part of the immutable Job name.
+  attempt: 1
+  mode: dry-run
+  # Required when enabled. Use a dedicated, least-privilege migration user;
+  # these credentials must not reuse the normal application MySQL identity.
+  databaseSecret:
+    name: ""
+    hostKey: ""
+    portKey: ""
+    databaseKey: ""
+    userKey: ""
+    # The referenced value must be URL-encoded. The Core runner decodes it
+    # using QueryUnescape, matching the chart/Core application convention.
+    passwordKey: ""
+  activeDeadlineSeconds: 86400
+  terminationGracePeriodSeconds: 300
+  tmpSizeLimit: 1Gi
+  image:
+    repository: wandb/pt-osc-runner
+    # Required when enabled. Tags are intentionally unsupported.
+    digest: ""
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  # Component-specific scheduling replaces the corresponding global fallback.
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  priorityClassName: ""
+
 weave:
   install: true
   deploymentPostfix: "bc"

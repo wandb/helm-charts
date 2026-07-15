@@ -1,0 +1,220 @@
+{{- if .Values.mysqlOnlineSchemaChange.enabled }}
+{{- $config := .Values.mysqlOnlineSchemaChange -}}
+{{- $migrationID := required "mysqlOnlineSchemaChange.migrationId is required when mysqlOnlineSchemaChange.enabled is true" $config.migrationId -}}
+{{- if not (kindIs "string" $migrationID) -}}
+  {{- fail "mysqlOnlineSchemaChange.migrationId must be a string" -}}
+{{- end -}}
+{{- if not (regexMatch "^([a-z0-9]|[a-z0-9][a-z0-9-]{0,61}[a-z0-9])$" $migrationID) -}}
+  {{- fail "mysqlOnlineSchemaChange.migrationId must be a 1-63 character lowercase DNS label with alphanumeric endpoints" -}}
+{{- end -}}
+{{- $attemptValue := $config.attempt -}}
+{{- if not (or (kindIs "float64" $attemptValue) (kindIs "int" $attemptValue) (kindIs "int64" $attemptValue)) -}}
+  {{- fail "mysqlOnlineSchemaChange.attempt must be an integer between 1 and 999999" -}}
+{{- end -}}
+{{- if not (regexMatch "^[1-9][0-9]*$" (toString $attemptValue)) -}}
+  {{- fail "mysqlOnlineSchemaChange.attempt must be an integer between 1 and 999999" -}}
+{{- end -}}
+{{- $attempt := int $attemptValue -}}
+{{- if gt $attempt 999999 -}}
+  {{- fail "mysqlOnlineSchemaChange.attempt must be an integer between 1 and 999999" -}}
+{{- end -}}
+{{- $activeDeadlineSecondsValue := $config.activeDeadlineSeconds -}}
+{{- if not (or (kindIs "float64" $activeDeadlineSecondsValue) (kindIs "int" $activeDeadlineSecondsValue) (kindIs "int64" $activeDeadlineSecondsValue)) -}}
+  {{- fail "mysqlOnlineSchemaChange.activeDeadlineSeconds must be a positive integer" -}}
+{{- end -}}
+{{- if not (regexMatch "^[1-9][0-9]*$" (toString $activeDeadlineSecondsValue)) -}}
+  {{- fail "mysqlOnlineSchemaChange.activeDeadlineSeconds must be a positive integer" -}}
+{{- end -}}
+{{- $activeDeadlineSeconds := int $activeDeadlineSecondsValue -}}
+{{- $terminationGracePeriodSecondsValue := $config.terminationGracePeriodSeconds -}}
+{{- if not (or (kindIs "float64" $terminationGracePeriodSecondsValue) (kindIs "int" $terminationGracePeriodSecondsValue) (kindIs "int64" $terminationGracePeriodSecondsValue)) -}}
+  {{- fail "mysqlOnlineSchemaChange.terminationGracePeriodSeconds must be a positive integer" -}}
+{{- end -}}
+{{- if not (regexMatch "^[1-9][0-9]*$" (toString $terminationGracePeriodSecondsValue)) -}}
+  {{- fail "mysqlOnlineSchemaChange.terminationGracePeriodSeconds must be a positive integer" -}}
+{{- end -}}
+{{- $terminationGracePeriodSeconds := int $terminationGracePeriodSecondsValue -}}
+{{- $mode := required "mysqlOnlineSchemaChange.mode is required when mysqlOnlineSchemaChange.enabled is true" $config.mode -}}
+{{- if not (has $mode (list "dry-run" "execute")) -}}
+  {{- fail "mysqlOnlineSchemaChange.mode must be one of: dry-run, execute" -}}
+{{- end -}}
+{{- $databaseSecret := $config.databaseSecret -}}
+{{- $databaseSecretName := required "mysqlOnlineSchemaChange.databaseSecret.name is required when mysqlOnlineSchemaChange.enabled is true" $databaseSecret.name -}}
+{{- if not (kindIs "string" $databaseSecretName) -}}
+  {{- fail "mysqlOnlineSchemaChange.databaseSecret.name must be a valid Kubernetes DNS-subdomain Secret name" -}}
+{{- end -}}
+{{- if or (gt (len $databaseSecretName) 253) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$" $databaseSecretName)) -}}
+  {{- fail "mysqlOnlineSchemaChange.databaseSecret.name must be a valid Kubernetes DNS-subdomain Secret name" -}}
+{{- end -}}
+{{- $databaseHostKey := required "mysqlOnlineSchemaChange.databaseSecret.hostKey is required when mysqlOnlineSchemaChange.enabled is true" $databaseSecret.hostKey -}}
+{{- $databasePortKey := required "mysqlOnlineSchemaChange.databaseSecret.portKey is required when mysqlOnlineSchemaChange.enabled is true" $databaseSecret.portKey -}}
+{{- $databaseNameKey := required "mysqlOnlineSchemaChange.databaseSecret.databaseKey is required when mysqlOnlineSchemaChange.enabled is true" $databaseSecret.databaseKey -}}
+{{- $databaseUserKey := required "mysqlOnlineSchemaChange.databaseSecret.userKey is required when mysqlOnlineSchemaChange.enabled is true" $databaseSecret.userKey -}}
+{{- $databasePasswordKey := required "mysqlOnlineSchemaChange.databaseSecret.passwordKey is required when mysqlOnlineSchemaChange.enabled is true" $databaseSecret.passwordKey -}}
+{{- range $field, $key := dict "hostKey" $databaseHostKey "portKey" $databasePortKey "databaseKey" $databaseNameKey "userKey" $databaseUserKey "passwordKey" $databasePasswordKey -}}
+  {{- if not (kindIs "string" $key) -}}
+    {{- fail (printf "mysqlOnlineSchemaChange.databaseSecret.%s must be a valid Kubernetes Secret data key" $field) -}}
+  {{- end -}}
+  {{- if or (gt (len $key) 253) (not (regexMatch "^[-._A-Za-z0-9]+$" $key)) -}}
+    {{- fail (printf "mysqlOnlineSchemaChange.databaseSecret.%s must be a valid Kubernetes Secret data key" $field) -}}
+  {{- end -}}
+{{- end -}}
+{{- $repository := required "mysqlOnlineSchemaChange.image.repository is required when mysqlOnlineSchemaChange.enabled is true" $config.image.repository -}}
+{{- $digest := required "mysqlOnlineSchemaChange.image.digest is required when mysqlOnlineSchemaChange.enabled is true" $config.image.digest -}}
+{{- if not (regexMatch "^sha256:[a-f0-9]{64}$" $digest) -}}
+  {{- fail "mysqlOnlineSchemaChange.image.digest must be a sha256 digest in the form sha256:<64 lowercase hexadecimal characters>" -}}
+{{- end -}}
+{{- if .Values.global.repositoryPrefix -}}
+  {{- $repository = printf "%s/%s" (trimSuffix "/" .Values.global.repositoryPrefix) (trimPrefix "/" $repository) -}}
+{{- end -}}
+{{- $sanitizedMigrationID := regexReplaceAll "[^a-z0-9-]+" (lower $migrationID) "-" -}}
+{{- $sanitizedMigrationID = regexReplaceAll "-+" $sanitizedMigrationID "-" -}}
+{{- $sanitizedMigrationID = trimAll "-" $sanitizedMigrationID -}}
+{{- $shortMigrationID := trunc 20 $sanitizedMigrationID | trimSuffix "-" -}}
+{{- $migrationHash := trunc 8 (sha256sum $migrationID) -}}
+{{- $jobSuffix := printf "mysql-osc-%s-%s-%d" $shortMigrationID $migrationHash $attempt -}}
+{{- $releaseNameLength := sub 63 (add 1 (len $jobSuffix)) -}}
+{{- $releaseName := trunc (int $releaseNameLength) .Release.Name | trimSuffix "-" -}}
+{{- $jobName := printf "%s-%s" $releaseName $jobSuffix -}}
+{{- $serviceAccountName := $jobName -}}
+{{- $nodeSelector := coalesce $config.nodeSelector .Values.global.nodeSelector -}}
+{{- $tolerations := coalesce $config.tolerations .Values.global.tolerations -}}
+{{- $priorityClassName := coalesce $config.priorityClassName .Values.global.priorityClassName -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $serviceAccountName }}
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mysql-online-schema-change
+    wandb.ai/mysql-online-schema-change-id: {{ $migrationID | quote }}
+    wandb.ai/mysql-online-schema-change-attempt: {{ $attempt | quote }}
+  annotations:
+    helm.sh/resource-policy: keep
+automountServiceAccountToken: false
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $jobName }}
+  labels:
+    {{- include "wandb.labels" . | nindent 4 }}
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mysql-online-schema-change
+    wandb.ai/mysql-online-schema-change-id: {{ $migrationID | quote }}
+    wandb.ai/mysql-online-schema-change-attempt: {{ $attempt | quote }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  activeDeadlineSeconds: {{ $activeDeadlineSeconds }}
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        {{- include "wandb.labels" . | nindent 8 }}
+        {{- include "wandb.commonLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mysql-online-schema-change
+        wandb.ai/mysql-online-schema-change-id: {{ $migrationID | quote }}
+        wandb.ai/mysql-online-schema-change-attempt: {{ $attempt | quote }}
+    spec:
+      serviceAccountName: {{ $serviceAccountName }}
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      terminationGracePeriodSeconds: {{ $terminationGracePeriodSeconds }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 0
+        fsGroup: 1001
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        {{- if kindIs "string" . }}
+        - name: {{ . | quote }}
+        {{- else if and (kindIs "map" .) (hasKey . "name") }}
+        - name: {{ .name | quote }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- with $nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $config.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      containers:
+        - name: pt-osc-runner
+          image: {{ printf "%s@%s" $repository $digest | quote }}
+          imagePullPolicy: {{ $config.image.pullPolicy }}
+          command:
+            - /usr/local/bin/pt-osc-runner
+          args:
+            - run
+          env:
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $databaseSecretName | quote }}
+                  key: {{ $databasePasswordKey | quote }}
+            - name: MYSQL_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $databaseSecretName | quote }}
+                  key: {{ $databasePortKey | quote }}
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $databaseSecretName | quote }}
+                  key: {{ $databaseHostKey | quote }}
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $databaseSecretName | quote }}
+                  key: {{ $databaseNameKey | quote }}
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $databaseSecretName | quote }}
+                  key: {{ $databaseUserKey | quote }}
+            {{- include "wandb.mysqlCaCertEnv" . | nindent 12 }}
+            - name: WANDB_OSC_MIGRATION_ID
+              value: {{ $migrationID | quote }}
+            - name: WANDB_OSC_MODE
+              value: {{ $mode | quote }}
+            - name: TMPDIR
+              value: /tmp
+          resources:
+            {{- toYaml $config.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 0
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- include "wandb.mysql.caCertVolumeMount" . | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: {{ $config.tmpSizeLimit }}
+        {{- include "wandb.mysql.caCertVolume" . | nindent 8 }}
+{{- end }}

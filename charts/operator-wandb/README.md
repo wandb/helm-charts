@@ -270,6 +270,76 @@ For complete examples with secrets and additional configurations, see:
 - Values: [test-configs/operator-wandb/user-defined-secrets.yaml](../../test-configs/operator-wandb/user-defined-secrets.yaml)
 - Secrets: [test-configs/additional-resources/user-defined-secrets/](../../test-configs/additional-resources/user-defined-secrets/)
 
+## MySQL Online Schema Changes
+
+`mysqlOnlineSchemaChange` creates a disabled-by-default, non-hook Job for one
+allowlisted migration implemented by the Core `pt-osc-runner`. The chart accepts
+only a migration ID and `dry-run` or `execute` mode; SQL, table names, and raw
+`pt-online-schema-change` arguments are deliberately not configurable. The
+runner image must be pinned by a `sha256` digest. Enabling the Job also requires
+an explicit `databaseSecret` containing a dedicated, least-privilege migration
+identity; application MySQL user/password values are never inherited.
+The value referenced by `databaseSecret.passwordKey` must use the chart/Core
+standard URL encoding because the runner decodes it with `QueryUnescape`; a raw
+`+` would otherwise be decoded as a space.
+
+When `global.mysql.caCert` is configured, the existing chart CA volume is
+mounted and `MYSQL_CA_CERT_PATH` is set; the runner infers `VERIFY_CA`. Without
+a CA path, the runner defaults to encrypted MySQL transport in `REQUIRED` mode.
+
+Roll out a migration separately from a normal W&B application image change:
+
+1. Keep the currently deployed application image, enable the Job in `dry-run`
+   mode with `attempt: 1`, deploy, and wait for the retained Job to succeed.
+   Increment `attempt` for a new dry-run retry Job.
+2. Keep the exact same `migrationId` and immutable `image.digest`, change to
+   `mode: execute`, increment `attempt` to create a new immutable Job, deploy,
+   and wait for it to succeed. Do not automatically retry a failed or
+   interrupted execute: database review and manual ledger recovery are required
+   before an approved retry creates another incremented attempt.
+3. After success, set `enabled: false` and deploy that state before making the
+   next normal application image change.
+
+The Job and its attempt-specific ServiceAccount have
+`helm.sh/resource-policy: keep`, so disabling the feature or uninstalling the
+release does not delete them while a Job is pending or after it completes.
+Remove both retained resources explicitly after preserving any required logs or
+audit evidence. The dedicated ServiceAccount has no RBAC and does not mount a
+Kubernetes API token.
+
+Both resources share migration ID and attempt labels, so one attempt can be
+cleaned up together:
+
+```bash
+kubectl delete job,serviceaccount \
+  -l wandb.ai/mysql-online-schema-change-id=wb-12345-add-run-index,wandb.ai/mysql-online-schema-change-attempt=1
+```
+
+The Core runner ledger permits a successful dry-run followed by execute for the
+same migration ID and canonical descriptor fingerprint. A completed execute is
+idempotent; fingerprint mismatches and interrupted or failed execute attempts
+fail closed for database review.
+
+Example values:
+
+```yaml
+mysqlOnlineSchemaChange:
+  enabled: true
+  migrationId: wb-12345-add-run-index
+  attempt: 1
+  mode: dry-run
+  databaseSecret:
+    name: wandb-mysql-online-schema-change
+    hostKey: host
+    portKey: port
+    databaseKey: database
+    userKey: user
+    passwordKey: password
+  image:
+    repository: wandb/pt-osc-runner
+    digest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+```
+
 ## Chart Relationship
 
 The operator-wandb chart uses the wandb-base chart as a building block for deploying various W&B services. The wandb-base chart provides a consistent deployment pattern for different services, while allowing for service-specific configuration.
