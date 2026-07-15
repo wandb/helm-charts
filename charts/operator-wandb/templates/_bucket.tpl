@@ -72,8 +72,8 @@ provider: {{ $provider }}
 path: {{ $path }}
 accessKey: {{ $accessKey }}
 secretKey: {{ $secretKey }}
-azureTenantId: {{ $azureTenantId }}
-azureClientId: {{ $azureClientId }}
+azureTenantId: {{ $azureTenantId | toJson }}
+azureClientId: {{ $azureClientId | toJson }}
 accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
 secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}
