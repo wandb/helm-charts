@@ -13,6 +13,31 @@
 {{ .Release.Name }}-bucket-configmap
 {{- end -}}
 
+{{/*
+Returns the effective Azure storage identity. The dedicated global override is
+owned by the deployment and takes precedence over the CR/user bucket values.
+*/}}
+{{- define "wandb.azureStorageIdentity" -}}
+{{- $bucket := include "wandb.bucket" . | fromYaml -}}
+{{- $override := default (dict) .Values.global.azureStorageIdentity -}}
+{{- $overrideTenantId := default "" $override.tenantId -}}
+{{- $overrideClientId := default "" $override.clientId -}}
+{{- $tenantId := default "" $bucket.azureTenantId -}}
+{{- $clientId := default "" $bucket.azureClientId -}}
+{{- $overrideConfigured := or (not (empty $overrideTenantId)) (not (empty $overrideClientId)) -}}
+{{- if $overrideConfigured -}}
+  {{- if ne (empty $overrideTenantId) (empty $overrideClientId) -}}
+    {{- fail "global.azureStorageIdentity.tenantId and clientId must be provided together" -}}
+  {{- end -}}
+  {{- $tenantId = $overrideTenantId -}}
+  {{- $clientId = $overrideClientId -}}
+{{- else if and (eq $bucket.provider "az") (ne (empty $tenantId) (empty $clientId)) -}}
+  {{- fail "Azure bucket azureTenantId and azureClientId must be provided together" -}}
+{{- end -}}
+{{- $enabled := and (eq $bucket.provider "az") (not (empty $tenantId)) (not (empty $clientId)) -}}
+{{- dict "enabled" $enabled "tenantId" $tenantId "clientId" $clientId | toYaml -}}
+{{- end }}
+
 
 {{- define "wandb.bucket" -}}
 {{- $url := "" -}}
