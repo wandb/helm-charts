@@ -107,6 +107,13 @@ Global values will override any chart-specific values.
 {{- end }}
 {{- end -}}
 
+{{- define "wandb.mysqlCaCertEnv" -}}
+{{- if .Values.global.mysql.caCert }}
+- name: MYSQL_CA_CERT_PATH
+  value: "/etc/ssl/certs/{{ include "wandb.mysql.certFileName" . }}"
+{{- end }}
+{{- end -}}
+
 {{- define "wandb.mysqlConfigEnvs" -}}
 {{- /*
   ATTENTION!
@@ -188,10 +195,7 @@ Global values will override any chart-specific values.
   value: "{{ include "wandb.mysql.user" . }}"
 {{- end -}}
 
-{{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") }}
-- name: MYSQL_CA_CERT_PATH
-  value: "/etc/ssl/certs/{{ include "wandb.mysql.certFileName" . }}"
-{{- end }}
+{{ include "wandb.mysqlCaCertEnv" . }}
 {{- end -}}
 
 {{- define "wandb.mysqlEnvs" -}}
@@ -647,4 +651,3 @@ Global values will override any chart-specific values.
   value: "true"
 {{- end }}
 {{- end -}}
-
