@@ -2026,6 +2026,286 @@ history-updater:
                   selectPolicy: Max
           # triggers must be provided by user when enabling KEDA
 
+# run-store-accelerator-run-updater drains the run-update snapshot queue into
+# the run-store accelerator (ClickHouse). Enable only on instances that have the
+# run-store accelerator turned on (global.olap.runStoreAccelerator.enabled).
+run-store-accelerator-run-updater:
+  install: false
+  pubSub:
+    # pubSub subscription comes from terraform
+    subscription: ""
+  kafka:
+    # unique consumer group so it reads the run-update shadow topic independently
+    # of the other consumers (flat-run-fields-updater, history-updater, metric-observer)
+    consumerGroupId: "run-store-accelerator-run-updater"
+  env:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_RUN_STORE_ACCELERATOR:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-run-store-accelerator-run-updater-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
+  containers:
+    run-store-accelerator-run-updater:
+      args: ["run-store-accelerator-run-updater"]
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  size: ""
+  # Sizing mirrors history-updater (the closest analog: a ClickHouse-writing
+  # run-update consumer on the same queue). Revisit once load-test data exists.
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 1
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 5
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 2
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 1
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 10
+          minReplicas: 3
+        keda:
+          enabled: false
+          minReplicaCount: 3
+          maxReplicaCount: 10
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 5
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 3
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    large:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: "1"
+          memory: 1536Mi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 15
+          minReplicas: 6
+        keda:
+          enabled: false
+          minReplicaCount: 6
+          maxReplicaCount: 15
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 10
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 4
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    xlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 20
+          minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 20
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 15
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 5
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 30
+          minReplicas: 9
+        keda:
+          enabled: false
+          minReplicaCount: 9
+          maxReplicaCount: 30
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 20
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 6
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+
 # history-reader is a gRPC service that serves run history from ClickHouse.
 history-reader:
   install: false
