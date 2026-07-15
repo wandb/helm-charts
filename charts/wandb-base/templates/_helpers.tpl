@@ -1,18 +1,3 @@
-{{/* Resolve Azure workload identity for workloads that consume bucket envs. */}}
-{{- define "wandb-base.azureWorkloadIdentity" -}}
-{{- $identity := dict "enabled" false -}}
-{{- $usesBucketEnvs := false -}}
-{{- range (default (list) .Values.envTpls) -}}
-  {{- if contains "wandb.bucketEnvs" . -}}
-    {{- $usesBucketEnvs = true -}}
-  {{- end -}}
-{{- end -}}
-{{- if $usesBucketEnvs -}}
-  {{- $identity = include "wandb.azureStorageIdentity" . | fromYaml -}}
-{{- end -}}
-{{- $identity | toYaml -}}
-{{- end -}}
-
 {{/*
 Expand the name of the chart.
 */}}
