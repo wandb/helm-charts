@@ -781,7 +781,7 @@ data:
             <layer>chartsnap-clickhouse</layer>
         </macros>
     </yandex>
-  05-zookeeper.xml: "<yandex>\n    <zookeeper>\n        <node>\n            <host>chartsnap-clickhouse-keeper-0.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</host>\n            <port>9181</port>\n        </node>\n        <node>\n            <host>chartsnap-clickhouse-keeper-1.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</host>\n            <port>9181</port>\n        </node>\n        <node>\n            <host>chartsnap-clickhouse-keeper-2.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</host>\n            <port>9181</port>\n        </node>\n    </zookeeper>    \n</yandex>\n"
+  05-zookeeper.xml: "<yandex>\n    <zookeeper>\n        <node>\n            <host>chartsnap-clickhouse-keeper-0.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</host>\n            <port>9181</port>\n        </node>\n    </zookeeper>    \n</yandex>\n"
   08-sampling.xml: |
     <yandex>
         <asynchronous_insert_log remove="1"/>
@@ -800,44 +800,6 @@ data:
         <opentelemetry_span_log remove="1"/>
         <processors_profile_log remove="1"/>
     </yandex>
----
-# Source: operator-wandb/charts/clickhouse/templates/keeper/configd-configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: chartsnap-clickhouse-keeper-configd
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: clickhouse
-    app.kubernetes.io/version: 25.7.5
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/component: keeper
-    app.kubernetes.io/part-of: clickhouse
-data:
-  raft_configuration.xml: |
-    <clickhouse>
-        <keeper_server>
-            <raft_configuration>
-                <server>
-                    <id>0</id>
-                    <hostname>chartsnap-clickhouse-keeper-0.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</hostname>
-                    <port>9234</port>
-                </server>
-                <server>
-                    <id>1</id>
-                    <hostname>chartsnap-clickhouse-keeper-1.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</hostname>
-                    <port>9234</port>
-                </server>
-                <server>
-                    <id>2</id>
-                    <hostname>chartsnap-clickhouse-keeper-2.chartsnap-clickhouse-keeper-headless.default.svc.cluster.local</hostname>
-                    <port>9234</port>
-                </server>
-            </raft_configuration>
-        </keeper_server>
-    </clickhouse>
 ---
 # Source: operator-wandb/charts/mysql/templates/configmap.yaml
 apiVersion: v1
@@ -6600,7 +6562,7 @@ metadata:
     app.kubernetes.io/component: keeper
     app.kubernetes.io/part-of: clickhouse
 spec:
-  replicas: 3
+  replicas: 1
   podManagementPolicy: Parallel
   selector:
     matchLabels:
@@ -6615,7 +6577,6 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/configd-configuration: bfdea18bbc1786d95702e6f773f35a312de0f1cd6f51dc27fdf091b40320afdd
       labels:
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/managed-by: Helm
@@ -6707,8 +6668,6 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /bitnami/clickhouse-keeper
-        - name: configd-configuration
-          mountPath: /bitnami/clickhouse-keeper/etc/keeper_config.d
         - name: empty-dir
           mountPath: /opt/bitnami/clickhouse-keeper/etc
           subPath: app-conf-dir
@@ -6724,9 +6683,6 @@ spec:
       volumes:
       - name: empty-dir
         emptyDir: {}
-      - name: configd-configuration
-        configMap:
-          name: chartsnap-clickhouse-keeper-configd
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
@@ -6779,7 +6735,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/configd-configuration: dc3b278f99d27bba9daa9c189b7500c5cf80a73866e54f4e92475777381f9c59
+        checksum/configd-configuration: f8a34aedee2e8de1dbac43571d41b81e102a78f9d1d0a440f1c5b444b9a36b06
       labels:
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/managed-by: Helm
