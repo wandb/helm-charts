@@ -396,6 +396,19 @@ global:
         name: ""
         secretKey: "OIDC_SECRET"
 
+  # Customer-supplied Azure workload identity for Blob storage. When set, this
+  # pair takes precedence over identity values in both bucket and defaultBucket,
+  # allowing the customer's infrastructure identity to override the W&B-managed CR.
+  # Each value can be a literal string or a Kubernetes EnvVarSource-style map:
+  #   clientId:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: azure-storage-identity
+  #         key: client-id
+  azureStorageIdentity:
+    tenantId: null
+    clientId: null
+
   # Storage bucket that will be used by the application by default but can be overridden by the user in the wandb-console.
   defaultBucket:
     # az, s3, gcs
@@ -404,9 +417,20 @@ global:
     path: ""
     region: ""
     kmsKey: ""
+    # Azure (provider "az") identity-based auth. Each value can be a literal
+    # string or a Kubernetes EnvVarSource-style map. When both are set the application
+    # authenticates to Blob storage with an Entra ID workload identity
+    # (user-delegation SAS) and the storage account access key is optional.
+    # The chart adds the required workload-identity pod label to services that
+    # consume bucket credentials. ServiceAccount annotations supplied by the
+    # customer's infrastructure remain supported but are not required here.
+    azureTenantId: null
+    azureClientId: null
 
   # If specified, the application will use this bucket for all storage operations, and will not be overridable by the user.
   bucket:
+    # azureTenantId: ""
+    # azureClientId: ""
     secret:
       secretName: ""
       accessKeyName: "ACCESS_KEY"
@@ -577,6 +601,8 @@ artifactsGc:
   DeleteFilesNumWorkers: 0
 
 api:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   service:
     enabled: true
     loadBalancerHealthCheckPath: "/ready"
@@ -763,6 +789,8 @@ api:
           minReplicas: 2
 
 app:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: true
   deploymentPostfix: "bc"
   image:
@@ -1095,6 +1123,8 @@ console:
         verbs: ["get"]
 
 executor:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   deploymentPostfix: "bc"
   workerConcurrency: 10
@@ -1203,6 +1233,8 @@ executor:
           minReplicas: 2
 
 filemeta:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -1366,6 +1398,8 @@ anaconda2:
           minReplicas: 2
 
 filestream:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   deploymentPostfix: "bc"
   pubSub:
@@ -1473,6 +1507,8 @@ filestream:
           minReplicas: 1
 
 flat-run-fields-updater:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   deploymentPostfix: "bc"
   pubSub:
@@ -1748,6 +1784,8 @@ flat-run-fields-updater:
           # triggers must be provided by user when enabling KEDA
 
 history-updater:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   pubSub:
     # pubSub subscription comes from terraform
@@ -2028,6 +2066,8 @@ history-updater:
 
 # history-reader is a gRPC service that serves run history from ClickHouse.
 history-reader:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -2280,6 +2320,8 @@ frontend:
           minReplicas: 2
 
 glue:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -2446,6 +2488,8 @@ internalSignerPreHook:
         verbs: ["get", "patch", "create", "update"]
 
 metric-observer:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -2584,6 +2628,8 @@ metric-observer:
           minReplicas: 8
 
 parquet:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: true
   deploymentPostfix: "bc"
   image:
@@ -2760,6 +2806,8 @@ parquet:
           minReplicas: 2
 
 parquet-metadata-cache:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   maxColumnChunks: 10000000
   install: false
   serviceAccount:
@@ -2889,6 +2937,8 @@ parquet-metadata-cache:
           minReplicas: 1
 
 settingsMigrationJob:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -4060,6 +4110,8 @@ bufstream:
           memory: 4Gi
 
 lumen-agent:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   kind: CronJob
   image:
