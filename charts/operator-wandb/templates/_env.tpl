@@ -53,12 +53,29 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.bucketEnvs" -}}
+{{- $azureIdentity := include "wandb.azureStorageIdentity" . | fromYaml -}}
+{{- if not $azureIdentity.enabled }}
 - name: AZURE_STORAGE_KEY
   valueFrom:
     secretKeyRef:
       name: {{ (include "wandb.bucket" . | fromYaml).secretName | quote }}
       key: {{ (include "wandb.bucket" . | fromYaml).accessKeyName | quote }}
       optional: true
+{{- end }}
+{{- if $azureIdentity.enabled }}
+- name: AZURE_STORAGE_TENANT_ID
+{{- if kindIs "map" $azureIdentity.tenantId }}
+{{- toYaml $azureIdentity.tenantId | nindent 2 }}
+{{- else }}
+  value: {{ $azureIdentity.tenantId | quote }}
+{{- end }}
+- name: AZURE_STORAGE_CLIENT_ID
+{{- if kindIs "map" $azureIdentity.clientId }}
+{{- toYaml $azureIdentity.clientId | nindent 2 }}
+{{- else }}
+  value: {{ $azureIdentity.clientId | quote }}
+{{- end }}
+{{- end }}
 - name: BUCKET_ACCESS_KEY
   valueFrom:
     secretKeyRef:
@@ -647,4 +664,3 @@ Global values will override any chart-specific values.
   value: "true"
 {{- end }}
 {{- end -}}
-

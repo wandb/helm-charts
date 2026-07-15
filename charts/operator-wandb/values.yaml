@@ -396,6 +396,22 @@ global:
         name: ""
         secretKey: "OIDC_SECRET"
 
+  # Deployment-owned Azure workload identity for Blob storage. When set, this
+  # pair takes precedence over identity values in both bucket and defaultBucket,
+  # so a user-edited CR cannot replace the infrastructure-managed identity.
+  # Each value can be a literal string or a Kubernetes EnvVarSource-style map:
+  #   clientId:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: azure-storage-identity
+  #         key: client-id
+  # Referenced values cannot be copied into ServiceAccount annotations. In that
+  # mode, provide azure.workload.identity/client-id through each bucket-consuming
+  # service's serviceAccount.annotations.
+  azureStorageIdentity:
+    tenantId: null
+    clientId: null
+
   # Storage bucket that will be used by the application by default but can be overridden by the user in the wandb-console.
   defaultBucket:
     # az, s3, gcs
@@ -404,9 +420,21 @@ global:
     path: ""
     region: ""
     kmsKey: ""
+    # Azure (provider "az") identity-based auth. Each value can be a literal
+    # string or a Kubernetes EnvVarSource-style map. When both are set the application
+    # authenticates to Blob storage with an Entra ID workload identity
+    # (user-delegation SAS) and the storage account access key is optional.
+    # The chart detects workloads that consume bucket envs and adds the required
+    # pod label. It also adds ServiceAccount annotations for literal IDs; when
+    # using valueFrom, provide the client-id annotation separately because
+    # Kubernetes annotations cannot reference Secrets or ConfigMaps.
+    azureTenantId: null
+    azureClientId: null
 
   # If specified, the application will use this bucket for all storage operations, and will not be overridable by the user.
   bucket:
+    # azureTenantId: ""
+    # azureClientId: ""
     secret:
       secretName: ""
       accessKeyName: "ACCESS_KEY"
