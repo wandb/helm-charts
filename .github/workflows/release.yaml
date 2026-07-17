@@ -11,6 +11,8 @@ jobs:
 
     permissions:
       contents: write
+      packages: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -41,6 +43,97 @@ jobs:
         shell: bash
 
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@be16258da8010256c6e82849661221415f031968 # v1.5.0
+        id: releaser
+        uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
+        with:
+          skip_existing: true
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Install cosign
+        if: steps.releaser.outputs.changed_charts != ''
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: Login to GHCR
+        if: steps.releaser.outputs.changed_charts != ''
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push and sign charts on OCI registry
+        if: steps.releaser.outputs.changed_charts != ''
+        shell: bash
+        env:
+          OCI_REPO: oci://ghcr.io/${{ github.repository_owner }}/helm-charts
+        run: |
+          set -euo pipefail
+          : > pushed-refs.txt
+          pushed_count=0
+          for tarball in .cr-release-packages/*.tgz; do
+            [ -e "$tarball" ] || continue
+            echo "Pushing $tarball to $OCI_REPO"
+            push_output=$(helm push \
+              "$tarball" \
+              "$OCI_REPO" \
+              --registry-config "$HOME/.docker/config.json" 2>&1)
+            echo "$push_output"
+            pushed=$(awk '/^Pushed: /{print $2}' <<< "$push_output")
+            digest=$(awk '/^Digest: /{print $2}' <<< "$push_output")
+            if [ -z "$pushed" ] || [ -z "$digest" ]; then
+              echo "::error::failed to parse push output for $tarball"
+              exit 1
+            fi
+            ref="${pushed}@${digest}"
+            echo "Signing $ref"
+            cosign sign --yes "$ref"
+            echo "$ref" >> pushed-refs.txt
+            pushed_count=$((pushed_count + 1))
+          done
+          if [ "$pushed_count" -eq 0 ]; then
+            echo "::error::chart-releaser reported changed charts, but no OCI artifacts were found in .cr-release-packages/"
+            exit 1
+          fi
+          echo "--- pushed and signed refs ---"
+          cat pushed-refs.txt
+
+      - name: Verify OCI chart signatures
+        if: steps.releaser.outputs.changed_charts != ''
+        shell: bash
+        env:
+          CERT_IDENTITY_REGEXP: ^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yaml@refs/heads/main$
+          CERT_OIDC_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          set -euo pipefail
+          while IFS= read -r ref; do
+            [ -z "$ref" ] && continue
+            echo "Verifying $ref"
+            cosign verify \
+              --certificate-identity-regexp "$CERT_IDENTITY_REGEXP" \
+              --certificate-oidc-issuer "$CERT_OIDC_ISSUER" \
+              "$ref" >/dev/null
+          done < pushed-refs.txt
+          echo "All published charts verified."
+
+      - name: Verify public OCI chart access
+        if: steps.releaser.outputs.changed_charts != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          anonymous_config="$RUNNER_TEMP/helm-anonymous/config.json"
+          download_dir="$RUNNER_TEMP/helm-anonymous/downloads"
+          mkdir -p "$download_dir"
+          while IFS= read -r ref; do
+            [ -z "$ref" ] && continue
+            tagged_ref=${ref%@*}
+            chart_ref=${tagged_ref%:*}
+            chart_version=${tagged_ref##*:}
+            echo "Pulling $chart_ref:$chart_version without credentials"
+            helm pull \
+              "oci://${chart_ref}" \
+              --version "$chart_version" \
+              --destination "$download_dir" \
+              --registry-config "$anonymous_config"
+          done < pushed-refs.txt
+          echo "All published charts are publicly accessible."
