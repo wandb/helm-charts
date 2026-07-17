@@ -1,0 +1,104 @@
+nameOverride: ""
+fullnameOverride: ""
+
+# "DaemonSet" (default): one collector per node, needed for host-level
+# receivers (hostMetrics, logsCollection, kubeletMetrics).
+# "Deployment": central collector behind the Service, suitable when only
+# network receivers (otlp, statsd) are used.
+workload:
+  kind: DaemonSet
+
+# deployment:
+#   replicas: 2
+#   revisionHistoryLimit: 10
+#   strategy:
+#     type: RollingUpdate
+#     rollingUpdate:
+#       maxSurge: 1
+#       maxUnavailable: 0
+#   labels: {}
+#   annotations: {}
+
+config:
+  service:
+    pipelines:
+      traces:
+        exporters: [debug]
+        processors: [batch, memory_limiter]
+        receivers: [otlp]
+
+presets:
+  receivers:
+    hostMetrics: false
+    logsCollection: false
+    kubeletMetrics: false
+    kubernetesEvent: false
+    kubernetesCluster: false
+    statsd: true
+    otlp: true
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: 0.126.0
+  pullPolicy: IfNotPresent
+  # pullSecrets: []
+
+# Tolerations for pod scheduling
+tolerations: []
+
+# Extra environment variables sourced from Secrets/ConfigMaps.
+# Example:
+#   extraEnvFrom:
+#     DD_API_KEY:
+#       secretKeyRef:
+#         name: my-secret
+#         key: api-key
+extraEnvFrom: {}
+
+extraCors: []
+
+service: {}
+
+pod:
+  securityContext:
+    fsGroup: 0
+    fsGroupChangePolicy: "OnRootMismatch"
+  labels: {}
+  annotations: {}
+
+clusterRole:
+  annotations: {}
+  labels: {}
+
+common:
+  labels: {}
+  annotations: {}
+
+daemonset:
+  labels: {}
+  annotations: {}
+  # Expose the OTLP receiver ports (4317/4318) on the node IP via hostPort so
+  # workloads can send to the node-local collector through status.hostIP
+  # ($(OTEL_HOST_IP)) instead of the ClusterIP Service — avoids a cross-node hop.
+  # Required by the orchestrator chart's node-local telemetry wiring. Only applied
+  # to the DaemonSet workload (a Deployment must use the Service).
+  hostPorts:
+    enabled: true
+
+configMap:
+  annotations: {}
+  labels: {}
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 300Mi
+  limits:
+    cpu: 1000m
+    memory: 750Mi
+
+serviceAccount:
+  create: true
+
+role: {}
+roleBinding: {}

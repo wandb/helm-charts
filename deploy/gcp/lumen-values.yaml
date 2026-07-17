@@ -1,0 +1,58 @@
+global:
+  cloudProvider: "gcp"
+  lumen:
+    dataRoot: "gs://wandb-lumen"
+    publish:
+      gorilla:
+        enabled: true
+        includeEnvVars: true
+
+lumen-processor:
+  serviceAccount:
+    annotations: {}
+  cronJobs:
+    processor:
+      volumes:
+        - name: gcp-key
+          secret:
+            secretName: lumen-processor-key
+      containers:
+        collector:
+          env:
+            GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
+            GOMEMLIMIT:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            GOMAXPROCS:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+          volumeMounts:
+            - name: gcp-key
+              mountPath: /var/secrets/google
+              readOnly: true
+
+lumen-notebook:
+  serviceAccount:
+    annotations: {}
+  volumes:
+    - name: gcp-key
+      secret:
+        secretName: lumen-processor-key
+  containers:
+    notebook:
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
+        GOMEMLIMIT:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        GOMAXPROCS:
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+      volumeMounts:
+        - name: gcp-key
+          mountPath: /var/secrets/google
+          readOnly: true

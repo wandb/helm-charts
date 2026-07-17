@@ -1,0 +1,28 @@
+{{- if eq (default "DaemonSet" .Values.workload.kind) "Deployment" }}
+{{- $deploy := default dict .Values.deployment }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "otel.fullname" . }}
+  labels:
+    {{- include "otel.labels" . | nindent 4 }}
+    {{- if $deploy.labels -}}
+    {{-   toYaml $deploy.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if $deploy.annotations -}}
+    {{-   toYaml $deploy.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ $deploy.replicas | default 2 }}
+  revisionHistoryLimit: {{ $deploy.revisionHistoryLimit | default 10 }}
+  {{- if $deploy.strategy }}
+  strategy:
+    {{- toYaml $deploy.strategy | nindent 4 }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "otel.selectorLabels" . | nindent 6 }}
+  template:
+{{ include "otel.podTemplate" . }}
+{{- end }}

@@ -44,7 +44,7 @@ helm upgrade --namespace=wandb --create-namespace --install wandb wandb/wandb --
 
 ## Install from our OCI registry
 
-Charts are also published as OCI artifacts to `oci://ghcr.io/wandb/helm-charts/<chart>`. No `helm repo add` is needed; reference the chart directly. `--version` is required.
+Charts are also published as OCI artifacts to `oci://ghcr.io/wandb/helm-charts/<chart>`. No registry login or `helm repo add` is needed. Pin `--version` for reproducible installs; without it, Helm selects the latest stable version.
 
 > **Requires the W&B operator controller image at tag `1.22.0` or later** when consumed via the `WeightsAndBiases` CR (`spec.chart.url`). The `oci://` scheme was added in [wandb/operator#147](https://github.com/wandb/operator/pull/147), shipped as [`wandb/controller:1.22.0`](https://hub.docker.com/r/wandb/controller/tags) (Docker Hub uses unprefixed semver — no leading `v`). Earlier controller versions cannot parse OCI URLs and must continue to use the HTTPS endpoint above. Check the running version with:
 >

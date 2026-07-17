@@ -39,10 +39,12 @@ data:
   GORILLA_GLUE_CLICKHOUSE_ADDRESS: "http://$(WF_CLICKHOUSE_HOST):$(WF_CLICKHOUSE_PORT)"
   {{- end }}
 
-  # Activity store configuration
+  # Activity store configuration (see global.activityStore)
+  {{- if .Values.global.activityStore.enabled }}
   GORILLA_GLUE_ACTIVITY_STORE_ENABLE: "true"
-  GORILLA_GLUE_ACTIVITY_STORE_SERVE: "true"
-  GORILLA_GLUE_ACTIVITY_STORE_BACKFILL_ENABLE: "true"
+  GORILLA_GLUE_ACTIVITY_STORE_SERVE: {{ .Values.global.activityStore.serve | quote }}
+  GORILLA_GLUE_ACTIVITY_STORE_BACKFILL_ENABLE: {{ .Values.global.activityStore.backfill | quote }}
+  {{- end }}
 
   # Monitoring configurations
   {{- if and .Values.global .Values.global.observability }}
@@ -56,3 +58,10 @@ data:
   GORILLA_GLUE_CLEAR_TASK_DEDUPE_KEY_ENABLED: "false"
 
   GORILLA_GLUE_LOCAL_SERVICE_BYPASS: "{{ .Values.global.localService.bypass }}"
+  {{- if .Values.glue.leaderElection.enabled }}
+  # Leader election (see glue.leaderElection in values.yaml): only the Lease
+  # holder runs the task runner. Namespace pinned to match the glue Role scope.
+  GORILLA_GLUE_LEADER_ELECTION_ENABLED: "true"
+  GORILLA_GLUE_LEADER_ELECTION_LEASE_NAME: "{{ .Values.glue.leaderElection.leaseName }}"
+  GORILLA_GLUE_LEADER_ELECTION_NAMESPACE: "{{ .Release.Namespace }}"
+  {{- end }}

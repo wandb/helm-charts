@@ -32,6 +32,16 @@ global:
 
   storageClass: ""
 
+  lumen:
+    dataRoot: ""
+    customer: ""
+    publish:
+      envVars: false
+    # Terraform-provided per cluster aws-eks / azure-aks / google-gke.
+    # It can be empty for GCP-direct deployments, where no WIF is rendered.
+    gcpWorkloadIdentity:
+      audience: ""
+
   banners: {}
     # banner1:
     #   type: warning | error | info
@@ -315,6 +325,23 @@ global:
   #           name: "clickhouse-registry-search"
   #           key: "host"
 
+  # Activity Store powers user-activity metrics on the Organization Dashboard.
+  # Gorilla defaults these OFF; the chart turns them on so activity shows up for
+  # dedicated / self-managed installs (WB-30288). This is the single source of
+  # truth shared by the api and glue services.
+  #
+  #   enabled  - master switch. When false the activity store is a no-op:
+  #              nothing is collected, served, or backfilled (serve/backfill
+  #              have no effect while this is false).
+  #   serve    - the api serves activity queries to the Organization Dashboard.
+  #   backfill - glue backfills historical activity into the metadata store.
+  #              This runs a sustained background job; disable it if you only
+  #              want activity captured from now forward.
+  activityStore:
+    enabled: true
+    serve: true
+    backfill: true
+
   email:
     smtp:
       host: ""
@@ -408,9 +435,14 @@ global:
     project: ""
     instance: ""
 
-  # When enabled, historyStore will only use parquet pods (no mysql/bigtable fallback).
   historyStore:
+    # When enabled, historyStore will only use parquet pods (no mysql/bigtable fallback).
     parquetOnly: false
+    # When enabled, historyStore will use gRPC headless service instead of net/rpc
+    parquetUseGRPC: false
+    # When enabled, historyStore will query the history-reader gRPC service
+    # first (backed by ClickHouse).
+    historyReaderEnabled: false
 
   pubSub:
     enabled: false
@@ -586,6 +618,7 @@ api:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.registrySearchEnvs" . }}'
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   initContainers:
     init-db:
       enabled: false
@@ -619,6 +652,8 @@ api:
         - name: api
           containerPort: 8081
           protocol: TCP
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
       livenessProbe:
         httpGet:
           path: /healthz
@@ -657,6 +692,8 @@ api:
   volumes:
     - name: temp-dir
       emptyDir: {}
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
   size: ""
   sizing:
     small:
@@ -734,6 +771,8 @@ app:
   # TODO(dpanzella) Read from here for backwards compatability, needs to be moved so API can access as well
   internalJWTMap:
     - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace"
+      issuer: "https://kubernetes.default.svc.cluster.local"
+    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace-worker"
       issuer: "https://kubernetes.default.svc.cluster.local"
   env:
     GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
@@ -1079,12 +1118,17 @@ executor:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   env:
     GORILLA_TASK_QUEUE:
       value: '{{ include "wandb.executor.taskQueue" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     executor:
       args: ["executor"]
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1179,11 +1223,16 @@ filemeta:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     filemeta:
       args: ["filemeta"]
       env: {}
       envFrom: {}
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
   size: ""
   sizing:
     small:
@@ -1341,12 +1390,17 @@ filestream:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   env:
     GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
       value: '{{ include "wandb.fileStreamStoreConsumer" . }}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     filestream:
       args: ["filestream"]
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1449,12 +1503,17 @@ flat-run-fields-updater:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   containers:
     flat-run-fields-updater:
       args: ["flat-run-fields-updater"]
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
   size: ""
   sizing:
     small:
@@ -1718,9 +1777,14 @@ history-updater:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     history-updater:
       args: ["history-updater"]
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
@@ -1962,6 +2026,148 @@ history-updater:
                   selectPolicy: Max
           # triggers must be provided by user when enabling KEDA
 
+# history-reader is a gRPC service that serves run history from ClickHouse.
+history-reader:
+  install: false
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  service:
+    enabled: true
+    # Headless so gRPC clients resolve to all pod IPs and do client-side
+    # load balancing.
+    headless: true
+    ports:
+      - port: 9244
+        protocol: TCP
+        name: grpc
+  grpc:
+    maxRecvMsgSize: 4194304
+    maxSendMsgSize: 4194304
+  cache:
+    size: 10000
+    ttl: 5m
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-history-reader-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucket.cwIdentity" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.historyEnvs" . }}'
+    - '{{ include "wandb.historyStoreEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  env:
+    GORILLA_HISTORY_READER_HISTORY_STORE:
+      value: "$(GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS)"
+  containers:
+    history-reader:
+      args: ["history-reader"]
+      ports:
+        - name: grpc
+          containerPort: 9244
+          protocol: TCP
+      livenessProbe:
+        grpc:
+          port: 9244
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+      readinessProbe:
+        grpc:
+          port: 9244
+        initialDelaySeconds: 30
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+        successThreshold: 1
+  size: ""
+  # Sizing grounded in the June 2026 load test (Datadog,
+  # kube_container_name:history-reader): active pods peaked at ~150 MiB and
+  # ~0.26 CPU each (avg ~100 MiB, <25 mCPU). Tiers are set well above that to
+  # leave headroom for the per-pod in-memory cache (cache.size 10000, 5m TTL)
+  # to fill under production read volume. Replica counts are kept below
+  # history-updater because each pod holds its own cache, so we favor fewer,
+  # longer-lived pods over wide fan-out.
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 2Gi
+        requests:
+          cpu: 500m
+          memory: 1Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    large:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 8Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          cpu: "4"
+          memory: 16Gi
+        requests:
+          cpu: "2"
+          memory: 8Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          cpu: "8"
+          memory: 32Gi
+        requests:
+          cpu: "4"
+          memory: 16Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+
 frontend:
   install: false
   podSecurityContext:
@@ -2096,10 +2302,13 @@ glue:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.registrySearchEnvs" . }}'
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   initContainers:
     init-db:
       enabled: false
     migrate-db:
+      # Skip when api is enabled; concurrent migrate-db races on ClickHouse OLAP.
+      enabled: '{{ not .Values.global.api.enabled }}'
       command:
         - bash
         - -c
@@ -2129,6 +2338,8 @@ glue:
         - name: http
           containerPort: 8080
           protocol: TCP
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
       livenessProbe:
         httpGet:
           path: /healthz
@@ -2143,9 +2354,17 @@ glue:
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
   image:
     repository: wandb/megabinary
     tag: latest
+  # Run glue as a multi-replica (HA) Deployment; only the Lease holder runs
+  # tasks. Just set replicaCount + enabled (strategy/PDB/affinity default).
+  leaderElection:
+    enabled: false
+    # Lease glue replicas compete for; DNS-1123, unique per namespace.
+    leaseName: gorilla-glue-leader
   role:
     create: true
     rules:
@@ -2155,6 +2374,14 @@ glue:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
+      # Lease lock + Events for leader election; used only when it is enabled
+      # (harmless and namespaced otherwise).
+      - apiGroups: ["coordination.k8s.io"]
+        resources: ["leases"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: [""]
+        resources: ["events"]
+        verbs: ["create", "patch"]
   strategy:
     type: Recreate
   volumesTpls:
@@ -2269,11 +2496,16 @@ metric-observer:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     metric-observer:
       args: ["metric-observer"]
       env: {}
       envFrom: {}
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
   role:
     create: true
     rules:
@@ -2379,6 +2611,14 @@ parquet:
       - port: 8087
         protocol: TCP
         name: parquet
+  services:
+    - name: "{{ .Release.Name }}-parquet-grpc"
+      enabled: true
+      headless: true
+      ports:
+        - port: 8088
+          protocol: TCP
+          name: grpc
   fuse:
     enabled: false
     resources:
@@ -2411,8 +2651,10 @@ parquet:
     - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
     - '{{ include "wandb.gcsFuseAnnotations" . }}'
+    - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     parquet:
       args: ["parquet"]
@@ -2420,6 +2662,8 @@ parquet:
         - name: parquet
           containerPort: 8087
           protocol: TCP
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
       livenessProbe:
         httpGet:
           path: /healthz
@@ -2563,6 +2807,9 @@ parquet-metadata-cache:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     parquet-metadata-cache:
       args: ["parquet-metadata-cache"]
@@ -2570,6 +2817,8 @@ parquet-metadata-cache:
         - name: grpc
           containerPort: 9091
           protocol: TCP
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
       livenessProbe:
         grpc:
           port: 9091
@@ -2706,11 +2955,113 @@ settingsMigrationJob:
   podDisruptionBudget:
     enabled: false
 
+# Runs ClickHouse schema migrations once per helm operation as a hook Job, so
+# concurrent migrate-db initContainers cannot race on ClickHouse, which has no
+# DB-level locking. The migrate binary skips any schema whose MIGRATE_*_DB env
+# var is unset, so the job is a fast no-op unless OLAP features are enabled;
+# MySQL schemas stay with the initContainers. The image must carry the same
+# migration files as the deployed code -- keep its tag in lockstep with api.
+# TODO: default to true once the deployer stamps this job's image tag
+# alongside api's (wandb/deployments user-spec/deploy.py).
+clickhouseMigrationJob:
+  install: false
+  kind: Job
+  podDisruptionBudget:
+    enabled: false
+  # The job needs no k8s API access. This also avoids a helm hook ordering
+  # deadlock: same-weight hooks run sorted by name, so a dedicated
+  # ServiceAccount would be created after the Job that references it.
+  serviceAccount:
+    create: false
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  helmHook:
+    enabled: true
+    hook: "post-install,pre-upgrade"
+  envTpls:
+    - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.historyEnvs" . }}'
+    - '{{ include "wandb.registrySearchEnvs" . }}'
+    - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
+  jobs:
+    ch-migrate:
+      # Only render when at least one global.olap feature is enabled.
+      enabled: '{{ include "wandb.olapAnyFeatureEnabled" . }}'
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      volumes:
+        - name: temp-dir
+          emptyDir: {}
+      initContainers:
+        # Blocks until every configured ClickHouse endpoint accepts a TCP
+        # connection; activeDeadlineSeconds bounds the overall wait. NOTE: a
+        # pre-upgrade hook cannot see resources created by the same apply, so
+        # enabling OLAP features together with an in-release ClickHouse in one
+        # upgrade will time out here -- create ClickHouse first, or disable
+        # this job for that one upgrade.
+        wait-for-clickhouse:
+          command:
+            - bash
+            - -c
+            - |
+              wait_for() {
+                until (exec 3<>"/dev/tcp/$1/$2") 2>/dev/null; do
+                  echo "waiting for clickhouse at $1:$2"
+                  sleep 5
+                done
+                echo "clickhouse reachable at $1:$2"
+              }
+              if [[ -n "$HISTORY_HOST" ]]; then
+                wait_for "$HISTORY_HOST" "$HISTORY_PORT"
+              fi
+              if [[ -n "$REGISTRY_SEARCH_HOST" ]]; then
+                wait_for "$REGISTRY_SEARCH_HOST" "$REGISTRY_SEARCH_PORT"
+              fi
+              if [[ -n "$RUN_STORE_ACCELERATOR_HOST" ]]; then
+                wait_for "$RUN_STORE_ACCELERATOR_HOST" "$RUN_STORE_ACCELERATOR_PORT"
+              fi
+              exit 0
+      containers:
+        ch-migrate:
+          command:
+            - bash
+            - -c
+            - |
+              # No --db/--runs-db/--usage-db flags: without them the MySQL
+              # schemas are skipped (their env vars are unset here) and only the
+              # ClickHouse schemas run, keyed off the MIGRATE_*_DB env vars.
+              LOG_FILE="/tmp/migrate.log"
+              ./megabinary migrate 2>&1 | tee -a $LOG_FILE
+              EXIT_CODE=${PIPESTATUS[0]}
+              MIGRATION_FILE_MISSING_ERROR_CODE=101
+              if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
+                exit 0
+              else
+                # missing migration error log from golang-migrate@v4 -- older versions of megabinary
+                if grep -q "no migration found for version" $LOG_FILE; then
+                  exit 0
+                fi
+                exit $EXIT_CODE
+              fi
+          volumeMounts:
+            - name: temp-dir
+              mountPath: /tmp/
+
 weave:
   install: true
   deploymentPostfix: "bc"
   cache:
+    # Keep WEAVE_CACHE_DURATION_DAYS unset or 0 for size-triggered cleanup.
+    # Positive values only remove expired buckets and may not reclaim the active bucket.
+    # Clear expired cache entries on this interval, in hours.
     intervalInHours: 24
+    # Check cache usage on this interval, in seconds.
+    checkIntervalInSeconds: 60
+    # Trigger cleanup when cache usage reaches this percentage of size (1-99).
+    clearPercent: 80
+    # Also used as WEAVE_CACHE_SIZE_LIMIT so cleanup and emptyDir share one limit.
+    # Supports bytes and K/M/G/Ki/Mi/Gi suffixes.
     size: 20Gi
     medium: ""
   image:
@@ -2843,15 +3194,22 @@ weave:
           minReplicas: 2
 
 ## MCP Server -- Model Context Protocol server for AI agent access to W&B data.
-## Requires weave-trace to be installed (WF_TRACE_SERVER_URL points to in-cluster weave-trace).
-## If weave-trace is disabled, override WF_TRACE_SERVER_URL in the env block below.
+## Can run without weave-trace for W&B Models, Reports, Docs, Artifacts, and
+## Registry tools. Weave trace tools are auto-enabled only when a trace backend
+## is available (bundled weave-trace or mcp-server.env.WF_TRACE_SERVER_URL).
 ## Disabled by default. Enable with: mcp-server.install: true
 ## Docs: https://github.com/wandb/wandb-mcp-server
 mcp-server:
   install: false
   image:
     repository: wandb/mcp-server
-    tag: "0.3.3"
+    tag: "0.3.5"
+  weave:
+    ## Controls whether trace-dependent MCP tools are exposed.
+    ## - auto: enable when bundled weave-trace is installed or WF_TRACE_SERVER_URL is set.
+    ## - true: require a trace backend and expose Weave tools.
+    ## - false: hide Weave tools for Models-only installs.
+    tools: "auto"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 0
@@ -2874,8 +3232,8 @@ mcp-server:
         periodSeconds: 10
       resources:
         requests:
-          cpu: 500m
-          memory: 1Gi
+          cpu: 50m
+          memory: 512Mi
         limits:
           cpu: 2
           memory: 4Gi
@@ -2913,9 +3271,9 @@ mcp-server:
   ## and break the second tpl parse). The two helpers below resolve to
   ## final values short enough to survive both constraints.
   podLabels:
-    tags.datadoghq.com/service: '{{ include `wandb.mcpDDService` . }}'
-    tags.datadoghq.com/env: '{{ include `wandb.mcpDDEnv` . }}'
-    tags.datadoghq.com/version: '{{ .Values.image.tag }}'
+    tags.datadoghq.com/service: "{{ include `wandb.mcpDDService` . }}"
+    tags.datadoghq.com/env: "{{ include `wandb.mcpDDEnv` . }}"
+    tags.datadoghq.com/version: "{{ .Values.image.tag }}"
     app.kubernetes.io/component: mcp-server
     app.kubernetes.io/part-of: wandb-platform
   ## Pod annotations -- always-on entries here. The Datadog autodiscovery
@@ -3196,6 +3554,17 @@ weave-trace-worker:
         - name: http
           containerPort: 8080
           protocol: TCP
+      volumeMounts:
+        - name: weave-trace-internal-jwt
+          mountPath: /tmp/weave-trace/internal-jwt
+  volumes:
+    - name: weave-trace-internal-jwt
+      projected:
+        sources:
+          - serviceAccountToken:
+              audience: internal-service
+              path: token
+              expirationSeconds: 600
   service:
     ports:
       - name: http
@@ -3365,6 +3734,93 @@ weave-evaluate-model-worker:
         horizontal:
           enabled: true
           maxReplicas: 6
+          minReplicas: 2
+
+weave-trace-agent-scoring-worker:
+  install: false
+  deploymentPostfix: "bc"
+  image:
+    repository: wandb/weave-trace
+    tag: latest
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  env:
+    WANDB_INTERNAL_SERVICE_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: weave-worker-auth
+          key: key
+  containers:
+    weave-trace-agent-scoring-worker:
+      args:
+        - "python"
+        - "-m"
+        - "src.workers.agent_scoring_worker"
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 2
+    large:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 8
           minReplicas: 2
 
 nginx:
@@ -3618,6 +4074,78 @@ bufstream:
         requests:
           cpu: "1"
           memory: 4Gi
+
+lumen-agent:
+  install: false
+  kind: CronJob
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+    tag: v0.1.5
+  serviceAccount:
+    name: lumen
+    annotations: {}
+  globalOptOut:
+    volumes: true
+  podDisruptionBudget:
+    enabled: false
+  service:
+    enabled: false
+  role:
+    create: true
+    rules:
+      - apiGroups: [""]
+        resources: ["pods", "configmaps", "secrets"]
+        verbs: ["get", "list"]
+      - apiGroups: ["apps"]
+        resources: ["replicasets", "deployments"]
+        verbs: ["get"]
+      - apiGroups: ["apps.wandb.com"]
+        resources: ["weightsandbiases"]
+        verbs: ["get", "list"]
+  envTpls:
+    - '{{ include "wandb.bucketEnvs" . }}'
+  cronJobs:
+    lumen-agent:
+      enabled: true
+      schedule: "0 * * * *"
+      concurrencyPolicy: "Forbid"
+      failedJobsHistoryLimit: 3
+      restartPolicy: "OnFailure"
+      backoffLimit: 5
+      successfulJobsHistoryLimit: 5
+      startingDeadlineSeconds: 300
+      volumesTpls:
+        - '{{ include "wandb.lumenStagingVolume" . }}'
+        - '{{ include "wandb.lumenWifVolumes" . }}'
+        - '{{ include "wandb.lumenRulesVolume" . }}'
+      containers:
+        collector:
+          command: ["/app/entrypoint.sh", "agent"]
+          args: []
+          env:
+            GOMEMLIMIT:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            GOMAXPROCS:
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            GOOGLE_APPLICATION_CREDENTIALS: '{{ include `wandb.lumen.googleCredsPath` . }}'
+          envFrom:
+            "{{ .Release.Name }}-lumen-configmap": "configMapRef"
+            "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+          volumeMountsTpls:
+            - '{{ include "wandb.lumenStagingVolumeMount" . }}'
+            - '{{ include "wandb.lumenWifVolumeMounts" . }}'
+            - '{{ include "wandb.lumenRulesVolumeMount" . }}'
+          resources:
+            requests:
+              cpu: 1
+              memory: 4Gi
+            limits:
+              cpu: 2
+              memory: 4Gi
 
 reloader:
   install: false
