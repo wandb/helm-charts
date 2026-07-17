@@ -53,6 +53,7 @@ jobs:
       - name: Run chart-testing (list-changed)
         id: list-changed
         run: |
+          set -euo pipefail
           changed=$(ct list-changed --config ct.yaml)
           if [[ -n "$changed" ]]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -64,14 +65,20 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.number }}
         run: |
+          set -euo pipefail
           git_hash=$(git rev-parse --short "$GITHUB_SHA")
           for chart in $(ct list-changed --config ct.yaml); do
-          helm package --version=$(helm show chart ${chart} | yq .version)-PR${PR_NUMBER}-${git_hash} -d .cr-release-packages ${chart}
+            chart_version=$(helm show chart "$chart" | yq .version)
+            helm package \
+              --version="${chart_version}-PR${PR_NUMBER}-${git_hash}" \
+              --destination .cr-release-packages \
+              "$chart"
           done
         shell: bash
 
       - name: Run chart-releaser
         if: steps.list-changed.outputs.changed == 'true'
+        # v1.6.0+ fails with skip_packaging; see helm/chart-releaser-action#171.
         uses: helm/chart-releaser-action@be16258da8010256c6e82849661221415f031968 # v1.5.0
         with:
           skip_packaging: true
