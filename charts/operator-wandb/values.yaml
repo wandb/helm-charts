@@ -2323,6 +2323,8 @@ glue:
     init-db:
       enabled: false
     migrate-db:
+      # Skip when api is enabled; concurrent migrate-db races on ClickHouse OLAP.
+      enabled: '{{ not .Values.global.api.enabled }}'
       command:
         - bash
         - -c
@@ -2373,6 +2375,12 @@ glue:
   image:
     repository: wandb/megabinary
     tag: latest
+  # Run glue as a multi-replica (HA) Deployment; only the Lease holder runs
+  # tasks. Just set replicaCount + enabled (strategy/PDB/affinity default).
+  leaderElection:
+    enabled: false
+    # Lease glue replicas compete for; DNS-1123, unique per namespace.
+    leaseName: gorilla-glue-leader
   role:
     create: true
     rules:
@@ -2382,6 +2390,14 @@ glue:
       - apiGroups: [""]
         resources: ["namespaces"]
         verbs: ["get"]
+      # Lease lock + Events for leader election; used only when it is enabled
+      # (harmless and namespaced otherwise).
+      - apiGroups: ["coordination.k8s.io"]
+        resources: ["leases"]
+        verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      - apiGroups: [""]
+        resources: ["events"]
+        verbs: ["create", "patch"]
   strategy:
     type: Recreate
   volumesTpls:
