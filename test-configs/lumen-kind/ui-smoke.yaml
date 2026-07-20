@@ -1,0 +1,64 @@
+# Lightweight images exercise the chart's init/application separation, shared
+# UID file ownership, readiness, and rolling replacement without cloud access.
+global:
+  repositoryPrefix: ""
+  lumen:
+    dataRoot: file:///tmp/lumen
+
+notebook:
+  replicaCount: 0
+
+processor:
+  cronJobs:
+    processor:
+      suspend: true
+
+ui:
+  enabled: true
+  image:
+    repository: busybox
+    tag: 1.37.0
+    pullPolicy: IfNotPresent
+  secretProviderClass:
+    enabled: false
+  initContainers:
+    fetch-reader:
+      image:
+        repository: alpine
+        tag: 3.23.3
+        pullPolicy: IfNotPresent
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -eu
+          mkdir -p /var/lib/lumen/ducklake-reader
+          printf '{"snapshot_id":1}\n' > /var/lib/lumen/ducklake-reader/latest.json
+          chmod 0600 /var/lib/lumen/ducklake-reader/latest.json
+      envFrom: {}
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+  containers:
+    ui:
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          set -eu
+          test -r /var/lib/lumen/ducklake-reader/latest.json
+          mkdir -p /tmp/www/api/v1
+          printf '{"status":"healthy"}\n' > /tmp/www/api/v1/health
+          printf '{"status":"ready","snapshotId":1}\n' > /tmp/www/api/v1/ready
+          exec httpd -f -p 3000 -h /tmp/www
+      envFrom: {}
+      volumeMountsTpls: []
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi

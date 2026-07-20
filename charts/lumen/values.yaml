@@ -108,3 +108,124 @@ notebook:
         limits:
           cpu: 8
           memory: 24Gi
+
+# UI: read-only configuration explorer. Disabled until its identity, Secret
+# Manager resources, hostname, and immutable image tags are configured.
+ui:
+  enabled: false
+  kind: Deployment
+  replicaCount: 2
+  image:
+    repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen-ui
+    # Required when enabled. Use the immutable Git SHA published by wandb/lumen.
+    tag: ""
+  serviceAccount:
+    create: true
+    automount: true
+    annotations: {}
+  globalOptOut:
+    volumes: true
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  terminationGracePeriodSeconds: 150
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+    maxUnavailable: 0
+  service:
+    enabled: true
+    ports:
+      - port: 3000
+        targetPort: http
+        protocol: TCP
+        name: http
+  config:
+    # Defaults to <global.lumen.dataRoot>/ducklake when empty.
+    ducklakeRoot: ""
+    hostname: ""
+    allowedEmailDomains:
+      - wandb.com
+      - coreweave.com
+    github:
+      clientId: ""
+      redirectUri: ""
+      allowedOrg: wandb
+      allowedTeamSlug: engineering
+  secretProviderClass:
+    # The GKE managed Secret Manager add-on. Disable only in local chart tests.
+    enabled: true
+    sessionSecretResourceName: ""
+    githubClientSecretResourceName: ""
+  volumes:
+    - name: ducklake-reader
+      emptyDir:
+        sizeLimit: 1Gi
+  volumesTpls:
+    - '{{ include "wandb.lumenUISecretVolume" . }}'
+  initContainers:
+    fetch-reader:
+      image:
+        repository: us-docker.pkg.dev/wandb-production/public/wandb/lumen
+        # Required when enabled and initially expected to match ui.image.tag.
+        tag: ""
+        pullPolicy: IfNotPresent
+      command: ["/app/bin/processor"]
+      args: ["ducklake", "fetch", "--state-dir", "/var/lib/lumen/ducklake-reader"]
+      envFrom:
+        "{{ .Release.Name }}-ui-configmap": configMapRef
+      volumeMounts:
+        - name: ducklake-reader
+          mountPath: /var/lib/lumen/ducklake-reader
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 1
+          memory: 1Gi
+  containers:
+    ui:
+      envFrom:
+        "{{ .Release.Name }}-ui-configmap": configMapRef
+      ports:
+        - containerPort: 3000
+          name: http
+      livenessProbe:
+        httpGet:
+          path: /api/v1/health
+          port: http
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+      readinessProbe:
+        httpGet:
+          path: /api/v1/ready
+          port: http
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+      startupProbe:
+        httpGet:
+          path: /api/v1/ready
+          port: http
+        periodSeconds: 5
+        timeoutSeconds: 5
+        failureThreshold: 60
+      volumeMounts:
+        - name: ducklake-reader
+          mountPath: /var/lib/lumen/ducklake-reader
+          readOnly: true
+      volumeMountsTpls:
+        - '{{ include "wandb.lumenUISecretVolumeMount" . }}'
+      resources:
+        requests:
+          cpu: 1
+          memory: 4Gi
+          ephemeral-storage: 1Gi
+        limits:
+          cpu: 4
+          memory: 12Gi
+          ephemeral-storage: 10Gi
