@@ -51,6 +51,9 @@
 {{- end -}}
 
 {{- define "wandb.lumen.validateUI" -}}
+{{- if and .Values.ui.exposure.enabled (not .Values.ui.enabled) -}}
+{{- fail "ui.exposure.enabled requires ui.enabled=true" -}}
+{{- end -}}
 {{- if .Values.ui.enabled -}}
 {{- if and (not .Values.ui.image.digest) (or (not .Values.ui.image.tag) (eq .Values.ui.image.tag "latest")) -}}
 {{- fail "ui.image.tag must be an immutable tag, or ui.image.digest must be set, when ui.enabled=true" -}}
@@ -58,6 +61,11 @@
 {{- $fetchImage := index .Values.ui.initContainers "fetch-reader" "image" -}}
 {{- if and (not $fetchImage.digest) (or (not $fetchImage.tag) (eq $fetchImage.tag "latest")) -}}
 {{- fail "ui.initContainers.fetch-reader.image.tag must be an immutable tag, or its digest must be set, when ui.enabled=true" -}}
+{{- end -}}
+{{- if .Values.ui.exposure.enabled -}}
+{{- $serviceAnnotations := default (dict) .Values.ui.service.annotations -}}
+{{- $_ := required "ui.service.annotations[cloud.google.com/neg] is required when ui.exposure.enabled=true" (get $serviceAnnotations "cloud.google.com/neg") -}}
+{{- $_ := required "ui.service.annotations[cloud.google.com/backend-config] is required when ui.exposure.enabled=true" (get $serviceAnnotations "cloud.google.com/backend-config") -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}

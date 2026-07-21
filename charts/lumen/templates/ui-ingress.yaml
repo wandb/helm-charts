@@ -1,0 +1,71 @@
+{{- if and .Values.ui.enabled .Values.ui.exposure.enabled }}
+{{- $name := printf "%s-ui" .Release.Name }}
+{{- $hostname := required "ui.config.hostname is required when ui.exposure.enabled=true" .Values.ui.config.hostname }}
+{{- $staticIpName := required "ui.exposure.globalStaticIpName is required when ui.exposure.enabled=true" .Values.ui.exposure.globalStaticIpName }}
+{{- $iapSecretName := required "ui.exposure.iap.oauthSecretName is required when ui.exposure.enabled=true" .Values.ui.exposure.iap.oauthSecretName }}
+{{- $iapCredentialRevision := required "ui.exposure.iap.credentialRevision is required when ui.exposure.enabled=true" .Values.ui.exposure.iap.credentialRevision }}
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ $name }}
+  annotations:
+    lumen.wandb.com/iap-credential-revision: {{ $iapCredentialRevision | quote }}
+spec:
+  timeoutSec: 180
+  connectionDraining:
+    drainingTimeoutSec: 150
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /api/v1/health
+    port: 3000
+  iap:
+    enabled: true
+    oauthclientCredentials:
+      secretName: {{ $iapSecretName }}
+  logging:
+    enable: true
+    sampleRate: 1.0
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: {{ $name }}
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: {{ $name }}
+spec:
+  domains:
+    - {{ $hostname | quote }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+  annotations:
+    kubernetes.io/ingress.class: gce
+    kubernetes.io/ingress.global-static-ip-name: {{ $staticIpName | quote }}
+    networking.gke.io/managed-certificates: {{ $name | quote }}
+    networking.gke.io/v1beta1.FrontendConfig: {{ $name | quote }}
+spec:
+  rules:
+    - host: {{ $hostname | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $name }}
+                port:
+                  number: 3000
+{{- end }}
