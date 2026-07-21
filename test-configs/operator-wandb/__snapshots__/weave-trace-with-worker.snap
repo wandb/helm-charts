@@ -7144,9 +7144,32 @@ spec:
         - -m
         - src.workers.insights_worker
         envFrom:
+        - secretRef:
+            name: chartsnap-global-secret
         - configMapRef:
             name: chartsnap-weave-trace-configmap
         env:
+        - name: WF_CLICKHOUSE_HOST
+          value: chartsnap-clickhouse-headless
+        - name: WF_CLICKHOUSE_PORT
+          value: "8123"
+        - name: WF_CLICKHOUSE_DATABASE
+          value: weave_trace_db
+        - name: WF_CLICKHOUSE_USER
+          value: default
+        - name: WF_CLICKHOUSE_REPLICATED
+          value: "false"
+        - name: WF_CLICKHOUSE_PASS
+          valueFrom:
+            secretKeyRef:
+              key: CLICKHOUSE_PASSWORD
+              name: chartsnap-clickhouse
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
         - name: BUCKET_PROXY
           value: "true"
         - name: GLOBAL_ADMIN_API_KEY
@@ -7157,6 +7180,11 @@ spec:
           value: "true"
         - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
           value: "true"
+        - name: WANDB_INTERNAL_SERVICE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: key
+              name: weave-worker-auth
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -7168,8 +7196,8 @@ spec:
         imagePullPolicy: IfNotPresent
         resources:
           requests:
-            cpu: "1"
-            memory: 3Gi
+            cpu: 100m
+            memory: 128Mi
         volumeMounts:
         - name: wandb-ca-certs-root
           mountPath: /usr/local/share/ca-certificates/
