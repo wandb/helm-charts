@@ -69,7 +69,8 @@ Resolves:
   (see templates/weave-trace.yaml), so the in-cluster Service path http://<release>-weave-trace:8722
   returns 404 without the prefix. Using the ingress URL matches the convention other
   internal consumers use (see weave-trace.yaml WF_TRACE_SERVER_URL line).
-- WANDB_BASE_URL: the W&B instance URL (from global.host)
+- WANDB_BASE_URL: the public W&B instance URL (from global.host)
+- WANDB_INTERNAL_BASE_URL: the namespace-local API Service used by backend calls
 
 MCP can run without weave-trace. When WANDB_MCP_ENABLE_WEAVE_TOOLS=false,
 trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
@@ -91,6 +92,10 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
 {{- end }}
 - name: WANDB_BASE_URL
   value: {{ .Values.global.host | quote }}
+{{- if not (hasKey $mcpEnv "WANDB_INTERNAL_BASE_URL") }}
+- name: WANDB_INTERNAL_BASE_URL
+  value: "http://{{ .Release.Name }}-api:8081"
+{{- end }}
 {{/*
   Privacy level for customer-supplied content in logs. Default here is "standard"
   (redact free-text params, demote verbose log sites to DEBUG) so customer K8s

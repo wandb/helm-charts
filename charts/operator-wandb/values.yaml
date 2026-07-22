@@ -3258,7 +3258,13 @@ mcp-server:
   install: false
   image:
     repository: wandb/mcp-server
-    tag: "0.3.5"
+    tag: "0.4.0"
+  ## Keep one pod and one Uvicorn worker so the process-local admission budget
+  ## is deterministic. Revisit only with a shared/distributed admission layer.
+  replicaCount: 1
+  autoscaling:
+    horizontal:
+      enabled: false
   weave:
     ## Controls whether trace-dependent MCP tools are exposed.
     ## - auto: enable when bundled weave-trace is installed or WF_TRACE_SERVER_URL is set.
@@ -3367,6 +3373,17 @@ mcp-server:
     MCP_RATE_LIMIT_ENABLED: "true"
     MCP_RATE_LIMIT_PER_KEY: "60/minute"
     MCP_RATE_LIMIT_GLOBAL: "1000/minute"
+    MCP_HOSTED_MODE: "true"
+    MCP_ADMISSION_CONTROL_ENABLED: "true"
+    MCP_TOOL_TIMEOUT_SECONDS: "30"
+    MCP_WANDB_REQUEST_TIMEOUT_SECONDS: "20"
+    WANDB_MCP_ENABLE_RAW_GRAPHQL: "false"
+    UVICORN_WORKERS: "1"
+    UVICORN_LIMIT_CONCURRENCY: "16"
+    ## WANDB_BASE_URL stays public for client-visible links and .netrc lookup.
+    ## WANDB_INTERNAL_BASE_URL is generated as http://<release>-api:8081 by
+    ## wandb.mcpEnvs. Set it here only for installations with a custom API
+    ## Service name; an explicit non-empty value overrides the generated URL.
     # Note: WANDB_CACHE_DIR, WANDB_CONFIG_DIR, WANDB_DATA_DIR, and HOME=/tmp
     # are already set by the MCP Docker image. The emptyDir volume mounted
     # at /tmp/ above gives the pod isolated writable scratch space matching
