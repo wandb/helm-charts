@@ -12,6 +12,10 @@
     false - hide Weave tools and do not default WF_TRACE_SERVER_URL.
 */}}
 {{- $mcp := index .Values "mcp-server" | default dict -}}
+{{- $mcpEnv := index $mcp "env" | default dict -}}
+{{- if and (hasKey $mcpEnv "WANDB_INTERNAL_BASE_URL") (eq (index $mcpEnv "WANDB_INTERNAL_BASE_URL" | toString | trim) "") -}}
+{{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL must be non-empty when set; omit it to use http://<release>-api:8081" -}}
+{{- end -}}
 {{- if index $mcp "install" -}}
 {{- $mcpWeave := index $mcp "weave" | default dict -}}
 {{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
