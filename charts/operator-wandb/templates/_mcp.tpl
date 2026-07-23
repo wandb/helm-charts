@@ -71,12 +71,15 @@ Resolves:
   internal consumers use (see weave-trace.yaml WF_TRACE_SERVER_URL line).
 - WANDB_BASE_URL: the public W&B instance URL (from global.host)
 - WANDB_INTERNAL_BASE_URL: the namespace-local API Service used by backend calls
+- MCP_WORKLOAD_PROFILE: bounded workload limits for this deployment
 
 MCP can run without weave-trace. When WANDB_MCP_ENABLE_WEAVE_TOOLS=false,
 trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
 */}}
 {{- define "wandb.mcpEnvs" -}}
 {{- $mcpEnv := index .Values "env" | default dict -}}
+{{- $mcpPerformance := index .Values "performance" | default dict -}}
+{{- $workloadProfile := (index $mcpPerformance "profile" | default "dedicated" | toString | lower) -}}
 {{- $mcpWeave := index .Values "weave" | default dict -}}
 {{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
 {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
@@ -95,6 +98,10 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
 {{- if not (hasKey $mcpEnv "WANDB_INTERNAL_BASE_URL") }}
 - name: WANDB_INTERNAL_BASE_URL
   value: "http://{{ .Release.Name }}-api:8081"
+{{- end }}
+{{- if not (hasKey $mcpEnv "MCP_WORKLOAD_PROFILE") }}
+- name: MCP_WORKLOAD_PROFILE
+  value: {{ $workloadProfile | quote }}
 {{- end }}
 {{/*
   Privacy level for customer-supplied content in logs. Default here is "standard"
