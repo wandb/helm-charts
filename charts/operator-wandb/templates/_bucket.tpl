@@ -14,19 +14,20 @@
 {{- end -}}
 
 {{/*
-Returns the effective Azure storage identity. The dedicated global override is
-supplied by the customer's infrastructure and takes precedence over the
-W&B-managed CR bucket values.
+Returns the effective Azure storage identity. The global identity belongs to
+the infrastructure-managed default bucket. A customer BYOB bucket uses its own
+credentials and must not inherit the default bucket identity.
 */}}
 {{- define "wandb.azureStorageIdentity" -}}
 {{- $bucket := include "wandb.bucket" . | fromYaml -}}
+{{- $hasCustomerBucket := not (empty .Values.global.bucket.name) -}}
 {{- $override := default (dict) .Values.global.azureStorageIdentity -}}
 {{- $overrideTenantId := default "" $override.tenantId -}}
 {{- $overrideClientId := default "" $override.clientId -}}
 {{- $tenantId := default "" $bucket.azureTenantId -}}
 {{- $clientId := default "" $bucket.azureClientId -}}
 {{- $overrideConfigured := or (not (empty $overrideTenantId)) (not (empty $overrideClientId)) -}}
-{{- if $overrideConfigured -}}
+{{- if and (not $hasCustomerBucket) $overrideConfigured -}}
   {{- if ne (empty $overrideTenantId) (empty $overrideClientId) -}}
     {{- fail "global.azureStorageIdentity.tenantId and clientId must be provided together" -}}
   {{- end -}}
