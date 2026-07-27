@@ -396,9 +396,9 @@ global:
         name: ""
         secretKey: "OIDC_SECRET"
 
-  # Infrastructure-managed Azure workload identity for the default Blob storage
-  # bucket. A customer BYOB bucket does not inherit this identity; it uses the
-  # access key or identity values configured on global.bucket.
+  # Infrastructure-managed Azure workload identity for this deployment. The
+  # managed default bucket uses this identity. A customer Azure bucket can opt
+  # in with global.bucket.azureAuthMethod: workloadIdentity.
   # Each value can be a literal string or a Kubernetes EnvVarSource-style map:
   #   clientId:
   #     valueFrom:
@@ -408,6 +408,9 @@ global:
   azureStorageIdentity:
     tenantId: null
     clientId: null
+    # Principal ID is exposed to administrators for Azure role assignments.
+    # The chart does not use it for pod authentication.
+    principalId: null
 
   # Storage bucket that will be used by the application by default but can be overridden by the user in the wandb-console.
   defaultBucket:
@@ -430,6 +433,10 @@ global:
 
   # If specified, the application will use this bucket for all storage operations, and will not be overridable by the user.
   bucket:
+    # Azure only. Existing configurations default to access-key authentication.
+    # Set to workloadIdentity to use global.azureStorageIdentity.
+    azureAuthMethod: null
+    # Legacy bucket-scoped identity values remain supported.
     # azureTenantId: ""
     # azureClientId: ""
     secret:
@@ -512,6 +519,10 @@ global:
 
   weave-trace:
     enabled: false
+    # Weave stores files in ClickHouse unless this is explicitly enabled.
+    # Enable only with a Weave image that supports Azure workload identity.
+    fileStorage:
+      useDefaultBucket: false
 
   # As part of the migration away from using local, the `bypass` setting will
   # control whether the gorilla services will use the app service (and, thus, local)
@@ -3495,6 +3506,8 @@ mcp-server:
 weave-trace:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -3633,6 +3646,8 @@ weave-trace:
 weave-trace-worker:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -3742,6 +3757,8 @@ weave-trace-worker:
 weave-evaluate-model-worker:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -3845,6 +3862,8 @@ weave-evaluate-model-worker:
 weave-trace-agent-scoring-worker:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
