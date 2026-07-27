@@ -13,6 +13,38 @@
 {{ .Release.Name }}-bucket-configmap
 {{- end -}}
 
+{{/*
+Returns the effective Azure storage identity. The global identity belongs to
+the infrastructure-managed default bucket. A customer BYOB bucket uses its own
+credentials and must not inherit the default bucket identity.
+*/}}
+{{- define "wandb.azureStorageIdentity" -}}
+{{- $bucket := include "wandb.bucket" . | fromYaml -}}
+{{- $hasCustomerBucket := not (empty .Values.global.bucket.name) -}}
+{{- $override := default (dict) .Values.global.azureStorageIdentity -}}
+{{- $overrideTenantId := default "" $override.tenantId -}}
+{{- $overrideClientId := default "" $override.clientId -}}
+{{- $tenantId := default "" $bucket.azureTenantId -}}
+{{- $clientId := default "" $bucket.azureClientId -}}
+{{- $overrideConfigured := or (not (empty $overrideTenantId)) (not (empty $overrideClientId)) -}}
+{{- if and (not $hasCustomerBucket) $overrideConfigured -}}
+  {{- if ne (empty $overrideTenantId) (empty $overrideClientId) -}}
+    {{- fail "global.azureStorageIdentity.tenantId and clientId must be provided together" -}}
+  {{- end -}}
+  {{- $tenantId = $overrideTenantId -}}
+  {{- $clientId = $overrideClientId -}}
+{{- else if and (eq $bucket.provider "az") (ne (empty $tenantId) (empty $clientId)) -}}
+  {{- fail "Azure bucket azureTenantId and azureClientId must be provided together" -}}
+{{- end -}}
+{{- $enabled := and (eq $bucket.provider "az") (not (empty $tenantId)) (not (empty $clientId)) -}}
+{{- dict "enabled" $enabled "tenantId" $tenantId "clientId" $clientId | toYaml -}}
+{{- end }}
+
+{{/* Return whether the effective Azure storage identity is configured. */}}
+{{- define "wandb.azureStorageIdentityEnabled" -}}
+{{- (include "wandb.azureStorageIdentity" . | fromYaml).enabled -}}
+{{- end }}
+
 
 {{- define "wandb.bucket" -}}
 {{- $url := "" -}}
@@ -20,11 +52,15 @@
 {{- $provider := "" -}}
 {{- $accessKey := "" -}}
 {{- $secretKey := "" -}}
+{{- $azureTenantId := "" -}}
+{{- $azureClientId := "" -}}
 {{- if .Values.global.bucket.name -}}
 {{- $provider = .Values.global.bucket.provider -}}
 {{- $path = .Values.global.bucket.path -}}
 {{- $accessKey = default "" .Values.global.bucket.accessKey -}}
 {{- $secretKey = default "" .Values.global.bucket.secretKey -}}
+{{- $azureTenantId = default "" .Values.global.bucket.azureTenantId -}}
+{{- $azureClientId = default "" .Values.global.bucket.azureClientId -}}
 name: {{ .Values.global.bucket.name }}
 region: {{ .Values.global.bucket.region }}
 kmsKey: {{ .Values.global.bucket.kmsKey }}
@@ -33,6 +69,8 @@ kmsKey: {{ .Values.global.bucket.kmsKey }}
 {{- $path = .Values.global.defaultBucket.path -}}
 {{- $accessKey = default "" .Values.global.defaultBucket.accessKey -}}
 {{- $secretKey = default "" .Values.global.defaultBucket.secretKey -}}
+{{- $azureTenantId = default "" .Values.global.defaultBucket.azureTenantId -}}
+{{- $azureClientId = default "" .Values.global.defaultBucket.azureClientId -}}
 name: {{ .Values.global.defaultBucket.name }}
 region: {{ .Values.global.defaultBucket.region }}
 kmsKey: {{ .Values.global.defaultBucket.kmsKey }}
@@ -41,6 +79,8 @@ provider: {{ $provider }}
 path: {{ $path }}
 accessKey: {{ $accessKey }}
 secretKey: {{ $secretKey }}
+azureTenantId: {{ $azureTenantId | toJson }}
+azureClientId: {{ $azureClientId | toJson }}
 accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
 secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}
