@@ -1,0 +1,190 @@
+suite: managed session key rotation
+templates:
+  - templates/session-key.yaml
+release:
+  name: wandb
+  namespace: default
+kubernetesProvider:
+  scheme:
+    "v1/Secret":
+      gvr:
+        version: v1
+        resource: secrets
+      namespaced: true
+
+tests:
+  - it: prepares a candidate without replacing the current signing key
+    set:
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: prepare
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+          data:
+            GORILLA_SESSION_KEY: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+    asserts:
+      - equal:
+          path: data.GORILLA_SESSION_KEY
+          value: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+      - isNotEmpty:
+          path: data.GORILLA_SESSION_KEY_PREVIOUS
+      - equal:
+          path: metadata.annotations["wandb.ai/session-key-rotation-id"]
+          value: rotation-1
+      - equal:
+          path: metadata.annotations["wandb.ai/session-key-rotation-phase"]
+          value: prepare
+
+  - it: keeps a prepared rotation stable across reconciliation
+    set:
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: prepare
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+            annotations:
+              wandb.ai/session-key-rotation-id: rotation-1
+              wandb.ai/session-key-rotation-phase: prepare
+          data:
+            GORILLA_SESSION_KEY: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+            GORILLA_SESSION_KEY_PREVIOUS: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+    asserts:
+      - equal:
+          path: data.GORILLA_SESSION_KEY
+          value: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+      - equal:
+          path: data.GORILLA_SESSION_KEY_PREVIOUS
+          value: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+
+  - it: activates the prepared candidate and retains all outgoing keys
+    set:
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: activate
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+            annotations:
+              wandb.ai/session-key-rotation-id: rotation-1
+              wandb.ai/session-key-rotation-phase: prepare
+          data:
+            GORILLA_SESSION_KEY: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+            GORILLA_SESSION_KEY_PREVIOUS: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIsY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2M=
+    asserts:
+      - equal:
+          path: data.GORILLA_SESSION_KEY
+          value: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+      - equal:
+          path: data.GORILLA_SESSION_KEY_PREVIOUS
+          value: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEsY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2M=
+      - equal:
+          path: metadata.annotations["wandb.ai/session-key-rotation-phase"]
+          value: activate
+
+  - it: does not swap the keys again when activate is reconciled
+    set:
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: activate
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+            annotations:
+              wandb.ai/session-key-rotation-id: rotation-1
+              wandb.ai/session-key-rotation-phase: activate
+          data:
+            GORILLA_SESSION_KEY: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+            GORILLA_SESSION_KEY_PREVIOUS: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEsY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2M=
+    asserts:
+      - equal:
+          path: data.GORILLA_SESSION_KEY
+          value: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+      - equal:
+          path: data.GORILLA_SESSION_KEY_PREVIOUS
+          value: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEsY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2M=
+
+  - it: clears previous keys after the overlap window
+    set:
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: clear
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+            annotations:
+              wandb.ai/session-key-rotation-id: rotation-1
+              wandb.ai/session-key-rotation-phase: activate
+          data:
+            GORILLA_SESSION_KEY: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+            GORILLA_SESSION_KEY_PREVIOUS: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEsY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2M=
+    asserts:
+      - equal:
+          path: data.GORILLA_SESSION_KEY
+          value: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+      - notExists:
+          path: data.GORILLA_SESSION_KEY_PREVIOUS
+      - equal:
+          path: metadata.annotations["wandb.ai/session-key-rotation-phase"]
+          value: clear
+
+  - it: clears a prepared candidate when the rotation is cancelled
+    set:
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: clear
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+            annotations:
+              wandb.ai/session-key-rotation-id: rotation-1
+              wandb.ai/session-key-rotation-phase: prepare
+          data:
+            GORILLA_SESSION_KEY: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+            GORILLA_SESSION_KEY_PREVIOUS: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+    asserts:
+      - equal:
+          path: data.GORILLA_SESSION_KEY
+          value: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+      - notExists:
+          path: data.GORILLA_SESSION_KEY_PREVIOUS
+
+  - it: rejects activate before prepare
+    set:
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: activate
+    asserts:
+      - failedTemplate:
+          errorMessage: global.auth.sessionKeyRotation.phase=activate requires a prepared rotation with the same id
+
+  - it: rejects managed rotation with explicit key overrides
+    set:
+      global.auth.sessionKey:
+        valueFrom:
+          secretKeyRef:
+            name: external-session-keys
+            key: current
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: prepare
+    asserts:
+      - failedTemplate:
+          errorMessage: global.auth.sessionKeyRotation cannot be combined with sessionKey or sessionKeyPrevious

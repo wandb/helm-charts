@@ -231,6 +231,7 @@ The following credentials can be pulled from external Kubernetes Secrets:
 | **ClickHouse** | `global.clickhouse.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
 | **Kafka** | `global.kafka.passwordSecret` | `name`, `passwordKey` |
 | **OIDC** | `global.auth.oidc.oidcSecret` | `name`, `secretKey` |
+| **Session signing** | `global.auth.sessionKey`, `global.auth.sessionKeyPrevious` | Literal value or a map with `valueFrom` |
 | **SMTP** | `global.email.smtp.*` | Each field (host, port, user, password) can be a string or a map with `valueFrom` |
 
 ### Example: Using External Secrets with MySQL/ClickHouse/SMTP
@@ -269,6 +270,15 @@ global:
 For complete examples with secrets and additional configurations, see:
 - Values: [test-configs/operator-wandb/user-defined-secrets.yaml](../../test-configs/operator-wandb/user-defined-secrets.yaml)
 - Secrets: [test-configs/additional-resources/user-defined-secrets/](../../test-configs/additional-resources/user-defined-secrets/)
+
+### Session Key Rotation
+
+The chart generates `GORILLA_SESSION_KEY` on first install and retains it in the
+release's `gorilla-session-key` Secret. It can rotate that managed key without
+invalidating active sessions by using a three-phase workflow.
+
+See [Session Key Rotation](docs/session-key-rotation.md) for the managed
+workflow and external Secret examples.
 
 ## Chart Relationship
 

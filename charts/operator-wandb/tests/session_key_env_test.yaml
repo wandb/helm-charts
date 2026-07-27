@@ -1,0 +1,82 @@
+suite: session key environment
+templates:
+  - charts/api/templates/deployment.yaml
+  - charts/app/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: wires external session key references into the api
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      global.auth.sessionKey:
+        valueFrom:
+          secretKeyRef:
+            name: external-session-keys
+            key: current
+      global.auth.sessionKeyPrevious:
+        valueFrom:
+          secretKeyRef:
+            name: external-session-keys
+            key: previous
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_SESSION_KEY
+            valueFrom:
+              secretKeyRef:
+                name: external-session-keys
+                key: current
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_SESSION_KEY_PREVIOUS
+            valueFrom:
+              secretKeyRef:
+                name: external-session-keys
+                key: previous
+
+  - it: wires literal session keys into the app
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.auth.sessionKey: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      global.auth.sessionKeyPrevious: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_SESSION_KEY
+            value: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_SESSION_KEY_PREVIOUS
+            value: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+  - it: changes the api pod template for each managed rotation phase
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: prepare
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_SESSION_KEY_ROTATION
+            value: rotation-1-prepare
+
+  - it: changes the app pod template for each managed rotation phase
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: activate
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_SESSION_KEY_ROTATION
+            value: rotation-1-activate
