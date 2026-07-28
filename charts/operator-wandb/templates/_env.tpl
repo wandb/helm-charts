@@ -145,7 +145,7 @@ Global values will override any chart-specific values.
         ...
 */ -}}
 
-{{- if ne (default "password" .Values.global.mysql.authMode) "aws-iam" }}
+{{- if not .Values.global.mysql.rdsIamAuth }}
 {{- if kindIs "map" .Values.global.mysql.password }}
 - name: MYSQL_PASSWORD
 {{- toYaml .Values.global.mysql.password | nindent 2 }}

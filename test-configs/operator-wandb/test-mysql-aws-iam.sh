@@ -20,7 +20,7 @@ if grep -q 'name: wandb-mysql$' "$rendered"; then
 fi
 
 # shellcheck disable=SC2016 # Helm intentionally renders these environment references literally.
-expected_dsn='mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&auth=aws-iam&aws-region=us-east-1'
+expected_dsn='mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&rds-iam-auth=true&aws-region=us-east-1'
 if ! grep -Fq "$expected_dsn" "$rendered"; then
   echo "IAM authentication DSN was not rendered" >&2
   exit 1
@@ -66,7 +66,7 @@ fi
 
 if helm template wandb "$chart" \
   --namespace default \
-  --set global.mysql.authMode=aws-iam \
+  --set global.mysql.rdsIamAuth=true \
   --set global.mysql.awsRegion=us-east-1 \
   --set global.mysql.caCert=test \
   --set app.initContainers.init-db.enabled=false \
@@ -77,11 +77,20 @@ fi
 
 if helm template wandb "$chart" \
   --namespace default \
-  --set global.mysql.authMode=aws-iam \
+  --set global.mysql.rdsIamAuth=true \
   --set global.mysql.host=db.example \
   --set global.mysql.caCert=test \
   --set app.initContainers.init-db.enabled=false \
   --set prometheus.mysql-exporter.install=false >/dev/null 2>&1; then
   echo "IAM authentication without an AWS region must fail validation" >&2
+  exit 1
+fi
+
+password_rendered="$(mktemp)"
+trap 'rm -f "$rendered" "$password_rendered"' EXIT
+helm template wandb "$chart" --namespace default >"$password_rendered"
+if ! grep -Fq 'name: MYSQL_PASSWORD' "$password_rendered" ||
+  ! grep -Fq 'mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred' "$password_rendered"; then
+  echo "default password authentication must remain unchanged" >&2
   exit 1
 fi

@@ -79,8 +79,8 @@ Return the db password
 Return the db connection string
 */}}
 {{- define "wandb.mysql" -}}
-{{- if eq (default "password" .Values.global.mysql.authMode) "aws-iam" -}}
-mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&auth=aws-iam&aws-region={{ .Values.global.mysql.awsRegion }}
+{{- if .Values.global.mysql.rdsIamAuth -}}
+mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&rds-iam-auth=true&aws-region={{ .Values.global.mysql.awsRegion }}
 {{- else -}}
 mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
 {{- end -}}
