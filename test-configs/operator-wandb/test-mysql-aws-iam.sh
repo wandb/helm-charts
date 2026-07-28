@@ -5,7 +5,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 chart="$repo_root/charts/operator-wandb"
 values="$repo_root/test-configs/operator-wandb/mysql-aws-iam.yaml"
 rendered="$(mktemp)"
-trap 'rm -f "$rendered"' EXIT
+password_rendered="$(mktemp)"
+trap 'rm -f "$rendered" "$password_rendered"' EXIT
 
 helm template wandb "$chart" --namespace default --values "$values" >"$rendered"
 
@@ -58,36 +59,40 @@ for metric in "${iam_metrics[@]}"; do
   fi
 done
 
+if [[ "$(grep -c -- '- name: IamDbAuthConnection' "$rendered")" -ne 7 ]]; then
+  echo "expected exactly seven Aurora IAM authentication metrics" >&2
+  exit 1
+fi
+
 if ! grep -A3 -F 'exportedTagsOnMetrics:' "$rendered" | grep -Fq -- 'AWS/RDS:' ||
   ! grep -A3 -F 'exportedTagsOnMetrics:' "$rendered" | grep -Fq -- '- Namespace'; then
   echo "RDS metrics must export the Namespace tag for per-deployment dashboards" >&2
   exit 1
 fi
 
-if helm template wandb "$chart" \
-  --namespace default \
-  --set global.mysql.rdsIamAuth=true \
-  --set global.mysql.awsRegion=us-east-1 \
-  --set global.mysql.caCert=test \
-  --set app.initContainers.init-db.enabled=false \
-  --set prometheus.mysql-exporter.install=false >/dev/null 2>&1; then
-  echo "IAM authentication without a database host must fail validation" >&2
-  exit 1
-fi
+assert_iam_render_rejected() {
+  local description="$1"
+  shift
 
-if helm template wandb "$chart" \
-  --namespace default \
-  --set global.mysql.rdsIamAuth=true \
-  --set global.mysql.host=db.example \
-  --set global.mysql.caCert=test \
-  --set app.initContainers.init-db.enabled=false \
-  --set prometheus.mysql-exporter.install=false >/dev/null 2>&1; then
-  echo "IAM authentication without an AWS region must fail validation" >&2
-  exit 1
-fi
+  if helm template wandb "$chart" --namespace default --values "$values" "$@" >/dev/null 2>&1; then
+    echo "IAM authentication $description must fail validation" >&2
+    exit 1
+  fi
+}
 
-password_rendered="$(mktemp)"
-trap 'rm -f "$rendered" "$password_rendered"' EXIT
+assert_iam_render_rejected "with rdsIamAuth as string false" --set-string global.mysql.rdsIamAuth=false
+assert_iam_render_rejected "with rdsIamAuth as string true" --set-string global.mysql.rdsIamAuth=true
+assert_iam_render_rejected "with rdsIamAuth as a number" --set global.mysql.rdsIamAuth=1
+assert_iam_render_rejected "without a database host" --set global.mysql.host=
+assert_iam_render_rejected "without a database user" --set global.mysql.user=
+assert_iam_render_rejected "without an AWS region" --set global.mysql.awsRegion=
+assert_iam_render_rejected "without a CA certificate" --set global.mysql.caCert=
+assert_iam_render_rejected "with a database password" --set global.mysql.password=must-be-empty
+assert_iam_render_rejected "with a password Secret" --set global.mysql.passwordSecret.name=existing-secret
+assert_iam_render_rejected "with local MySQL installed" --set mysql.install=true
+assert_iam_render_rejected "with password init-db enabled" --set app.initContainers.init-db.enabled=true
+assert_iam_render_rejected "with mysql-exporter enabled" --set prometheus.mysql-exporter.install=true
+
 helm template wandb "$chart" --namespace default >"$password_rendered"
 if ! grep -Fq 'name: MYSQL_PASSWORD' "$password_rendered" ||
   ! grep -Fq 'mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred' "$password_rendered"; then
