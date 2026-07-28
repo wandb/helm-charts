@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Check Helm template source for maintainability problems."""
+"""Check Helm template source for maintainability gaps not covered by helmfmt.
+
+Re-evaluate these checks when the pinned helmfmt release gains equivalent
+functionality; repository-owned rules should be removed when upstream can
+enforce them reliably.
+"""
 
 from __future__ import annotations
 
@@ -13,19 +18,20 @@ from typing import Iterable, Sequence
 
 TEMPLATE_ACTION = re.compile(r"{{-?\s*(.*?)\s*-?}}", re.DOTALL)
 TEMPLATE_COMMENT = re.compile(r"{{-?\s*/\*.*?\*/\s*-?}}", re.DOTALL)
+LEFT_CHOMP_PADDING = re.compile(r"(?m)^[ \t]*{{-[ \t]{2,}(?=\S)")
 STABLE_SELECTOR = re.compile(
     r"(?:\$[A-Za-z_][A-Za-z0-9_]*|\.[A-Za-z_][A-Za-z0-9_]*)"
     r"(?:\.[A-Za-z_][A-Za-z0-9_]*)*\Z"
 )
 BLOCK_OPENERS = {"block", "define", "if", "range", "with"}
-CONTROL_OPENERS = {"if", "range", "with"}
 TEMPLATE_SUFFIXES = {".tpl", ".txt", ".yaml", ".yml"}
-MAINTAINED_CHARTS = (
-    "operator",
-    "operator-wandb",
-    "orchestrator",
-    "wandb-base",
-    "lumen",
+MAINTAINED_CHARTS = tuple(
+    chart
+    for chart in Path(__file__)
+    .with_name("maintained_charts.txt")
+    .read_text()
+    .splitlines()
+    if chart
 )
 
 
@@ -46,13 +52,17 @@ class Finding:
     message: str
 
 
-def parse_actions(source: str) -> list[Action]:
-    source_without_comments = TEMPLATE_COMMENT.sub(
+def without_template_comments(source: str) -> str:
+    return TEMPLATE_COMMENT.sub(
         lambda match: "".join(
             "\n" if character == "\n" else " " for character in match.group(0)
         ),
         source,
     )
+
+
+def parse_actions(source: str) -> list[Action]:
+    source_without_comments = without_template_comments(source)
     return [
         Action(
             command=" ".join(match.group(1).split()),
@@ -63,7 +73,9 @@ def parse_actions(source: str) -> list[Action]:
     ]
 
 
-def matching_end(actions: Sequence[Action], opening_index: int) -> tuple[int, bool] | None:
+def matching_end(
+    actions: Sequence[Action], opening_index: int
+) -> tuple[int, bool] | None:
     depth = 1
     has_top_level_else = False
     for index in range(opening_index + 1, len(actions)):
@@ -135,84 +147,15 @@ def find_complementary_blocks(source: str) -> list[Finding]:
     return findings
 
 
-def standalone_indentation(source: str, action: Action) -> int | None:
-    line_start = source.rfind("\n", 0, action.start) + 1
-    line_end = source.find("\n", action.end)
-    if line_end == -1:
-        line_end = len(source)
-    before = source[line_start : action.start]
-    after = source[action.end : line_end]
-    if before.strip() or after.strip():
-        return None
-    return len(before.expandtabs(2))
-
-
-def find_control_indentation(source: str) -> list[Finding]:
-    stack: list[tuple[str, int | None]] = []
-    findings: list[Finding] = []
-
-    for action in parse_actions(source):
-        keyword = action.keyword
-        indentation = standalone_indentation(source, action)
-        line = source.count("\n", 0, action.start) + 1
-
-        if keyword == "end":
-            if not stack:
-                continue
-            opener, opener_indentation = stack.pop()
-            if (
-                indentation is not None
-                and opener_indentation is not None
-                and indentation != opener_indentation
-            ):
-                findings.append(
-                    Finding(
-                        line=line,
-                        message=f"align end with its {opener}",
-                    )
-                )
-            continue
-
-        if keyword == "else":
-            if stack:
-                opener, opener_indentation = stack[-1]
-                if (
-                    indentation is not None
-                    and opener_indentation is not None
-                    and indentation != opener_indentation
-                ):
-                    findings.append(
-                        Finding(
-                            line=line,
-                            message=f"align else with its {opener}",
-                        )
-                    )
-            continue
-
-        if keyword not in BLOCK_OPENERS:
-            continue
-
-        if keyword in CONTROL_OPENERS and indentation is not None:
-            parent = next(
-                (
-                    (parent_keyword, parent_indentation)
-                    for parent_keyword, parent_indentation in reversed(stack)
-                    if parent_keyword in CONTROL_OPENERS
-                    and parent_indentation is not None
-                ),
-                None,
-            )
-            if parent is not None and indentation <= parent[1]:
-                findings.append(
-                    Finding(
-                        line=line,
-                        message=f"indent nested {keyword} deeper than its parent",
-                    )
-                )
-
-        stack.append((keyword, indentation))
-
-    return findings
+def find_left_chomp_padding(source: str) -> list[Finding]:
+    source_without_comments = without_template_comments(source)
+    return [
+        Finding(
+            line=source_without_comments.count("\n", 0, match.start()) + 1,
+            message="use one space inside the template action after '{{-'",
+        )
+        for match in LEFT_CHOMP_PADDING.finditer(source_without_comments)
+    ]
 
 
 def template_files(paths: Iterable[Path]) -> list[Path]:
@@ -247,12 +190,15 @@ def check(paths: Sequence[Path]) -> int:
         try:
             source = path.read_text()
         except (OSError, UnicodeError) as error:
-            print(f"{display_path(path)}: unable to read template: {error}", file=sys.stderr)
+            print(
+                f"{display_path(path)}: unable to read template: {error}",
+                file=sys.stderr,
+            )
             return 2
 
         for finding in [
             *find_complementary_blocks(source),
-            *find_control_indentation(source),
+            *find_left_chomp_padding(source),
         ]:
             had_finding = True
             print(f"{display_path(path)}:{finding.line}: {finding.message}")
@@ -265,10 +211,7 @@ def main() -> int:
         "paths",
         nargs="*",
         type=Path,
-        help=(
-            "template files or directories "
-            "(defaults to maintained chart templates)"
-        ),
+        help=("template files or directories (defaults to maintained chart templates)"),
     )
     arguments = parser.parse_args()
     return check(arguments.paths or default_paths())

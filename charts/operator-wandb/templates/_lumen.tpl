@@ -4,9 +4,9 @@
 {{- end -}}
 
 {{- define "wandb.lumen.googleCredsPath" -}}
-{{- if dig "lumen" "gcpWorkloadIdentity" "audience" "" .Values.global -}}
+  {{- if dig "lumen" "gcpWorkloadIdentity" "audience" "" .Values.global -}}
 /var/secrets/gcp/credential-config.json
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{- define "wandb.lumen.dataRoot" -}}
@@ -22,9 +22,9 @@
 {{- end -}}
 
 {{- define "wandb.lumen.publish.envVars" -}}
-{{- if eq (dig "lumen" "publish" "envVars" false .Values.global | toString) "true" -}}
+  {{- if eq (dig "lumen" "publish" "envVars" false .Values.global | toString) "true" -}}
 true
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{- define "wandb.lumen.customer" -}}
