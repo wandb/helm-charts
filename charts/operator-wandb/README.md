@@ -73,6 +73,28 @@ Due to the scope and complexity of this chart, all possible values are not docum
 
 Because properties are regularly added, updated, or relocated, it is _strongly suggested_ to not "copy and paste" the entire values.yaml file. Please provide Helm only those properties you need, and allow the defaults to be provided by the version of this chart at the time of deployment.
 
+### MCP workload isolation
+
+`api.mcpWorkloadIsolation.enabled` is disabled by default. When enabled, the
+chart gives cooperative MCP requests a separate Core query-cost bucket and
+limits each MCP request to two MySQL connections. This is workload
+classification, not authentication, and the MCP and ordinary SDK budgets are
+separate but additive.
+
+Do not enable this setting unless the pinned W&B Server image contains
+[`wandb/core#49143`](https://github.com/wandb/core/pull/49143). Verify that
+requirement in the image's embedded release metadata and validate the exact
+image digest in staging first. Roll back the Core-side lane by setting:
+
+```yaml
+api:
+  mcpWorkloadIsolation:
+    enabled: false
+```
+
+Explicit `api.containers.api.env` values for the two
+`GORILLA_MCP_*` settings override the chart-generated size defaults.
+
 ### Global Configuration
 
 The chart provides global configuration options that affect multiple components:
