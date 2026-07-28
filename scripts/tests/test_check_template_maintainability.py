@@ -54,9 +54,9 @@ enabled
             for chart in MAINTAINED_CHARTS
         }
         fixtures["charts/wandb/templates/fixture.tpl"] = complementary_blocks
-        fixtures[
-            "charts/operator-wandb/charts/dependency/templates/fixture.tpl"
-        ] = complementary_blocks
+        fixtures["charts/operator-wandb/charts/dependency/templates/fixture.tpl"] = (
+            complementary_blocks
+        )
 
         result = self.run_default_checker(fixtures)
 
@@ -155,44 +155,36 @@ enabled
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_rejects_nested_control_blocks_at_the_parent_indentation(self) -> None:
+    def test_rejects_legacy_padding_inside_left_chomp_action(self) -> None:
         result = self.run_checker(
-            """{{- if $identity.enabled }}
-{{- if $identity.clientId }}
+            """{{-   if $identity.enabled }}
 - name: CLIENT_ID
-{{- end }}
-{{- end }}
+{{-   end }}
 """
         )
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn("indent nested if deeper than its parent", result.stdout)
+        self.assertIn("fixture.tpl:1:", result.stdout)
+        self.assertIn("use one space inside the template action", result.stdout)
+        self.assertIn("fixture.tpl:3:", result.stdout)
 
-    def test_rejects_control_boundaries_not_aligned_with_their_block(self) -> None:
+    def test_accepts_one_space_inside_left_chomp_action(self) -> None:
         result = self.run_checker(
             """{{- if $identity.enabled }}
-  {{- if $identity.clientId }}
 - name: CLIENT_ID
-{{- else }}
-- name: DEFAULT_CLIENT_ID
-{{- end }}
 {{- end }}
 """
         )
 
-        self.assertEqual(result.returncode, 1)
-        self.assertIn("align else with its if", result.stdout)
-        self.assertIn("align end with its if", result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_accepts_indented_nested_control_flow(self) -> None:
+    def test_ignores_legacy_padding_inside_comments(self) -> None:
         result = self.run_checker(
-            """{{- if $identity.enabled }}
-  {{- if $identity.clientId }}
-- name: CLIENT_ID
-  {{- else }}
-- name: DEFAULT_CLIENT_ID
-  {{- end }}
-{{- end }}
+            """{{- /*
+Example:
+{{-   if $identity.enabled }}
+{{-   end }}
+*/}}
 """
         )
 
