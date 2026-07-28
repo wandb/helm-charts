@@ -64,9 +64,10 @@ if [[ "$(grep -c -- '- name: IamDbAuthConnection' "$rendered")" -ne 7 ]]; then
   exit 1
 fi
 
-if ! grep -A3 -F 'exportedTagsOnMetrics:' "$rendered" | grep -Fq -- 'AWS/RDS:' ||
-  ! grep -A3 -F 'exportedTagsOnMetrics:' "$rendered" | grep -Fq -- '- Namespace'; then
-  echo "RDS metrics must export the Namespace tag for per-deployment dashboards" >&2
+exported_tags_block="$(grep -A3 -F 'exportedTagsOnMetrics:' "$rendered")"
+if [[ "$exported_tags_block" != *"AWS/RDS:"* ]] ||
+  [[ "$exported_tags_block" != *"- namespace"* ]]; then
+  echo "RDS metrics must export the lowercase namespace tag used by managed-install resources" >&2
   exit 1
 fi
 
