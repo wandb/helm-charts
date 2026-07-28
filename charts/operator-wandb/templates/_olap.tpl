@@ -75,10 +75,10 @@ Returns: "" (empty) or "?key=val&key=val"
 {{- if gt $len 0 -}}
 {{- $count := 0 -}}
 {{- print "?" -}}
-{{- range $key, $val := $params -}}
+  {{- range $key, $val := $params -}}
 {{- $count = add $count 1 -}}
 {{- printf "%s=%s" $key (toString $val) -}}
 {{- if lt (int $count) $len -}}&{{- end -}}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 {{- end -}}

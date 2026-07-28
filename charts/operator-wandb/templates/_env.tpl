@@ -357,44 +357,44 @@ Global values will override any chart-specific values.
   {{- $prefix := .envVarPrefix -}}
   {{- $secretName := include "wandb.olapSecretName" (dict "root" .root "featureName" .featureName) -}}
   {{- $secretKey := include "wandb.olapSecretKey" (dict "envVarPrefix" $prefix) -}}
-{{- if kindIs "map" $config.host }}
+  {{- if kindIs "map" $config.host }}
 - name: {{ $prefix }}_HOST
 {{- toYaml $config.host | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: {{ $prefix }}_HOST
   value: {{ tpl ($config.host | toString) .root | quote }}
-{{- end }}
-{{- if kindIs "map" $config.port }}
+  {{- end }}
+  {{- if kindIs "map" $config.port }}
 - name: {{ $prefix }}_PORT
 {{- toYaml $config.port | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: {{ $prefix }}_PORT
   value: {{ $config.port | toString | quote }}
-{{- end }}
-{{- if kindIs "map" $config.database }}
+  {{- end }}
+  {{- if kindIs "map" $config.database }}
 - name: {{ $prefix }}_DATABASE
 {{- toYaml $config.database | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: {{ $prefix }}_DATABASE
   value: {{ $config.database | quote }}
-{{- end }}
-{{- if kindIs "map" $config.user }}
+  {{- end }}
+  {{- if kindIs "map" $config.user }}
 - name: {{ $prefix }}_USER
 {{- toYaml $config.user | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: {{ $prefix }}_USER
   value: {{ $config.user | quote }}
-{{- end }}
-{{- if kindIs "map" $config.password }}
+  {{- end }}
+  {{- if kindIs "map" $config.password }}
 - name: {{ $prefix }}_PASSWORD
 {{- toYaml $config.password | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: {{ $prefix }}_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ $secretName | quote }}
       key: {{ $secretKey | quote }}
-{{- end }}
+  {{- end }}
   {{- $finalConnectionUrl := printf "%s://$(%s_USER):$(%s_PASSWORD)@$(%s_HOST):$(%s_PORT)/$(%s_DATABASE)$(%s_PARAMS)" $config.type $prefix $prefix $prefix $prefix $prefix $prefix }}
 - name: {{ $prefix }}_PARAMS
   value: {{ include "wandb.olapParamsQuery" (dict "params" $config.params) | quote }}
@@ -403,7 +403,7 @@ Global values will override any chart-specific values.
 {{- $migratePrefix := default $prefix .migratePrefix }}
 - name: "MIGRATE_{{ $migratePrefix }}_DB"
   value: {{ $finalConnectionUrl | quote }}
-  {{- end }}
+{{- end }}
 {{- end -}}
 
 {{- define "wandb.registrySearchEnvs" -}}

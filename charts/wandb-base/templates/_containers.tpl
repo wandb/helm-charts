@@ -182,13 +182,13 @@
 
 {{- define "wandb-base.env" -}}
 {{- range $key, $value := .env -}}
-{{- if kindIs "map" $value }}
+  {{- if kindIs "map" $value }}
 - name: {{ $key }}
 {{- toYaml $value | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: {{ $key }}
   value: {{ toString $value | quote }}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 {{- end -}}
 
