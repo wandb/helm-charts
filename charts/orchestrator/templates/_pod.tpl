@@ -9,17 +9,17 @@ priorityClassName: {{ $pcName }}
 {{- $psc := . }}
 {{- if $psc }}
 securityContext:
-{{-   if not (empty $psc.runAsUser) }}
+  {{-   if not (empty $psc.runAsUser) }}
   runAsUser: {{ $psc.runAsUser }}
-{{-   end }}
-{{-   if not (empty $psc.runAsGroup) }}
+  {{-   end }}
+  {{-   if not (empty $psc.runAsGroup) }}
   runAsGroup: {{ $psc.runAsGroup }}
-{{-   end }}
-{{-   if not (empty $psc.fsGroup) }}
+  {{-   end }}
+  {{-   if not (empty $psc.fsGroup) }}
   fsGroup: {{ $psc.fsGroup }}
-{{-   end }}
-{{-   if not (empty $psc.fsGroupChangePolicy) }}
+  {{-   end }}
+  {{-   if not (empty $psc.fsGroupChangePolicy) }}
   fsGroupChangePolicy: {{ $psc.fsGroupChangePolicy }}
-{{-   end }}
+  {{-   end }}
 {{- end }}
 {{- end -}}

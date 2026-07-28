@@ -41,7 +41,7 @@
 {{- define "wandb.gcsFuseVolumes" }}
 {{- if .Values.fuse.enabled }}
 - name: fuse
-{{- if and (eq (include "wandb.bucket" . | fromYaml).provider "gcs") (eq .Values.global.cloudProvider "gcp") }}
+  {{- if and (eq (include "wandb.bucket" . | fromYaml).provider "gcs") (eq .Values.global.cloudProvider "gcp") }}
   csi:
     driver: gcsfuse.csi.storage.gke.io
     readOnly: true
@@ -51,9 +51,9 @@
       fileCacheCapacity: "{{ .Values.fuse.fileCacheCapacity }}"
       fileCacheForRangeRead: "true"
       gcsfuseMetadataPrefetchOnMount: "true"
-{{- else }}
+  {{- else }}
   emptyDir: {}
-{{- end }}
+  {{- end }}
 {{- end }}
 {{- end }}
 
