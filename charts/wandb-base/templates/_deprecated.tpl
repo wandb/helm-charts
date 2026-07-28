@@ -70,9 +70,9 @@ Handles merging a set of pod annotations
 Handles merging a set of non-selector labels
 */}}
 {{- define "wandb-base.podLabels" -}}
-{{- $allLabels := merge .Values.podLabels .Values.pod.labels .Values.global.pod.labels -}}
-{{- if $allLabels -}}
-{{-   range $key, $value := $allLabels }}
+  {{- $allLabels := merge .Values.podLabels .Values.pod.labels .Values.global.pod.labels -}}
+  {{- if $allLabels -}}
+    {{- range $key, $value := $allLabels }}
 {{ $key }}: {{ $value | trunc 63 | quote }}
     {{- end }}
   {{- end -}}
