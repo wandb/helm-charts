@@ -12,6 +12,21 @@
     false - hide Weave tools and do not default WF_TRACE_SERVER_URL.
 */}}
 {{- $mcp := index .Values "mcp-server" | default dict -}}
+{{- $mcpEnv := index $mcp "env" | default dict -}}
+{{- $mcpPerformance := index $mcp "performance" | default dict -}}
+{{- $workloadProfile := (index $mcpPerformance "profile" | default "dedicated" | toString | lower) -}}
+{{- if not (has $workloadProfile (list "shared" "dedicated" "local")) -}}
+{{- fail "mcp-server.performance.profile must be one of: shared, dedicated, local" -}}
+{{- end -}}
+{{- if hasKey $mcpEnv "MCP_WORKLOAD_PROFILE" -}}
+{{- $workloadOverride := (index $mcpEnv "MCP_WORKLOAD_PROFILE" | toString | lower | trim) -}}
+{{- if not (has $workloadOverride (list "shared" "dedicated" "local")) -}}
+{{- fail "mcp-server.env.MCP_WORKLOAD_PROFILE must be one of: shared, dedicated, local" -}}
+{{- end -}}
+{{- end -}}
+{{- if and (hasKey $mcpEnv "WANDB_INTERNAL_BASE_URL") (eq (index $mcpEnv "WANDB_INTERNAL_BASE_URL" | toString | trim) "") -}}
+{{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL must be non-empty when set; omit it to use http://<release>-api:8081" -}}
+{{- end -}}
 {{- if index $mcp "install" -}}
 {{- $mcpWeave := index $mcp "weave" | default dict -}}
 {{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
