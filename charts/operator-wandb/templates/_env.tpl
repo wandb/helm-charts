@@ -639,6 +639,31 @@ Global values will override any chart-specific values.
 {{- end }}
 {{- end -}}
 
+{{/*
+Render the Core-side MCP workload lane only when explicitly enabled.
+
+This header-based lane is cooperative workload classification, not an
+authentication boundary. It requires a W&B Server image containing
+wandb/core#49143. Explicit api.containers.api.env values win over this helper
+through the wandb-base envTpls merge behavior.
+*/}}
+{{- define "wandb.mcpWorkloadIsolationEnvs" -}}
+{{- $isolation := .Values.mcpWorkloadIsolation | default dict -}}
+{{- if (index $isolation "enabled") -}}
+{{- $querySecondsBySize := index $isolation "querySecondsBySize" | default dict -}}
+{{- $size := .Values.global.size | default "small" | toString | lower -}}
+{{- $defaultQuerySeconds := index $querySecondsBySize "default" | default 1 -}}
+{{- $querySeconds := $defaultQuerySeconds -}}
+{{- if hasKey $querySecondsBySize $size -}}
+{{- $querySeconds = index $querySecondsBySize $size -}}
+{{- end -}}
+- name: GORILLA_MCP_MYSQL_CONNECTIONS_PER_REQUEST
+  value: {{ index $isolation "mysqlConnectionsPerRequest" | default 2 | toString | quote }}
+- name: GORILLA_MCP_SDK_GRAPHQL_QUERY_SECONDS
+  value: {{ $querySeconds | toString | quote }}
+{{- end -}}
+{{- end -}}
+
 {{- define "wandb.lumen.gorillaEnvs" -}}
 - name: GORILLA_LUMEN_ADDR
   value: ":16060"
@@ -647,4 +672,3 @@ Global values will override any chart-specific values.
   value: "true"
 {{- end }}
 {{- end -}}
-
