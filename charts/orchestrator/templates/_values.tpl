@@ -33,10 +33,10 @@ Usage: {{ include "orchestrator.envVar" (dict "name" "ENV_VAR_NAME" "value" .Val
   valueFrom:
     {{- toYaml (get $value "valueFrom") | nindent 4 }}
 {{- else if kindIs "string" $value -}}
-{{- if ne $value "" -}}
+  {{- if ne $value "" -}}
 - name: {{ $name }}
   value: {{ $value | quote }}
-{{- end -}}
+  {{- end -}}
 {{- else if not (kindIs "invalid" $value) -}}
 - name: {{ $name }}
   value: {{ $value | quote }}

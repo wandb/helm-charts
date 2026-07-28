@@ -5,10 +5,10 @@
 */}}
 {{- $job := mergeOverwrite (dict "enabled" true) $job}}
 {{- $enabled := $job.enabled }}
-{{- if kindIs "string" $enabled }}
+  {{- if kindIs "string" $enabled }}
   {{- $enabled = eq (tpl $enabled $ | trim) "true" }}
-{{- end }}
-{{- if $enabled }}
+  {{- end }}
+  {{- if $enabled }}
   {{- $_ := set $job "restartPolicy" (default "Never" $job.restartPolicy ) }}
 apiVersion: batch/v1
 kind: Job
@@ -16,28 +16,28 @@ metadata:
   name: {{ printf "%s-%s" $.Release.Name $jobName }}
   labels:
     {{- include "wandb-base.labels" $ | nindent 4 }}
-  {{- if (or $job.annotations $.Values.helmHook.enabled (include "wandb-base.commonAnnotations" $)) }}
+    {{- if (or $job.annotations $.Values.helmHook.enabled (include "wandb-base.commonAnnotations" $)) }}
   annotations:
     {{- tpl (include "wandb-base.commonAnnotations" $ | nindent 4) $ }}
-    {{- if $job.annotations }}
+      {{- if $job.annotations }}
       {{- toYaml $job.annotations | nindent 4 }}
-    {{- end }}
-    {{- if $.Values.helmHook.enabled }}
+      {{- end }}
+      {{- if $.Values.helmHook.enabled }}
       {{- include "wandb-base.helmHookAnnotations" $ | nindent 4 }}
+      {{- end }}
     {{- end }}
-  {{- end }}
 spec:
-  {{- if hasKey $job "ttlSecondsAfterFinished" }}
+    {{- if hasKey $job "ttlSecondsAfterFinished" }}
   ttlSecondsAfterFinished: {{ $job.ttlSecondsAfterFinished }}
-  {{- end }}
-  {{- if hasKey $job "backoffLimit" }}
+    {{- end }}
+    {{- if hasKey $job "backoffLimit" }}
   backoffLimit: {{ $job.backoffLimit }}
-  {{- end }}
-  {{- with $job.activeDeadlineSeconds }}
+    {{- end }}
+    {{- with $job.activeDeadlineSeconds }}
   activeDeadlineSeconds: {{ . }}
-  {{- end }}
+    {{- end }}
   template:
     {{- include "wandb-base.pod" (dict "podData" $job "root" $) | nindent 8 }}
 ---
-{{- end }}
+  {{- end }}
 {{- end }}
