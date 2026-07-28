@@ -45,9 +45,9 @@ Const: Internals should not be tied back to the values.yaml in any way.
 {{- end -}}
 
 {{- define "wandb.emailSink" -}}
-{{- if ne .Values.global.email.smtp.host "" -}}
+  {{- if ne .Values.global.email.smtp.host "" -}}
 smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
-{{- else -}}
+  {{- else -}}
 https://api.wandb.ai/email/dispatch
-{{- end -}}
+  {{- end -}}
 {{- end -}}

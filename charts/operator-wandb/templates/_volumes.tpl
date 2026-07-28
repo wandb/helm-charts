@@ -32,16 +32,16 @@
 {{- end -}}
 
 {{- define "wandb.gcsFuseVolumeMounts" }}
-{{- if .Values.fuse.enabled }}
+  {{- if .Values.fuse.enabled }}
 - name: fuse
   mountPath: "/{{ (include "wandb.bucket" . | fromYaml).name }}"
-{{- end }}
+  {{- end }}
 {{- end }}
 
 {{- define "wandb.gcsFuseVolumes" }}
-{{- if .Values.fuse.enabled }}
+  {{- if .Values.fuse.enabled }}
 - name: fuse
-  {{- if and (eq (include "wandb.bucket" . | fromYaml).provider "gcs") (eq .Values.global.cloudProvider "gcp") }}
+    {{- if and (eq (include "wandb.bucket" . | fromYaml).provider "gcs") (eq .Values.global.cloudProvider "gcp") }}
   csi:
     driver: gcsfuse.csi.storage.gke.io
     readOnly: true
@@ -51,26 +51,26 @@
       fileCacheCapacity: "{{ .Values.fuse.fileCacheCapacity }}"
       fileCacheForRangeRead: "true"
       gcsfuseMetadataPrefetchOnMount: "true"
-  {{- else }}
+    {{- else }}
   emptyDir: {}
+    {{- end }}
   {{- end }}
-{{- end }}
 {{- end }}
 
 
 {{- define "wandb.internalSignerVolumeMounts" }}
-{{- if .Values.global.localService.bypass }}
+  {{- if .Values.global.localService.bypass }}
 - name: wandb-internal-signer-root
   mountPath: /vol/env
-{{- end }}
+  {{- end }}
 {{- end }}
 
 {{- define "wandb.internalSignerVolumes" }}
-{{- if .Values.global.localService.bypass }}
+  {{- if .Values.global.localService.bypass }}
 - name: wandb-internal-signer-root
   secret:
     secretName: "{{ .Release.Name }}-internal-signer"
-{{- end }}
+  {{- end }}
 {{- end }}
 
 
@@ -85,7 +85,7 @@
 {{- end }}
 
 {{- define "wandb.lumenWifVolumes" }}
-{{- if include "wandb.lumen.audience" . }}
+  {{- if include "wandb.lumen.audience" . }}
 - name: gcp-ksa
   projected:
     sources:
@@ -96,18 +96,18 @@
 - name: gcp-wif-config
   configMap:
     name: "{{ .Release.Name }}-lumen-gcp-wif"
-{{- end }}
+  {{- end }}
 {{- end }}
 
 {{- define "wandb.lumenWifVolumeMounts" }}
-{{- if include "wandb.lumen.audience" . }}
+  {{- if include "wandb.lumen.audience" . }}
 - name: gcp-ksa
   mountPath: /var/run/secrets/tokens/gcp-ksa
   readOnly: true
 - name: gcp-wif-config
   mountPath: /var/secrets/gcp
   readOnly: true
-{{- end }}
+  {{- end }}
 {{- end }}
 
 {{- define "wandb.lumenRulesVolume" }}

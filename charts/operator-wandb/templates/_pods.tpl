@@ -1,15 +1,15 @@
 {{- define "wandb.priorityClassName" -}}
-{{- $pcName := default .Values.global.priorityClassName .Values.priorityClassName -}}
-{{- if $pcName }}
+  {{- $pcName := default .Values.global.priorityClassName .Values.priorityClassName -}}
+  {{- if $pcName }}
 priorityClassName: {{ $pcName }}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/*
 Return a PodSecurityContext definition.
 */}}
 {{- define "wandb.podSecurityContext" -}}
-{{- $psc := . | default dict }}
+  {{- $psc := . | default dict }}
 securityContext:
   {{- if hasKey $psc "runAsUser" }}
   runAsUser: {{ $psc.runAsUser }}
@@ -39,51 +39,51 @@ securityContext:
 Return container-specific securityContext template.
 */}}
 {{- define "wandb.containerSecurityContext" -}}
-{{- $csc := . | default dict }}
-{{- if $csc }}
+  {{- $csc := . | default dict }}
+  {{- if $csc }}
 securityContext:
-  {{- if kindIs "map" $csc.capabilities }}
+    {{- if kindIs "map" $csc.capabilities }}
   capabilities:
-    {{- if gt (len $csc.capabilities.add) 0 }}
+      {{- if gt (len $csc.capabilities.add) 0 }}
     add:
-      {{- range $c := $csc.capabilities.add }}
+        {{- range $c := $csc.capabilities.add }}
       - {{ $c }}
+        {{- end }}
       {{- end }}
-    {{- end }}
-    {{- if gt (len $csc.capabilities.drop) 0 }}
+      {{- if gt (len $csc.capabilities.drop) 0 }}
     drop:
-      {{- range $c := $csc.capabilities.drop }}
+        {{- range $c := $csc.capabilities.drop }}
       - {{ $c }}
+        {{- end }}
       {{- end }}
     {{- end }}
-  {{- end }}
-  {{- if hasKey $csc "allowPrivilegeEscalation" }}
+    {{- if hasKey $csc "allowPrivilegeEscalation" }}
   allowPrivilegeEscalation: {{ $csc.allowPrivilegeEscalation }}
-  {{- end }}
-  {{- if hasKey $csc "readOnlyRootFilesystem" }}
+    {{- end }}
+    {{- if hasKey $csc "readOnlyRootFilesystem" }}
   readOnlyRootFilesystem: {{ $csc.readOnlyRootFilesystem }}
-  {{- end }}
-  {{- if hasKey $csc "runAsUser" }}
+    {{- end }}
+    {{- if hasKey $csc "runAsUser" }}
   runAsUser: {{ $csc.runAsUser }}
-  {{- end }}
-  {{- if hasKey $csc "runAsNonRoot" }}
+    {{- end }}
+    {{- if hasKey $csc "runAsNonRoot" }}
   runAsNonRoot: {{ $csc.runAsNonRoot }}
-  {{- end }}
-  {{- if hasKey $csc "runAsGroup" }}
+    {{- end }}
+    {{- if hasKey $csc "runAsGroup" }}
   runAsGroup: {{ $csc.runAsGroup }}
-  {{- end }}
-  {{- if hasKey $csc "privileged" }}
+    {{- end }}
+    {{- if hasKey $csc "privileged" }}
   privileged: {{ $csc.privileged }}
+    {{- end }}
   {{- end }}
-{{- end }}
 {{- end -}}
 
 {{/*
 Return init container specific securityContext template
 */}}
 {{- define "wandb.init.containerSecurityContext" }}
-{{- if .Values.init.containerSecurityContext }}
+  {{- if .Values.init.containerSecurityContext }}
 securityContext:
   {{- toYaml .Values.init.containerSecurityContext | nindent 2 }}
-{{- end }}
+  {{- end }}
 {{- end }}

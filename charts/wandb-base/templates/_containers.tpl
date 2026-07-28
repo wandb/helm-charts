@@ -1,26 +1,26 @@
 {{/*
   wandb-base.containers should be passed a dict with key `containers` containing the map of containers and a key `root`
   containing the . from the calling context
- */}}
+*/}}
 {{- define "wandb-base.containers" -}}
   {{- range $containerName, $containerSource := .containers -}}
     {{- $enabled := true -}}
     {{- if hasKey $containerSource "enabled" -}}
-        {{- $enabledValue := $containerSource.enabled -}}
-        {{- if kindIs "string" $enabledValue -}}
-          {{- $enabled = eq (tpl $enabledValue $.root | trim) "true" -}}
-        {{- else -}}
-          {{- $enabled = $enabledValue -}}
-        {{- end -}}
+      {{- $enabledValue := $containerSource.enabled -}}
+      {{- if kindIs "string" $enabledValue -}}
+        {{- $enabled = eq (tpl $enabledValue $.root | trim) "true" -}}
+      {{- else -}}
+        {{- $enabled = $enabledValue -}}
+      {{- end -}}
     {{- end -}}
     {{- if $enabled -}}
       {{- $globalOptOutVolumes := false -}}
       {{- $globalOptOut := (default dict $.root.Values.globalOptOut) -}}
       {{- if and (hasKey $globalOptOut "volumes") -}}
         {{- if kindIs "string" $globalOptOut.volumes -}}
-            {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes $.root | trim) "true" -}}
+          {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes $.root | trim) "true" -}}
         {{- else -}}
-            {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
+          {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
         {{- end -}}
       {{- end -}}
       {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
@@ -181,20 +181,20 @@
 {{- end }}
 
 {{- define "wandb-base.env" -}}
-{{- range $key, $value := .env -}}
-  {{- if kindIs "map" $value }}
+  {{- range $key, $value := .env -}}
+    {{- if kindIs "map" $value }}
 - name: {{ $key }}
 {{- toYaml $value | nindent 2 }}
-  {{- else }}
+    {{- else }}
 - name: {{ $key }}
   value: {{ toString $value | quote }}
+    {{- end -}}
   {{- end -}}
-{{- end -}}
 {{- end -}}
 
 {{- define "wandb-base.envFrom" -}}
-{{- range $key, $value := .envFrom }}
+  {{- range $key, $value := .envFrom }}
 - {{ $value }}:
     name: {{ $key }}
-{{- end }}
+  {{- end }}
 {{- end }}

@@ -11,23 +11,23 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 If release name contains chart name it will be used as a full name.
 */}}
 {{- define "operator.fullname" -}}
-{{- if .Values.fullnameOverride }}
+  {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-  {{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
   {{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+    {{- $name := default .Chart.Name .Values.nameOverride }}
+    {{- if contains $name .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+    {{- else }}
+      {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+    {{- end }}
   {{- end }}
-{{- end }}
 {{- end }}
 
 {{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "operator.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+  {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -36,9 +36,9 @@ Common labels
 {{- define "operator.labels" -}}
 helm.sh/chart: {{ include "operator.chart" . }}
 {{ include "operator.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
+  {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
+  {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
@@ -54,19 +54,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the manager service account to use
 */}}
 {{- define "manager.serviceAccount.name" -}}
-{{- if .Values.manager.serviceAccount.create }}
-{{- $name := printf "%s-%s" (include "name" .) "manager" }}
+  {{- if .Values.manager.serviceAccount.create }}
+    {{- $name := printf "%s-%s" (include "name" .) "manager" }}
 {{- default $name .Values.manager.serviceAccount.name }}
-{{- else }}
+  {{- else }}
 {{- default "default" .Values.manager.serviceAccount.name }}
-{{- end }}
+  {{- end }}
 {{- end }}
 
 {{/*
 Return isolated namespaces as a comma seperated list
 */}}
 {{- define "operator.isolatedNamespaces" -}}
-{{- if .Values.namespaceIsolation.enabled }}
+  {{- if .Values.namespaceIsolation.enabled }}
 {{- join "," (append .Values.namespaceIsolation.additionalNamespaces .Release.Namespace) }}
-{{- end }}
+  {{- end }}
 {{- end }}

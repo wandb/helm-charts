@@ -10,8 +10,8 @@ Sprig `merge` deep-merges nested maps (like params). Feature keys win,
 missing keys fall through from default.
 */}}
 {{- define "wandb.olapConfig" -}}
-{{- $default := deepCopy (default (dict) (index .root.Values.global.olap "default")) -}}
-{{- $feature := deepCopy (default (dict) (index .root.Values.global.olap .featureName)) -}}
+  {{- $default := deepCopy (default (dict) (index .root.Values.global.olap "default")) -}}
+  {{- $feature := deepCopy (default (dict) (index .root.Values.global.olap .featureName)) -}}
 {{- toYaml (merge $feature $default) -}}
 {{- end -}}
 
@@ -26,12 +26,12 @@ Usage:
 Returns: "true" or "false"
 */}}
 {{- define "wandb.olapAnyFeatureEnabled" -}}
-{{- $any := false -}}
-{{- range $name, $cfg := omit (default (dict) .Values.global.olap) "default" -}}
-  {{- if and (kindIs "map" $cfg) $cfg.enabled -}}
-    {{- $any = true -}}
+  {{- $any := false -}}
+  {{- range $name, $cfg := omit (default (dict) .Values.global.olap) "default" -}}
+    {{- if and (kindIs "map" $cfg) $cfg.enabled -}}
+      {{- $any = true -}}
+    {{- end -}}
   {{- end -}}
-{{- end -}}
 {{- $any -}}
 {{- end -}}
 
@@ -44,8 +44,8 @@ Usage:
 Returns: e.g. "myrelease-olap-registry-search"
 */}}
 {{- define "wandb.olapSecretName" -}}
-{{- $kebab := .featureName | snakecase | replace "_" "-" -}}
-{{- printf "%s-olap-%s" .root.Release.Name $kebab -}}
+  {{- $kebab := .featureName | snakecase | replace "_" "-" -}}
+  {{- printf "%s-olap-%s" .root.Release.Name $kebab -}}
 {{- end -}}
 
 {{/*
@@ -57,7 +57,7 @@ Usage:
 Returns: e.g. "REGISTRY_SEARCH_PASSWORD"
 */}}
 {{- define "wandb.olapSecretKey" -}}
-{{- printf "%s_PASSWORD" .envVarPrefix -}}
+  {{- printf "%s_PASSWORD" .envVarPrefix -}}
 {{- end -}}
 
 {{/*
@@ -70,15 +70,15 @@ Usage:
 Returns: "" (empty) or "?key=val&key=val"
 */}}
 {{- define "wandb.olapParamsQuery" -}}
-{{- $params := .params | default (dict) -}}
-{{- $len := len $params -}}
-{{- if gt $len 0 -}}
-{{- $count := 0 -}}
+  {{- $params := .params | default (dict) -}}
+  {{- $len := len $params -}}
+  {{- if gt $len 0 -}}
+    {{- $count := 0 -}}
 {{- print "?" -}}
-  {{- range $key, $val := $params -}}
-{{- $count = add $count 1 -}}
-{{- printf "%s=%s" $key (toString $val) -}}
-{{- if lt (int $count) $len -}}&{{- end -}}
+    {{- range $key, $val := $params -}}
+      {{- $count = add $count 1 -}}
+      {{- printf "%s=%s" $key (toString $val) -}}
+      {{- if lt (int $count) $len -}}&{{- end -}}
+    {{- end -}}
   {{- end -}}
-{{- end -}}
 {{- end -}}
