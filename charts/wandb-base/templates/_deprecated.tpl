@@ -18,9 +18,9 @@ Handles merging a set of deployment labels
 {{- define "wandb-base.deploymentLabels" -}}
 {{- $allLabels := merge (default (dict) (default (dict) .Values.deployment).labels) .Values.global.deployment.labels -}}
 {{- if $allLabels -}}
-{{-   range $key, $value := $allLabels }}
+  {{-   range $key, $value := $allLabels }}
 {{ $key }}: {{ $value | trunc 63 | quote }}
-{{-   end }}
+  {{-   end }}
 {{- end -}}
 {{- end -}}
 
@@ -30,9 +30,9 @@ Handles merging a set of statefulset labels
 {{- define "wandb-base.statefulsetLabels" -}}
 {{- $allLabels := merge (default (dict) (default (dict) .Values.statefulset).labels) .Values.global.statefulset.labels -}}
 {{- if $allLabels -}}
-{{-   range $key, $value := $allLabels }}
+  {{-   range $key, $value := $allLabels }}
 {{ $key }}: {{ $value | trunc 63 | quote }}
-{{-   end }}
+  {{-   end }}
 {{- end -}}
 {{- end -}}
 
@@ -72,9 +72,9 @@ Handles merging a set of non-selector labels
 {{- define "wandb-base.podLabels" -}}
 {{- $allLabels := merge .Values.podLabels .Values.pod.labels .Values.global.pod.labels -}}
 {{- if $allLabels -}}
-{{-   range $key, $value := $allLabels }}
+  {{-   range $key, $value := $allLabels }}
 {{ $key }}: {{ $value | trunc 63 | quote }}
-{{-   end }}
+  {{-   end }}
 {{- end -}}
 {{- end -}}
 
@@ -84,8 +84,8 @@ Handles merging a set of labels for services
 {{- define "wandb-base.serviceLabels" -}}
 {{- $allLabels := merge .Values.serviceLabels .Values.global.service.labels -}}
 {{- if $allLabels -}}
-{{-   range $key, $value := $allLabels }}
+  {{-   range $key, $value := $allLabels }}
 {{ $key }}: {{ $value | trunc 63 | quote }}
-{{-   end }}
+  {{-   end }}
 {{- end -}}
 {{- end -}}

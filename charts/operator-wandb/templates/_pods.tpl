@@ -52,9 +52,9 @@ securityContext:
     {{- end }}
     {{- if gt (len $csc.capabilities.drop) 0 }}
     drop:
-    {{- range $c := $csc.capabilities.drop }}
+      {{- range $c := $csc.capabilities.drop }}
       - {{ $c }}
-    {{- end }}
+      {{- end }}
     {{- end }}
   {{- end }}
   {{- if hasKey $csc "allowPrivilegeEscalation" }}

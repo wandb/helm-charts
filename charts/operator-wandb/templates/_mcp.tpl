@@ -109,10 +109,10 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
   DaemonSet handles logs (via stdout tail) and APM (via DD_AGENT_HOST:8126). Setting the
   forwarder in agent mode would double-ship logs and require a DD_API_KEY on the workload.
 */}}
-{{- if eq (index .Values "datadog" "mode" | default "agent") "forwarder" }}
+  {{- if eq (index .Values "datadog" "mode" | default "agent") "forwarder" }}
 - name: MCP_DATADOG_FORWARD
   value: "true"
-{{- end }}
+  {{- end }}
 - name: DD_SERVICE
   value: {{ index .Values "datadog" "service" | default "wandb-mcp-server-onprem" | quote }}
 - name: DD_ENV
@@ -145,15 +145,15 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
   from a chart-default toggle. Gate matches MCP_DATADOG_FORWARD above so the
   two modes are cleanly exclusive.
 */}}
-{{- if eq (index .Values "datadog" "mode" | default "agent") "forwarder" }}
-{{- with index .Values "analytics" "datadogApiKeySecret" "name" }}
+  {{- if eq (index .Values "datadog" "mode" | default "agent") "forwarder" }}
+    {{- with index .Values "analytics" "datadogApiKeySecret" "name" }}
 - name: DD_API_KEY
   valueFrom:
     secretKeyRef:
       name: {{ . }}
       key: {{ index $.Values "analytics" "datadogApiKeySecret" "key" | default "api-key" }}
-{{- end }}
-{{- end }}
+    {{- end }}
+  {{- end }}
 {{- end }}
 {{- if index .Values "otel" "enabled" }}
 - name: MCP_OTEL_ENABLED
