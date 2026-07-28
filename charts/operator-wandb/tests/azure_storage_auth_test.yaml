@@ -1,0 +1,42 @@
+suite: Azure storage authentication
+templates:
+  - templates/bucket.yaml
+release:
+  name: chartsnap
+
+tests:
+  - it: does not render a stale managed access key when workload identity is enabled
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+          accessKey: orphaned-managed-storage-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    template: templates/bucket.yaml
+    documentIndex: 1
+    asserts:
+      - notExists:
+          path: data.ACCESS_KEY
+
+  - it: renders the customer access key when BYOB explicitly uses key authentication
+    set:
+      global:
+        bucket:
+          provider: az
+          name: customer-storage-account
+          path: customer-container
+          accessKey: customer-storage-key
+          azureAuthMethod: accessKey
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    template: templates/bucket.yaml
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: data.ACCESS_KEY
+          value: Y3VzdG9tZXItc3RvcmFnZS1rZXk=
