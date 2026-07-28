@@ -1,3 +1,4 @@
+{{- $azureIdentity := include "wandb.azureStorageIdentity" . | fromYaml -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -22,7 +23,7 @@ metadata:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
   {{- with include "wandb.bucket" . | fromYaml }}
-    {{- if .accessKey }}
+    {{- if and .accessKey (not $azureIdentity.enabled) }}
   {{ .accessKeyName }}: {{ .accessKey | b64enc }}
     {{- end }}
     {{- if .secretKey }}
