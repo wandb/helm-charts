@@ -12,12 +12,21 @@ from typing import Iterable, Sequence
 
 
 TEMPLATE_ACTION = re.compile(r"{{-?\s*(.*?)\s*-?}}", re.DOTALL)
+TEMPLATE_COMMENT = re.compile(r"{{-?\s*/\*.*?\*/\s*-?}}", re.DOTALL)
 STABLE_SELECTOR = re.compile(
     r"(?:\$[A-Za-z_][A-Za-z0-9_]*|\.[A-Za-z_][A-Za-z0-9_]*)"
     r"(?:\.[A-Za-z_][A-Za-z0-9_]*)*\Z"
 )
 BLOCK_OPENERS = {"block", "define", "if", "range", "with"}
+CONTROL_OPENERS = {"if", "range", "with"}
 TEMPLATE_SUFFIXES = {".tpl", ".txt", ".yaml", ".yml"}
+MAINTAINED_CHARTS = (
+    "operator",
+    "operator-wandb",
+    "orchestrator",
+    "wandb-base",
+    "lumen",
+)
 
 
 @dataclass(frozen=True)
@@ -34,17 +43,23 @@ class Action:
 @dataclass(frozen=True)
 class Finding:
     line: int
-    condition: str
+    message: str
 
 
 def parse_actions(source: str) -> list[Action]:
+    source_without_comments = TEMPLATE_COMMENT.sub(
+        lambda match: "".join(
+            "\n" if character == "\n" else " " for character in match.group(0)
+        ),
+        source,
+    )
     return [
         Action(
             command=" ".join(match.group(1).split()),
             start=match.start(),
             end=match.end(),
         )
-        for match in TEMPLATE_ACTION.finditer(source)
+        for match in TEMPLATE_ACTION.finditer(source_without_comments)
     ]
 
 
@@ -110,9 +125,92 @@ def find_complementary_blocks(source: str) -> list[Finding]:
             findings.append(
                 Finding(
                     line=source.count("\n", 0, action.start) + 1,
-                    condition=expression,
+                    message=(
+                        "combine complementary conditions with if/else "
+                        f"(condition: {expression})"
+                    ),
                 )
             )
+
+    return findings
+
+
+def standalone_indentation(source: str, action: Action) -> int | None:
+    line_start = source.rfind("\n", 0, action.start) + 1
+    line_end = source.find("\n", action.end)
+    if line_end == -1:
+        line_end = len(source)
+    before = source[line_start : action.start]
+    after = source[action.end : line_end]
+    if before.strip() or after.strip():
+        return None
+    return len(before.expandtabs(2))
+
+
+def find_control_indentation(source: str) -> list[Finding]:
+    stack: list[tuple[str, int | None]] = []
+    findings: list[Finding] = []
+
+    for action in parse_actions(source):
+        keyword = action.keyword
+        indentation = standalone_indentation(source, action)
+        line = source.count("\n", 0, action.start) + 1
+
+        if keyword == "end":
+            if not stack:
+                continue
+            opener, opener_indentation = stack.pop()
+            if (
+                indentation is not None
+                and opener_indentation is not None
+                and indentation != opener_indentation
+            ):
+                findings.append(
+                    Finding(
+                        line=line,
+                        message=f"align end with its {opener}",
+                    )
+                )
+            continue
+
+        if keyword == "else":
+            if stack:
+                opener, opener_indentation = stack[-1]
+                if (
+                    indentation is not None
+                    and opener_indentation is not None
+                    and indentation != opener_indentation
+                ):
+                    findings.append(
+                        Finding(
+                            line=line,
+                            message=f"align else with its {opener}",
+                        )
+                    )
+            continue
+
+        if keyword not in BLOCK_OPENERS:
+            continue
+
+        if keyword in CONTROL_OPENERS and indentation is not None:
+            parent = next(
+                (
+                    (parent_keyword, parent_indentation)
+                    for parent_keyword, parent_indentation in reversed(stack)
+                    if parent_keyword in CONTROL_OPENERS
+                    and parent_indentation is not None
+                ),
+                None,
+            )
+            if parent is not None and indentation <= parent[1]:
+                findings.append(
+                    Finding(
+                        line=line,
+                        message=f"indent nested {keyword} deeper than its parent",
+                    )
+                )
+
+        stack.append((keyword, indentation))
 
     return findings
 
@@ -132,11 +230,8 @@ def template_files(paths: Iterable[Path]) -> list[Path]:
 
 
 def default_paths() -> list[Path]:
-    return [
-        path
-        for path in Path("charts").glob("*/templates")
-        if path.is_dir()
-    ]
+    paths = [Path("charts") / chart / "templates" for chart in MAINTAINED_CHARTS]
+    return [path for path in paths if path.is_dir()]
 
 
 def display_path(path: Path) -> str:
@@ -155,13 +250,12 @@ def check(paths: Sequence[Path]) -> int:
             print(f"{display_path(path)}: unable to read template: {error}", file=sys.stderr)
             return 2
 
-        for finding in find_complementary_blocks(source):
+        for finding in [
+            *find_complementary_blocks(source),
+            *find_control_indentation(source),
+        ]:
             had_finding = True
-            print(
-                f"{display_path(path)}:{finding.line}: "
-                "combine complementary conditions with if/else "
-                f"(condition: {finding.condition})"
-            )
+            print(f"{display_path(path)}:{finding.line}: {finding.message}")
     return 1 if had_finding else 0
 
 
@@ -171,7 +265,10 @@ def main() -> int:
         "paths",
         nargs="*",
         type=Path,
-        help="template files or directories (defaults to every chart templates directory)",
+        help=(
+            "template files or directories "
+            "(defaults to maintained chart templates)"
+        ),
     )
     arguments = parser.parse_args()
     return check(arguments.paths or default_paths())
