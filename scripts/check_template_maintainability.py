@@ -12,6 +12,10 @@ from typing import Iterable, Sequence
 
 
 TEMPLATE_ACTION = re.compile(r"{{-?\s*(.*?)\s*-?}}", re.DOTALL)
+STABLE_SELECTOR = re.compile(
+    r"(?:\$[A-Za-z_][A-Za-z0-9_]*|\.[A-Za-z_][A-Za-z0-9_]*)"
+    r"(?:\.[A-Za-z_][A-Za-z0-9_]*)*\Z"
+)
 BLOCK_OPENERS = {"block", "define", "if", "range", "with"}
 TEMPLATE_SUFFIXES = {".tpl", ".txt", ".yaml", ".yml"}
 
@@ -98,7 +102,11 @@ def find_complementary_blocks(source: str) -> list[Finding]:
 
         negated, expression = condition_polarity(condition)
         next_negated, next_expression = condition_polarity(next_condition)
-        if expression and expression == next_expression and negated != next_negated:
+        if (
+            STABLE_SELECTOR.fullmatch(expression)
+            and expression == next_expression
+            and negated != next_negated
+        ):
             findings.append(
                 Finding(
                     line=source.count("\n", 0, action.start) + 1,

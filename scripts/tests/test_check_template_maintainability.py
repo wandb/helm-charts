@@ -64,6 +64,19 @@ class TemplateMaintainabilityCheckerTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_ignores_complementary_dynamic_expressions(self) -> None:
+        result = self.run_checker(
+            """{{- if not (include "identity.enabled" .) }}
+- name: ACCESS_KEY
+{{- end }}
+{{- if (include "identity.enabled" .) }}
+- name: CLIENT_ID
+{{- end }}
+"""
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_matches_across_nested_control_blocks(self) -> None:
         result = self.run_checker(
             """{{- if $identity.enabled }}
