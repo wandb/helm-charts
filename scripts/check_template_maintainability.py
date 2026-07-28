@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""Check Helm template source for maintainability problems."""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Iterable, Sequence
+
+
+TEMPLATE_ACTION = re.compile(r"{{-?\s*(.*?)\s*-?}}", re.DOTALL)
+BLOCK_OPENERS = {"block", "define", "if", "range", "with"}
+TEMPLATE_SUFFIXES = {".tpl", ".txt", ".yaml", ".yml"}
+
+
+@dataclass(frozen=True)
+class Action:
+    command: str
+    start: int
+    end: int
+
+    @property
+    def keyword(self) -> str:
+        return self.command.split(maxsplit=1)[0] if self.command else ""
+
+
+@dataclass(frozen=True)
+class Finding:
+    line: int
+    condition: str
+
+
+def parse_actions(source: str) -> list[Action]:
+    return [
+        Action(
+            command=" ".join(match.group(1).split()),
+            start=match.start(),
+            end=match.end(),
+        )
+        for match in TEMPLATE_ACTION.finditer(source)
+    ]
+
+
+def matching_end(actions: Sequence[Action], opening_index: int) -> tuple[int, bool] | None:
+    depth = 1
+    has_top_level_else = False
+    for index in range(opening_index + 1, len(actions)):
+        keyword = actions[index].keyword
+        if keyword in BLOCK_OPENERS:
+            depth += 1
+        elif keyword == "end":
+            depth -= 1
+            if depth == 0:
+                return index, has_top_level_else
+        elif keyword == "else" and depth == 1:
+            has_top_level_else = True
+    return None
+
+
+def if_condition(action: Action) -> str | None:
+    if action.keyword != "if":
+        return None
+    _, separator, condition = action.command.partition(" ")
+    return condition if separator and condition else None
+
+
+def condition_polarity(condition: str) -> tuple[bool, str]:
+    if condition.startswith("not "):
+        return True, condition.removeprefix("not ").strip()
+    return False, condition
+
+
+def find_complementary_blocks(source: str) -> list[Finding]:
+    actions = parse_actions(source)
+    findings: list[Finding] = []
+
+    for index, action in enumerate(actions):
+        condition = if_condition(action)
+        if condition is None:
+            continue
+
+        block_end = matching_end(actions, index)
+        if block_end is None:
+            continue
+        end_index, has_else = block_end
+        if has_else or end_index + 1 >= len(actions):
+            continue
+
+        next_action = actions[end_index + 1]
+        if source[actions[end_index].end : next_action.start].strip():
+            continue
+        next_condition = if_condition(next_action)
+        if next_condition is None:
+            continue
+
+        negated, expression = condition_polarity(condition)
+        next_negated, next_expression = condition_polarity(next_condition)
+        if expression and expression == next_expression and negated != next_negated:
+            findings.append(
+                Finding(
+                    line=source.count("\n", 0, action.start) + 1,
+                    condition=expression,
+                )
+            )
+
+    return findings
+
+
+def template_files(paths: Iterable[Path]) -> list[Path]:
+    files: set[Path] = set()
+    for path in paths:
+        if path.is_dir():
+            files.update(
+                candidate
+                for candidate in path.rglob("*")
+                if candidate.is_file() and candidate.suffix in TEMPLATE_SUFFIXES
+            )
+        elif path.is_file():
+            files.add(path)
+    return sorted(files)
+
+
+def default_paths() -> list[Path]:
+    return [
+        path
+        for path in Path("charts").glob("*/templates")
+        if path.is_dir()
+    ]
+
+
+def display_path(path: Path) -> str:
+    try:
+        return str(path.resolve().relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return path.name
+
+
+def check(paths: Sequence[Path]) -> int:
+    had_finding = False
+    for path in template_files(paths):
+        try:
+            source = path.read_text()
+        except (OSError, UnicodeError) as error:
+            print(f"{display_path(path)}: unable to read template: {error}", file=sys.stderr)
+            return 2
+
+        for finding in find_complementary_blocks(source):
+            had_finding = True
+            print(
+                f"{display_path(path)}:{finding.line}: "
+                "combine complementary conditions with if/else "
+                f"(condition: {finding.condition})"
+            )
+    return 1 if had_finding else 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "paths",
+        nargs="*",
+        type=Path,
+        help="template files or directories (defaults to every chart templates directory)",
+    )
+    arguments = parser.parse_args()
+    return check(arguments.paths or default_paths())
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
