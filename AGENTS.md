@@ -1,10 +1,12 @@
 # Working agreements
 
-Run `python3 -m unittest discover -s scripts/tests` and
+Run `python3 scripts/format_templates.py`, then run
+`python3 -m unittest discover -s scripts/tests` and
 `python3 scripts/check_template_maintainability.py` before considering template
-changes complete. Also run the relevant chart lint and snapshot tests. Treat
-these checks as a minimum: render the affected paths and understand the values,
-helpers, and Kubernetes objects involved.
+changes complete. Use the `helmfmt` version pinned in `.github/workflows/lint.yaml`.
+Also run the relevant chart lint and snapshot tests. Treat these checks as a
+minimum: render the affected paths and understand the values, helpers, and
+Kubernetes objects involved.
 
 Keep template decisions easy to follow in source:
 
