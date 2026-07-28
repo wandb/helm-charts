@@ -1,3 +1,4 @@
+{{- include "wandb.lumen.validateUI" . -}}
 {{- $bucket := include "wandb.lumen.dataRoot" . -}}
 apiVersion: v1
 kind: ConfigMap
@@ -6,6 +7,10 @@ metadata:
 data:
   LUMEN_DATA_ROOT: {{ $bucket | quote }}
   LUMEN_STAGING_ROOT: "file://{{ include "wandb.lumen.stagingPath" . }}"
+  {{- if .Values.ui.enabled }}
+  LUMEN_UI_ROLLOUT_DEPLOYMENT: {{ include "wandb.lumen.uiFullname" . | quote }}
+  LUMEN_UI_ROLLOUT_NAMESPACE: {{ .Release.Namespace | quote }}
+  {{- end }}
 
 ---
 
@@ -17,3 +22,29 @@ data:
   XDG_CONFIG_HOME: "{{ include "wandb.lumen.stagingPath" . }}/.config"
   XDG_STATE_HOME: "{{ include "wandb.lumen.stagingPath" . }}/.local/state"
   XDG_CACHE_HOME: "{{ include "wandb.lumen.stagingPath" . }}/.cache"
+
+{{- if .Values.ui.enabled }}
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-ui-configmap
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  LUMEN_DUCKLAKE_ROOT: {{ required "ui.config.ducklakeRoot or global.lumen.dataRoot is required when ui.enabled=true" (include "wandb.lumen.ducklakeRoot" .) | quote }}
+  LUMEN_DUCKLAKE_STATE_DIR: "/var/lib/lumen/ducklake-reader"
+  LUMEN_UI_SOURCE_MODE: "ducklake"
+  LUMEN_UI_INSTALL_DUCKDB_EXTENSIONS: "false"
+  LUMEN_UI_SESSION_SECRET_FILE: "/var/run/secrets/lumen-ui/session-secret"
+  GITHUB_APP_CLIENT_SECRET_FILE: "/var/run/secrets/lumen-ui/github-client-secret"
+  LUMEN_UI_HOSTNAME: {{ .Values.ui.config.hostname | quote }}
+  GITHUB_APP_CLIENT_ID: {{ .Values.ui.config.github.clientId | quote }}
+  {{- if .Values.ui.config.github.redirectUri }}
+  GITHUB_APP_REDIRECT_URI: {{ .Values.ui.config.github.redirectUri | quote }}
+  {{- end }}
+  GITHUB_ALLOWED_ORG: {{ .Values.ui.config.github.allowedOrg | quote }}
+  GITHUB_ALLOWED_TEAM_SLUG: {{ .Values.ui.config.github.allowedTeamSlug | quote }}
+  AUTH_ALLOWED_EMAIL_DOMAINS: {{ join "," .Values.ui.config.allowedEmailDomains | quote }}
+{{- end }}
