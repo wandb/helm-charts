@@ -17,16 +17,16 @@ spec:
         control-plane: controller-manager
     spec:
       securityContext:
-        {{- if .Values.podSecurityContext }}
+{{- if .Values.podSecurityContext }}
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-        {{- else }}
+{{- else }}
         seccompProfile:
           type: RuntimeDefault
-        {{- end }}
+{{- end }}
       imagePullSecrets:
-        {{- range .Values.image.pullSecrets }}
+{{- range .Values.image.pullSecrets }}
       - name: {{ . }}
-        {{- end }}
+{{- end }}
       containers:
       - name: manager
         command:
@@ -34,23 +34,23 @@ spec:
         args:
         - --leader-elect
         - --zap-devel=false
-        {{- if .Values.namespaceIsolation.enabled }}
+{{- if .Values.namespaceIsolation.enabled }}
         - --isolation-namespaces={{ include "operator.isolatedNamespaces" . }}
-        {{- end }}
-        {{- if .Values.image.digest }}
+{{- end }}
+{{- if .Values.image.digest }}
         image: {{ .Values.image.repository }}@{{ .Values.image.digest }}
-        {{- else if .Values.image.tag }}
+{{- else if .Values.image.tag }}
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
-        {{- else }}
+{{- else }}
         image: {{ .Values.image.repository }}:latest
-        {{- end }}
-        {{- if .Values.image.pullPolicy }}
+{{- end }}
+{{- if .Values.image.pullPolicy }}
         imagePullPolicy: {{ .Values.image.pullPolicy | quote }}
-        {{- end }}
+{{- end }}
         env:
-        {{- if .Values.extraEnv }}
+{{- if .Values.extraEnv }}
         {{- toYaml .Values.extraEnv | nindent 8 }}
-        {{- end }}
+{{- end }}
         - name: WANDB_MANAGER_SERVICE_ACCOUNT
           value: {{ include "manager.serviceAccount.name" . }}
         - name: OPERATOR_NAMESPACE
@@ -61,10 +61,10 @@ spec:
               fieldPath: spec.serviceAccountName
         - name: AIRGAPPED
           value: {{ .Values.airgapped | quote }}
-        {{- if or .Values.customCACerts .Values.caCertsConfigMap }}
+{{- if or .Values.customCACerts .Values.caCertsConfigMap }}
         - name: SSL_CERT_DIR
           value: /certs/
-        {{- end }}
+{{- end }}
         livenessProbe:
           httpGet:
             path: /healthz
@@ -78,52 +78,52 @@ spec:
           initialDelaySeconds: 5
           periodSeconds: 10
         resources: {{- toYaml .Values.resources | nindent 10 }}
-        {{- if .Values.securityContext }}
+{{- if .Values.securityContext }}
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
-        {{- end }}
+{{- end }}
         volumeMounts:
           - name: helm-cache
             mountPath: /helm
-          {{- if or .Values.airgapped }}
+{{- if or .Values.airgapped }}
           - name: {{ include "name" . }}-charts
             mountPath: /charts
-          {{- end }}
-          {{- if or .Values.customCACerts .Values.caCertsConfigMap }}
+{{- end }}
+{{- if or .Values.customCACerts .Values.caCertsConfigMap }}
           - name: wandb-ca-certs
             mountPath: /certs/
-          {{- end }}
+{{- end }}
       volumes:
         - name: helm-cache
           emptyDir: {}
-        {{- if .Values.airgapped }}
+{{- if .Values.airgapped }}
         - name: {{ include "name" . }}-charts
           configMap:
             name: {{ include "name" . }}-charts
             optional: true
-        {{- end }}
+{{- end }}
         - name: wandb-ca-certs
           projected:
             sources:
-          {{- if .Values.caCertsConfigMap }}
+{{- if .Values.caCertsConfigMap }}
               - configMap:
                   name: {{ .Values.caCertsConfigMap }}
-          {{- end }}
-          {{- if .Values.customCACerts }}
+{{- end }}
+{{- if .Values.customCACerts }}
               - configMap:
                   name: {{ include "operator.fullname" . }}-ca-certs
-          {{- end }}
+{{- end }}
       serviceAccountName: {{ include "manager.serviceAccount.name" . }}
-      {{- if .Values.nodeSelector }}
+{{- if .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml .Values.nodeSelector | nindent 8 }}
-      {{- end }}
-      {{- if .Values.affinity }}
+{{- end }}
+{{- if .Values.affinity }}
       affinity:
         {{- toYaml .Values.affinity | nindent 8 }}
-      {{- end }}
-      {{- if .Values.tolerations }}
+{{- end }}
+{{- if .Values.tolerations }}
       tolerations:
         {{- toYaml .Values.tolerations | nindent 8 }}
-      {{- end }}
+{{- end }}
       terminationGracePeriodSeconds: 10

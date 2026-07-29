@@ -11,13 +11,13 @@
   Optionally appends customer:<value> and any extraTags entries.
 */}}
 {{- define "wandb.mcpDatadogTags" -}}
-{{- $tags := list "product:wandb" "component:mcp-server" (printf "deployment_type:%s" (index .Values "datadog" "deploymentType" | default "self-managed")) -}}
-{{- with index .Values "datadog" "customer" -}}
-{{- $tags = append $tags (printf "customer:%s" .) -}}
-{{- end -}}
-{{- range (index .Values "datadog" "extraTags" | default list) -}}
-{{- $tags = append $tags . -}}
-{{- end -}}
+  {{- $tags := list "product:wandb" "component:mcp-server" (printf "deployment_type:%s" (index .Values "datadog" "deploymentType" | default "self-managed")) -}}
+  {{- with index .Values "datadog" "customer" -}}
+    {{- $tags = append $tags (printf "customer:%s" .) -}}
+  {{- end -}}
+  {{- range (index .Values "datadog" "extraTags" | default list) -}}
+    {{- $tags = append $tags . -}}
+  {{- end -}}
 {{ toJson $tags }}
 {{- end -}}
 
@@ -31,7 +31,7 @@
   subtree at call time.
 */}}
 {{- define "wandb.mcpDatadogLogs" -}}
-{{- $entry := dict "source" "python" "service" (include "wandb.mcpDDService" .) -}}
+  {{- $entry := dict "source" "python" "service" (include "wandb.mcpDDService" .) -}}
 {{ list $entry | toJson }}
 {{- end -}}
 
@@ -75,44 +75,44 @@ MCP can run without weave-trace. When WANDB_MCP_ENABLE_WEAVE_TOOLS=false,
 trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
 */}}
 {{- define "wandb.mcpEnvs" -}}
-{{- $mcpEnv := index .Values "env" | default dict -}}
-{{- $mcpWeave := index .Values "weave" | default dict -}}
-{{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
-{{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
-{{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
-{{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
-{{- $hasTraceBackend := or $hasExplicitTraceURL (index $globalWeaveTrace "enabled") -}}
-{{- $enableWeaveTools := or (eq $weaveMode "true") (and (eq $weaveMode "auto") $hasTraceBackend) -}}
+  {{- $mcpEnv := index .Values "env" | default dict -}}
+  {{- $mcpWeave := index .Values "weave" | default dict -}}
+  {{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
+  {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
+  {{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
+  {{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
+  {{- $hasTraceBackend := or $hasExplicitTraceURL (index $globalWeaveTrace "enabled") -}}
+  {{- $enableWeaveTools := or (eq $weaveMode "true") (and (eq $weaveMode "auto") $hasTraceBackend) -}}
 - name: WANDB_MCP_ENABLE_WEAVE_TOOLS
   value: {{ ternary "true" "false" $enableWeaveTools | quote }}
-{{- if and $enableWeaveTools (not $hasExplicitTraceURL) }}
+  {{- if and $enableWeaveTools (not $hasExplicitTraceURL) }}
 - name: WF_TRACE_SERVER_URL
   value: "{{ .Values.global.host }}/traces"
-{{- end }}
+  {{- end }}
 - name: WANDB_BASE_URL
   value: {{ .Values.global.host | quote }}
-{{/*
-  Privacy level for customer-supplied content in logs. Default here is "standard"
-  (redact free-text params, demote verbose log sites to DEBUG) so customer K8s
-  installs don't retain plaintext customer queries/descriptions/titles in logs.
-  Override via mcp-server.privacy.logLevel: "off" | "standard" | "strict".
-  See https://github.com/wandb/wandb-mcp-server/blob/main/docs/OBSERVABILITY.md
-*/}}
+  {{/*
+    Privacy level for customer-supplied content in logs. Default here is "standard"
+    (redact free-text params, demote verbose log sites to DEBUG) so customer K8s
+    installs don't retain plaintext customer queries/descriptions/titles in logs.
+    Override via mcp-server.privacy.logLevel: "off" | "standard" | "strict".
+    See https://github.com/wandb/wandb-mcp-server/blob/main/docs/OBSERVABILITY.md
+  */}}
 - name: MCP_LOG_PRIVACY_LEVEL
   value: {{ index .Values "privacy" "logLevel" | default "standard" | quote }}
-{{- if index .Values "datadog" "enabled" }}
+  {{- if index .Values "datadog" "enabled" }}
 - name: MCP_DATADOG_ENABLED
   value: "true"
-{{/*
-  Forwarder is enabled ONLY when datadog.mode == "forwarder" (serverless). On managed K8s
-  (mode=agent, default), we intentionally do NOT set MCP_DATADOG_FORWARD -- the DD Agent
-  DaemonSet handles logs (via stdout tail) and APM (via DD_AGENT_HOST:8126). Setting the
-  forwarder in agent mode would double-ship logs and require a DD_API_KEY on the workload.
-*/}}
-{{- if eq (index .Values "datadog" "mode" | default "agent") "forwarder" }}
+    {{/*
+      Forwarder is enabled ONLY when datadog.mode == "forwarder" (serverless). On managed K8s
+      (mode=agent, default), we intentionally do NOT set MCP_DATADOG_FORWARD -- the DD Agent
+      DaemonSet handles logs (via stdout tail) and APM (via DD_AGENT_HOST:8126). Setting the
+      forwarder in agent mode would double-ship logs and require a DD_API_KEY on the workload.
+    */}}
+    {{- if eq (index .Values "datadog" "mode" | default "agent") "forwarder" }}
 - name: MCP_DATADOG_FORWARD
   value: "true"
-{{- end }}
+    {{- end }}
 - name: DD_SERVICE
   value: {{ index .Values "datadog" "service" | default "wandb-mcp-server-onprem" | quote }}
 - name: DD_ENV
@@ -131,36 +131,36 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
   value: "false"
 - name: DD_TRACE_HEADER_TAGS
   value: ""
-{{/*
-  Tell the server to emit structured JSON logs so Datadog parses level/status correctly
-  instead of misclassifying normal INFO request logs as errors. Requires
-  wandb-mcp-server >= 0.3.3 (MCP_LOG_FORMAT support). Earlier images ignore this var.
-*/}}
+    {{/*
+      Tell the server to emit structured JSON logs so Datadog parses level/status correctly
+      instead of misclassifying normal INFO request logs as errors. Requires
+      wandb-mcp-server >= 0.3.3 (MCP_LOG_FORMAT support). Earlier images ignore this var.
+    */}}
 - name: MCP_LOG_FORMAT
   value: "json"
-{{/*
-  DD_API_KEY only belongs in forwarder mode (the in-app HTTP intake path). In
-  agent mode the DD Agent DaemonSet holds its own API key on the node, and a
-  pod-level DD_API_KEY would be at best redundant and at worst a stale leftover
-  from a chart-default toggle. Gate matches MCP_DATADOG_FORWARD above so the
-  two modes are cleanly exclusive.
-*/}}
-{{- if eq (index .Values "datadog" "mode" | default "agent") "forwarder" }}
-{{- with index .Values "analytics" "datadogApiKeySecret" "name" }}
+    {{/*
+      DD_API_KEY only belongs in forwarder mode (the in-app HTTP intake path). In
+      agent mode the DD Agent DaemonSet holds its own API key on the node, and a
+      pod-level DD_API_KEY would be at best redundant and at worst a stale leftover
+      from a chart-default toggle. Gate matches MCP_DATADOG_FORWARD above so the
+      two modes are cleanly exclusive.
+    */}}
+    {{- if eq (index .Values "datadog" "mode" | default "agent") "forwarder" }}
+      {{- with index .Values "analytics" "datadogApiKeySecret" "name" }}
 - name: DD_API_KEY
   valueFrom:
     secretKeyRef:
       name: {{ . }}
       key: {{ index $.Values "analytics" "datadogApiKeySecret" "key" | default "api-key" }}
-{{- end }}
-{{- end }}
-{{- end }}
-{{- if index .Values "otel" "enabled" }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- if index .Values "otel" "enabled" }}
 - name: MCP_OTEL_ENABLED
   value: "true"
 - name: OTEL_SERVICE_NAME
   value: "mcp-server"
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: "http://{{ .Release.Name }}-otel-collector:4317"
-{{- end }}
+  {{- end }}
 {{- end -}}
