@@ -6,6 +6,9 @@ templates:
   - charts/app/templates/serviceaccount.yaml
   - charts/app/templates/rolebinding.yaml
   - charts/weave-trace/templates/deployment.yaml
+  - charts/bufstream/templates/deployment.yaml
+  - charts/bufstream/templates/service-account.yaml
+  - charts/bufstream/templates/cluster-role-bind.yaml
 release:
   name: chartsnap
 
@@ -65,8 +68,6 @@ tests:
           tenantId: tenant-id
           clientId: client-id
           serviceAccount:
-            annotations:
-              azure.workload.identity/client-id: client-id
             labels:
               identity.wandb.ai/storage: shared
     asserts:
@@ -81,6 +82,52 @@ tests:
       - equal:
           path: metadata.labels["identity.wandb.ai/storage"]
           value: shared
+
+  - it: preserves explicit annotations for a reference-valued Azure client ID
+    template: templates/azure-storage-serviceaccount.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId:
+            valueFrom:
+              secretKeyRef:
+                name: azure-storage-identity
+                key: client-id
+          serviceAccount:
+            annotations:
+              azure.workload.identity/client-id: infrastructure-client-id
+              identity.wandb.ai/federated: "true"
+    asserts:
+      - equal:
+          path: metadata.annotations["azure.workload.identity/client-id"]
+          value: infrastructure-client-id
+      - equal:
+          path: metadata.annotations["identity.wandb.ai/federated"]
+          value: "true"
+
+  - it: rejects a reference-valued Azure client ID without a ServiceAccount annotation
+    template: templates/azure-storage-serviceaccount.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId:
+            valueFrom:
+              secretKeyRef:
+                name: azure-storage-identity
+                key: client-id
+    asserts:
+      - failedTemplate:
+          errorMessage: global.azureStorageIdentity.serviceAccount.annotations.azure.workload.identity/client-id is required when clientId is not a literal string
 
   - it: selects the chart-owned shared account without creating component accounts
     template: charts/app/templates/deployment.yaml
@@ -226,6 +273,9 @@ tests:
               secretKeyRef:
                 name: azure-storage-identity
                 key: client-id
+          serviceAccount:
+            annotations:
+              azure.workload.identity/client-id: infrastructure-client-id
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
@@ -266,3 +316,158 @@ tests:
       - equal:
           path: spec.template.spec.serviceAccountName
           value: wandb-bucket-access
+
+  - it: gives Weave the shared account when its default bucket gate is enabled alongside access-key BYOB
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace:
+        install: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        bucket:
+          provider: az
+          name: customer-storage-account
+          path: customer-container
+          accessKey: customer-storage-key
+          secretKey: customer-storage-secret
+          azureAuthMethod: accessKey
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+        weave-trace:
+          fileStorage:
+            useDefaultBucket: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-bucket-access
+
+  - it: keeps Weave on its component account when its default bucket gate is disabled
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace:
+        install: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        bucket:
+          provider: az
+          name: customer-storage-account
+          path: customer-container
+          accessKey: customer-storage-key
+          secretKey: customer-storage-secret
+          azureAuthMethod: accessKey
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+        weave-trace:
+          fileStorage:
+            useDefaultBucket: false
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: chartsnap-weave-trace
+
+  - it: gives Bufstream the shared account and suppresses its component account
+    template: charts/bufstream/templates/deployment.yaml
+    set:
+      bufstream:
+        install: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-bucket-access
+      - equal:
+          path: spec.template.metadata.labels["azure.workload.identity/use"]
+          value: "true"
+
+  - it: suppresses the Bufstream component account in shared identity mode
+    template: charts/bufstream/templates/service-account.yaml
+    set:
+      bufstream:
+        install: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: follows the shared account in Bufstream node-reader bindings
+    template: charts/bufstream/templates/cluster-role-bind.yaml
+    set:
+      bufstream:
+        install: true
+        discoverZoneFromNode: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    asserts:
+      - equal:
+          path: subjects[0].name
+          value: wandb-bucket-access
+
+  - it: keeps Bufstream on its component account for access-key BYOB
+    template: charts/bufstream/templates/deployment.yaml
+    set:
+      bufstream:
+        install: true
+      global:
+        bucket:
+          provider: az
+          name: customer-storage-account
+          path: customer-container
+          accessKey: customer-storage-key
+          secretKey: customer-storage-secret
+          azureAuthMethod: accessKey
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: bufstream-service-account
+
+  - it: gives Bufstream an externally-created shared account by its configured name
+    template: charts/bufstream/templates/deployment.yaml
+    set:
+      bufstream:
+        install: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            name: externally-created-bucket-access
+            create: false
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: externally-created-bucket-access

@@ -109,6 +109,10 @@ their component accounts.
   (and (not $hasCustomerBucket) (eq $defaultBucket.provider "az"))
   (and $hasCustomerBucket (eq $bucket.azureAuthMethod "workloadIdentity"))
   -}}
+  {{- $explicitSharedServiceAccount := default false .Values.azureStorageUseSharedServiceAccount -}}
+  {{- if kindIs "string" $explicitSharedServiceAccount -}}
+    {{- $explicitSharedServiceAccount = eq (tpl $explicitSharedServiceAccount . | trim) "true" -}}
+  {{- end -}}
   {{- $podLabels := default (dict) .Values.podLabels -}}
   {{- $workloadIdentity := get $podLabels "azure.workload.identity/use" | default false -}}
   {{- $enabled := false -}}
@@ -117,7 +121,7 @@ their component accounts.
   {{- else -}}
     {{- $enabled = $workloadIdentity -}}
   {{- end -}}
-{{- and $globalConfigured $usesDeploymentIdentity $enabled -}}
+{{- and $globalConfigured (or $usesDeploymentIdentity $explicitSharedServiceAccount) $enabled -}}
 {{- end }}
 
 {{- define "wandb-base.azureStorageServiceAccountName" -}}
