@@ -80,7 +80,8 @@ Legacy bucket-scoped identities deliberately retain their component accounts.
   {{- $identity := include "wandb.azureStorageIdentity" . | fromYaml -}}
   {{- $globalIdentity := default (dict) .Values.global.azureStorageIdentity -}}
   {{- $globalConfigured := and (not (empty $globalIdentity.tenantId)) (not (empty $globalIdentity.clientId)) -}}
-{{- and $globalConfigured $identity.enabled -}}
+  {{- $weaveUsesDefaultBucket := include "wandb.weaveTraceUsesAzureWorkloadIdentity" . | trim | eq "true" -}}
+{{- and $globalConfigured (or $identity.enabled $weaveUsesDefaultBucket) -}}
 {{- end }}
 
 {{- define "wandb.azureStorageServiceAccountName" -}}
