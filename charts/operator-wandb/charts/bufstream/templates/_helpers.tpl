@@ -21,6 +21,34 @@ Helpers to allow overriding the namespace
 {{- end -}}
 
 {{/*
+Select the umbrella chart's Azure storage ServiceAccount when Bufstream uses
+the deployment-wide identity. Bucket-scoped identity and key-based BYOB retain
+the component account.
+*/}}
+{{- define "bufstream.azureStorageServiceAccountEnabled" -}}
+  {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
+  {{- $globalConfigured := and (not (empty $identity.tenantId)) (not (empty $identity.clientId)) -}}
+  {{- $bucket := default (dict) .Values.global.bucket -}}
+  {{- $hasCustomerBucket := not (empty $bucket.name) -}}
+  {{- $defaultBucket := default (dict) .Values.global.defaultBucket -}}
+  {{- $usesDeploymentIdentity := or
+  (and (not $hasCustomerBucket) (eq $defaultBucket.provider "az"))
+  (and $hasCustomerBucket (eq $bucket.azureAuthMethod "workloadIdentity"))
+  -}}
+{{- and $globalConfigured $usesDeploymentIdentity -}}
+{{- end -}}
+
+{{- define "bufstream.serviceAccountName" -}}
+{{- if include "bufstream.azureStorageServiceAccountEnabled" . | trim | eq "true" -}}
+  {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
+  {{- $serviceAccount := default (dict) $identity.serviceAccount -}}
+{{ default "wandb-bucket-access" $serviceAccount.name }}
+{{- else -}}
+{{ .Values.bufstream.serviceAccount.name }}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Helpers to generate application configurations from a base, allowing arbitrary overrides from a value
 */}}
 
