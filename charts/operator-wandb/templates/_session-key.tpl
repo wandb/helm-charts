@@ -20,4 +20,8 @@
 - name: WANDB_SESSION_KEY_ROTATION
   value: {{ printf "%s-%s" $rotation.id $rotation.phase | quote }}
 {{- end }}
+{{- with .Values.global.auth.sessionKeyRolloutId }}
+- name: WANDB_SESSION_KEY_ROLLOUT
+  value: {{ . | toString | quote }}
+{{- end }}
 {{- end -}}

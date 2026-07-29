@@ -275,7 +275,9 @@ For complete examples with secrets and additional configurations, see:
 
 The chart generates `GORILLA_SESSION_KEY` on first install and retains it in the
 release's `gorilla-session-key` Secret. It can rotate that managed key without
-invalidating active sessions by using a three-phase workflow.
+invalidating active sessions by using a three-phase workflow, or perform an
+explicit emergency hard cutover. External Secret users can force the required
+API and app rollouts with `global.auth.sessionKeyRolloutId`.
 
 See [Session Key Rotation](docs/session-key-rotation.md) for the managed
 workflow and external Secret examples.
