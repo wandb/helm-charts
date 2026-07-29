@@ -345,6 +345,59 @@ tests:
           path: spec.template.spec.serviceAccountName
           value: wandb-bucket-access
 
+  - it: creates the shared account for Weave's default bucket alongside access-key BYOB
+    template: templates/azure-storage-serviceaccount.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        bucket:
+          provider: az
+          name: customer-storage-account
+          path: customer-container
+          accessKey: customer-storage-key
+          secretKey: customer-storage-secret
+          azureAuthMethod: accessKey
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+        weave-trace:
+          fileStorage:
+            useDefaultBucket: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: wandb-bucket-access
+
+  - it: does not create the shared account for ordinary access-key BYOB
+    template: templates/azure-storage-serviceaccount.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        bucket:
+          provider: az
+          name: customer-storage-account
+          path: customer-container
+          accessKey: customer-storage-key
+          secretKey: customer-storage-secret
+          azureAuthMethod: accessKey
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+        weave-trace:
+          fileStorage:
+            useDefaultBucket: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
   - it: keeps Weave on its component account when its default bucket gate is disabled
     template: charts/weave-trace/templates/deployment.yaml
     set:
