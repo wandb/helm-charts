@@ -168,6 +168,135 @@ tests:
       - notExists:
           path: data.GORILLA_SESSION_KEY_PREVIOUS
 
+  - it: hard cuts over to a new key without retaining verification keys
+    set:
+      global.auth.sessionKeyRotation.id: incident-1
+      global.auth.sessionKeyRotation.phase: hard-cutover
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+          data:
+            GORILLA_SESSION_KEY: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+            GORILLA_SESSION_KEY_PREVIOUS: Y2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2M=
+    asserts:
+      - notEqual:
+          path: data.GORILLA_SESSION_KEY
+          value: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+      - notExists:
+          path: data.GORILLA_SESSION_KEY_PREVIOUS
+      - equal:
+          path: metadata.annotations["wandb.ai/session-key-rotation-id"]
+          value: incident-1
+      - equal:
+          path: metadata.annotations["wandb.ai/session-key-rotation-phase"]
+          value: hard-cutover
+
+  - it: hard cuts over an in-progress rotation with a new id
+    set:
+      global.auth.sessionKeyRotation.id: incident-1
+      global.auth.sessionKeyRotation.phase: hard-cutover
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+            annotations:
+              wandb.ai/session-key-rotation-id: rotation-1
+              wandb.ai/session-key-rotation-phase: prepare
+          data:
+            GORILLA_SESSION_KEY: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+            GORILLA_SESSION_KEY_PREVIOUS: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+    asserts:
+      - notEqual:
+          path: data.GORILLA_SESSION_KEY
+          value: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+      - notExists:
+          path: data.GORILLA_SESSION_KEY_PREVIOUS
+      - equal:
+          path: metadata.annotations["wandb.ai/session-key-rotation-id"]
+          value: incident-1
+      - equal:
+          path: metadata.annotations["wandb.ai/session-key-rotation-phase"]
+          value: hard-cutover
+
+  - it: keeps a hard cutover stable across reconciliation
+    set:
+      global.auth.sessionKeyRotation.id: incident-1
+      global.auth.sessionKeyRotation.phase: hard-cutover
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+            annotations:
+              wandb.ai/session-key-rotation-id: incident-1
+              wandb.ai/session-key-rotation-phase: hard-cutover
+          data:
+            GORILLA_SESSION_KEY: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+    asserts:
+      - equal:
+          path: data.GORILLA_SESSION_KEY
+          value: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+      - notExists:
+          path: data.GORILLA_SESSION_KEY_PREVIOUS
+
+  - it: allows a new rotation after a hard cutover
+    set:
+      global.auth.sessionKeyRotation.id: rotation-2
+      global.auth.sessionKeyRotation.phase: prepare
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+            annotations:
+              wandb.ai/session-key-rotation-id: incident-1
+              wandb.ai/session-key-rotation-phase: hard-cutover
+          data:
+            GORILLA_SESSION_KEY: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+    asserts:
+      - equal:
+          path: data.GORILLA_SESSION_KEY
+          value: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+      - isNotEmpty:
+          path: data.GORILLA_SESSION_KEY_PREVIOUS
+      - equal:
+          path: metadata.annotations["wandb.ai/session-key-rotation-id"]
+          value: rotation-2
+      - equal:
+          path: metadata.annotations["wandb.ai/session-key-rotation-phase"]
+          value: prepare
+
+  - it: rejects reuse of a hard cutover rotation id
+    set:
+      global.auth.sessionKeyRotation.id: incident-1
+      global.auth.sessionKeyRotation.phase: prepare
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+            annotations:
+              wandb.ai/session-key-rotation-id: incident-1
+              wandb.ai/session-key-rotation-phase: hard-cutover
+          data:
+            GORILLA_SESSION_KEY: YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=
+    asserts:
+      - failedTemplate:
+          errorMessage: global.auth.sessionKeyRotation.id must be unique for each rotation
+
   - it: rejects activate before prepare
     set:
       global.auth.sessionKeyRotation.id: rotation-1

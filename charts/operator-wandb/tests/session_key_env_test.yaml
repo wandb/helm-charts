@@ -56,7 +56,7 @@ tests:
             name: GORILLA_SESSION_KEY_PREVIOUS
             value: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
-  - it: changes the api pod template for each managed rotation phase
+  - it: changes the api pod template for the managed prepare phase
     template: charts/api/templates/deployment.yaml
     set:
       global.api.enabled: true
@@ -69,7 +69,7 @@ tests:
             name: WANDB_SESSION_KEY_ROTATION
             value: rotation-1-prepare
 
-  - it: changes the app pod template for each managed rotation phase
+  - it: changes the app pod template for the managed activate phase
     template: charts/app/templates/deployment.yaml
     set:
       global.auth.sessionKeyRotation.id: rotation-1
@@ -79,4 +79,72 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: WANDB_SESSION_KEY_ROTATION
+            value: rotation-1-activate
+
+  - it: changes the api pod template for the managed clear phase
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: clear
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_SESSION_KEY_ROTATION
+            value: rotation-1-clear
+
+  - it: changes the app pod template for a managed hard cutover
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.auth.sessionKeyRotation.id: incident-1
+      global.auth.sessionKeyRotation.phase: hard-cutover
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_SESSION_KEY_ROTATION
+            value: incident-1-hard-cutover
+
+  - it: changes the api pod template when external session keys change
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      global.auth.sessionKey:
+        valueFrom:
+          secretKeyRef:
+            name: external-session-keys
+            key: current
+      global.auth.sessionKeyPrevious:
+        valueFrom:
+          secretKeyRef:
+            name: external-session-keys
+            key: previous
+      global.auth.sessionKeyRolloutId: rotation-1-prepare
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_SESSION_KEY_ROLLOUT
+            value: rotation-1-prepare
+
+  - it: changes the app pod template when external session keys change
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.auth.sessionKey:
+        valueFrom:
+          secretKeyRef:
+            name: external-session-keys
+            key: current
+      global.auth.sessionKeyPrevious:
+        valueFrom:
+          secretKeyRef:
+            name: external-session-keys
+            key: previous
+      global.auth.sessionKeyRolloutId: rotation-1-activate
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_SESSION_KEY_ROLLOUT
             value: rotation-1-activate
