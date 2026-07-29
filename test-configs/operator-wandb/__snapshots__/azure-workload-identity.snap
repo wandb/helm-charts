@@ -105,32 +105,6 @@ spec:
       app.kubernetes.io/instance: chartsnap
   maxUnavailable: 1
 ---
-# Source: operator-wandb/charts/app/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-app
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: app
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
-# Source: operator-wandb/charts/console/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-console
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: console
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
 # Source: operator-wandb/charts/otel/charts/daemonset/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -143,19 +117,6 @@ metadata:
     app.kubernetes.io/version: "0.33.0"
     wandb.com/app-name: daemonset-0.1.0
     app.kubernetes.io/managed-by: Helm
----
-# Source: operator-wandb/charts/parquet/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-parquet
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: parquet
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
 ---
 # Source: operator-wandb/charts/prometheus/charts/instance/templates/serviceaccount.yaml
 apiVersion: v1
@@ -172,19 +133,6 @@ metadata:
   name: chartsnap-prometheus-server
   namespace: default
 ---
-# Source: operator-wandb/charts/weave-trace/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-weave-trace
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
 # Source: operator-wandb/charts/weave/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -197,6 +145,13 @@ metadata:
     app.kubernetes.io/version: "latest"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
+---
+# Source: operator-wandb/templates/azure-storage-serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wandb-bucket-access
+  labels:
 ---
 # Source: operator-wandb/templates/bucket.yaml
 apiVersion: v1
@@ -1733,7 +1688,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 subjects:
 - kind: ServiceAccount
-  name: chartsnap-console
+  name: wandb-bucket-access
   namespace: default
 roleRef:
   kind: ClusterRole
@@ -1839,7 +1794,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 subjects:
 - kind: ServiceAccount
-  name: chartsnap-app
+  name: wandb-bucket-access
   namespace: default
 roleRef:
   kind: Role
@@ -2774,7 +2729,7 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
-      serviceAccountName: chartsnap-app
+      serviceAccountName: wandb-bucket-access
       securityContext:
         fsGroup: 0
         fsGroupChangePolicy: OnRootMismatch
@@ -2904,7 +2859,7 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
-      serviceAccountName: chartsnap-console
+      serviceAccountName: wandb-bucket-access
       securityContext:
         fsGroup: 0
         fsGroupChangePolicy: OnRootMismatch
@@ -3207,7 +3162,7 @@ spec:
         - name: redis-ca
           mountPath: /etc/ssl/certs/redis_ca.pem
           subPath: redis_ca.pem
-      serviceAccountName: chartsnap-parquet
+      serviceAccountName: wandb-bucket-access
       securityContext:
         fsGroup: 0
         fsGroupChangePolicy: OnRootMismatch
@@ -3530,7 +3485,7 @@ spec:
           subPath: redis_ca.pem
         - mountPath: /tmp/
           name: temp-dir
-      serviceAccountName: chartsnap-weave-trace
+      serviceAccountName: wandb-bucket-access
       securityContext:
         fsGroup: 0
         fsGroupChangePolicy: OnRootMismatch
@@ -4001,7 +3956,7 @@ spec:
               mountPath: /etc/ssl/certs/redis_ca.pem
               subPath: redis_ca.pem
           restartPolicy: Never
-          serviceAccountName: chartsnap-parquet
+          serviceAccountName: wandb-bucket-access
           securityContext:
             fsGroup: 0
             fsGroupChangePolicy: OnRootMismatch

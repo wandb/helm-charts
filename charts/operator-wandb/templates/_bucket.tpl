@@ -73,6 +73,23 @@ the deployment. Bucket authentication can still use a storage key.
 {{- end }}
 
 {{/*
+Return whether workloads can use the deployment-wide Azure storage account.
+Legacy bucket-scoped identities deliberately retain their component accounts.
+*/}}
+{{- define "wandb.azureStorageServiceAccountEnabled" -}}
+  {{- $identity := include "wandb.azureStorageIdentity" . | fromYaml -}}
+  {{- $globalIdentity := default (dict) .Values.global.azureStorageIdentity -}}
+  {{- $globalConfigured := and (not (empty $globalIdentity.tenantId)) (not (empty $globalIdentity.clientId)) -}}
+{{- and $globalConfigured $identity.enabled -}}
+{{- end }}
+
+{{- define "wandb.azureStorageServiceAccountName" -}}
+  {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
+  {{- $serviceAccount := default (dict) $identity.serviceAccount -}}
+{{- default "wandb-bucket-access" $serviceAccount.name -}}
+{{- end }}
+
+{{/*
 Return the URI used when Weave explicitly opts into the deployment bucket.
 Weave accepts az://<account>/<container>; a W&B bucket path with a prefix
 cannot be represented without changing Weave's object layout.
