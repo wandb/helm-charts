@@ -2101,13 +2101,15 @@ run-store-accelerator-run-updater:
     repository: wandb/megabinary
     tag: latest
   size: ""
-  # CPU request is a full core (limit 2 for burst). Load testing on a dedicated
-  # instance showed per-pod CPU well under a core even at a busy prod pod's
-  # throughput (~8m idle, ~0.15-0.26 core at a few-thousand field-rows/s). Memory
-  # tracks project/field cardinality, not throughput, so the HPA scales on CPU
-  # only. Baseline is a single pod (minReplicas 1). For queue-depth (Kafka-lag)
-  # autoscaling, enable the KEDA block below and supply triggers (see
-  # flat-run-fields-updater and test-configs/operator-wandb/keda-frfu.yaml).
+  # CPU request is a full core (limit 2 for burst), sized from production: on the
+  # largest instance (forest) the run-updater runs ~30 pods at ~0.8 core each,
+  # writing ~550k field-rows/s (~16.6k/s per pod) to ClickHouse. Pods sit near 80%
+  # of a one-core request (the HPA target), so a core is right-sized; 100m would
+  # throttle. Scaling is CPU-only: memory tracks project/field cardinality, not
+  # throughput. Baseline is a single pod (minReplicas 1); per-size maxReplicas
+  # scales with expected write load (forest sustains ~30). For queue-depth
+  # (Kafka-lag) autoscaling instead, enable the KEDA block and supply triggers
+  # (see flat-run-fields-updater and test-configs/operator-wandb/keda-frfu.yaml).
   sizing:
     small:
       resources:
@@ -2120,14 +2122,14 @@ run-store-accelerator-run-updater:
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 5
+          maxReplicas: 3
           minReplicas: 1
           targetCPUUtilizationPercentage: 80
           targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
           minReplicaCount: 1
-          maxReplicaCount: 5
+          maxReplicaCount: 3
           pollingInterval: 15
           cooldownPeriod: 300
           fallback:
@@ -2168,14 +2170,14 @@ run-store-accelerator-run-updater:
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 10
+          maxReplicas: 6
           minReplicas: 1
           targetCPUUtilizationPercentage: 80
           targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
           minReplicaCount: 1
-          maxReplicaCount: 10
+          maxReplicaCount: 6
           pollingInterval: 15
           cooldownPeriod: 300
           fallback:
@@ -2216,14 +2218,14 @@ run-store-accelerator-run-updater:
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 15
+          maxReplicas: 10
           minReplicas: 1
           targetCPUUtilizationPercentage: 80
           targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
           minReplicaCount: 1
-          maxReplicaCount: 15
+          maxReplicaCount: 10
           pollingInterval: 15
           cooldownPeriod: 300
           fallback:
