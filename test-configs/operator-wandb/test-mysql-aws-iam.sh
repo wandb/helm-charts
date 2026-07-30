@@ -138,60 +138,8 @@ if ! grep -q 'name: wandb-ca-certs-root' "$migration_job_rendered"; then
   exit 1
 fi
 
-iam_metrics=(
-  IamDbAuthConnectionRequests
-  IamDbAuthConnectionSuccess
-  IamDbAuthConnectionFailure
-  IamDbAuthConnectionFailureInvalidToken
-  IamDbAuthConnectionFailureInsufficientPermissions
-  IamDbAuthConnectionFailureThrottling
-  IamDbAuthConnectionFailureServerError
-)
-for metric in "${iam_metrics[@]}"; do
-  if ! grep -Fq -- "- name: $metric" "$rendered"; then
-    echo "missing Aurora IAM authentication metric: $metric" >&2
-    exit 1
-  fi
-  metric_block="$(grep -A3 -F -- "- name: $metric" "$rendered")"
-  if [[ "$metric_block" != *"length: 600"* ]]; then
-    echo "Aurora IAM authentication metric $metric must use a 600-second lookback for delayed CloudWatch samples" >&2
-    exit 1
-  fi
-  if [[ "$metric_block" != *"period: 600"* ]]; then
-    echo "Aurora IAM authentication metric $metric must aggregate a 600-second CloudWatch period" >&2
-    exit 1
-  fi
-done
-
-if [[ "$(grep -c -- '- name: IamDbAuthConnection' "$rendered")" -ne 7 ]]; then
-  echo "expected exactly seven Aurora IAM authentication metrics" >&2
-  exit 1
-fi
-
-datadog_iam_metrics=(
-  aws_rds_iam_db_auth_connection_requests_sum
-  aws_rds_iam_db_auth_connection_success_sum
-  aws_rds_iam_db_auth_connection_failure_sum
-  aws_rds_iam_db_auth_connection_failure_invalid_token_sum
-  aws_rds_iam_db_auth_connection_failure_insufficient_permissions_sum
-  aws_rds_iam_db_auth_connection_failure_throttling_sum
-  aws_rds_iam_db_auth_connection_failure_server_error_sum
-)
-if ! grep -Fq 'ad.datadoghq.com/yace.checks:' "$rendered"; then
-  echo "YACE must configure Datadog OpenMetrics autodiscovery" >&2
-  exit 1
-fi
-for metric in "${datadog_iam_metrics[@]}"; do
-  if ! grep -Fq "\"$metric\"" "$rendered"; then
-    echo "Datadog OpenMetrics autodiscovery must collect $metric" >&2
-    exit 1
-  fi
-done
-
-exported_tags_block="$(grep -A3 -F 'exportedTagsOnMetrics:' "$rendered")"
-if [[ "$exported_tags_block" != *"AWS/RDS:"* ]] ||
-  [[ "$exported_tags_block" != *"- namespace"* ]]; then
-  echo "RDS metrics must export the lowercase namespace tag used by managed-install resources" >&2
+if grep -Fq 'ad.datadoghq.com/yace.checks:' "$rendered"; then
+  echo "YACE is only for W&B Console and must not configure Datadog ingestion" >&2
   exit 1
 fi
 
