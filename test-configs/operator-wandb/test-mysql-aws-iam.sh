@@ -119,6 +119,11 @@ for metric in "${iam_metrics[@]}"; do
     echo "missing Aurora IAM authentication metric: $metric" >&2
     exit 1
   fi
+  metric_block="$(grep -A2 -F -- "- name: $metric" "$rendered")"
+  if [[ "$metric_block" != *"length: 600"* ]]; then
+    echo "Aurora IAM authentication metric $metric must use a 600-second lookback for delayed CloudWatch samples" >&2
+    exit 1
+  fi
 done
 
 if [[ "$(grep -c -- '- name: IamDbAuthConnection' "$rendered")" -ne 7 ]]; then
