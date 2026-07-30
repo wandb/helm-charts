@@ -6,7 +6,9 @@ chart="$repo_root/charts/operator-wandb"
 values="$repo_root/test-configs/operator-wandb/mysql-aws-iam.yaml"
 rendered="$(mktemp)"
 password_rendered="$(mktemp)"
-trap 'rm -f "$rendered" "$password_rendered"' EXIT
+migration_rendered="$(mktemp)"
+migration_job_rendered="$(mktemp)"
+trap 'rm -f "$rendered" "$password_rendered" "$migration_rendered" "$migration_job_rendered"' EXIT
 
 helm template wandb "$chart" --namespace default --values "$values" >"$rendered"
 
@@ -102,6 +104,37 @@ fi
 
 if grep -q 'prometheus-mysql-exporter' "$rendered"; then
   echo "password-based mysql-exporter must be disabled for IAM authentication" >&2
+  exit 1
+fi
+
+helm template wandb "$chart" \
+  --namespace default \
+  --values "$values" \
+  --set clickhouseMigrationJob.install=true \
+  --set global.olap.history.enabled=true \
+  --set global.olap.history.host=clickhouse.example.internal \
+  --set-string global.olap.history.port=9440 >"$migration_rendered"
+
+awk '
+  BEGIN { RS = "---" }
+  $0 ~ "\nkind: Job\n" &&
+    $0 ~ "\n  name: wandb-ch-migrate\n" {
+    print
+  }
+' "$migration_rendered" >"$migration_job_rendered"
+
+if [[ ! -s "$migration_job_rendered" ]]; then
+  echo "expected the ClickHouse migration Job to be rendered" >&2
+  exit 1
+fi
+
+if grep -Eq 'name: mysql-ca|secretName: "?wandb-mysql-ca-cert"?' "$migration_job_rendered"; then
+  echo "the pre-upgrade ClickHouse migration Job must not depend on the same-upgrade MySQL CA Secret" >&2
+  exit 1
+fi
+
+if ! grep -q 'name: wandb-ca-certs-root' "$migration_job_rendered"; then
+  echo "the ClickHouse migration Job must retain global custom CA certificate mounts" >&2
   exit 1
 fi
 
