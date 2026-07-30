@@ -1,5 +1,5 @@
 {{- define "wandb.caCertsVolumeMounts" -}}
-{{- $globalOptOut := default dict .Values.globalOptOut -}}
+  {{- $globalOptOut := default dict .Values.globalOptOut -}}
 - name: wandb-ca-certs-root
   mountPath: /usr/local/share/ca-certificates/
 - name: wandb-ca-certs
@@ -9,13 +9,13 @@
 - name: redis-ca
   mountPath: /etc/ssl/certs/redis_ca.pem
   subPath: redis_ca.pem
-{{- if not ($globalOptOut.mysqlCaCert | default false) }}
+  {{- if not ($globalOptOut.mysqlCaCert | default false) }}
 {{ include "wandb.mysql.caCertVolumeMount" . }}
-{{- end }}
+  {{- end }}
 {{- end -}}
 
 {{- define "wandb.caCertsVolumes" -}}
-{{- $globalOptOut := default dict .Values.globalOptOut -}}
+  {{- $globalOptOut := default dict .Values.globalOptOut -}}
 - name: wandb-ca-certs-root
   emptyDir: {}
 - name: wandb-ca-certs
@@ -32,9 +32,9 @@
       - key: REDIS_CA_CERT
         path: redis_ca.pem
     optional: true
-{{- if not ($globalOptOut.mysqlCaCert | default false) }}
+  {{- if not ($globalOptOut.mysqlCaCert | default false) }}
 {{ include "wandb.mysql.caCertVolume" . }}
-{{- end }}
+  {{- end }}
 {{- end -}}
 
 {{- define "wandb.gcsFuseVolumeMounts" }}
