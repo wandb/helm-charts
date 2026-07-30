@@ -2087,7 +2087,6 @@ run-store-accelerator-run-updater:
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
@@ -2102,8 +2101,13 @@ run-store-accelerator-run-updater:
     repository: wandb/megabinary
     tag: latest
   size: ""
-  # Sizing mirrors history-updater (the closest analog: a ClickHouse-writing
-  # run-update consumer on the same queue). Revisit once load-test data exists.
+  # CPU request is a full core (limit 2 for burst). Load testing on a dedicated
+  # instance showed per-pod CPU well under a core even at a busy prod pod's
+  # throughput (~8m idle, ~0.15-0.26 core at a few-thousand field-rows/s). Memory
+  # tracks project/field cardinality, not throughput, so the HPA scales on CPU
+  # only. Baseline is a single pod (minReplicas 1). For queue-depth (Kafka-lag)
+  # autoscaling, enable the KEDA block below and supply triggers (see
+  # flat-run-fields-updater and test-configs/operator-wandb/keda-frfu.yaml).
   sizing:
     small:
       resources:
@@ -2118,6 +2122,8 @@ run-store-accelerator-run-updater:
           enabled: true
           maxReplicas: 5
           minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
           minReplicaCount: 1
@@ -2163,10 +2169,12 @@ run-store-accelerator-run-updater:
         horizontal:
           enabled: true
           maxReplicas: 10
-          minReplicas: 3
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
-          minReplicaCount: 3
+          minReplicaCount: 1
           maxReplicaCount: 10
           pollingInterval: 15
           cooldownPeriod: 300
@@ -2209,10 +2217,12 @@ run-store-accelerator-run-updater:
         horizontal:
           enabled: true
           maxReplicas: 15
-          minReplicas: 6
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
-          minReplicaCount: 6
+          minReplicaCount: 1
           maxReplicaCount: 15
           pollingInterval: 15
           cooldownPeriod: 300
@@ -2255,10 +2265,12 @@ run-store-accelerator-run-updater:
         horizontal:
           enabled: true
           maxReplicas: 20
-          minReplicas: 9
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
-          minReplicaCount: 9
+          minReplicaCount: 1
           maxReplicaCount: 20
           pollingInterval: 15
           cooldownPeriod: 300
@@ -2301,10 +2313,12 @@ run-store-accelerator-run-updater:
         horizontal:
           enabled: true
           maxReplicas: 30
-          minReplicas: 9
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
-          minReplicaCount: 9
+          minReplicaCount: 1
           maxReplicaCount: 30
           pollingInterval: 15
           cooldownPeriod: 300
