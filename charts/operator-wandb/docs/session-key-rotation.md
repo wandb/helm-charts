@@ -108,10 +108,17 @@ global:
     sessionKeyRolloutId: "2026-07-session-key-prepare"
 ```
 
-For external keys, create and update `gorilla-session-keys` separately. A Secret
-data update does not change environment variables in running containers. After
-each Secret update, change `sessionKeyRolloutId` and apply the Helm release to
-force API and app rollouts:
+For external keys, create and update `gorilla-session-keys` separately.
+Kubernetes does not refresh environment variables in existing containers.
+However, an installed Secret-reload controller such as Stakater Reloader may
+detect the referenced Secret update and start API and app rollouts immediately.
+Monitor for that rollout before making another change.
+
+Do not rely on a reload controller being installed or enabled. After each
+Secret update, change `sessionKeyRolloutId` and apply the Helm release to
+guarantee that the pod template changes and every enabled API and app replica
+restarts. If a reload controller already completed a rollout, changing the
+marker may cause a second, safe rollout:
 
 1. **Prepare:** set `current` to A and `previous` to B, set the rollout ID to a
    unique value ending in `-prepare`, apply the release, and wait for rollout.
