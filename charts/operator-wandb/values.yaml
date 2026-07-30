@@ -385,6 +385,31 @@ global:
 
   auth:
     sessionLengthHours: 720
+    # Override the chart-managed session key with a literal value or a
+    # Kubernetes EnvVarSource map such as valueFrom.secretKeyRef.
+    sessionKey:
+      # valueFrom:
+      #   secretKeyRef:
+      #     name: gorilla-session-keys
+      #     key: current
+    # Comma-separated verification-only keys. This accepts the same literal or
+    # Kubernetes EnvVarSource forms as sessionKey.
+    sessionKeyPrevious:
+      # valueFrom:
+      #   secretKeyRef:
+      #     name: gorilla-session-keys
+      #     key: previous
+    # Change this value after updating external session-key Secret data to
+    # force the API and app pod templates to roll. It does not contain key
+    # material and can be used with sessionKey/sessionKeyPrevious overrides.
+    sessionKeyRolloutId: ""
+    # Managed rotation uses the release's existing gorilla-session-key Secret.
+    # Use a new id for each rotation. Routine rotations advance phase through
+    # prepare -> activate -> clear. hard-cutover immediately replaces the
+    # current key without retaining verification keys.
+    sessionKeyRotation:
+      id: ""
+      phase: ""
     # Internal URL for the auth service should be using oidc or auth0
     jwkUrl: ""
     oidc:
@@ -603,6 +628,7 @@ api:
     "{{ .Release.Name }}-gorilla-session-key": "secretRef"
   envTpls:
     - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.sessionKeyEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
@@ -811,6 +837,7 @@ app:
     "{{ .Release.Name }}-local-configmap": "configMapRef"
   envTpls:
     - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.sessionKeyEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
