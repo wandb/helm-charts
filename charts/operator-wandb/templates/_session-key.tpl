@@ -8,7 +8,7 @@
     {{- end }}
   {{- end }}
   {{- with .Values.global.auth.sessionKeyPrevious }}
-- name: GORILLA_SESSION_KEY_PREVIOUS
+- name: GORILLA_SESSION_PREVIOUS_KEYS
     {{- if kindIs "map" . }}
 {{- toYaml . | nindent 2 }}
     {{- else }}

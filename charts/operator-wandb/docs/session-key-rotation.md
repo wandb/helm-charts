@@ -20,7 +20,7 @@ global:
 ```
 
 `prepare` generates a candidate key, keeps the current signing key, and adds the
-candidate to `GORILLA_SESSION_KEY_PREVIOUS`. The rotation ID and phase also
+candidate to `GORILLA_SESSION_PREVIOUS_KEYS`. The rotation ID and phase also
 change the API and app pod templates, which starts a rollout. Wait for every
 enabled API and app pod to finish rolling before continuing. This wait is the
 critical safety step: during the next rollout, prepared pods sign with A and
@@ -37,7 +37,7 @@ global:
 ```
 
 `activate` makes the candidate the current signing key and retains the outgoing
-key in `GORILLA_SESSION_KEY_PREVIOUS`. Reapplying the same ID and phase does not
+key in `GORILLA_SESSION_PREVIOUS_KEYS`. Reapplying the same ID and phase does not
 swap the keys again.
 
 After the longest-lived session or token has expired, remove the verification
