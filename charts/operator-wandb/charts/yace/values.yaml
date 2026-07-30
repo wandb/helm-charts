@@ -21,6 +21,9 @@ searchTags: {}
 config: |-
   apiVersion: v1alpha1
   discovery:
+    exportedTagsOnMetrics:
+      AWS/RDS:
+        - namespace
     jobs:
       - type: AWS/ElastiCache
         regions:
@@ -81,6 +84,34 @@ config: |-
             statistics: [Average]
           - name: WriteIOPS
             statistics: [Average]
+          - name: IamDbAuthConnectionRequests
+            statistics: [Sum]
+            length: 600
+            period: 600
+          - name: IamDbAuthConnectionSuccess
+            statistics: [Sum]
+            length: 600
+            period: 600
+          - name: IamDbAuthConnectionFailure
+            statistics: [Sum]
+            length: 600
+            period: 600
+          - name: IamDbAuthConnectionFailureInvalidToken
+            statistics: [Sum]
+            length: 600
+            period: 600
+          - name: IamDbAuthConnectionFailureInsufficientPermissions
+            statistics: [Sum]
+            length: 600
+            period: 600
+          - name: IamDbAuthConnectionFailureThrottling
+            statistics: [Sum]
+            length: 600
+            period: 600
+          - name: IamDbAuthConnectionFailureServerError
+            statistics: [Sum]
+            length: 600
+            period: 600
         {{- if .Values.searchTags }}
         searchTags:
           {{- range $k, $v := .Values.searchTags }}
@@ -94,7 +125,28 @@ service:
 
 pod:
   labels: {}
-  annotations: {}
+  annotations:
+    ad.datadoghq.com/yace.checks: |
+      {
+        "openmetrics": {
+          "init_config": {},
+          "instances": [
+            {
+              "openmetrics_endpoint": "http://%%host%%:5000/metrics",
+              "namespace": "",
+              "metrics": [
+                "aws_rds_iam_db_auth_connection_requests_sum",
+                "aws_rds_iam_db_auth_connection_success_sum",
+                "aws_rds_iam_db_auth_connection_failure_sum",
+                "aws_rds_iam_db_auth_connection_failure_invalid_token_sum",
+                "aws_rds_iam_db_auth_connection_failure_insufficient_permissions_sum",
+                "aws_rds_iam_db_auth_connection_failure_throttling_sum",
+                "aws_rds_iam_db_auth_connection_failure_server_error_sum"
+              ]
+            }
+          ]
+        }
+      }
   securityContext:
     runAsNonRoot: true
     runAsUser: 999

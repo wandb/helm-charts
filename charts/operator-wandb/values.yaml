@@ -109,6 +109,10 @@ global:
     namespace: default
 
   mysql:
+    # Enable short-lived AWS RDS IAM tokens instead of password authentication.
+    rdsIamAuth: false
+    # Required when rdsIamAuth is true.
+    awsRegion: ""
     host: ""
     port: 3306
     database: "wandb_local"
@@ -3023,6 +3027,11 @@ clickhouseMigrationJob:
   kind: Job
   podDisruptionBudget:
     enabled: false
+  # This pre-upgrade hook never connects to MySQL. Do not make it depend on a
+  # MySQL CA Secret that may be created by the same upgrade the hook precedes.
+  # Keep other global volumes, including custom ClickHouse trust roots.
+  globalOptOut:
+    mysqlCaCert: true
   # The job needs no k8s API access. This also avoids a helm hook ordering
   # deadlock: same-weight hooks run sorted by name, so a dedicated
   # ServiceAccount would be created after the Job that references it.
