@@ -2101,17 +2101,20 @@ run-store-accelerator-run-updater:
     repository: wandb/megabinary
     tag: latest
   size: ""
-  # Sized from production. CPU request is a full core (limit 2 for burst): the
-  # run-updater uses ~0.8 core at ~16.6k field-rows/s on the busiest SaaS pod and
-  # sits near 80% of a one-core request, the HPA target, so scaling is CPU-only.
-  # Memory tracks project/field cardinality, not throughput, so it is a poor
-  # autoscaling signal and is excluded from the HPA. minReplicas is 1 everywhere;
-  # per-size maxReplicas is set from observed dedicated-instance load (the busiest
-  # managed instance runs ~70 run-updates/s, a few pods), well below multi-tenant
-  # SaaS. Memory mirrors flat-run-fields-updater, the same run-update consumer;
-  # wide-run tenants can exceed these defaults and set per-instance overrides.
-  # For queue-depth (Kafka-lag) autoscaling, enable the KEDA block and supply
-  # triggers (see flat-run-fields-updater and test-configs/operator-wandb/keda-frfu.yaml).
+  # Sized from production. CPU limit is 2 (burst headroom); requests are sub-core
+  # and scale with tier (250m small ... 750m xxl). The busiest SaaS pod runs
+  # ~0.8 core at ~16.6k field-rows/s, but under the HPA per-pod CPU converges to
+  # ~80% of the request regardless of tier (bigger tiers add pods, not hotter
+  # ones) and smaller instances mostly idle, so the request tracks each tier's
+  # baseline while the limit leaves burst room. Scaling is CPU-only: memory tracks
+  # project/field cardinality, not throughput, so it is excluded from the HPA.
+  # minReplicas is 1 everywhere; per-size maxReplicas is set from observed
+  # dedicated-instance load (the busiest managed instance runs ~70 run-updates/s,
+  # a few pods), well below multi-tenant SaaS. Memory mirrors flat-run-fields-updater,
+  # the same run-update consumer; wide-run tenants can exceed these defaults and set
+  # per-instance overrides. For queue-depth (Kafka-lag) autoscaling, enable the KEDA
+  # block and supply triggers (see flat-run-fields-updater and
+  # test-configs/operator-wandb/keda-frfu.yaml).
   sizing:
     small:
       resources:
@@ -2119,7 +2122,7 @@ run-store-accelerator-run-updater:
           cpu: "2"
           memory: 4Gi
         requests:
-          cpu: "1"
+          cpu: "250m"
           memory: 2Gi
       autoscaling:
         horizontal:
@@ -2167,7 +2170,7 @@ run-store-accelerator-run-updater:
           cpu: "2"
           memory: 4Gi
         requests:
-          cpu: "1"
+          cpu: "250m"
           memory: 2Gi
       autoscaling:
         horizontal:
@@ -2215,7 +2218,7 @@ run-store-accelerator-run-updater:
           cpu: "2"
           memory: 4Gi
         requests:
-          cpu: "1"
+          cpu: "500m"
           memory: 3Gi
       autoscaling:
         horizontal:
@@ -2263,7 +2266,7 @@ run-store-accelerator-run-updater:
           cpu: "2"
           memory: 8Gi
         requests:
-          cpu: "1"
+          cpu: "500m"
           memory: 6Gi
       autoscaling:
         horizontal:
@@ -2311,7 +2314,7 @@ run-store-accelerator-run-updater:
           cpu: "2"
           memory: 8Gi
         requests:
-          cpu: "1"
+          cpu: "750m"
           memory: 6Gi
       autoscaling:
         horizontal:
