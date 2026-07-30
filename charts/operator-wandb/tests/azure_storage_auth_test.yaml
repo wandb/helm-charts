@@ -56,6 +56,27 @@ tests:
           path: data.SECRET_KEY
           value: Y3VzdG9tZXItc3RvcmFnZS1zZWNyZXQ=
 
+  - it: suppresses stale customer keys when BYOB explicitly uses workload identity
+    set:
+      global:
+        bucket:
+          provider: az
+          name: customer-storage-account
+          path: customer-container
+          accessKey: orphaned-customer-storage-key
+          secretKey: orphaned-customer-storage-secret
+          azureAuthMethod: workloadIdentity
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    template: templates/bucket.yaml
+    documentIndex: 1
+    asserts:
+      - notExists:
+          path: data.ACCESS_KEY
+      - notExists:
+          path: data.SECRET_KEY
+
   - it: creates one chart-owned shared account for the deployment-wide identity
     template: templates/azure-storage-serviceaccount.yaml
     set:
@@ -262,6 +283,49 @@ tests:
           provider: az
           name: managed-storage-account
           path: managed-container
+        azureStorageIdentity:
+          tenantId:
+            valueFrom:
+              secretKeyRef:
+                name: azure-storage-identity
+                key: tenant-id
+          clientId:
+            valueFrom:
+              secretKeyRef:
+                name: azure-storage-identity
+                key: client-id
+          serviceAccount:
+            annotations:
+              azure.workload.identity/client-id: infrastructure-client-id
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_TENANT_ID
+            valueFrom:
+              secretKeyRef:
+                name: azure-storage-identity
+                key: tenant-id
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: azure-storage-identity
+                key: client-id
+          any: true
+
+  - it: uses deployment identity references for workload-identity BYOB
+    template: charts/app/templates/deployment.yaml
+    set:
+      global:
+        bucket:
+          provider: az
+          name: customer-storage-account
+          path: customer-container
+          azureAuthMethod: workloadIdentity
         azureStorageIdentity:
           tenantId:
             valueFrom:
