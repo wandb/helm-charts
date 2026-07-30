@@ -2101,35 +2101,37 @@ run-store-accelerator-run-updater:
     repository: wandb/megabinary
     tag: latest
   size: ""
-  # CPU request is a full core (limit 2 for burst), sized from production: on the
-  # largest instance (forest) the run-updater runs ~30 pods at ~0.8 core each,
-  # writing ~550k field-rows/s (~16.6k/s per pod) to ClickHouse. Pods sit near 80%
-  # of a one-core request (the HPA target), so a core is right-sized; 100m would
-  # throttle. Scaling is CPU-only: memory tracks project/field cardinality, not
-  # throughput. Baseline is a single pod (minReplicas 1); per-size maxReplicas
-  # scales with expected write load (forest sustains ~30). For queue-depth
-  # (Kafka-lag) autoscaling instead, enable the KEDA block and supply triggers
-  # (see flat-run-fields-updater and test-configs/operator-wandb/keda-frfu.yaml).
+  # Sized from production. CPU request is a full core (limit 2 for burst): the
+  # run-updater uses ~0.8 core at ~16.6k field-rows/s on the busiest SaaS pod and
+  # sits near 80% of a one-core request, the HPA target, so scaling is CPU-only.
+  # Memory tracks project/field cardinality, not throughput, so it is a poor
+  # autoscaling signal and is excluded from the HPA. minReplicas is 1 everywhere;
+  # per-size maxReplicas is set from observed dedicated-instance load (the busiest
+  # managed instance runs ~70 run-updates/s, a few pods), well below multi-tenant
+  # SaaS. Memory mirrors flat-run-fields-updater, the same run-update consumer;
+  # wide-run tenants can exceed these defaults and set per-instance overrides.
+  # For queue-depth (Kafka-lag) autoscaling, enable the KEDA block and supply
+  # triggers (see flat-run-fields-updater and test-configs/operator-wandb/keda-frfu.yaml).
   sizing:
     small:
       resources:
         limits:
           cpu: "2"
-          memory: 2Gi
+          memory: 4Gi
         requests:
           cpu: "1"
-          memory: 1Gi
+          memory: 2Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 3
+          maxReplicas: 2
           minReplicas: 1
           targetCPUUtilizationPercentage: 80
           targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
           minReplicaCount: 1
-          maxReplicaCount: 3
+          maxReplicaCount: 2
           pollingInterval: 15
           cooldownPeriod: 300
           fallback:
@@ -2163,26 +2165,26 @@ run-store-accelerator-run-updater:
       resources:
         limits:
           cpu: "2"
-          memory: 2Gi
+          memory: 4Gi
         requests:
           cpu: "1"
-          memory: 1Gi
+          memory: 2Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 6
+          maxReplicas: 3
           minReplicas: 1
           targetCPUUtilizationPercentage: 80
           targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
           minReplicaCount: 1
-          maxReplicaCount: 6
+          maxReplicaCount: 3
           pollingInterval: 15
           cooldownPeriod: 300
           fallback:
             failureThreshold: 5
-            replicas: 5
+            replicas: 2
           advanced:
             horizontalPodAutoscalerConfig:
               behavior:
@@ -2211,26 +2213,26 @@ run-store-accelerator-run-updater:
       resources:
         limits:
           cpu: "2"
-          memory: 2Gi
+          memory: 4Gi
         requests:
           cpu: "1"
-          memory: 1536Mi
+          memory: 3Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 10
+          maxReplicas: 5
           minReplicas: 1
           targetCPUUtilizationPercentage: 80
           targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
           minReplicaCount: 1
-          maxReplicaCount: 10
+          maxReplicaCount: 5
           pollingInterval: 15
           cooldownPeriod: 300
           fallback:
             failureThreshold: 5
-            replicas: 10
+            replicas: 3
           advanced:
             horizontalPodAutoscalerConfig:
               behavior:
@@ -2259,26 +2261,26 @@ run-store-accelerator-run-updater:
       resources:
         limits:
           cpu: "2"
-          memory: 4Gi
+          memory: 8Gi
         requests:
           cpu: "1"
-          memory: 3Gi
+          memory: 6Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 20
+          maxReplicas: 8
           minReplicas: 1
           targetCPUUtilizationPercentage: 80
           targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
           minReplicaCount: 1
-          maxReplicaCount: 20
+          maxReplicaCount: 8
           pollingInterval: 15
           cooldownPeriod: 300
           fallback:
             failureThreshold: 5
-            replicas: 15
+            replicas: 5
           advanced:
             horizontalPodAutoscalerConfig:
               behavior:
@@ -2307,26 +2309,26 @@ run-store-accelerator-run-updater:
       resources:
         limits:
           cpu: "2"
-          memory: 4Gi
+          memory: 8Gi
         requests:
           cpu: "1"
-          memory: 3Gi
+          memory: 6Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 30
+          maxReplicas: 12
           minReplicas: 1
           targetCPUUtilizationPercentage: 80
           targetMemoryUtilizationPercentage: 0
         keda:
           enabled: false
           minReplicaCount: 1
-          maxReplicaCount: 30
+          maxReplicaCount: 12
           pollingInterval: 15
           cooldownPeriod: 300
           fallback:
             failureThreshold: 5
-            replicas: 20
+            replicas: 8
           advanced:
             horizontalPodAutoscalerConfig:
               behavior:
