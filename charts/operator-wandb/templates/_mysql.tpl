@@ -2,11 +2,11 @@
 Return the name of the secret where information is stored, considering if the custom secret is defined
 */}}
 {{- define "wandb.mysql.passwordSecret" -}}
-{{- if .Values.global.mysql.passwordSecret.name }}
+  {{- if .Values.global.mysql.passwordSecret.name }}
   {{- .Values.global.mysql.passwordSecret.name -}}
-{{- else }}
+  {{- else }}
   {{- print .Release.Name "-mysql" -}}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 
@@ -14,21 +14,21 @@ Return the name of the secret where information is stored, considering if the cu
   determine the name of the mysql cert.
 */}}
 {{- define "wandb.mysql.certFileName" -}}
-{{- if kindIs "map" $.Values.global.mysql.caCert -}}
-  {{- if $.Values.global.mysql.caCert.valueFrom.secretKeyRef -}}
-    {{/* Passed a secret */}}
+  {{- if kindIs "map" $.Values.global.mysql.caCert -}}
+    {{- if $.Values.global.mysql.caCert.valueFrom.secretKeyRef -}}
+      {{/* Passed a secret */}}
     {{- print $.Values.global.mysql.caCert.valueFrom.secretKeyRef.key -}}
-  {{- else if $.Values.global.mysql.caCert.valueFrom.configMapKeyRef -}}
-    {{/* Passed a configmap */}}
+    {{- else if $.Values.global.mysql.caCert.valueFrom.configMapKeyRef -}}
+      {{/* Passed a configmap */}}
     {{- print $.Values.global.mysql.caCert.valueFrom.configMapKeyRef.key -}}
+    {{- else -}}
+      {{/* Invalid */}}
+      {{ fail "Invalid config for 'global.mysql.caCert'" }}
+    {{- end -}}
   {{- else -}}
-    {{/* Invalid */}}
-    {{ fail "Invalid config for 'global.mysql.caCert'" }}
-  {{- end -}}
-{{- else -}}
-  {{/* Passed value directly */}}
+    {{/* Passed value directly */}}
   {{- print "mysql_ca.pem" -}}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 
@@ -43,11 +43,11 @@ Return the db port
 Return the db host
 */}}
 {{- define "wandb.mysql.host" -}}
-{{- if eq .Values.global.mysql.host "" -}}
-{{ printf "%s-%s" .Release.Name "mysql" }}
-{{- else -}}
+  {{- if eq .Values.global.mysql.host "" -}}
+    {{ printf "%s-%s" .Release.Name "mysql" }}
+  {{- else -}}
 {{ .Values.global.mysql.host }}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/*
@@ -79,11 +79,11 @@ Return the db password
 Return the db connection string
 */}}
 {{- define "wandb.mysql" -}}
-{{- if .Values.global.mysql.rdsIamAuth -}}
+  {{- if .Values.global.mysql.rdsIamAuth -}}
 mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&rds-iam-auth=true&aws-region={{ .Values.global.mysql.awsRegion }}
-{{- else -}}
+  {{- else -}}
 mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 
@@ -91,53 +91,53 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
   helper to extract logic for creating the caCert Volume
 */}}
 {{- define "wandb.mysql.caCertVolume" -}}
-{{- $refName := (printf "%s-mysql-ca-cert" .Release.Name) -}}
-{{- $key := "MYSQL_CA_CERT" -}}
-{{- $path := "mysql_ca.pem" -}}
-{{- if kindIs "map" .Values.global.mysql.caCert -}}
-  {{- if .Values.global.mysql.caCert.valueFrom.secretKeyRef }}
-    {{- $refName = .Values.global.mysql.caCert.valueFrom.secretKeyRef.name -}}
-    {{- $key = .Values.global.mysql.caCert.valueFrom.secretKeyRef.key -}}
-    {{- $path = .Values.global.mysql.caCert.valueFrom.secretKeyRef.key  -}}
+  {{- $refName := (printf "%s-mysql-ca-cert" .Release.Name) -}}
+  {{- $key := "MYSQL_CA_CERT" -}}
+  {{- $path := "mysql_ca.pem" -}}
+  {{- if kindIs "map" .Values.global.mysql.caCert -}}
+    {{- if .Values.global.mysql.caCert.valueFrom.secretKeyRef }}
+      {{- $refName = .Values.global.mysql.caCert.valueFrom.secretKeyRef.name -}}
+      {{- $key = .Values.global.mysql.caCert.valueFrom.secretKeyRef.key -}}
+      {{- $path = .Values.global.mysql.caCert.valueFrom.secretKeyRef.key  -}}
 - name: mysql-ca
   secret:
     secretName: "{{ $refName }}"
     items:
       - key: "{{ $key }}"
         path: "{{ $path }}"
-  {{- else if .Values.global.mysql.caCert.valueFrom.configMapKeyRef }}
-    {{- $refName = .Values.global.mysql.caCert.valueFrom.configMapKeyRef.name -}}
-    {{- $key = .Values.global.mysql.caCert.valueFrom.configMapKeyRef.key -}}
-    {{- $path = .Values.global.mysql.caCert.valueFrom.configMapKeyRef.key  -}}
+    {{- else if .Values.global.mysql.caCert.valueFrom.configMapKeyRef }}
+      {{- $refName = .Values.global.mysql.caCert.valueFrom.configMapKeyRef.name -}}
+      {{- $key = .Values.global.mysql.caCert.valueFrom.configMapKeyRef.key -}}
+      {{- $path = .Values.global.mysql.caCert.valueFrom.configMapKeyRef.key  -}}
 - name: mysql-ca
   configMap:
     name: "{{ $refName }}"
     items:
       - key: "{{ $key }}"
         path: "{{ $path }}"
+    {{- else }}
+      {{ fail "Invalid caCert config" }}
+    {{- end }}
   {{- else }}
-    {{ fail "Invalid caCert config" }}
-  {{- end }}
-{{- else }}
-  {{- if not (eq .Values.global.mysql.caCert "") }}
+    {{- if not (eq .Values.global.mysql.caCert "") }}
 - name: mysql-ca
   secret:
     secretName: "{{ $refName }}"
     items:
       - key: "{{ $key }}"
         path: "{{ $path }}"
+    {{- end }}
   {{- end }}
-{{- end }}
 {{- end -}}
 
 {{/*
   helper to extract logic for creating the caCert Volume Mount
 */}}
 {{- define "wandb.mysql.caCertVolumeMount" -}}
-{{- if or (kindIs "map" .Values.global.mysql.caCert) (not (eq .Values.global.mysql.caCert "")) }}
-{{- $file := (include "wandb.mysql.certFileName" .) -}}
+  {{- if or (kindIs "map" .Values.global.mysql.caCert) (not (eq .Values.global.mysql.caCert "")) }}
+    {{- $file := (include "wandb.mysql.certFileName" .) -}}
 - name: mysql-ca
   mountPath: /etc/ssl/certs/{{ $file }}
   subPath: {{ $file }}
-{{- end }}
+  {{- end }}
 {{- end -}}

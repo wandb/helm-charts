@@ -27,11 +27,73 @@ if ! grep -Fq "$expected_dsn" "$rendered"; then
   exit 1
 fi
 
-role_annotation_count="$(grep -c 'eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/wandb-database' "$rendered")"
-if [[ "$role_annotation_count" -ne 11 ]]; then
-  echo "expected 11 database workload service accounts, found $role_annotation_count" >&2
-  exit 1
-fi
+database_role_annotation='eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/wandb-database'
+
+service_account_exists() {
+  local name="$1"
+
+  awk -v expected_name="$name" '
+    BEGIN { RS = "---" }
+    $0 ~ "\nkind: ServiceAccount\n" &&
+      $0 ~ "\n  name: " expected_name "\n" {
+      found = 1
+    }
+    END { exit found ? 0 : 1 }
+  ' "$rendered"
+}
+
+service_account_has_database_role() {
+  local name="$1"
+
+  awk -v expected_name="$name" -v expected_annotation="$database_role_annotation" '
+    BEGIN { RS = "---" }
+    $0 ~ "\nkind: ServiceAccount\n" &&
+      $0 ~ "\n  name: " expected_name "\n" &&
+      index($0, expected_annotation) {
+      found = 1
+    }
+    END { exit found ? 0 : 1 }
+  ' "$rendered"
+}
+
+database_service_accounts=(
+  wandb-api
+  wandb-app
+  wandb-executor
+  wandb-filemeta
+  wandb-filestream
+  wandb-flat-run-fields-updater
+  wandb-glue
+  wandb-history-updater
+  wandb-metric-observer
+  wandb-parquet
+  wandb-parquet-metadata-cache
+)
+for service_account in "${database_service_accounts[@]}"; do
+  if ! service_account_exists "$service_account"; then
+    echo "expected database workload ServiceAccount $service_account to be rendered" >&2
+    exit 1
+  fi
+  if ! service_account_has_database_role "$service_account"; then
+    echo "expected database role annotation on ServiceAccount $service_account" >&2
+    exit 1
+  fi
+done
+
+excluded_service_accounts=(
+  wandb-weave
+  wandb-weave-trace
+)
+for service_account in "${excluded_service_accounts[@]}"; do
+  if ! service_account_exists "$service_account"; then
+    echo "expected excluded ServiceAccount $service_account to be rendered" >&2
+    exit 1
+  fi
+  if service_account_has_database_role "$service_account"; then
+    echo "database role annotation must not be set on ServiceAccount $service_account" >&2
+    exit 1
+  fi
+done
 
 if grep -q 'name: init-db' "$rendered"; then
   echo "password-based init-db must be disabled for IAM authentication" >&2
@@ -81,6 +143,16 @@ assert_iam_render_rejected() {
   fi
 }
 
+assert_iam_render_accepted() {
+  local description="$1"
+  shift
+
+  if ! helm template wandb "$chart" --namespace default --values "$values" "$@" >/dev/null; then
+    echo "IAM authentication $description must pass validation" >&2
+    exit 1
+  fi
+}
+
 assert_iam_render_rejected "with rdsIamAuth as string false" --set-string global.mysql.rdsIamAuth=false
 assert_iam_render_rejected "with rdsIamAuth as string true" --set-string global.mysql.rdsIamAuth=true
 assert_iam_render_rejected "with rdsIamAuth as a number" --set global.mysql.rdsIamAuth=1
@@ -94,9 +166,20 @@ assert_iam_render_rejected "with local MySQL installed" --set mysql.install=true
 assert_iam_render_rejected "with password init-db enabled" --set app.initContainers.init-db.enabled=true
 assert_iam_render_rejected "with mysql-exporter enabled" --set prometheus.mysql-exporter.install=true
 
+assert_iam_render_accepted \
+  "with app disabled and its unused init-db default enabled" \
+  --set app.install=false \
+  --set app.initContainers.init-db.enabled=true
+assert_iam_render_accepted \
+  "with Prometheus disabled and its unused mysql-exporter default enabled" \
+  --set prometheus.install=false \
+  --set prometheus.mysql-exporter.install=true
+
 helm template wandb "$chart" --namespace default >"$password_rendered"
+# shellcheck disable=SC2016 # Helm intentionally renders these environment references literally.
+expected_password_dsn='mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
 if ! grep -Fq 'name: MYSQL_PASSWORD' "$password_rendered" ||
-  ! grep -Fq 'mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred' "$password_rendered"; then
+  ! grep -Fq "$expected_password_dsn" "$password_rendered"; then
   echo "default password authentication must remain unchanged" >&2
   exit 1
 fi

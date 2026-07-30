@@ -1,13 +1,13 @@
 {{- define "wandb.extraEnvFrom" -}}
-{{- $global := deepCopy (get .root.Values.global "extraEnvFrom" | default (dict)) -}}
-{{- $values := deepCopy (get .root.Values "extraEnvFrom" | default (dict)) -}}
-{{- $local  := deepCopy (get .local "extraEnvFrom" | default (dict)) -}}
-{{- $allExtraEnvFrom := mergeOverwrite $global $values $local -}}
-{{- range $key, $value := $allExtraEnvFrom }}
+  {{- $global := deepCopy (get .root.Values.global "extraEnvFrom" | default (dict)) -}}
+  {{- $values := deepCopy (get .root.Values "extraEnvFrom" | default (dict)) -}}
+  {{- $local  := deepCopy (get .local "extraEnvFrom" | default (dict)) -}}
+  {{- $allExtraEnvFrom := mergeOverwrite $global $values $local -}}
+  {{- range $key, $value := $allExtraEnvFrom }}
 - name: {{ $key }}
   valueFrom: 
 {{ toYaml $value | nindent 4 }}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/*
@@ -16,11 +16,11 @@ Returns the extraEnv keys and values to inject into containers.
 Global values will override any chart-specific values.
 */}}
 {{- define "wandb.extraEnv" -}}
-{{- $allExtraEnv := merge (default (dict) .Values.extraEnv) .Values.global.extraEnv -}}
-{{- range $key, $value := $allExtraEnv }}
+  {{- $allExtraEnv := merge (default (dict) .Values.extraEnv) .Values.global.extraEnv -}}
+  {{- range $key, $value := $allExtraEnv }}
 - name: {{ $key }}
   value: {{ $value | quote }}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{- define "wandb.redisEnvs" -}}
@@ -97,103 +97,103 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.statsigEnvs" -}}
-{{- if eq .Values.global.statsig.apiKey "" }}
+  {{- if eq .Values.global.statsig.apiKey "" }}
 - name: GORILLA_STATSIG_KEY
   valueFrom:
     secretKeyRef:
       name: "gorilla-statsig"
       key: "GORILLA_STATSIG_KEY"
       optional: true
-{{- end }}
+  {{- end }}
 {{- end -}}
 
 {{- define "wandb.mysqlConfigEnvs" -}}
-{{- /*
-  ATTENTION!
-  
-  MYSQL_PASSWORD, MYSQL_PORT, MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER
+  {{- /*
+    ATTENTION!
 
-  Are all set in the the values.yaml under global.mysql.(host,port,database,user,password)
+    MYSQL_PASSWORD, MYSQL_PORT, MYSQL_HOST, MYSQL_DATABASE, MYSQL_USER
 
-  The following blocks are to enable values to be provided in one of two ways:
+    Are all set in the the values.yaml under global.mysql.(host,port,database,user,password)
 
-  AS STANDARD:
-    mysql:
-      host: "mysql.com"
-      port: 3306
-      database: "wandb_local"
-      user: "wandb"
-      password: "supersafe"
+    The following blocks are to enable values to be provided in one of two ways:
 
-  AS K8s REFS:
-    mysql:
-      host:
-       valueFrom:
-        secretKeyRef:
-          name: "mysql-settings-secret"
-          key: "endpoint"
-      port:
-       valueFrom:
-        secretKeyRef:
-          name: "mysql-settings-secret"
-          key: "port"
-      database:
-        ...
-      user:
-        ...
-      password:
-        ...
-*/ -}}
+    AS STANDARD:
+      mysql:
+        host: "mysql.com"
+        port: 3306
+        database: "wandb_local"
+        user: "wandb"
+        password: "supersafe"
 
-{{- if not .Values.global.mysql.rdsIamAuth }}
-{{- if kindIs "map" .Values.global.mysql.password }}
+    AS K8s REFS:
+      mysql:
+        host:
+         valueFrom:
+          secretKeyRef:
+            name: "mysql-settings-secret"
+            key: "endpoint"
+        port:
+         valueFrom:
+          secretKeyRef:
+            name: "mysql-settings-secret"
+            key: "port"
+        database:
+          ...
+        user:
+          ...
+        password:
+          ...
+  */ -}}
+
+  {{- if not .Values.global.mysql.rdsIamAuth }}
+    {{- if kindIs "map" .Values.global.mysql.password }}
 - name: MYSQL_PASSWORD
 {{- toYaml .Values.global.mysql.password | nindent 2 }}
-{{- else }}
+    {{- else }}
 - name: MYSQL_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.mysql.passwordSecret" . | quote}}
       key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
-{{- end }}
-{{- end }}
+    {{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.mysql.port }}
+  {{- if kindIs "map" .Values.global.mysql.port }}
 - name: MYSQL_PORT
 {{- toYaml .Values.global.mysql.port | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: MYSQL_PORT
   value: "{{ include "wandb.mysql.port" . }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.mysql.host }}
+  {{- if kindIs "map" .Values.global.mysql.host }}
 - name: MYSQL_HOST
 {{- toYaml .Values.global.mysql.host | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: MYSQL_HOST
   value: "{{ include "wandb.mysql.host" . }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.mysql.database }}
+  {{- if kindIs "map" .Values.global.mysql.database }}
 - name: MYSQL_DATABASE
 {{- toYaml .Values.global.mysql.database | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: MYSQL_DATABASE
   value: "{{ include "wandb.mysql.database" . }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.mysql.user }}
+  {{- if kindIs "map" .Values.global.mysql.user }}
 - name: MYSQL_USER
 {{- toYaml .Values.global.mysql.user | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: MYSQL_USER
   value: "{{ include "wandb.mysql.user" . }}"
-{{- end -}}
+  {{- end -}}
 
-{{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") }}
+  {{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") }}
 - name: MYSQL_CA_CERT_PATH
   value: "/etc/ssl/certs/{{ include "wandb.mysql.certFileName" . }}"
-{{- end }}
+  {{- end }}
 {{- end -}}
 
 {{- define "wandb.mysqlEnvs" -}}
@@ -211,95 +211,95 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.clickhouseConfigEnvs" -}}
-{{- /*
-  ATTENTION!
-  
-  WF_CLICKHOUSE_HOST, WF_CLICKHOUSE_PORT, WF_CLICKHOUSE_DATABASE, 
-  WF_CLICKHOUSE_USER, WF_CLICKHOUSE_REPLICATED, CLICKHOUSE_PASSWORD
+  {{- /*
+    ATTENTION!
 
-  Are all set in the values.yaml under global.clickhouse.(host,port,database,user,password,replicated)
+    WF_CLICKHOUSE_HOST, WF_CLICKHOUSE_PORT, WF_CLICKHOUSE_DATABASE,
+    WF_CLICKHOUSE_USER, WF_CLICKHOUSE_REPLICATED, CLICKHOUSE_PASSWORD
 
-  The following blocks are to enable values to be provided in one of two ways:
+    Are all set in the values.yaml under global.clickhouse.(host,port,database,user,password,replicated)
 
-  AS STANDARD:
-    clickhouse:
-      host: "clickhouse.example.com"
-      port: 8443
-      database: "weave_trace_db"
-      user: "default"
-      password: "supersafe"
-      replicated: false
+    The following blocks are to enable values to be provided in one of two ways:
 
-  AS K8s REFS:
-    clickhouse:
-      host:
-        valueFrom:
-          secretKeyRef:
-            name: "clickhouse-settings-secret"
-            key: "endpoint"
-      port:
-        valueFrom:
-          secretKeyRef:
-            name: "clickhouse-settings-secret"
-            key: "port"
-      database:
-        ...
-      user:
-        ...
-      password:
-        ...
-*/ -}}
+    AS STANDARD:
+      clickhouse:
+        host: "clickhouse.example.com"
+        port: 8443
+        database: "weave_trace_db"
+        user: "default"
+        password: "supersafe"
+        replicated: false
 
-{{- if kindIs "map" .Values.global.clickhouse.host }}
+    AS K8s REFS:
+      clickhouse:
+        host:
+          valueFrom:
+            secretKeyRef:
+              name: "clickhouse-settings-secret"
+              key: "endpoint"
+        port:
+          valueFrom:
+            secretKeyRef:
+              name: "clickhouse-settings-secret"
+              key: "port"
+        database:
+          ...
+        user:
+          ...
+        password:
+          ...
+  */ -}}
+
+  {{- if kindIs "map" .Values.global.clickhouse.host }}
 - name: WF_CLICKHOUSE_HOST
 {{- toYaml .Values.global.clickhouse.host | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: WF_CLICKHOUSE_HOST
   value: "{{ include "wandb.clickhouse.host" . }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.clickhouse.port }}
+  {{- if kindIs "map" .Values.global.clickhouse.port }}
 - name: WF_CLICKHOUSE_PORT
 {{- toYaml .Values.global.clickhouse.port | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: WF_CLICKHOUSE_PORT
   value: "{{ include "wandb.clickhouse.port" . }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.clickhouse.database }}
+  {{- if kindIs "map" .Values.global.clickhouse.database }}
 - name: WF_CLICKHOUSE_DATABASE
 {{- toYaml .Values.global.clickhouse.database | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: WF_CLICKHOUSE_DATABASE
   value: "{{ include "wandb.clickhouse.database" . }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.clickhouse.user }}
+  {{- if kindIs "map" .Values.global.clickhouse.user }}
 - name: WF_CLICKHOUSE_USER
 {{- toYaml .Values.global.clickhouse.user | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: WF_CLICKHOUSE_USER
   value: "{{ include "wandb.clickhouse.user" . }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.clickhouse.replicated }}
+  {{- if kindIs "map" .Values.global.clickhouse.replicated }}
 - name: WF_CLICKHOUSE_REPLICATED
 {{- toYaml .Values.global.clickhouse.replicated | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: WF_CLICKHOUSE_REPLICATED
   value: "{{ .Values.global.clickhouse.replicated }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.clickhouse.password }}
+  {{- if kindIs "map" .Values.global.clickhouse.password }}
 - name: WF_CLICKHOUSE_PASS
 {{- toYaml .Values.global.clickhouse.password | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: WF_CLICKHOUSE_PASS
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.clickhouse.passwordSecret" . | quote}}
       key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{- define "wandb.clickhouseEnvs" -}}
@@ -307,102 +307,102 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.olapFeatureEnvs" -}}
-{{- /*
-  Shared template for OLAP feature environment variables.
-
-  Params (via dict):
-    root           - top-level Helm context (.)
-    featureName    - key under global.olap, e.g. "registrySearch"
-    envVarPrefix   - env var prefix, e.g. "REGISTRY_SEARCH"
-    finalEnvName   - the composed URL env var, e.g. "GORILLA_REGISTRY_SEARCH_ADDRESS"
-    migratePrefix  - (optional) prefix for MIGRATE_*_DB env var; defaults to envVarPrefix
-
-  Merges global.olap.<featureName> over global.olap.default.
-  Each field supports both plain values and K8s refs (valueFrom maps).
-  The params map is serialized into a query string. The type field drives
-  the connection URL schema.
-
-  AS STANDARD:
-    olap:
-      default:
-        host: "clickhouse.example.com"
-        port: "9440"
-        user: "default"
-        password: "supersafe"
-      registrySearch:
-        enabled: true
-        database: "registry_search"
-
-  AS K8s REFS:
-    olap:
-      registrySearch:
-        enabled: true
-        host:
-          valueFrom:
-            configMapKeyRef:
-              name: "clickhouse-registry-search"
-              key: "host"
-        password:
-          valueFrom:
-            secretKeyRef:
-              name: "clickhouse-registry-search-password"
-              key: "password"
-*/ -}}
-{{- $config := include "wandb.olapConfig" (dict "root" .root "featureName" .featureName) | fromYaml -}}
-{{- if $config.enabled -}}
   {{- /*
-    # TODO: validate this doesn't silently break inside the operator. Punting for now.
-    # {{- if and (not (kindIs "map" $config.host)) (empty $config.host) -}}
-    #   {{- fail (printf "global.olap.%s: host must be set (either in global.olap.default.host or global.olap.%s.host) when enabled" .featureName .featureName) -}}
-    # {{- end -}}
- */}}
-  {{- $prefix := .envVarPrefix -}}
-  {{- $secretName := include "wandb.olapSecretName" (dict "root" .root "featureName" .featureName) -}}
-  {{- $secretKey := include "wandb.olapSecretKey" (dict "envVarPrefix" $prefix) -}}
-{{- if kindIs "map" $config.host }}
+    Shared template for OLAP feature environment variables.
+
+    Params (via dict):
+      root           - top-level Helm context (.)
+      featureName    - key under global.olap, e.g. "registrySearch"
+      envVarPrefix   - env var prefix, e.g. "REGISTRY_SEARCH"
+      finalEnvName   - the composed URL env var, e.g. "GORILLA_REGISTRY_SEARCH_ADDRESS"
+      migratePrefix  - (optional) prefix for MIGRATE_*_DB env var; defaults to envVarPrefix
+
+    Merges global.olap.<featureName> over global.olap.default.
+    Each field supports both plain values and K8s refs (valueFrom maps).
+    The params map is serialized into a query string. The type field drives
+    the connection URL schema.
+
+    AS STANDARD:
+      olap:
+        default:
+          host: "clickhouse.example.com"
+          port: "9440"
+          user: "default"
+          password: "supersafe"
+        registrySearch:
+          enabled: true
+          database: "registry_search"
+
+    AS K8s REFS:
+      olap:
+        registrySearch:
+          enabled: true
+          host:
+            valueFrom:
+              configMapKeyRef:
+                name: "clickhouse-registry-search"
+                key: "host"
+          password:
+            valueFrom:
+              secretKeyRef:
+                name: "clickhouse-registry-search-password"
+                key: "password"
+  */ -}}
+  {{- $config := include "wandb.olapConfig" (dict "root" .root "featureName" .featureName) | fromYaml -}}
+  {{- if $config.enabled -}}
+    {{- /*
+      # TODO: validate this doesn't silently break inside the operator. Punting for now.
+      # {{- if and (not (kindIs "map" $config.host)) (empty $config.host) -}}
+      #   {{- fail (printf "global.olap.%s: host must be set (either in global.olap.default.host or global.olap.%s.host) when enabled" .featureName .featureName) -}}
+      # {{- end -}}
+    */}}
+    {{- $prefix := .envVarPrefix -}}
+    {{- $secretName := include "wandb.olapSecretName" (dict "root" .root "featureName" .featureName) -}}
+    {{- $secretKey := include "wandb.olapSecretKey" (dict "envVarPrefix" $prefix) -}}
+    {{- if kindIs "map" $config.host }}
 - name: {{ $prefix }}_HOST
 {{- toYaml $config.host | nindent 2 }}
-{{- else }}
+    {{- else }}
 - name: {{ $prefix }}_HOST
   value: {{ tpl ($config.host | toString) .root | quote }}
-{{- end }}
-{{- if kindIs "map" $config.port }}
+    {{- end }}
+    {{- if kindIs "map" $config.port }}
 - name: {{ $prefix }}_PORT
 {{- toYaml $config.port | nindent 2 }}
-{{- else }}
+    {{- else }}
 - name: {{ $prefix }}_PORT
   value: {{ $config.port | toString | quote }}
-{{- end }}
-{{- if kindIs "map" $config.database }}
+    {{- end }}
+    {{- if kindIs "map" $config.database }}
 - name: {{ $prefix }}_DATABASE
 {{- toYaml $config.database | nindent 2 }}
-{{- else }}
+    {{- else }}
 - name: {{ $prefix }}_DATABASE
   value: {{ $config.database | quote }}
-{{- end }}
-{{- if kindIs "map" $config.user }}
+    {{- end }}
+    {{- if kindIs "map" $config.user }}
 - name: {{ $prefix }}_USER
 {{- toYaml $config.user | nindent 2 }}
-{{- else }}
+    {{- else }}
 - name: {{ $prefix }}_USER
   value: {{ $config.user | quote }}
-{{- end }}
-{{- if kindIs "map" $config.password }}
+    {{- end }}
+    {{- if kindIs "map" $config.password }}
 - name: {{ $prefix }}_PASSWORD
 {{- toYaml $config.password | nindent 2 }}
-{{- else }}
+    {{- else }}
 - name: {{ $prefix }}_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ $secretName | quote }}
       key: {{ $secretKey | quote }}
-{{- end }}
-  {{- $finalConnectionUrl := printf "%s://$(%s_USER):$(%s_PASSWORD)@$(%s_HOST):$(%s_PORT)/$(%s_DATABASE)$(%s_PARAMS)" $config.type $prefix $prefix $prefix $prefix $prefix $prefix }}
+    {{- end }}
+    {{- $finalConnectionUrl := printf "%s://$(%s_USER):$(%s_PASSWORD)@$(%s_HOST):$(%s_PORT)/$(%s_DATABASE)$(%s_PARAMS)" $config.type $prefix $prefix $prefix $prefix $prefix $prefix }}
 - name: {{ $prefix }}_PARAMS
   value: {{ include "wandb.olapParamsQuery" (dict "params" $config.params) | quote }}
 - name: {{ .finalEnvName }}
   value: {{ $finalConnectionUrl | quote }}
-{{- $migratePrefix := default $prefix .migratePrefix }}
+    {{- $migratePrefix := default $prefix .migratePrefix }}
 - name: "MIGRATE_{{ $migratePrefix }}_DB"
   value: {{ $finalConnectionUrl | quote }}
   {{- end }}
@@ -414,11 +414,11 @@ Global values will override any chart-specific values.
 
 {{- define "wandb.runStoreAcceleratorEnvs" -}}
 {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUN_STORE_ACCELERATOR" "migratePrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") }}
-{{- /*TODO: Remove once Go code migrates EnvVarPrefix from RUNS_ACCELERATOR to RUN_STORE_ACCELERATOR */}}
-{{- if .Values.global.olap.runStoreAccelerator.enabled }}
+  {{- /*TODO: Remove once Go code migrates EnvVarPrefix from RUNS_ACCELERATOR to RUN_STORE_ACCELERATOR */}}
+  {{- if .Values.global.olap.runStoreAccelerator.enabled }}
 - name: MIGRATE_RUNS_ACCELERATOR_DB
   value: "$(MIGRATE_RUN_STORE_ACCELERATOR_DB)"
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{- define "wandb.historyEnvs" -}}
@@ -426,12 +426,12 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{/* 
-# TODO: uncomment when weave trace is ready to be integrated. 
-# Note, right now it is using WF_CLICKHOUSE as the env var prefix, but we might want to change this to something else if not overly coupled in the weaveTrace code. 
+# TODO: uncomment when weave trace is ready to be integrated.
+# Note, right now it is using WF_CLICKHOUSE as the env var prefix, but we might want to change this to something else if not overly coupled in the weaveTrace code.
 # {{- define "wandb.weaveTraceEnvs" -}}
 # {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "weaveTrace" "envVarPrefix" "WEAVE_TRACE" "finalEnvName" "GORILLA_WEAVE_TRACE_ADDRESS") -}}
 # {{- end -}}
- */}}
+*/}}
 
 {{- define "wandb.historyStoreEnvs" -}}
 - name: GORILLA_HISTORY_STORE
@@ -456,7 +456,7 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.oidcEnvs" -}}
-{{- if or .Values.global.auth.oidc.secret "" .Values.global.auth.oidc.oidcSecret.name }}
+  {{- if or .Values.global.auth.oidc.secret "" .Values.global.auth.oidc.oidcSecret.name }}
 - name: GORILLA_OIDC_SECRET
   valueFrom:
     secretKeyRef:
@@ -467,103 +467,103 @@ Global values will override any chart-specific values.
     secretKeyRef:
       name: {{ include "wandb.oidc.secretSecret" . | quote }}
       key: "{{ .Values.global.auth.oidc.oidcSecret.secretKey }}"
-{{- end }}
+  {{- end }}
 {{- end -}}
 
 {{- define "wandb.smtpEnvs" -}}
-{{- /*
-  ATTENTION!
-  
-  SMTP_PASSWORD, SMTP_PORT, SMTP_HOST, SMTP_USER, GORILLA_EMAIL_FROM_ADDRESS
+  {{- /*
+    ATTENTION!
 
-  Are all set in the values.yaml under global.email.smtp.(host,port,user,password,mailFrom)
+    SMTP_PASSWORD, SMTP_PORT, SMTP_HOST, SMTP_USER, GORILLA_EMAIL_FROM_ADDRESS
 
-  The following blocks enable values to be provided in one of two ways:
+    Are all set in the values.yaml under global.email.smtp.(host,port,user,password,mailFrom)
 
-  AS STANDARD:
-    email:
-      smtp:
-        host: "smtp.example.com"
-        port: 587
-        user: "noreply@example.com"
-        password: "supersafe"
-        mailFrom: "noreply@example.com"
+    The following blocks enable values to be provided in one of two ways:
 
-  AS K8s REFS:
-    email:
-      smtp:
-        host:
-          valueFrom:
-            secretKeyRef:
-              name: "smtp-settings-secret"
-              key: "host"
-        port:
-          valueFrom:
-            secretKeyRef:
-              name: "smtp-settings-secret"
-              key: "port"
-        user:
-          valueFrom:
-            secretKeyRef:
-              name: "smtp-settings-secret"
-              key: "user"
-        password:
-          valueFrom:
-            secretKeyRef:
-              name: "smtp-settings-secret"
-              key: "password"
-        mailFrom:
-          valueFrom:
-            secretKeyRef:
-              name: "smtp-settings-secret"
-              key: "mailFrom"
-*/ -}}
+    AS STANDARD:
+      email:
+        smtp:
+          host: "smtp.example.com"
+          port: 587
+          user: "noreply@example.com"
+          password: "supersafe"
+          mailFrom: "noreply@example.com"
 
-{{- if kindIs "map" .Values.global.email.smtp.host }}
+    AS K8s REFS:
+      email:
+        smtp:
+          host:
+            valueFrom:
+              secretKeyRef:
+                name: "smtp-settings-secret"
+                key: "host"
+          port:
+            valueFrom:
+              secretKeyRef:
+                name: "smtp-settings-secret"
+                key: "port"
+          user:
+            valueFrom:
+              secretKeyRef:
+                name: "smtp-settings-secret"
+                key: "user"
+          password:
+            valueFrom:
+              secretKeyRef:
+                name: "smtp-settings-secret"
+                key: "password"
+          mailFrom:
+            valueFrom:
+              secretKeyRef:
+                name: "smtp-settings-secret"
+                key: "mailFrom"
+  */ -}}
+
+  {{- if kindIs "map" .Values.global.email.smtp.host }}
 - name: SMTP_HOST
 {{- toYaml .Values.global.email.smtp.host | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: SMTP_HOST
   value: "{{ include "wandb.smtp.host" . }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.email.smtp.port -}}
+  {{- if kindIs "map" .Values.global.email.smtp.port -}}
 - name: SMTP_PORT
 {{- toYaml .Values.global.email.smtp.port | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: SMTP_PORT
   value: "{{ include "wandb.smtp.port" . }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.email.smtp.user }}
+  {{- if kindIs "map" .Values.global.email.smtp.user }}
 - name: SMTP_USER
 {{- toYaml .Values.global.email.smtp.user | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: SMTP_USER
   value: "{{ include "wandb.smtp.user" . }}"
-{{- end }}
+  {{- end }}
 
-{{- if kindIs "map" .Values.global.email.smtp.password }}
+  {{- if kindIs "map" .Values.global.email.smtp.password }}
 - name: SMTP_PASSWORD
 {{- toYaml .Values.global.email.smtp.password | nindent 2 }}
-{{- else }}
+  {{- else }}
 - name: SMTP_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.smtp.internalSecretName" . | quote }}
       key: {{ include "wandb.smtp.internalSecretKey" . | quote }}
-{{- end }}
+  {{- end }}
 
 - name: GORILLA_EMAIL_SINK
   value: "{{ include "wandb.emailSink" . | trim }}"
 
-{{- if kindIs "map" .Values.global.email.smtp.mailFrom }}
+  {{- if kindIs "map" .Values.global.email.smtp.mailFrom }}
 - name: GORILLA_EMAIL_FROM_ADDRESS
 {{- toYaml .Values.global.email.smtp.mailFrom | nindent 2 }}
-{{- else if ne .Values.global.email.smtp.mailFrom "" }}
+  {{- else if ne .Values.global.email.smtp.mailFrom "" }}
 - name: GORILLA_EMAIL_FROM_ADDRESS
   value: "{{ include "wandb.smtp.mailFrom" . }}"
-{{- end }}
+  {{- end }}
 {{- end -}}
 
 {{- define "wandb.downwardEnvs" -}}
@@ -590,10 +590,10 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.observabilityEnvs" -}}
-{{- if and .Values.traceRatio (ne .Values.traceRatio 0.0) }}
+  {{- if and .Values.traceRatio (ne .Values.traceRatio 0.0) }}
 - name: GORILLA_TRACER
   value: '{{ include "wandb.otelTracesEndpoint" . | trim }}'
-{{- end }}
+  {{- end }}
 {{- end -}}
 
 {{- define "wandb.sslCertEnvs" -}}
@@ -618,7 +618,7 @@ Global values will override any chart-specific values.
   in the `envTpls` section.
 */ -}}
 {{- define "wandb.rateLimitEnvs" -}}
-{{- if and .Values.global.api.enabled .Values.global.api.rateLimits.enabled}}
+  {{- if and .Values.global.api.enabled .Values.global.api.rateLimits.enabled}}
 - name: GORILLA_LIMITER
   value: "{{ include "wandb.redis.connectionString" . | trim }}"
 - name: GORILLA_DEFAULT_RATE_LIMITS_FILESTREAM_COUNT
@@ -635,17 +635,17 @@ Global values will override any chart-specific values.
   value: "{{ .Values.global.api.rateLimits.createArtifacts }}"
 - name: GORILLA_DEFAULT_RATE_LIMITS_CREATE_ARTIFACTS_TIME_WINDOW
   value: "{{ .Values.global.api.rateLimits.createArtifactsTimeWindow }}"
-{{- else }}
+  {{- else }}
 - name: GORILLA_LIMITER
   value: "noop://"
-{{- end }}
+  {{- end }}
 {{- end -}}
 
 {{- define "wandb.lumen.gorillaEnvs" -}}
 - name: GORILLA_LUMEN_ADDR
   value: ":16060"
-{{- if include "wandb.lumen.publish.envVars" . }}
+  {{- if include "wandb.lumen.publish.envVars" . }}
 - name: GORILLA_LUMEN_ENV_VARS_EXPOSED
   value: "true"
-{{- end }}
+  {{- end }}
 {{- end -}}
