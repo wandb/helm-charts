@@ -305,6 +305,27 @@ tests:
       - failedTemplate:
           errorMessage: global.auth.sessionKeyRotation.phase=activate requires a prepared rotation with the same id
 
+  - it: rejects activate when the prepared candidate is empty
+    set:
+      global.auth.sessionKeyRotation.id: rotation-1
+      global.auth.sessionKeyRotation.phase: activate
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: wandb-gorilla-session-key
+            namespace: default
+            annotations:
+              wandb.ai/session-key-rotation-id: rotation-1
+              wandb.ai/session-key-rotation-phase: prepare
+          data:
+            GORILLA_SESSION_KEY: YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=
+            GORILLA_SESSION_KEY_PREVIOUS: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: prepared session key rotation has no candidate key
+
   - it: rejects managed rotation with explicit key overrides
     set:
       global.auth.sessionKey:
