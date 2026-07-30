@@ -3010,14 +3010,16 @@ settingsMigrationJob:
   podDisruptionBudget:
     enabled: false
 
-# Runs ClickHouse schema migrations once per helm operation as a hook Job, so
-# concurrent migrate-db initContainers cannot race on ClickHouse, which has no
-# DB-level locking. The migrate binary skips any schema whose MIGRATE_*_DB env
-# var is unset, so the job is a fast no-op unless OLAP features are enabled;
-# MySQL schemas stay with the initContainers. The image must carry the same
+# Runs ClickHouse schema migrations once per helm operation as a hook Job.
+# This Job is the sole ClickHouse migrator: only its envTpls use the
+# wandb.*MigrateEnvs helpers that set MIGRATE_*_DB, and the migrate binary
+# skips any schema whose MIGRATE_*_DB env var is unset. App-pod migrate-db
+# initContainers therefore run MySQL schemas only and cannot race on
+# ClickHouse, which has no DB-level locking. The image must carry the same
 # migration files as the deployed code -- keep its tag in lockstep with api.
-# TODO: default to true once the deployer stamps this job's image tag
-# alongside api's (wandb/deployments user-spec/deploy.py).
+# TODO: default install to true (tracked separately); until then, deployments
+# with OLAP features enabled must set install: true or ClickHouse schemas
+# will not be migrated at all.
 clickhouseMigrationJob:
   install: false
   kind: Job
@@ -3036,9 +3038,9 @@ clickhouseMigrationJob:
     hook: "post-install,pre-upgrade"
   envTpls:
     - '{{ include "wandb.sslCertEnvs" . }}'
-    - '{{ include "wandb.historyEnvs" . }}'
-    - '{{ include "wandb.registrySearchEnvs" . }}'
-    - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
+    - '{{ include "wandb.historyMigrateEnvs" . }}'
+    - '{{ include "wandb.registrySearchMigrateEnvs" . }}'
+    - '{{ include "wandb.runStoreAcceleratorMigrateEnvs" . }}'
   jobs:
     ch-migrate:
       # Only render when at least one global.olap feature is enabled.
