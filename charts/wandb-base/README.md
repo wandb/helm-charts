@@ -60,6 +60,19 @@ envFrom:
   app-secrets: "secretRef"
 ```
 
+Subcharts inherit `global.env` and the legacy `global.extraEnv` by default. A
+workload that must receive only its chart-local environment can disable that
+inheritance without changing other subcharts:
+
+```yaml
+globalOptOut:
+  env: true
+```
+
+This option does not remove chart-local `env`, `extraEnv`, `envTpls`, or
+`envFrom` values. Existing installations remain unchanged when the option is
+omitted.
+
 ### Volumes
 
 Volumes can be defined at multiple levels and are combined by name. The chart uses the pod- or chart-level volume when a name collides with a global volume.

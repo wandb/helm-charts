@@ -3388,12 +3388,14 @@ mcp-server:
       ad.datadoghq.com/mcp-server.tags: {{ include "wandb.mcpDatadogTags" . | quote }}
       ad.datadoghq.com/mcp-server.logs: {{ include "wandb.mcpDatadogLogs" . | quote }}
       {{- end }}
-  envFrom:
-    "{{ .Release.Name }}-global-configmap": "configMapRef"
+  ## MCP receives only its chart-local environment. In particular, do not
+  ## inherit the global admin API key or Gorilla server-only controls.
+  globalOptOut:
+    env: true
+  envFrom: {}
   envTpls:
     - '{{ include "wandb.mcpEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
-    - '{{ include "wandb.statsigEnvs" . }}'
   env:
     WANDB_SILENT: "True"
     WEAVE_SILENT: "True"
@@ -3410,7 +3412,9 @@ mcp-server:
     MCP_ADMISSION_CONTROL_ENABLED: "true"
     MCP_TOOL_TIMEOUT_SECONDS: "30"
     MCP_WANDB_REQUEST_TIMEOUT_SECONDS: "20"
+    WANDB_MCP_READ_ONLY: "false"
     WANDB_MCP_ENABLE_RAW_GRAPHQL: "false"
+    WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS: "false"
     UVICORN_WORKERS: "1"
     # Keep connection/task headroom above the 16-request application limit so
     # health probes and idle MCP keep-alives cannot cause transport-level 503s.

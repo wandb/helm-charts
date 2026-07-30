@@ -64,6 +64,7 @@ fails helm render with "index of nil pointer".
 
 Resolves:
 - WANDB_MCP_ENABLE_WEAVE_TOOLS: whether trace-dependent MCP tools are exposed.
+- MCP_DEPLOYMENT_TYPE: the existing Dedicated/Self-Managed install classification.
 - WF_TRACE_SERVER_URL: public weave-trace URL via ingress (global.host + /traces).
   The chart's weave-trace subchart mounts the FastAPI app under API_PATH_PREFIX=/traces
   (see templates/weave-trace.yaml), so the in-cluster Service path http://<release>-weave-trace:8722
@@ -89,6 +90,8 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
   {{- $enableWeaveTools := or (eq $weaveMode "true") (and (eq $weaveMode "auto") $hasTraceBackend) -}}
 - name: WANDB_MCP_ENABLE_WEAVE_TOOLS
   value: {{ ternary "true" "false" $enableWeaveTools | quote }}
+- name: MCP_DEPLOYMENT_TYPE
+  value: {{ index .Values "datadog" "deploymentType" | default "self-managed" | quote }}
   {{- if and $enableWeaveTools (not $hasExplicitTraceURL) }}
 - name: WF_TRACE_SERVER_URL
   value: "{{ .Values.global.host }}/traces"
