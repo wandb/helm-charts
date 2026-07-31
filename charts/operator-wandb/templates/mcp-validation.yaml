@@ -31,12 +31,40 @@
       {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL must be non-empty when set" -}}
     {{- end -}}
   {{- else if .Values.global.api.enabled -}}
-    {{- if not (index .Values "api" "service" "enabled") -}}
+    {{- $api := index .Values "api" | default dict -}}
+    {{- $apiService := index $api "service" | default dict -}}
+    {{- if not (index $apiService "enabled") -}}
       {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when global.api.enabled=true and api.service.enabled=false" -}}
     {{- end -}}
+    {{- $apiNameOverride := index $api "nameOverride" | default "" | toString | trim -}}
+    {{- $apiFullnameOverride := index $api "fullnameOverride" | default "" | toString | trim -}}
+    {{- $apiServiceName := index $apiService "name" | default "" | toString | trim -}}
+    {{- $apiPortIsDefault := false -}}
+    {{- range (index $apiService "ports" | default list) -}}
+      {{- if and (eq (index . "name" | default "" | toString) "http") (eq (index . "port" | toString) "8081") -}}
+        {{- $apiPortIsDefault = true -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if or (ne $apiNameOverride "") (ne $apiFullnameOverride "") (ne $apiServiceName "") (not $apiPortIsDefault) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when api naming or the http Service port is overridden" -}}
+    {{- end -}}
   {{- else -}}
-    {{- if or (not (index .Values "app" "install")) (not (index .Values "app" "service" "enabled")) -}}
+    {{- $app := index .Values "app" | default dict -}}
+    {{- $appService := index $app "service" | default dict -}}
+    {{- if or (not (index $app "install")) (not (index $appService "enabled")) -}}
       {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when the monolith app Service is disabled" -}}
+    {{- end -}}
+    {{- $appNameOverride := index $app "nameOverride" | default "" | toString | trim -}}
+    {{- $appFullnameOverride := index $app "fullnameOverride" | default "" | toString | trim -}}
+    {{- $appServiceName := index $appService "name" | default "" | toString | trim -}}
+    {{- $appPortIsDefault := false -}}
+    {{- range (index $appService "ports" | default list) -}}
+      {{- if and (eq (index . "name" | default "" | toString) "app") (eq (index . "port" | toString) "8080") -}}
+        {{- $appPortIsDefault = true -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if or (ne $appNameOverride "") (ne $appFullnameOverride "") (ne $appServiceName "") (not $appPortIsDefault) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when app naming or the app Service port is overridden" -}}
     {{- end -}}
   {{- end -}}
   {{- $mcpWeave := index $mcp "weave" | default dict -}}

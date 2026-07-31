@@ -19,7 +19,7 @@ def _helm_template(
     *,
     release: str = "routing-test",
     namespace: str = "customer-wandb",
-    values: dict[str, str | bool] | None = None,
+    values: dict[str, str | bool | int] | None = None,
     mcp_only: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     command = [
@@ -31,7 +31,7 @@ def _helm_template(
         namespace,
     ]
     for name, value in (values or {}).items():
-        if isinstance(value, bool):
+        if isinstance(value, (bool, int)):
             command.extend(("--set", f"{name}={str(value).lower()}"))
         else:
             command.extend(("--set-string", f"{name}={value}"))
@@ -46,8 +46,8 @@ def _helm_template(
     )
 
 
-def _mcp_values(**overrides: str | bool) -> dict[str, str | bool]:
-    values: dict[str, str | bool] = {
+def _mcp_values(**overrides: str | bool | int) -> dict[str, str | bool | int]:
+    values: dict[str, str | bool | int] = {
         "mcp-server.install": True,
         "global.host": PUBLIC_BASE_URL,
     }
@@ -157,6 +157,92 @@ class McpChartRenderTest(unittest.TestCase):
                     _env_value(manifest, "WANDB_INTERNAL_BASE_URL"), override
                 )
                 self.assertEqual(manifest.count("name: WANDB_INTERNAL_BASE_URL"), 1)
+
+    def test_custom_backend_service_settings_require_explicit_url(self) -> None:
+        cases: tuple[tuple[str, dict[str, str | bool | int], str], ...] = (
+            (
+                "split service name",
+                {
+                    "global.api.enabled": True,
+                    "api.service.name": "custom-api-service",
+                },
+                "api naming or the http Service port is overridden",
+            ),
+            (
+                "split name override",
+                {
+                    "global.api.enabled": True,
+                    "api.nameOverride": "custom-api",
+                },
+                "api naming or the http Service port is overridden",
+            ),
+            (
+                "split fullname override",
+                {
+                    "global.api.enabled": True,
+                    "api.fullnameOverride": "custom-api-fullname",
+                },
+                "api naming or the http Service port is overridden",
+            ),
+            (
+                "split service port",
+                {
+                    "global.api.enabled": True,
+                    "api.service.ports[0].port": 9081,
+                },
+                "api naming or the http Service port is overridden",
+            ),
+            (
+                "monolith service name",
+                {
+                    "global.api.enabled": False,
+                    "app.service.name": "custom-app-service",
+                },
+                "app naming or the app Service port is overridden",
+            ),
+            (
+                "monolith name override",
+                {
+                    "global.api.enabled": False,
+                    "app.nameOverride": "custom-app",
+                },
+                "app naming or the app Service port is overridden",
+            ),
+            (
+                "monolith fullname override",
+                {
+                    "global.api.enabled": False,
+                    "app.fullnameOverride": "custom-app-fullname",
+                },
+                "app naming or the app Service port is overridden",
+            ),
+            (
+                "monolith service port",
+                {
+                    "global.api.enabled": False,
+                    "app.service.ports[0].port": 9080,
+                },
+                "app naming or the app Service port is overridden",
+            ),
+        )
+        explicit_url = "http://custom-backend.platform.svc.cluster.local:9090"
+        for label, values, expected_error in cases:
+            with self.subTest(label=label, explicit_override=False):
+                result = _helm_template(values=_mcp_values(**values))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected_error, result.stderr)
+
+            with self.subTest(label=label, explicit_override=True):
+                values_with_override = {
+                    **values,
+                    "mcp-server.env.WANDB_INTERNAL_BASE_URL": explicit_url,
+                }
+                manifest = self.assert_render_succeeds(
+                    _helm_template(values=_mcp_values(**values_with_override))
+                )
+                self.assertEqual(
+                    _env_value(manifest, "WANDB_INTERNAL_BASE_URL"), explicit_url
+                )
 
     def test_nonstandard_topology_requires_an_explicit_internal_url(self) -> None:
         cases = (

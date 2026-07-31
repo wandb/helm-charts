@@ -71,8 +71,9 @@ Resolves:
   returns 404 without the prefix. Using the ingress URL matches the convention other
   internal consumers use (see weave-trace.yaml WF_TRACE_SERVER_URL line).
 - WANDB_BASE_URL: the public W&B instance URL (from global.host)
-- WANDB_INTERNAL_BASE_URL: the namespace-local split API or monolith Service
-  used by backend calls
+- WANDB_INTERNAL_BASE_URL: the default namespace-local split API or monolith
+  Service used by backend calls; custom backend naming/ports require an
+  explicit value because this helper runs in MCP subchart scope
 - MCP_WORKLOAD_PROFILE: bounded workload limits for this deployment
 
 MCP can run without weave-trace. When WANDB_MCP_ENABLE_WEAVE_TOOLS=false,
