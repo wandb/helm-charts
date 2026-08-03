@@ -331,6 +331,23 @@ workspace-engine:
             limits:
               cpu: "1"
               memory: 1Gi
+    authz-apply-schema:
+      annotations:
+        "helm.sh/hook": "pre-install,pre-upgrade"
+        "helm.sh/hook-weight": "-4"
+        "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+      backoffLimit: 3
+      ttlSecondsAfterFinished: 300
+      containers:
+        authz-apply-schema:
+          command: ["./engine", "authz", "apply-schema"]
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
 
   service:
     enabled: true
@@ -381,6 +398,65 @@ workspace-engine:
       ports:
         - name: http
           containerPort: 8086
+        - name: health
+          containerPort: 8089
+      resources:
+        requests:
+          cpu: 8
+          memory: 16Gi
+        limits:
+          cpu: 32
+          memory: 64Gi
+      livenessProbe:
+        httpGet:
+          path: /livez
+          port: health
+      readinessProbe:
+        httpGet:
+          path: /readyz
+          port: health
+      startupProbe:
+        httpGet:
+          path: /readyz
+          port: health
+
+# Optional second engine Deployment running only the reconcile controllers,
+# for scaling them independently of the Connect API. See "Workspace-engine
+# topology" in the README — requires an engine image >= ctrlplane c48ced3,
+# and the workspace-engine block above should set SERVICES: connect when
+# this is enabled.
+workspace-engine-controllers:
+  install: false
+
+  image:
+    repository: orchestrator/workspace-engine
+    tag: latest
+
+  env:
+    BASE_URL: "{{ .Values.global.fqdn }}"
+    GITHUB_URL: "{{ .Values.global.integrations.github.url }}"
+    DD_SERVICE: "ctrlplane/workspace-engine"
+    DD_ENV: "local"
+    TRACE_SAMPLE_RATE: "0.1"
+
+    AUTH_ALLOW_UNVERIFIED_JWT_CLAIMS: "false"
+    AUTHZ_ALLOW_DISABLED: "false"
+
+    SERVICES: "controllers"
+
+  envTpls:
+    - '{{ include "orchestrator.githubBotEnvVars" . }}'
+    - '{{ include "orchestrator.postgresqlEnvVars" . }}'
+    - '{{ include "orchestrator.encryptionKeyEnvVars" . }}'
+    - '{{ include "orchestrator.spicedbEnvVars" . }}'
+    - '{{ include "orchestrator.authJwtEnvVars" . }}'
+    - '{{ include "orchestrator.redisEnvVars" . }}'
+    - '{{ include "orchestrator.authSyncSecretEnvVars" . }}'
+    - '{{ include "orchestrator.workspaceEngineTelemetryEnvVars" . }}'
+
+  containers:
+    workspace-engine:
+      ports:
         - name: health
           containerPort: 8089
       resources:

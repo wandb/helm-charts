@@ -11,6 +11,8 @@ jobs:
 
     permissions:
       contents: write
+      packages: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -41,6 +43,41 @@ jobs:
         shell: bash
 
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@be16258da8010256c6e82849661221415f031968 # v1.5.0
+        id: releaser
+        uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
+        with:
+          skip_existing: true
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Install cosign
+        if: steps.releaser.outputs.changed_charts != ''
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: Login to GHCR
+        if: steps.releaser.outputs.changed_charts != ''
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push and sign charts on OCI registry
+        if: steps.releaser.outputs.changed_charts != ''
+        shell: bash
+        env:
+          OCI_REPO: oci://ghcr.io/${{ github.repository_owner }}/helm-charts
+        run: ./.github/scripts/push-and-sign-oci-charts.sh
+
+      - name: Verify OCI chart signatures
+        if: steps.releaser.outputs.changed_charts != ''
+        shell: bash
+        env:
+          CERT_IDENTITY_REGEXP: ^https://github\.com/${{ github.repository }}/\.github/workflows/release\.yaml@refs/heads/main$
+          CERT_OIDC_ISSUER: https://token.actions.githubusercontent.com
+        run: ./.github/scripts/verify-oci-signatures.sh
+
+      - name: Verify public OCI chart access
+        if: steps.releaser.outputs.changed_charts != ''
+        shell: bash
+        run: ./.github/scripts/verify-public-oci-access.sh
