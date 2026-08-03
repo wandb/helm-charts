@@ -1,8 +1,13 @@
 name: Lint Charts
 
 on:
+  # No paths filter: run on every PR and let ct + ct.yaml gate what's linted.
   pull_request:
-    paths: charts/**
+
+env:
+  # When upgrading, re-evaluate the repository-owned checks for gaps helmfmt now covers.
+  HELMFMT_VERSION: "0.5.0"
+  HELMFMT_LINUX_X86_64_SHA256: "17e6de3266b7bfeb50f4e425736d3362c3c7a01bf9756710b1d350f9ced78fb2"
 
 jobs:
   lint-test:
@@ -30,6 +35,25 @@ jobs:
         uses: helm/chart-testing-action@6ec842c01de15ebb84c8627d2744a0c2f2755c9f # v2.8.0
         with:
           version: v3.11.0
+
+      - name: Set up helmfmt
+        run: |
+          archive="${RUNNER_TEMP}/helmfmt.tar.gz"
+          curl --fail --location --silent --show-error \
+            "https://github.com/digitalstudium/helmfmt/releases/download/v${HELMFMT_VERSION}/helmfmt_Linux_x86_64.tar.gz" \
+            --output "${archive}"
+          echo "${HELMFMT_LINUX_X86_64_SHA256}  ${archive}" | sha256sum --check
+          tar -xzf "${archive}" -C "${RUNNER_TEMP}" helmfmt
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
+      - name: Test template tooling
+        run: python3 -m unittest discover -s scripts/tests
+
+      - name: Check Helm template formatting
+        run: python3 scripts/format_templates.py --check
+
+      - name: Check template maintainability
+        run: python3 scripts/check_template_maintainability.py
 
       - name: Run chart-testing (list-changed)
         id: list-changed

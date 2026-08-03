@@ -17,58 +17,58 @@ These are the variables a service can expect
 Return the kafka client user
 */}}
 {{- define "wandb.kafka.user" -}}
-{{- if .Values.kafka.install -}}
+  {{- if .Values.kafka.install -}}
 {{ .Values.global.kafka.user }}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/*
 Return the kafka client password
 */}}
 {{- define "wandb.kafka.password" -}}
-{{- if .Values.kafka.install -}}
+  {{- if .Values.kafka.install -}}
 {{ .Values.global.kafka.password }}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/*
 Return name of secret where kafka information is stored
 */}}
 {{- define "wandb.kafka.passwordSecret" -}}
-{{- if .Values.global.kafka.passwordSecret.name }}
+  {{- if .Values.global.kafka.passwordSecret.name }}
   {{- .Values.global.kafka.passwordSecret.name -}}
-{{- else -}}
+  {{- else -}}
   {{- print .Release.Name "-kafka" -}}
-{{- end -}}
+  {{- end -}}
 {{- end }}
 
 {{/*
 Return name of secret where kafka information is stored
 */}}
 {{- define "wandb.kafka.passwordSecret.passwordKey" -}}
-{{- if .Values.global.kafka.passwordSecret.name }}
+  {{- if .Values.global.kafka.passwordSecret.name }}
   {{- .Values.global.kafka.passwordSecret.passwordKey -}}
-{{- else -}}
+  {{- else -}}
   KAFKA_CLIENT_PASSWORD
-{{- end -}}
+  {{- end -}}
 {{- end }}
 
 {{/*
 Return the kafka broker url port
 */}}
 {{- define "wandb.kafka.brokerHost" -}}
-{{- if eq .Values.global.kafka.brokerHost "" -}}
-{{- if .Values.kafka.install -}}
-{{ printf "%s-%s" .Release.Name "kafka" }}
-{{- else if .Values.bufstream.install -}}
-{{- $bufstreamNamespace := default .Release.Namespace .Values.bufstream.namespaceOverride -}}
-{{ printf "bufstream.%s.svc.cluster.local" $bufstreamNamespace }}
-{{- else -}}
+  {{- if eq .Values.global.kafka.brokerHost "" -}}
+    {{- if .Values.kafka.install -}}
+      {{ printf "%s-%s" .Release.Name "kafka" }}
+    {{- else if .Values.bufstream.install -}}
+      {{- $bufstreamNamespace := default .Release.Namespace .Values.bufstream.namespaceOverride -}}
+      {{ printf "bufstream.%s.svc.cluster.local" $bufstreamNamespace }}
+    {{- else -}}
 bufstream.bufstream.svc.cluster.local
-{{- end -}}
-{{- else -}}
+    {{- end -}}
+  {{- else -}}
 {{ .Values.global.kafka.brokerHost }}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/*
@@ -83,7 +83,7 @@ Return kafka broker url port
 Return the kafka topic name for run-updates-shadow
 */}}
 {{- define "wandb.kafka.runUpdatesShadowTopic" -}}
-{{ printf "%s-%s" .Release.Name "run-updates-shadow" | trunc 63 | trimSuffix "-" }}
+  {{ printf "%s-%s" .Release.Name "run-updates-shadow" | trunc 63 | trimSuffix "-" }}
 {{- end -}}
 
 {{/*
@@ -94,42 +94,42 @@ Return the number of partitions for run-updates-shadow
 {{- end -}}
 
 {{- define "wandb.runUpdateShadowTopicProducer" -}}
-{{- if .Values.global.pubSub.enabled -}}
+  {{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}
-{{- else if .Values.global.bufstream.enabled -}}
+  {{- else if .Values.global.bufstream.enabled -}}
 kafka://$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
-{{- else -}}
+  {{- else -}}
 kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):$(KAFKA_BROKER_PORT)/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/*
-TODO(Zachary B) - Check with dpanzella to see if this is correct. 
+TODO(Zachary B) - Check with dpanzella to see if this is correct.
 */}}
 {{- define "wandb.runUpdateShadowQueue" -}}
-{{- if .Values.global.pubSub.enabled -}}
+  {{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.runUpdateShadowTopic }}/{{ .Values.pubSub.subscription }}
-{{- else if .Values.global.bufstream.enabled -}}
+  {{- else if .Values.global.bufstream.enabled -}}
 kafka://$(KAFKA_BROKER_HOST):9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id={{ .Values.kafka.consumerGroupId }}&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
-{{- else -}}
+  {{- else -}}
 kafka://$(KAFKA_CLIENT_USER):$(KAFKA_CLIENT_PASSWORD)@$(KAFKA_BROKER_HOST):9092/$(KAFKA_TOPIC_RUN_UPDATE_SHADOW_QUEUE)?consumer_group_id={{ .Values.kafka.consumerGroupId }}&num_partitions=$(KAFKA_RUN_UPDATE_SHADOW_QUEUE_NUM_PARTITIONS)
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/* TODO(dpanzella) - Probably need to make this support kafka as well*/}}
 {{- define "wandb.fileStreamStoreProducer" -}}
-{{- if .Values.global.pubSub.enabled -}}
+  {{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}
-{{- else -}}
+  {{- else -}}
 {{ include "wandb.mysql" . }}
-{{- end -}}
+  {{- end -}}
 {{- end -}}
 
 {{/* TODO(dpanzella) - Probably need to make this support kafka as well*/}}
 {{- define "wandb.fileStreamStoreConsumer" -}}
-{{- if .Values.global.pubSub.enabled -}}
+  {{- if .Values.global.pubSub.enabled -}}
 pubsub:/{{ .Values.global.pubSub.project }}/{{ .Values.global.pubSub.filestreamTopic }}/{{ .Values.pubSub.subscription }}
-{{- else -}}
+  {{- else -}}
 {{ include "wandb.mysql" . }}
-{{- end -}}
+  {{- end -}}
 {{- end -}}

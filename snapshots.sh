@@ -1,6 +1,9 @@
 #!/usr/bin/env bash 
 set -eo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+chart_version_post_renderer="$script_dir/scripts/normalize_snapshot_chart_versions.py"
+
 # Check if helm chartsnap plugin is installed
 if ! helm plugin list | grep -q "chartsnap"; then
   echo "❌ helm chartsnap plugin is not installed"
@@ -49,14 +52,16 @@ function update_chart() {
   local chart="$1"
   local values_file="$2"
   echo "updating $chart snapshots"
-  helm chartsnap -c "./charts/$chart" -u -f "$values_file"
+  helm chartsnap -c "./charts/$chart" -u -f "$values_file" -- \
+    --post-renderer "$chart_version_post_renderer"
 }
 
 function run_chart() {
   local chart="$1"
   local values_file="$2"
   echo "Checking $chart snapshot tests"
-  helm chartsnap -c "./charts/$chart" -f "$values_file"
+  helm chartsnap -c "./charts/$chart" -f "$values_file" -- \
+    --post-renderer "$chart_version_post_renderer"
 }
 
 function lint_chart() {

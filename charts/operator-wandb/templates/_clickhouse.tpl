@@ -2,11 +2,11 @@
 Return name of secret where clickhouse information is stored
 */}}
 {{- define "wandb.clickhouse.passwordSecret" -}}
-{{- if .Values.global.clickhouse.passwordSecret.name }}
+  {{- if .Values.global.clickhouse.passwordSecret.name }}
   {{- .Values.global.clickhouse.passwordSecret.name -}}
-{{- else -}}
+  {{- else -}}
   {{- print .Release.Name "-clickhouse" -}}
-{{- end -}}
+  {{- end -}}
 {{- end }}
 
 {{- define "wandb.clickhouse.host" -}}
@@ -14,16 +14,16 @@ Return name of secret where clickhouse information is stored
 {{- end }}
 
 {{- define "wandb.clickhouse.port" -}}
-{{- if .Values.global.clickhouse.port }}
+  {{- if .Values.global.clickhouse.port }}
   {{- print $.Values.global.clickhouse.port -}}
-{{- else -}}
-  {{- $host := (include "wandb.clickhouse.host" .) -}}
-  {{- if eq $host (print .Release.Name "-clickhouse-headless") }}
-    {{- print "8123" -}}
   {{- else -}}
+    {{- $host := (include "wandb.clickhouse.host" .) -}}
+    {{- if eq $host (print .Release.Name "-clickhouse-headless") }}
+    {{- print "8123" -}}
+    {{- else -}}
     {{- print "8443" -}}
+    {{- end -}}
   {{- end -}}
-{{- end -}}
 {{- end }}
 
 {{/*
