@@ -13,13 +13,66 @@
 */}}
 {{- $mcp := index .Values "mcp-server" | default dict -}}
 {{- if index $mcp "install" -}}
+  {{- $mcpEnv := index $mcp "env" | default dict -}}
+  {{- $mcpPerformance := index $mcp "performance" | default dict -}}
+  {{- $workloadProfile := (index $mcpPerformance "profile" | default "dedicated" | toString | lower) -}}
+  {{- if not (has $workloadProfile (list "shared" "dedicated" "local")) -}}
+    {{- fail "mcp-server.performance.profile must be one of: shared, dedicated, local" -}}
+  {{- end -}}
+  {{- if hasKey $mcpEnv "MCP_WORKLOAD_PROFILE" -}}
+    {{- $workloadOverride := (index $mcpEnv "MCP_WORKLOAD_PROFILE" | toString | lower | trim) -}}
+    {{- if not (has $workloadOverride (list "shared" "dedicated" "local")) -}}
+      {{- fail "mcp-server.env.MCP_WORKLOAD_PROFILE must be one of: shared, dedicated, local" -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $hasInternalURLOverride := hasKey $mcpEnv "WANDB_INTERNAL_BASE_URL" -}}
+  {{- if $hasInternalURLOverride -}}
+    {{- if eq (index $mcpEnv "WANDB_INTERNAL_BASE_URL" | toString | trim) "" -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL must be non-empty when set" -}}
+    {{- end -}}
+  {{- else if .Values.global.api.enabled -}}
+    {{- $api := index .Values "api" | default dict -}}
+    {{- $apiService := index $api "service" | default dict -}}
+    {{- if not (index $apiService "enabled") -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when global.api.enabled=true and api.service.enabled=false" -}}
+    {{- end -}}
+    {{- $apiNameOverride := index $api "nameOverride" | default "" | toString | trim -}}
+    {{- $apiFullnameOverride := index $api "fullnameOverride" | default "" | toString | trim -}}
+    {{- $apiServiceName := index $apiService "name" | default "" | toString | trim -}}
+    {{- $apiPortIsDefault := false -}}
+    {{- range (index $apiService "ports" | default list) -}}
+      {{- if and (eq (index . "name" | default "" | toString) "http") (eq (index . "port" | toString) "8081") -}}
+        {{- $apiPortIsDefault = true -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if or (ne $apiNameOverride "") (ne $apiFullnameOverride "") (ne $apiServiceName "") (not $apiPortIsDefault) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when api naming or the http Service port is overridden" -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $app := index .Values "app" | default dict -}}
+    {{- $appService := index $app "service" | default dict -}}
+    {{- if or (not (index $app "install")) (not (index $appService "enabled")) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when the monolith app Service is disabled" -}}
+    {{- end -}}
+    {{- $appNameOverride := index $app "nameOverride" | default "" | toString | trim -}}
+    {{- $appFullnameOverride := index $app "fullnameOverride" | default "" | toString | trim -}}
+    {{- $appServiceName := index $appService "name" | default "" | toString | trim -}}
+    {{- $appPortIsDefault := false -}}
+    {{- range (index $appService "ports" | default list) -}}
+      {{- if and (eq (index . "name" | default "" | toString) "app") (eq (index . "port" | toString) "8080") -}}
+        {{- $appPortIsDefault = true -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if or (ne $appNameOverride "") (ne $appFullnameOverride "") (ne $appServiceName "") (not $appPortIsDefault) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when app naming or the app Service port is overridden" -}}
+    {{- end -}}
+  {{- end -}}
   {{- $mcpWeave := index $mcp "weave" | default dict -}}
   {{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
   {{- if not (has $weaveMode (list "auto" "true" "false")) -}}
     {{- fail "mcp-server.weave.tools must be one of: auto, true, false" -}}
   {{- end -}}
   {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
-  {{- $mcpEnv := index $mcp "env" | default dict -}}
   {{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
   {{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
   {{- $hasBundledTrace := or (index .Values "weave-trace" "install") (index $globalWeaveTrace "enabled") -}}
