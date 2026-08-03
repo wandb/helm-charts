@@ -349,6 +349,20 @@ class McpChartRenderTest(unittest.TestCase):
         self.assertRegex(manifest, r"(?m)^spec:\n  replicas: 1$")
         self.assertNotIn("GORILLA_MCP_", manifest)
 
+    def test_helm_test_uses_the_canonical_health_endpoint(self) -> None:
+        manifest = self.assert_render_succeeds(
+            _helm_template(
+                values=_mcp_values(**{"global.api.enabled": True}),
+                mcp_only=False,
+            )
+        )
+        self.assertIn(
+            "http://routing-test-mcp-server:8080/mcp/health", manifest
+        )
+        self.assertNotIn(
+            "http://routing-test-mcp-server:8080/health", manifest
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

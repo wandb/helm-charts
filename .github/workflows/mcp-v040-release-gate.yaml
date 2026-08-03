@@ -1,0 +1,128 @@
+name: MCP v0.4 release gate
+
+on:
+  pull_request:
+    paths:
+      - release-candidates/**
+      - scripts/test_mcp_chart_render.py
+      - scripts/test_mcp_release_gate.py
+      - .github/workflows/mcp-v040-release-gate.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-v040-release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-gate:
+    name: MCP v0.4 release gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Install Helm
+        uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4.2.0
+        with:
+          version: v3.20.1
+      - name: Build chart dependencies
+        run: |
+          helm repo add stakater https://stakater.github.io/stakater-charts
+          helm repo add prometheus https://prometheus-community.github.io/helm-charts
+          helm repo update stakater prometheus
+          helm dependency build --skip-refresh ./charts/operator-wandb
+      - name: Verify MCP chart contract
+        run: |
+          helm lint ./charts/operator-wandb --strict
+          python3 scripts/test_mcp_chart_render.py
+      - name: Verify immutable image provenance and runtime
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          github.event.pull_request.head.repo.full_name == github.repository
+        run: >-
+          python3 scripts/test_mcp_release_gate.py
+          --manifest-output "${{ runner.temp }}/mcp-v040-release.yaml"
+      - name: Create Kubernetes release-test cluster
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
+        with:
+          version: v0.32.0
+          cluster_name: mcp-v040-release
+          node_image: kindest/node:v1.36.1
+      - name: Verify exact image through the Kubernetes Service
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          MANIFEST: ${{ runner.temp }}/mcp-v040-release.yaml
+        run: |
+          kubectl create namespace mcp-release
+          kubectl apply --namespace mcp-release --filename "$MANIFEST"
+          kubectl rollout status \
+            --namespace mcp-release \
+            deployment/mcp-release-mcp-server \
+            --timeout=180s
+
+          expected_digest=$(python3 -c 'import json; print(json.load(open("release-candidates/mcp-v0.4.0.json"))["image_digest"])')
+          image_repository=$(python3 -c 'import json; print(json.load(open("release-candidates/mcp-v0.4.0.json"))["image_repository"])')
+          image_id=$(kubectl get pods \
+            --namespace mcp-release \
+            --selector app.kubernetes.io/name=mcp-server \
+            --output jsonpath='{.items[0].status.containerStatuses[0].imageID}')
+          case "$image_id" in
+            *@"$expected_digest") ;;
+            *)
+              echo "::error::running pod image $image_id does not match $expected_digest"
+              exit 1
+              ;;
+          esac
+
+          kubectl port-forward \
+            --namespace mcp-release \
+            service/mcp-release-mcp-server \
+            18080:8080 > "${RUNNER_TEMP}/mcp-port-forward.log" 2>&1 &
+          port_forward_pid=$!
+          trap 'kill "$port_forward_pid" 2>/dev/null || true' EXIT
+          curl --fail --silent --show-error \
+            --retry 30 --retry-all-errors --retry-delay 1 \
+            http://127.0.0.1:18080/mcp/health
+
+          docker image inspect "$image_repository@$expected_digest" \
+            > "${RUNNER_TEMP}/mcp-image-inspect.json"
+          kubectl get deployment,pod,service \
+            --namespace mcp-release \
+            --output yaml \
+            > "${RUNNER_TEMP}/mcp-runtime.yaml"
+          {
+            echo "## MCP v0.4 release gate passed"
+            echo "- Chart SHA: \`$GITHUB_SHA\`"
+            echo "- Image: \`$image_repository@$expected_digest\`"
+            echo "- Pod image ID: \`$image_id\`"
+            echo "- Health: \`/mcp/health\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Refuse untrusted image execution
+        if: >-
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          python3 scripts/test_mcp_release_gate.py --render-only
+          echo "::error::The immutable release image must be validated from a same-repository branch."
+          exit 1
+      - name: Upload release evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mcp-v040-release-evidence
+          path: |
+            release-candidates/mcp-v0.4.0.json
+            ${{ runner.temp }}/mcp-v040-release.yaml
+            ${{ runner.temp }}/mcp-image-inspect.json
+            ${{ runner.temp }}/mcp-runtime.yaml
+          retention-days: 30
