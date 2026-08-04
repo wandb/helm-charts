@@ -595,24 +595,11 @@ metadata:
   name: chartsnap-reloader
   namespace: default
 ---
-# Source: operator-wandb/charts/weave-trace/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: chartsnap-weave-trace
-  labels:
-    helm.sh/chart: '###CHART_VERSION###'
-    app.kubernetes.io/name: weave-trace
-    app.kubernetes.io/instance: chartsnap
-    app.kubernetes.io/version: "latest"
-    app.kubernetes.io/managed-by: Helm
-automountServiceAccountToken: true
----
 # Source: operator-wandb/charts/weave/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: chartsnap-weave
+  name: wandb-weave
   labels:
     helm.sh/chart: '###CHART_VERSION###'
     app.kubernetes.io/name: weave
@@ -1696,7 +1683,7 @@ data:
   GORILLA_RUN_UPDATE_QUEUE_ADDR: "internal://"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_NAME: "wandb"
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_PREFIX: "wandb-overflow"
-  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{"system:serviceaccount:default:chartsnap-weave-trace": "https://kubernetes.default.svc.cluster.local", "system:serviceaccount:default:chartsnap-weave-trace-worker": "https://kubernetes.default.svc.cluster.local"}'
+  GORILLA_INTERNAL_JWT_SUBJECTS_TO_ISSUERS: '{"system:serviceaccount:default:wandb-weave": "https://kubernetes.default.svc.cluster.local"}'
   GORILLA_WEAVE_TRACE_SERVER_URL: "http://localhost:8080/traces"
   GORILLA_TASK_QUEUE_WORKER_ENABLED: "false"
   GORILLA_LOCAL_SERVICE_BYPASS: 'false'
@@ -6991,7 +6978,7 @@ spec:
           subPath: redis_ca.pem
         - mountPath: /tmp/
           name: temp-dir
-      serviceAccountName: chartsnap-weave-trace
+      serviceAccountName: wandb-weave
       securityContext:
         fsGroup: 0
         fsGroupChangePolicy: OnRootMismatch
@@ -7197,7 +7184,7 @@ spec:
           name: temp-dir
         - mountPath: /vol/weave/cache
           name: cache
-      serviceAccountName: chartsnap-weave
+      serviceAccountName: wandb-weave
       securityContext:
         fsGroup: 0
         fsGroupChangePolicy: OnRootMismatch
