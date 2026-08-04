@@ -64,18 +64,25 @@ fails helm render with "index of nil pointer".
 
 Resolves:
 - WANDB_MCP_ENABLE_WEAVE_TOOLS: whether trace-dependent MCP tools are exposed.
+- MCP_DEPLOYMENT_TYPE: the existing Dedicated/Self-Managed install classification.
 - WF_TRACE_SERVER_URL: public weave-trace URL via ingress (global.host + /traces).
   The chart's weave-trace subchart mounts the FastAPI app under API_PATH_PREFIX=/traces
   (see templates/weave-trace.yaml), so the in-cluster Service path http://<release>-weave-trace:8722
   returns 404 without the prefix. Using the ingress URL matches the convention other
   internal consumers use (see weave-trace.yaml WF_TRACE_SERVER_URL line).
-- WANDB_BASE_URL: the W&B instance URL (from global.host)
+- WANDB_BASE_URL: the public W&B instance URL (from global.host)
+- WANDB_INTERNAL_BASE_URL: the default namespace-local split API or monolith
+  Service used by backend calls; custom backend naming/ports require an
+  explicit value because this helper runs in MCP subchart scope
+- MCP_WORKLOAD_PROFILE: bounded workload limits for this deployment
 
 MCP can run without weave-trace. When WANDB_MCP_ENABLE_WEAVE_TOOLS=false,
 trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
 */}}
 {{- define "wandb.mcpEnvs" -}}
   {{- $mcpEnv := index .Values "env" | default dict -}}
+  {{- $mcpPerformance := index .Values "performance" | default dict -}}
+  {{- $workloadProfile := (index $mcpPerformance "profile" | default "dedicated" | toString | lower) -}}
   {{- $mcpWeave := index .Values "weave" | default dict -}}
   {{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
   {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
@@ -85,12 +92,26 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
   {{- $enableWeaveTools := or (eq $weaveMode "true") (and (eq $weaveMode "auto") $hasTraceBackend) -}}
 - name: WANDB_MCP_ENABLE_WEAVE_TOOLS
   value: {{ ternary "true" "false" $enableWeaveTools | quote }}
+- name: MCP_DEPLOYMENT_TYPE
+  value: {{ index .Values "datadog" "deploymentType" | default "self-managed" | quote }}
   {{- if and $enableWeaveTools (not $hasExplicitTraceURL) }}
 - name: WF_TRACE_SERVER_URL
   value: "{{ .Values.global.host }}/traces"
   {{- end }}
 - name: WANDB_BASE_URL
   value: {{ .Values.global.host | quote }}
+  {{- if not (hasKey $mcpEnv "WANDB_INTERNAL_BASE_URL") }}
+- name: WANDB_INTERNAL_BASE_URL
+    {{- if .Values.global.api.enabled }}
+  value: "http://{{ .Release.Name }}-api:8081"
+    {{- else }}
+  value: "http://{{ .Release.Name }}-app:8080"
+    {{- end }}
+  {{- end }}
+  {{- if not (hasKey $mcpEnv "MCP_WORKLOAD_PROFILE") }}
+- name: MCP_WORKLOAD_PROFILE
+  value: {{ $workloadProfile | quote }}
+  {{- end }}
   {{/*
     Privacy level for customer-supplied content in logs. Default here is "standard"
     (redact free-text params, demote verbose log sites to DEBUG) so customer K8s
