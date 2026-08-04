@@ -5,81 +5,18 @@ on:
     paths:
       - charts/operator-wandb/**
       - test-configs/operator-wandb/**
-      - scripts/operator_config_impact.py
       - scripts/test_mcp_chart_render.py
       - scripts/normalize_snapshot_chart_versions.py
       - snapshots.sh
       - .github/workflows/test-operator-wandb.yaml
 
-permissions:
-  contents: read
-
 jobs:
-  olap-impact:
-    name: Determine OLAP test impact
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      configurations: ${{ steps.matrix.outputs.configurations }}
-    steps:
-      - name: Checkout pull request merge
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Install Helm
-        uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4.2.0
-        with:
-          version: v3.20.1
-      - name: Build base and pull request dependencies
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          BASE_DIR: ${{ runner.temp }}/operator-wandb-base
-        run: |
-          helm repo add stakater https://stakater.github.io/stakater-charts
-          helm repo add prometheus https://prometheus-community.github.io/helm-charts
-          helm repo update stakater prometheus
-          git worktree add --detach "$BASE_DIR" "$BASE_SHA"
-          helm dependency build --skip-refresh ./charts/operator-wandb
-          helm dependency build --skip-refresh "$BASE_DIR/charts/operator-wandb"
-      - name: Select the installation matrix
-        id: matrix
-        env:
-          BASE_DIR: ${{ runner.temp }}/operator-wandb-base
-        run: |
-          all='["default","fmb","oidc-secret-from-k8s","runs-v2-bufstream","local-bypass-no-app","local-bypass-with-app","no-local-bypass","url-encoded-password","user-defined-secrets","olap-features-enabled","weave-trace","weave-trace-with-worker","historystore-parquet-only","glue-leader-election"]'
-          without_olap='["default","fmb","oidc-secret-from-k8s","runs-v2-bufstream","local-bypass-no-app","local-bypass-with-app","no-local-bypass","url-encoded-password","user-defined-secrets","weave-trace","weave-trace-with-worker","historystore-parquet-only","glue-leader-election"]'
-          set +e
-          python3 scripts/operator_config_impact.py \
-            --base-repository "$BASE_DIR" \
-            --head-repository . \
-            --configuration olap-features-enabled
-          status=$?
-          set -e
-          case "$status" in
-            0)
-              echo "OLAP manifests are identical; excluding unrelated OLAP installs."
-              echo "configurations=$without_olap" >> "$GITHUB_OUTPUT"
-              ;;
-            1)
-              echo "OLAP manifests changed; retaining all OLAP installs."
-              echo "configurations=$all" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "::warning::OLAP impact could not be determined; retaining all OLAP installs."
-              echo "configurations=$all" >> "$GITHUB_OUTPUT"
-              ;;
-          esac
-
   snapshots:
     name: Snapshot testing
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          persist-credentials: false
       - name: Install Helm
         uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4.2.0
         with:
@@ -107,13 +44,28 @@ jobs:
 
   test:
     name: Test Chart
-    needs: olap-impact
     strategy:
       fail-fast: false
       max-parallel: 39
       matrix:
         k8s-version: ["v1.36.1", "v1.35.5", "v1.34.8"]
-        configuration: ${{ fromJSON(needs.olap-impact.outputs.configurations) }}
+        configuration:
+          [
+            "default",
+            "fmb",
+            "oidc-secret-from-k8s",
+            "runs-v2-bufstream",
+            "local-bypass-no-app",
+            "local-bypass-with-app",
+            "no-local-bypass",
+            "url-encoded-password",
+            "user-defined-secrets",
+            "olap-features-enabled",
+            "weave-trace",
+            "weave-trace-with-worker",
+            "historystore-parquet-only",
+            "glue-leader-election",
+          ]
     runs-on: ubuntu-latest-8-cores
     concurrency:
       group: ${{ github.workflow }}-${{ matrix.k8s-version }}-${{ matrix.configuration }}-${{ github.ref }}
@@ -121,10 +73,9 @@ jobs:
     environment: Helm Charts
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
         with:
           fetch-depth: 0
-          persist-credentials: false
 
       - name: Set up Helm
         uses: azure/setup-helm@fe7b79cd5ee1e45176fcad797de68ecaf3ca4814 # v4.2.0
