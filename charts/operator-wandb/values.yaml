@@ -779,10 +779,10 @@ app:
     repository: wandb/local
     tag: latest
   # TODO(dpanzella) Read from here for backwards compatability, needs to be moved so API can access as well
+  # One shared Weave subject keeps per-install issuer overrides from clobbering
+  # the identity used by additional Weave workloads.
   internalJWTMap:
-    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace"
-      issuer: "https://kubernetes.default.svc.cluster.local"
-    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace-worker"
+    - subject: "system:serviceaccount:{{ .Release.Namespace }}:wandb-weave"
       issuer: "https://kubernetes.default.svc.cluster.local"
   env:
     GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
@@ -3410,6 +3410,11 @@ clickhouseMigrationJob:
 
 weave:
   install: true
+  # All Weave workloads use this ServiceAccount unless their own serviceAccount
+  # values are overridden. It carries the cloud workload identity once.
+  serviceAccount:
+    create: true
+    name: wandb-weave
   deploymentPostfix: "bc"
   cache:
     # Keep WEAVE_CACHE_DURATION_DAYS unset or 0 for size-triggered cleanup.
@@ -3748,6 +3753,9 @@ mcp-server:
 
 weave-trace:
   install: false
+  serviceAccount:
+    create: false
+    name: wandb-weave
   deploymentPostfix: "bc"
   image:
     repository: wandb/weave-trace
@@ -3886,6 +3894,9 @@ weave-trace:
 
 weave-trace-worker:
   install: false
+  serviceAccount:
+    create: false
+    name: wandb-weave
   deploymentPostfix: "bc"
   image:
     repository: wandb/weave-trace
@@ -3995,6 +4006,9 @@ weave-trace-worker:
 
 weave-evaluate-model-worker:
   install: false
+  serviceAccount:
+    create: false
+    name: wandb-weave
   deploymentPostfix: "bc"
   image:
     repository: wandb/weave-trace
@@ -4098,6 +4112,9 @@ weave-evaluate-model-worker:
 
 weave-trace-agent-scoring-worker:
   install: false
+  serviceAccount:
+    create: false
+    name: wandb-weave
   deploymentPostfix: "bc"
   image:
     repository: wandb/weave-trace
