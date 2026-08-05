@@ -13,13 +13,157 @@
 */}}
 {{- $mcp := index .Values "mcp-server" | default dict -}}
 {{- if index $mcp "install" -}}
+  {{- $mcpEnv := index $mcp "env" | default dict -}}
+  {{- $mcpExtraEnv := index $mcp "extraEnv" | default dict -}}
+  {{- $mcpContainers := index $mcp "containers" | default dict -}}
+  {{- $mcpContainer := index $mcpContainers "mcp-server" | default dict -}}
+  {{- $mcpContainerEnv := index $mcpContainer "env" | default dict -}}
+  {{- $mcpSizing := index $mcp "sizing" | default dict -}}
+  {{- $mcpTplContext := index .Subcharts "mcp-server" -}}
+
+  {{/*
+    Keep routing and worker controls single-source. wandb-base merges container,
+    chart, extra, and selected sizing env maps; allowing the same key in more
+    than one channel would make fail-closed routing dependent on merge order.
+  */}}
+  {{- if hasKey $mcpEnv "WANDB_BASE_URL" -}}
+    {{- fail "WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.env" -}}
+  {{- end -}}
+  {{- range $channelName, $channel := dict "mcp-server.extraEnv" $mcpExtraEnv "mcp-server.containers.mcp-server.env" $mcpContainerEnv -}}
+    {{- if hasKey $channel "WANDB_INTERNAL_BASE_URL" -}}
+      {{- fail (printf "WANDB_INTERNAL_BASE_URL may only be set in mcp-server.env, not %s" $channelName) -}}
+    {{- end -}}
+    {{- if hasKey $channel "WANDB_BASE_URL" -}}
+      {{- fail (printf "WANDB_BASE_URL is chart-managed from global.host and cannot be set in %s" $channelName) -}}
+    {{- end -}}
+    {{- if hasKey $channel "UVICORN_WORKERS" -}}
+      {{- fail (printf "UVICORN_WORKERS may only be set in mcp-server.env, not %s" $channelName) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $sizeName, $sizeValues := $mcpSizing -}}
+    {{- $sizeEnv := index $sizeValues "env" | default dict -}}
+    {{- if hasKey $sizeEnv "WANDB_INTERNAL_BASE_URL" -}}
+      {{- fail (printf "WANDB_INTERNAL_BASE_URL may only be set in mcp-server.env, not mcp-server.sizing.%s.env" $sizeName) -}}
+    {{- end -}}
+    {{- if hasKey $sizeEnv "WANDB_BASE_URL" -}}
+      {{- fail (printf "WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.sizing.%s.env" $sizeName) -}}
+    {{- end -}}
+    {{- if hasKey $sizeEnv "UVICORN_WORKERS" -}}
+      {{- fail (printf "UVICORN_WORKERS may only be set in mcp-server.env, not mcp-server.sizing.%s.env" $sizeName) -}}
+    {{- end -}}
+    {{- $sizeAutoscaling := index $sizeValues "autoscaling" | default dict -}}
+    {{- $sizeHorizontal := index $sizeAutoscaling "horizontal" | default dict -}}
+    {{- $sizeKeda := index $sizeAutoscaling "keda" | default dict -}}
+    {{- if or (index $sizeHorizontal "enabled") (index $sizeKeda "enabled") -}}
+      {{- fail (printf "MCP autoscaling must remain disabled; mcp-server.sizing.%s cannot enable horizontal or KEDA autoscaling" $sizeName) -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $hasMcpEnvTpl := false -}}
+  {{- range (index $mcp "envTpls" | default list) -}}
+    {{- if kindIs "string" . -}}
+      {{- $isCanonicalMcpEnvTpl := eq (trim .) "{{ include \"wandb.mcpEnvs\" . }}" -}}
+      {{- if $isCanonicalMcpEnvTpl -}}
+        {{- $hasMcpEnvTpl = true -}}
+      {{- end -}}
+      {{- if or (contains "WANDB_BASE_URL" .) (contains "WANDB_INTERNAL_BASE_URL" .) (contains "UVICORN_WORKERS" .) -}}
+        {{- fail "mcp-server.envTpls cannot define WANDB_BASE_URL, WANDB_INTERNAL_BASE_URL, or UVICORN_WORKERS directly" -}}
+      {{- end -}}
+      {{- if not $isCanonicalMcpEnvTpl -}}
+        {{- range (tpl . $mcpTplContext | fromYamlArray) -}}
+          {{- $renderedName := index . "name" | default "" | toString -}}
+          {{- if has $renderedName (list "WANDB_BASE_URL" "WANDB_INTERNAL_BASE_URL" "UVICORN_WORKERS") -}}
+            {{- fail "mcp-server.envTpls cannot render WANDB_BASE_URL, WANDB_INTERNAL_BASE_URL, or UVICORN_WORKERS outside wandb.mcpEnvs" -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not $hasMcpEnvTpl -}}
+    {{- fail "mcp-server.envTpls must include wandb.mcpEnvs" -}}
+  {{- end -}}
+
+  {{- $globalOptOut := index $mcp "globalOptOut" | default dict -}}
+  {{- $globalOptOutEnv := index $globalOptOut "env" -}}
+  {{- $globalOptOutEnvEnabled := false -}}
+  {{- if kindIs "string" $globalOptOutEnv -}}
+    {{- $globalOptOutEnvEnabled = eq (tpl $globalOptOutEnv $mcpTplContext | trim) "true" -}}
+  {{- else -}}
+    {{- $globalOptOutEnvEnabled = $globalOptOutEnv -}}
+  {{- end -}}
+  {{- if not $globalOptOutEnvEnabled -}}
+    {{- fail "mcp-server.globalOptOut.env must remain true to isolate MCP from global administrative environment" -}}
+  {{- end -}}
+  {{- if ne (index $mcp "replicaCount" | toString | trim) "1" -}}
+    {{- fail "mcp-server.replicaCount must equal 1 while admission control is process-local" -}}
+  {{- end -}}
+  {{- $mcpAutoscaling := index $mcp "autoscaling" | default dict -}}
+  {{- $mcpHorizontal := index $mcpAutoscaling "horizontal" | default dict -}}
+  {{- $mcpKeda := index $mcpAutoscaling "keda" | default dict -}}
+  {{- if or (index $mcpHorizontal "enabled") (index $mcpKeda "enabled") -}}
+    {{- fail "MCP autoscaling must remain disabled while admission control is process-local" -}}
+  {{- end -}}
+  {{- $workerValue := index $mcpEnv "UVICORN_WORKERS" -}}
+  {{- $resolvedWorkerValue := $workerValue | toString | trim -}}
+  {{- if kindIs "string" $workerValue -}}
+    {{- $resolvedWorkerValue = tpl $workerValue $mcpTplContext | trim -}}
+  {{- end -}}
+  {{- if or (not (hasKey $mcpEnv "UVICORN_WORKERS")) (ne $resolvedWorkerValue "1") -}}
+    {{- fail "mcp-server.env.UVICORN_WORKERS must equal 1 while admission control is process-local" -}}
+  {{- end -}}
+
+  {{- $hasInternalURLOverride := hasKey $mcpEnv "WANDB_INTERNAL_BASE_URL" -}}
+  {{- if $hasInternalURLOverride -}}
+    {{- $internalURLOverride := index $mcpEnv "WANDB_INTERNAL_BASE_URL" -}}
+    {{- if not (kindIs "string" $internalURLOverride) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL must be a non-empty string when set" -}}
+    {{- end -}}
+    {{- if eq (tpl $internalURLOverride $mcpTplContext | trim) "" -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL must be a non-empty string when set" -}}
+    {{- end -}}
+  {{- else if .Values.global.api.enabled -}}
+    {{- $api := index .Values "api" | default dict -}}
+    {{- $apiService := index $api "service" | default dict -}}
+    {{- if not (index $apiService "enabled") -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when global.api.enabled=true and api.service.enabled=false" -}}
+    {{- end -}}
+    {{- $apiNameOverride := index $api "nameOverride" | default "" | toString | trim -}}
+    {{- $apiFullnameOverride := index $api "fullnameOverride" | default "" | toString | trim -}}
+    {{- $apiServiceName := index $apiService "name" | default "" | toString | trim -}}
+    {{- $apiPortIsDefault := false -}}
+    {{- range (index $apiService "ports" | default list) -}}
+      {{- if and (eq (index . "name" | default "" | toString) "http") (eq (index . "port" | toString) "8081") -}}
+        {{- $apiPortIsDefault = true -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if or (ne $apiNameOverride "") (ne $apiFullnameOverride "") (ne $apiServiceName "") (not $apiPortIsDefault) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when api naming or the http Service port is overridden" -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $app := index .Values "app" | default dict -}}
+    {{- $appService := index $app "service" | default dict -}}
+    {{- if or (not (index $app "install")) (not (index $appService "enabled")) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when the monolith app Service is disabled" -}}
+    {{- end -}}
+    {{- $appNameOverride := index $app "nameOverride" | default "" | toString | trim -}}
+    {{- $appFullnameOverride := index $app "fullnameOverride" | default "" | toString | trim -}}
+    {{- $appServiceName := index $appService "name" | default "" | toString | trim -}}
+    {{- $appPortIsDefault := false -}}
+    {{- range (index $appService "ports" | default list) -}}
+      {{- if and (eq (index . "name" | default "" | toString) "app") (eq (index . "port" | toString) "8080") -}}
+        {{- $appPortIsDefault = true -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if or (ne $appNameOverride "") (ne $appFullnameOverride "") (ne $appServiceName "") (not $appPortIsDefault) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when app naming or the app Service port is overridden" -}}
+    {{- end -}}
+  {{- end -}}
   {{- $mcpWeave := index $mcp "weave" | default dict -}}
   {{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
   {{- if not (has $weaveMode (list "auto" "true" "false")) -}}
     {{- fail "mcp-server.weave.tools must be one of: auto, true, false" -}}
   {{- end -}}
   {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
-  {{- $mcpEnv := index $mcp "env" | default dict -}}
   {{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
   {{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
   {{- $hasBundledTrace := or (index .Values "weave-trace" "install") (index $globalWeaveTrace "enabled") -}}
