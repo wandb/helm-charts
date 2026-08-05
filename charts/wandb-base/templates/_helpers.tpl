@@ -85,11 +85,49 @@ Create the name of the service to use
 Create the name of the service account to use
 */}}
 {{- define "wandb-base.serviceAccountName" -}}
-  {{- if .Values.serviceAccount.create }}
+  {{- if include "wandb-base.azureStorageServiceAccountEnabled" . | trim | eq "true" }}
+{{- include "wandb-base.azureStorageServiceAccountName" . }}
+  {{- else if .Values.serviceAccount.create }}
 {{- default (include "wandb-base.fullname" .) .Values.serviceAccount.name }}
   {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
   {{- end }}
+{{- end }}
+
+{{/*
+Use the shared account only for workloads that already opt into Azure workload
+identity. This keeps legacy bucket-scoped identities and key-based BYOB on
+their component accounts.
+*/}}
+{{- define "wandb-base.azureStorageServiceAccountEnabled" -}}
+  {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
+  {{- $globalConfigured := and (not (empty $identity.tenantId)) (not (empty $identity.clientId)) -}}
+  {{- $bucket := default (dict) .Values.global.bucket -}}
+  {{- $hasCustomerBucket := not (empty $bucket.name) -}}
+  {{- $defaultBucket := default (dict) .Values.global.defaultBucket -}}
+  {{- $usesDeploymentIdentity := or
+  (and (not $hasCustomerBucket) (eq $defaultBucket.provider "az"))
+  (and $hasCustomerBucket (eq $bucket.azureAuthMethod "workloadIdentity"))
+  -}}
+  {{- $explicitSharedServiceAccount := default false .Values.azureStorageUseSharedServiceAccount -}}
+  {{- if kindIs "string" $explicitSharedServiceAccount -}}
+    {{- $explicitSharedServiceAccount = eq (tpl $explicitSharedServiceAccount . | trim) "true" -}}
+  {{- end -}}
+  {{- $podLabels := default (dict) .Values.podLabels -}}
+  {{- $workloadIdentity := get $podLabels "azure.workload.identity/use" | default false -}}
+  {{- $enabled := false -}}
+  {{- if kindIs "string" $workloadIdentity -}}
+    {{- $enabled = eq (tpl $workloadIdentity . | trim) "true" -}}
+  {{- else -}}
+    {{- $enabled = $workloadIdentity -}}
+  {{- end -}}
+{{- and $globalConfigured (or $usesDeploymentIdentity $explicitSharedServiceAccount) $enabled -}}
+{{- end }}
+
+{{- define "wandb-base.azureStorageServiceAccountName" -}}
+  {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
+  {{- $serviceAccount := default (dict) $identity.serviceAccount -}}
+{{- default "wandb-bucket-access" $serviceAccount.name -}}
 {{- end }}
 
 {{- define "wandb-base.deploymentRolloutStrategy" -}}
