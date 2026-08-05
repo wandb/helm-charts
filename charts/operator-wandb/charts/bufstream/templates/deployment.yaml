@@ -1,5 +1,9 @@
 apiVersion: apps/v1
 kind: {{ .Values.bufstream.deployment.kind | default "Deployment" }}
+{{- $podLabels := deepCopy (default (dict) .Values.bufstream.deployment.podLabels) }}
+{{- if include "bufstream.azureStorageServiceAccountEnabled" . | trim | eq "true" }}
+  {{- $_ := set $podLabels "azure.workload.identity/use" "true" }}
+{{- end }}
 metadata:
   name: {{ include "bufstream.name" . }}
   namespace: {{ include "bufstream.namespace" . }}
@@ -26,7 +30,7 @@ spec:
         {{- include "bufstream.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: bufstream
         bufstream.buf.build/cluster: {{ .Values.cluster | quote }}
-        {{- with .Values.bufstream.deployment.podLabels }}
+        {{- with $podLabels }}
           {{- toYaml . | nindent 8 -}}
         {{- end }}
       annotations:
@@ -238,7 +242,7 @@ spec:
         {{- with .Values.bufstream.deployment.extraContainers }}
         {{ include "bufstream.render" (dict "value" . "context" $) | nindent 8 }}
         {{- end }}
-      serviceAccountName: {{ tpl .Values.bufstream.serviceAccount.name . }}
+      serviceAccountName: {{ include "bufstream.serviceAccountName" . }}
       terminationGracePeriodSeconds: {{ .Values.bufstream.deployment.terminationGracePeriodSeconds }}
       volumes:
         - name: config-volume

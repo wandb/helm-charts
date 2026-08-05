@@ -396,6 +396,29 @@ global:
         name: ""
         secretKey: "OIDC_SECRET"
 
+  # Infrastructure-managed Azure workload identity for this deployment. The
+  # managed default bucket uses this identity. A customer Azure bucket can opt
+  # in with global.bucket.azureAuthMethod: workloadIdentity.
+  # Each value can be a literal string or a Kubernetes EnvVarSource-style map:
+  #   clientId:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: azure-storage-identity
+  #         key: client-id
+  azureStorageIdentity:
+    tenantId: null
+    clientId: null
+    # One deployment-wide account for Azure storage workload identity. Set
+    # create: false when infrastructure creates and federates this account.
+    serviceAccount:
+      name: "wandb-bucket-access"
+      create: true
+      annotations: {}
+      labels: {}
+    # Principal ID is exposed to administrators for Azure role assignments.
+    # The chart does not use it for pod authentication.
+    principalId: null
+
   # Storage bucket that will be used by the application by default but can be overridden by the user in the wandb-console.
   defaultBucket:
     # az, s3, gcs
@@ -404,9 +427,25 @@ global:
     path: ""
     region: ""
     kmsKey: ""
+    # Azure (provider "az") identity-based auth. Each value can be a literal
+    # string or a Kubernetes EnvVarSource-style map. When both are set the application
+    # authenticates to Blob storage with an Entra ID workload identity
+    # (user-delegation SAS) and the storage account access key is optional.
+    # The chart adds the required workload-identity pod label to services that
+    # consume bucket credentials. The customer's infrastructure must separately
+    # configure federated credentials. ServiceAccount names and annotations
+    # remain infrastructure-owned because other Azure clients may use them.
+    azureTenantId: null
+    azureClientId: null
 
   # If specified, the application will use this bucket for all storage operations, and will not be overridable by the user.
   bucket:
+    # Azure only. Existing configurations default to access-key authentication.
+    # Set to workloadIdentity to use global.azureStorageIdentity.
+    azureAuthMethod: null
+    # Legacy bucket-scoped identity values remain supported.
+    # azureTenantId: ""
+    # azureClientId: ""
     secret:
       secretName: ""
       accessKeyName: "ACCESS_KEY"
@@ -487,6 +526,10 @@ global:
 
   weave-trace:
     enabled: false
+    # Weave stores files in ClickHouse unless this is explicitly enabled.
+    # Enable only with a Weave image that supports Azure workload identity.
+    fileStorage:
+      useDefaultBucket: false
 
   # As part of the migration away from using local, the `bypass` setting will
   # control whether the gorilla services will use the app service (and, thus, local)
@@ -577,6 +620,8 @@ artifactsGc:
   DeleteFilesNumWorkers: 0
 
 api:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   service:
     enabled: true
     loadBalancerHealthCheckPath: "/ready"
@@ -773,6 +818,8 @@ api:
           minReplicas: 2
 
 app:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: true
   deploymentPostfix: "bc"
   image:
@@ -1012,6 +1059,8 @@ appRenamePostHook:
         verbs: ["get", "delete", "list", "watch"]
 
 console:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: true
   deploymentPostfix: "bc"
   service:
@@ -1105,6 +1154,8 @@ console:
         verbs: ["get"]
 
 executor:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   deploymentPostfix: "bc"
   workerConcurrency: 10
@@ -1223,6 +1274,8 @@ executor:
           minReplicas: 2
 
 filemeta:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -1386,6 +1439,8 @@ anaconda2:
           minReplicas: 2
 
 filestream:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   deploymentPostfix: "bc"
   pubSub:
@@ -1493,6 +1548,8 @@ filestream:
           minReplicas: 1
 
 flat-run-fields-updater:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   deploymentPostfix: "bc"
   pubSub:
@@ -1778,6 +1835,8 @@ flat-run-fields-updater:
           # triggers must be provided by user when enabling KEDA
 
 history-updater:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   pubSub:
     # pubSub subscription comes from terraform
@@ -2363,6 +2422,8 @@ run-store-accelerator-run-updater:
 
 # history-reader is a gRPC service that serves run history from ClickHouse.
 history-reader:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -2615,6 +2676,8 @@ frontend:
           minReplicas: 2
 
 glue:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -2797,6 +2860,8 @@ internalSignerPreHook:
         verbs: ["get", "patch", "create", "update"]
 
 metric-observer:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -2935,6 +3000,8 @@ metric-observer:
           minReplicas: 8
 
 parquet:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: true
   deploymentPostfix: "bc"
   image:
@@ -3136,6 +3203,8 @@ parquet:
           minReplicas: 2
 
 parquet-metadata-cache:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   maxColumnChunks: 10000000
   install: false
   serviceAccount:
@@ -3265,6 +3334,8 @@ parquet-metadata-cache:
           minReplicas: 1
 
 settingsMigrationJob:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -3749,6 +3820,9 @@ mcp-server:
 weave-trace:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  azureStorageUseSharedServiceAccount: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -3887,6 +3961,9 @@ weave-trace:
 weave-trace-worker:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  azureStorageUseSharedServiceAccount: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -3996,6 +4073,9 @@ weave-trace-worker:
 weave-evaluate-model-worker:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  azureStorageUseSharedServiceAccount: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -4099,6 +4179,9 @@ weave-evaluate-model-worker:
 weave-trace-agent-scoring-worker:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  azureStorageUseSharedServiceAccount: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -4436,6 +4519,8 @@ bufstream:
           memory: 4Gi
 
 lumen-agent:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   kind: CronJob
   image:
