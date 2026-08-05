@@ -14,8 +14,16 @@
       {{- end -}}
     {{- end -}}
     {{- if $enabled -}}
+      {{- $globalOptOutEnv := false -}}
       {{- $globalOptOutVolumes := false -}}
       {{- $globalOptOut := (default dict $.root.Values.globalOptOut) -}}
+      {{- if hasKey $globalOptOut "env" -}}
+        {{- if kindIs "string" $globalOptOut.env -}}
+          {{- $globalOptOutEnv = eq (tpl $globalOptOut.env $.root | trim) "true" -}}
+        {{- else -}}
+          {{- $globalOptOutEnv = $globalOptOut.env -}}
+        {{- end -}}
+      {{- end -}}
       {{- if and (hasKey $globalOptOut "volumes") -}}
         {{- if kindIs "string" $globalOptOut.volumes -}}
           {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes $.root | trim) "true" -}}
@@ -23,6 +31,8 @@
           {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
         {{- end -}}
       {{- end -}}
+      {{- $globalEnv := ternary dict (default dict $.root.Values.global.env) $globalOptOutEnv }}
+      {{- $globalExtraEnv := ternary dict (default dict $.root.Values.global.extraEnv) $globalOptOutEnv }}
       {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
       {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) $globalOptOutVolumes }}
       {{- $container := dict }}
@@ -33,7 +43,7 @@
       {{- $_ = set $container "securityContext" (coalesce $container.securityContext (merge $.root.Values.securityContext $.root.Values.container.securityContext)) -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
       {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) -}}
-      {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $.root.Values.global.env $.root.Values.global.extraEnv) -}}
+      {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $globalEnv $globalExtraEnv) -}}
       {{- $_ = set $container "root" $.root -}}
       {{- if eq $.source "containers" }}
         {{/* Merge in resources from .Values.resources to support legacy chart values */}}
