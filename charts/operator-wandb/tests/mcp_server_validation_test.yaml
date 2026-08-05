@@ -1,0 +1,466 @@
+suite: MCP internal routing validation
+templates:
+  - templates/mcp-validation.yaml
+release:
+  name: customer-a
+  namespace: wandb-system
+
+tests:
+  - it: ignores MCP validation when MCP is disabled
+    set:
+      mcp-server.install: false
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: ""
+      global.api.enabled: true
+      api.service.enabled: false
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an explicitly empty internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be a non-empty string when set
+
+  - it: rejects a non-string internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL:
+        valueFrom:
+          secretKeyRef:
+            name: invalid-internal-url
+            key: url
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be a non-empty string when set
+
+  - it: rejects an internal URL template that resolves empty in MCP scope
+    set:
+      mcp-server.install: true
+      mcp-server.customInternalURL: ""
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: '{{ .Values.customInternalURL }}'
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be a non-empty string when set
+
+  - it: accepts an internal URL template that resolves nonempty in MCP scope
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+      mcp-server.customInternalURL: http://custom-api.platform.svc.cluster.local:9090
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: '{{ .Values.customInternalURL }}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: evaluates internal URL templates with the MCP chart identity
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: '{{ if eq .Chart.Name `mcp-server` }}http://custom-api:8081{{ end }}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an internal URL template that only resolves in parent chart scope
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: '{{ if eq .Chart.Name `operator-wandb` }}http://wrong-scope:8081{{ end }}'
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be a non-empty string when set
+
+  - it: rejects an empty internal URL in extraEnv
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.WANDB_INTERNAL_BASE_URL: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_INTERNAL_BASE_URL may only be set in mcp-server.env, not mcp-server.extraEnv
+
+  - it: rejects a nonempty internal URL in extraEnv
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.WANDB_INTERNAL_BASE_URL: http://bypass-api:8081
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_INTERNAL_BASE_URL may only be set in mcp-server.env, not mcp-server.extraEnv
+
+  - it: rejects an empty internal URL in the MCP container env
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.WANDB_INTERNAL_BASE_URL: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_INTERNAL_BASE_URL may only be set in mcp-server.env, not mcp-server.containers.mcp-server.env
+
+  - it: rejects a nonempty internal URL in the MCP container env
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.WANDB_INTERNAL_BASE_URL: http://bypass-api:8081
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_INTERNAL_BASE_URL may only be set in mcp-server.env, not mcp-server.containers.mcp-server.env
+
+  - it: rejects an empty internal URL in a sizing env
+    set:
+      mcp-server.install: true
+      mcp-server.sizing.default.env.WANDB_INTERNAL_BASE_URL: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_INTERNAL_BASE_URL may only be set in mcp-server.env, not mcp-server.sizing.default.env
+
+  - it: rejects a nonempty internal URL in any sizing env
+    set:
+      mcp-server.install: true
+      mcp-server.sizing.medium.env.WANDB_INTERNAL_BASE_URL: http://bypass-api:8081
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_INTERNAL_BASE_URL may only be set in mcp-server.env, not mcp-server.sizing.medium.env
+
+  - it: rejects an empty public URL override in the canonical env
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_BASE_URL: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.env
+
+  - it: rejects a nonempty public URL override in the canonical env
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_BASE_URL: https://bypass.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.env
+
+  - it: rejects a public URL override in extraEnv
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.WANDB_BASE_URL: https://bypass.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.extraEnv
+
+  - it: rejects an empty public URL override in the MCP container env
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.WANDB_BASE_URL: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.containers.mcp-server.env
+
+  - it: rejects a public URL override in any sizing env
+    set:
+      mcp-server.install: true
+      mcp-server.sizing.large.env.WANDB_BASE_URL: https://bypass.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.sizing.large.env
+
+  - it: requires the chart-managed MCP environment template
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.sslCertEnvs" . }}'
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls must include wandb.mcpEnvs
+
+  - it: rejects an env template that only mentions the helper in a comment
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{/* wandb.mcpEnvs */}}[]'
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls must include wandb.mcpEnvs
+
+  - it: rejects a raw internal URL environment template
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - name: WANDB_INTERNAL_BASE_URL
+            value: http://bypass-api:8081
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls cannot define WANDB_BASE_URL, WANDB_INTERNAL_BASE_URL, or UVICORN_WORKERS directly
+
+  - it: rejects a raw public URL environment template
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - name: WANDB_BASE_URL
+            value: https://bypass.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls cannot define WANDB_BASE_URL, WANDB_INTERNAL_BASE_URL, or UVICORN_WORKERS directly
+
+  - it: rejects a dynamically named reserved environment template
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - name: '{{ printf `WANDB_%s` `BASE_URL` }}'
+            value: https://bypass.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls cannot render WANDB_BASE_URL, WANDB_INTERNAL_BASE_URL, or UVICORN_WORKERS outside wandb.mcpEnvs
+
+  - it: requires exactly one MCP replica
+    set:
+      mcp-server.install: true
+      mcp-server.replicaCount: 2
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.replicaCount must equal 1 while admission control is process-local
+
+  - it: rejects zero MCP replicas
+    set:
+      mcp-server.install: true
+      mcp-server.replicaCount: 0
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.replicaCount must equal 1 while admission control is process-local
+
+  - it: preserves MCP isolation from global environment
+    set:
+      mcp-server.install: true
+      mcp-server.globalOptOut.env: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.globalOptOut.env must remain true to isolate MCP from global administrative environment
+
+  - it: accepts a templated true global environment opt-out
+    set:
+      mcp-server.install: true
+      mcp-server.disableGlobalEnv: true
+      mcp-server.globalOptOut.env: '{{ .Values.disableGlobalEnv }}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts a templated propagated global environment opt-out
+    set:
+      global.api.enabled: true
+      mcp-server.install: true
+      mcp-server.globalOptOut.env: '{{ .Values.global.api.enabled }}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects top-level horizontal autoscaling
+    set:
+      mcp-server.install: true
+      mcp-server.autoscaling.horizontal.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP autoscaling must remain disabled while admission control is process-local
+
+  - it: rejects top-level KEDA autoscaling
+    set:
+      mcp-server.install: true
+      mcp-server.autoscaling.keda.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP autoscaling must remain disabled while admission control is process-local
+
+  - it: rejects horizontal autoscaling in any sizing profile
+    set:
+      mcp-server.install: true
+      mcp-server.sizing.small.autoscaling.horizontal.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP autoscaling must remain disabled; mcp-server.sizing.small cannot enable horizontal or KEDA autoscaling
+
+  - it: rejects KEDA autoscaling in any sizing profile
+    set:
+      mcp-server.install: true
+      mcp-server.sizing.xlarge.autoscaling.keda.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP autoscaling must remain disabled; mcp-server.sizing.xlarge cannot enable horizontal or KEDA autoscaling
+
+  - it: requires one Uvicorn worker
+    set:
+      mcp-server.install: true
+      mcp-server.env.UVICORN_WORKERS: "2"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.UVICORN_WORKERS must equal 1 while admission control is process-local
+
+  - it: accepts one Uvicorn worker resolved in MCP scope
+    set:
+      mcp-server.install: true
+      mcp-server.workerCount: 1
+      mcp-server.env.UVICORN_WORKERS: '{{ .Values.workerCount }}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects multiple Uvicorn workers resolved in MCP scope
+    set:
+      mcp-server.install: true
+      mcp-server.workerCount: 2
+      mcp-server.env.UVICORN_WORKERS: '{{ .Values.workerCount }}'
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.UVICORN_WORKERS must equal 1 while admission control is process-local
+
+  - it: rejects a Uvicorn worker override in extraEnv
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.UVICORN_WORKERS: "2"
+    asserts:
+      - failedTemplate:
+          errorMessage: UVICORN_WORKERS may only be set in mcp-server.env, not mcp-server.extraEnv
+
+  - it: rejects a Uvicorn worker override in the MCP container env
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.UVICORN_WORKERS: "2"
+    asserts:
+      - failedTemplate:
+          errorMessage: UVICORN_WORKERS may only be set in mcp-server.env, not mcp-server.containers.mcp-server.env
+
+  - it: rejects a Uvicorn worker override in any sizing env
+    set:
+      mcp-server.install: true
+      mcp-server.sizing.xxlarge.env.UVICORN_WORKERS: "2"
+    asserts:
+      - failedTemplate:
+          errorMessage: UVICORN_WORKERS may only be set in mcp-server.env, not mcp-server.sizing.xxlarge.env
+
+  - it: rejects a raw Uvicorn worker environment template
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - name: UVICORN_WORKERS
+            value: "2"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls cannot define WANDB_BASE_URL, WANDB_INTERNAL_BASE_URL, or UVICORN_WORKERS directly
+
+  - it: requires an override when the split API Service is disabled
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when global.api.enabled=true and api.service.enabled=false
+
+  - it: requires an override for split API naming changes
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.nameOverride: custom-api
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when api naming or the http Service port is overridden
+
+  - it: requires an override for split API fullname changes
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.fullnameOverride: custom-api
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when api naming or the http Service port is overridden
+
+  - it: requires an override for split API Service naming changes
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.name: custom-api
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when api naming or the http Service port is overridden
+
+  - it: requires an override for split API port changes
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports[0].port: 9081
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when api naming or the http Service port is overridden
+
+  - it: requires an override when the monolith Service is disabled
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when the monolith app Service is disabled
+
+  - it: requires an override when the monolith app is disabled
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.install: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when the monolith app Service is disabled
+
+  - it: requires an override for monolith name changes
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.nameOverride: custom-app
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when app naming or the app Service port is overridden
+
+  - it: requires an override for monolith naming changes
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.fullnameOverride: custom-app
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when app naming or the app Service port is overridden
+
+  - it: requires an override for monolith Service naming changes
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.name: custom-app
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when app naming or the app Service port is overridden
+
+  - it: requires an override for monolith port changes
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports[0].port: 9080
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when app naming or the app Service port is overridden
+
+  - it: accepts a custom topology with an explicit internal URL
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+      api.fullnameOverride: custom-api
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-api.platform.svc.cluster.local:9090
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts a custom monolith topology with an explicit internal URL
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.install: false
+      app.fullnameOverride: custom-app
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-app.platform.svc.cluster.local:9090
+    asserts:
+      - notFailedTemplate: {}
