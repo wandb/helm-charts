@@ -1,0 +1,19 @@
+suite: app rename post-upgrade hook job
+templates:
+  - charts/appRenamePostHook/templates/job.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: bounds cleanup retries while preserving the cleanup script
+    asserts:
+      - equal:
+          path: spec.backoffLimit
+          value: 1
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 1800
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: /cleanup-scripts/post_upgrade.sh
