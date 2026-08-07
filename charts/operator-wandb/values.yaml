@@ -1022,6 +1022,9 @@ appRenamePreHook:
     enabled: false
   jobs:
     app-rename-pre-hook:
+      # Bound annotation retries so a failed pre-upgrade hook always terminates.
+      backoffLimit: 1
+      activeDeadlineSeconds: 1500
       containers:
         app-rename-pre-hook:
           command:
@@ -1058,6 +1061,9 @@ appRenamePostHook:
     enabled: false
   jobs:
     app-rename-post-hook:
+      # Four sequential five-minute rollout waits leave ten minutes for retry and cleanup overhead.
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
       containers:
         app-rename-post-hook:
           command:
@@ -1084,6 +1090,9 @@ appRenamePostHook:
       - apiGroups: ["apps"]
         resources: ["deployments"]
         verbs: ["get", "delete", "list", "watch"]
+      - apiGroups: ["apps"]
+        resources: ["replicasets"]
+        verbs: ["list"]
 
 console:
   podLabels:
