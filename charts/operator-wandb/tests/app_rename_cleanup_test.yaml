@@ -1,0 +1,37 @@
+suite: app rename cleanup hooks
+templates:
+  - templates/app_rename_cleanup.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: waits for each replacement before safely deleting its predecessor
+    asserts:
+      - matchRegex:
+          path: data["post_upgrade.sh"]
+          pattern: 'if ! kubectl -n "\$NAMESPACE" rollout status deploy/"\$\{replacement\}" --timeout=5m; then'
+      - matchRegex:
+          path: data["post_upgrade.sh"]
+          pattern: 'if ! kubectl -n "\$NAMESPACE" rollout status deploy/"\$\{replacement\}" --timeout=5m; then\s+echo "Deployment ''\$\{replacement\}'' did not become available; controlled status follows\." >&2\s+log_replacement_status "\$replacement" "\$deployment"\s+exit 1\s+fi\s+echo "Deleting deployment ''\$\{RELEASE\}-\$\{deployment\}'' in namespace ''\$NAMESPACE''\.\.\."\s+kubectl -n "\$NAMESPACE" delete deployment "\$\{RELEASE\}-\$\{deployment\}" --ignore-not-found=true'
+      - matchRegex:
+          path: data["post_upgrade.sh"]
+          pattern: 'get deployment "\$replacement" -o .*jsonpath='
+      - matchRegex:
+          path: data["post_upgrade.sh"]
+          pattern: 'get replicasets -l "app\.kubernetes\.io/instance=\$\{RELEASE\},app\.kubernetes\.io/name=\$\{component\}" -o .*jsonpath='
+      - matchRegex:
+          path: data["post_upgrade.sh"]
+          pattern: 'delete deployment "\$\{RELEASE\}-\$\{deployment\}" --ignore-not-found=true'
+      - matchRegex:
+          path: data["pre_upgrade.sh"]
+          pattern: 'annotate deployment "\$\{RELEASE\}-\$\{deployment\}" "helm\.sh/resource-policy=keep" --overwrite'
+      - matchRegex:
+          path: data["pre_upgrade.sh"]
+          pattern: 'if \[ \$status -eq 0 \]; then[\s\S]*kubectl -n "\$NAMESPACE" annotate deployment "\$\{RELEASE\}-\$\{deployment\}" "helm\.sh/resource-policy=keep" --overwrite[\s\S]*annotation_status=\$\?[\s\S]*if \[ \$annotation_status -ne 0 \]; then[\s\S]*exit "\$annotation_status"[\s\S]*fi[\s\S]*else'
+      - notMatchRegex:
+          path: data["post_upgrade.sh"]
+          pattern: 'kubectl[^\n]*(describe| -o yaml| -o json)'
+      - notMatchRegex:
+          path: data["post_upgrade.sh"]
+          pattern: 'rollout status[^\n]*\|\|'
