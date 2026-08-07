@@ -1,3 +1,4 @@
+{{- $oidc := include "wandb.oidc.config" . | fromYaml -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -12,7 +13,7 @@ data:
   GORILLA_LICENSE_CERT_PATH: "/jwks.json"
   GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL: "true"
 {{- $corsOrigins := list }}
-{{- if ne .Values.global.auth.oidc.clientId "" }}
+{{- if ne $oidc.clientId "" }}
   {{- $corsOrigins = concat $corsOrigins (list .Values.global.host "null") | compact }}
 {{- end }}
 {{- if .Values.app.extraCors }}
@@ -21,10 +22,10 @@ data:
 {{- if gt (len $corsOrigins) 0 }}
   GORILLA_CORS_ORIGINS: "{{ join "," $corsOrigins }}"
 {{- end }}
-{{- if ne .Values.global.auth.oidc.clientId "" }}
-  GORILLA_OIDC_CLIENT_ID: "{{ .Values.global.auth.oidc.clientId }}"
-  GORILLA_AUTH_METHOD: "{{ .Values.global.auth.oidc.authMethod }}"
-  GORILLA_OIDC_ISSUER: "{{ .Values.global.auth.oidc.issuer }}"
+{{- if ne $oidc.clientId "" }}
+  GORILLA_OIDC_CLIENT_ID: "{{ $oidc.clientId }}"
+  GORILLA_AUTH_METHOD: "{{ $oidc.authMethod }}"
+  GORILLA_OIDC_ISSUER: "{{ $oidc.issuer }}"
 {{- end }}
   GORILLA_SESSION_LENGTH: "{{ .Values.global.auth.sessionLengthHours }}h"
   GORILLA_SWEEP_PROVIDER: "{{ include "wandb.anaconda2.sweepProvider" . }}"
