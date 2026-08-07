@@ -7072,7 +7072,7 @@ spec:
           key: "HISTORY_PASSWORD"
     - name: HISTORY_PARAMS
       value: "?max_open_conns=300&tls=false"
-    - name: TEST_CONNECTION_URL
+    - name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
       value: "clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)"
     - name: "MIGRATE_HISTORY_DB"
       value: "clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)"
@@ -7082,7 +7082,7 @@ spec:
     - |
       echo "Testing OLAP env vars for history..."
       fail=0
-      for var in HISTORY_HOST HISTORY_PORT HISTORY_DATABASE HISTORY_USER HISTORY_PASSWORD HISTORY_PARAMS MIGRATE_HISTORY_DB; do
+      for var in HISTORY_HOST HISTORY_PORT HISTORY_DATABASE HISTORY_USER HISTORY_PASSWORD HISTORY_PARAMS GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS MIGRATE_HISTORY_DB; do
         val=$(printenv "$var" || true)
         if [ -z "$val" ]; then
           echo "FAIL: $var is not set"
@@ -7091,12 +7091,6 @@ spec:
           echo "OK: $var is set"
         fi
       done
-      if [ -z "$TEST_CONNECTION_URL" ]; then
-        echo "FAIL: TEST_CONNECTION_URL is not set"
-        fail=1
-      else
-        echo "OK: TEST_CONNECTION_URL is set"
-      fi
       exit $fail
   restartPolicy: Never
 ---
@@ -7133,9 +7127,9 @@ spec:
           key: "REGISTRY_SEARCH_PASSWORD"
     - name: REGISTRY_SEARCH_PARAMS
       value: "?tls=false"
-    - name: TEST_CONNECTION_URL
+    - name: GORILLA_REGISTRY_SEARCH_ADDRESS
       value: "clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)"
-    - name: "MIGRATE_REGISTRY_SEARCH_DB"
+    - name: "MIGRATE_ARTIFACTS_DB"
       value: "clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)"
     command:
     - sh
@@ -7143,7 +7137,7 @@ spec:
     - |
       echo "Testing OLAP env vars for registrySearch..."
       fail=0
-      for var in REGISTRY_SEARCH_HOST REGISTRY_SEARCH_PORT REGISTRY_SEARCH_DATABASE REGISTRY_SEARCH_USER REGISTRY_SEARCH_PASSWORD REGISTRY_SEARCH_PARAMS MIGRATE_REGISTRY_SEARCH_DB; do
+      for var in REGISTRY_SEARCH_HOST REGISTRY_SEARCH_PORT REGISTRY_SEARCH_DATABASE REGISTRY_SEARCH_USER REGISTRY_SEARCH_PASSWORD REGISTRY_SEARCH_PARAMS GORILLA_REGISTRY_SEARCH_ADDRESS MIGRATE_ARTIFACTS_DB; do
         val=$(printenv "$var" || true)
         if [ -z "$val" ]; then
           echo "FAIL: $var is not set"
@@ -7152,12 +7146,6 @@ spec:
           echo "OK: $var is set"
         fi
       done
-      if [ -z "$TEST_CONNECTION_URL" ]; then
-        echo "FAIL: TEST_CONNECTION_URL is not set"
-        fail=1
-      else
-        echo "OK: TEST_CONNECTION_URL is set"
-      fi
       exit $fail
   restartPolicy: Never
 ---
@@ -7194,17 +7182,19 @@ spec:
           key: "RUN_STORE_ACCELERATOR_PASSWORD"
     - name: RUN_STORE_ACCELERATOR_PARAMS
       value: "?tls=false"
-    - name: TEST_CONNECTION_URL
+    - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
       value: "clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)"
     - name: "MIGRATE_RUN_STORE_ACCELERATOR_DB"
       value: "clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)"
+    - name: MIGRATE_RUNS_ACCELERATOR_DB
+      value: "$(MIGRATE_RUN_STORE_ACCELERATOR_DB)"
     command:
     - sh
     - -c
     - |
       echo "Testing OLAP env vars for runStoreAccelerator..."
       fail=0
-      for var in RUN_STORE_ACCELERATOR_HOST RUN_STORE_ACCELERATOR_PORT RUN_STORE_ACCELERATOR_DATABASE RUN_STORE_ACCELERATOR_USER RUN_STORE_ACCELERATOR_PASSWORD RUN_STORE_ACCELERATOR_PARAMS MIGRATE_RUN_STORE_ACCELERATOR_DB; do
+      for var in RUN_STORE_ACCELERATOR_HOST RUN_STORE_ACCELERATOR_PORT RUN_STORE_ACCELERATOR_DATABASE RUN_STORE_ACCELERATOR_USER RUN_STORE_ACCELERATOR_PASSWORD RUN_STORE_ACCELERATOR_PARAMS GORILLA_RUN_STORE_ACCELERATOR_ADDRESS MIGRATE_RUN_STORE_ACCELERATOR_DB MIGRATE_RUNS_ACCELERATOR_DB; do
         val=$(printenv "$var" || true)
         if [ -z "$val" ]; then
           echo "FAIL: $var is not set"
@@ -7213,12 +7203,6 @@ spec:
           echo "OK: $var is set"
         fi
       done
-      if [ -z "$TEST_CONNECTION_URL" ]; then
-        echo "FAIL: TEST_CONNECTION_URL is not set"
-        fail=1
-      else
-        echo "OK: TEST_CONNECTION_URL is set"
-      fi
       exit $fail
   restartPolicy: Never
 ---
