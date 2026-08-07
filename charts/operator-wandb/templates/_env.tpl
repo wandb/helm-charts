@@ -330,6 +330,11 @@ Global values will override any chart-specific values.
       featureName    - key under global.olap, e.g. "registrySearch"
       envVarPrefix   - env var prefix, e.g. "REGISTRY_SEARCH"
       finalEnvName   - the composed URL env var, e.g. "GORILLA_REGISTRY_SEARCH_ADDRESS"
+      emitMigrate    - (optional) also emit the MIGRATE_*_DB env var that makes
+                       `megabinary migrate` act on this schema. Only the
+                       clickhouseMigrationJob hook may set this: it keeps the
+                       hook Job the sole ClickHouse migrator, so concurrent
+                       app-pod initContainers cannot race on ClickHouse DDL.
       migratePrefix  - (optional) prefix for MIGRATE_*_DB env var; defaults to envVarPrefix
 
     Merges global.olap.<featureName> over global.olap.default.
@@ -417,18 +422,28 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.olapParamsQuery" (dict "params" $config.params) | quote }}
 - name: {{ .finalEnvName }}
   value: {{ $finalConnectionUrl | quote }}
-    {{- $migratePrefix := default $prefix .migratePrefix }}
+    {{- if .emitMigrate }}
+      {{- $migratePrefix := default $prefix .migratePrefix }}
 - name: "MIGRATE_{{ $migratePrefix }}_DB"
   value: {{ $finalConnectionUrl | quote }}
+    {{- end }}
   {{- end }}
 {{- end -}}
 
 {{- define "wandb.registrySearchEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "registrySearch" "envVarPrefix" "REGISTRY_SEARCH" "migratePrefix" "ARTIFACTS" "finalEnvName" "GORILLA_REGISTRY_SEARCH_ADDRESS") -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "registrySearch" "envVarPrefix" "REGISTRY_SEARCH" "finalEnvName" "GORILLA_REGISTRY_SEARCH_ADDRESS") -}}
+{{- end -}}
+
+{{- define "wandb.registrySearchMigrateEnvs" -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "registrySearch" "envVarPrefix" "REGISTRY_SEARCH" "emitMigrate" true "migratePrefix" "ARTIFACTS" "finalEnvName" "GORILLA_REGISTRY_SEARCH_ADDRESS") -}}
 {{- end -}}
 
 {{- define "wandb.runStoreAcceleratorEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUN_STORE_ACCELERATOR" "migratePrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") }}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") -}}
+{{- end -}}
+
+{{- define "wandb.runStoreAcceleratorMigrateEnvs" -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "runStoreAccelerator" "envVarPrefix" "RUN_STORE_ACCELERATOR" "emitMigrate" true "migratePrefix" "RUN_STORE_ACCELERATOR" "finalEnvName" "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS") }}
   {{- /*TODO: Remove once Go code migrates EnvVarPrefix from RUNS_ACCELERATOR to RUN_STORE_ACCELERATOR */}}
   {{- if .Values.global.olap.runStoreAccelerator.enabled }}
 - name: MIGRATE_RUNS_ACCELERATOR_DB
@@ -437,7 +452,11 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.historyEnvs" -}}
-{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "migratePrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS") -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS") -}}
+{{- end -}}
+
+{{- define "wandb.historyMigrateEnvs" -}}
+{{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "emitMigrate" true "migratePrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS") -}}
 {{- end -}}
 
 {{/* 

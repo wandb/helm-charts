@@ -1,7 +1,21 @@
+{{- /*
+  Feature-specific env vars the migrate helpers emit beyond the shared
+  <PREFIX>_* connection vars: the composed address env and the MIGRATE_*_DB
+  names the ch-migrate hook Job relies on. Adding a new OLAP feature requires
+  a wandb.<feature>MigrateEnvs helper and an entry here.
+*/ -}}
+{{- $featureSpecificVars := dict
+"history" (list "GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS" "MIGRATE_HISTORY_DB")
+"registrySearch" (list "GORILLA_REGISTRY_SEARCH_ADDRESS" "MIGRATE_ARTIFACTS_DB")
+"runStoreAccelerator" (list "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS" "MIGRATE_RUN_STORE_ACCELERATOR_DB" "MIGRATE_RUNS_ACCELERATOR_DB")
+-}}
 {{- range $featureName, $featureConfig := .Values.global.olap -}}
   {{- if ne $featureName "default" -}}
     {{- $config := include "wandb.olapConfig" (dict "root" $ "featureName" $featureName) | fromYaml -}}
     {{- if $config.enabled -}}
+      {{- if not (hasKey $featureSpecificVars $featureName) -}}
+        {{- fail (printf "test-olap: no migrate env mapping for OLAP feature %q; add a wandb.%sMigrateEnvs helper and list its env vars here" $featureName $featureName) -}}
+      {{- end -}}
       {{- $envVarPrefix := $featureName | snakecase | upper -}}
       {{- $kebab := $featureName | snakecase | replace "_" "-" }}
 ---
@@ -18,14 +32,14 @@ spec:
     - name: test-olap-envs
       image: us-docker.pkg.dev/wandb-production/public/python:3.12
       env:
-        {{- include "wandb.olapFeatureEnvs" (dict "root" $ "featureName" $featureName "envVarPrefix" $envVarPrefix "migratePrefix" $envVarPrefix "finalEnvName" "TEST_CONNECTION_URL") | nindent 8 }}
+        {{- include (printf "wandb.%sMigrateEnvs" $featureName) $ | nindent 8 }}
       command:
         - sh
         - -c
         - |
           echo "Testing OLAP env vars for {{ $featureName }}..."
           fail=0
-          for var in {{ $envVarPrefix }}_HOST {{ $envVarPrefix }}_PORT {{ $envVarPrefix }}_DATABASE {{ $envVarPrefix }}_USER {{ $envVarPrefix }}_PASSWORD {{ $envVarPrefix }}_PARAMS MIGRATE_{{ $envVarPrefix }}_DB; do
+          for var in {{ $envVarPrefix }}_HOST {{ $envVarPrefix }}_PORT {{ $envVarPrefix }}_DATABASE {{ $envVarPrefix }}_USER {{ $envVarPrefix }}_PASSWORD {{ $envVarPrefix }}_PARAMS {{ join " " (get $featureSpecificVars $featureName) }}; do
             val=$(printenv "$var" || true)
             if [ -z "$val" ]; then
               echo "FAIL: $var is not set"
@@ -34,12 +48,6 @@ spec:
               echo "OK: $var is set"
             fi
           done
-          if [ -z "$TEST_CONNECTION_URL" ]; then
-            echo "FAIL: TEST_CONNECTION_URL is not set"
-            fail=1
-          else
-            echo "OK: TEST_CONNECTION_URL is set"
-          fi
           exit $fail
   restartPolicy: Never
     {{- end }}
