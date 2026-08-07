@@ -4634,17 +4634,56 @@ reloader:
 
 clickhouse:
   install: false
+  # The bundled ClickHouse is for CI/dev only; production platforms use
+  # ClickHouse Cloud or customer-provided instances. Official images replace
+  # the frozen bitnamilegacy archive (stuck at 25.7; core's migrations need
+  # 26.x). The overrides below do what the Bitnami entrypoint did: admin user,
+  # logging, config/data paths, keeper server id.
   image:
-    repository: bitnamilegacy/clickhouse
+    repository: clickhouse/clickhouse-server
+    tag: "26.4"
   global:
     security:
       allowInsecureImages: true
   auth:
     existingSecret: '{{ include "wandb.clickhouse.passwordSecret" . }}'
     existingSecretKey: "{{- .Values.global.clickhouse.passwordSecret.passwordKey -}}"
+  # Keep the admin password as an env var so from_env works in usersdFiles below.
+  usePasswordFiles: false
 
   shards: 1
   replicaCount: 1
+
+  # /var/log/clickhouse-server is not writable as the chart's non-root uid;
+  # log to console like the Bitnami build did.
+  configdFiles:
+    00-logger-console.xml: |
+      <clickhouse>
+          <logger>
+              <console>1</console>
+              <log remove="remove"></log>
+              <errorlog remove="remove"></errorlog>
+          </logger>
+      </clickhouse>
+  # The Bitnami entrypoint provisioned the admin user; with the official image
+  # declare it via users.d, fed by the env var the chart already sets.
+  usersdFiles:
+    zz-admin-user.xml: |
+      <clickhouse>
+          <users>
+              <{{ .Values.auth.username }}>
+                  <password from_env="CLICKHOUSE_ADMIN_PASSWORD"></password>
+                  <access_management>1</access_management>
+              </{{ .Values.auth.username }}>
+          </users>
+      </clickhouse>
+  # Re-mount the chart's config/users fragments where the official image reads
+  # them (the chart itself mounts them at Bitnami's /bitnami/clickhouse/etc).
+  extraVolumeMounts:
+    - name: configd-configuration
+      mountPath: /etc/clickhouse-server/config.d
+    - name: usersd-configuration-configuration
+      mountPath: /etc/clickhouse-server/users.d
 
   # Apply global nodeSelector and tolerations to ClickHouse
   nodeSelector: {}
@@ -4658,8 +4697,40 @@ clickhouse:
     enabled: true
     size: 30Gi
     storageClass: ""
+    # The official image's config keeps data under /var/lib/clickhouse.
+    mountPath: /var/lib/clickhouse
 
   keeper:
+    image:
+      repository: clickhouse/clickhouse-keeper
+      tag: "26.4"
+    # Full keeper config replacing the Bitnami entrypoint-generated one. Raft
+    # membership still comes from the chart's keeper_config.d fragment, which
+    # ClickHouse merges from the directory next to the main config file.
+    configuration: |
+      <clickhouse>
+          <listen_host>0.0.0.0</listen_host>
+          <logger>
+              <console>1</console>
+              <log remove="remove"></log>
+              <errorlog remove="remove"></errorlog>
+          </logger>
+          <path>/var/lib/clickhouse-keeper</path>
+          <keeper_server>
+              <tcp_port from_env="CLICKHOUSE_KEEPER_TCP_PORT"></tcp_port>
+              <server_id from_env="KEEPER_SERVER_ID"></server_id>
+              <log_storage_path>/var/lib/clickhouse-keeper/coordination/log</log_storage_path>
+              <snapshot_storage_path>/var/lib/clickhouse-keeper/coordination/snapshots</snapshot_storage_path>
+          </keeper_server>
+      </clickhouse>
+    # The Bitnami entrypoint derived the numeric keeper server id from the pod
+    # ordinal; from_env needs an integer, so do the same here.
+    command:
+      - sh
+      - -ec
+      - |
+        export KEEPER_SERVER_ID="${CLICKHOUSE_KEEPER_SERVER_ID##*-}"
+        exec clickhouse-keeper --config-file=/bitnami/clickhouse-keeper/etc/keeper_config.xml
     # Apply global nodeSelector and tolerations to ClickHouse Keeper
     nodeSelector: {}
     tolerations: []
@@ -4671,3 +4742,4 @@ clickhouse:
       enabled: true
       size: 8Gi
       storageClass: ""
+      mountPath: /var/lib/clickhouse-keeper
