@@ -794,6 +794,14 @@ metadata:
     app.kubernetes.io/component: clickhouse
     app.kubernetes.io/part-of: clickhouse
 data:
+  00-logger-console.xml: |
+    <clickhouse>
+        <logger>
+            <console>1</console>
+            <log remove="remove"></log>
+            <errorlog remove="remove"></errorlog>
+        </logger>
+    </clickhouse>
   01-listen.xml: |
     <yandex>
         <listen_host>::</listen_host>
@@ -870,6 +878,63 @@ data:
                 </server>
             </raft_configuration>
         </keeper_server>
+    </clickhouse>
+---
+# Source: operator-wandb/charts/clickhouse/templates/keeper/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-clickhouse-keeper
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/version: 25.7.5
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/component: keeper
+    app.kubernetes.io/part-of: clickhouse
+data:
+  keeper_config.xml: |
+    <clickhouse>
+        <listen_host>0.0.0.0</listen_host>
+        <logger>
+            <console>1</console>
+            <log remove="remove"></log>
+            <errorlog remove="remove"></errorlog>
+        </logger>
+        <path>/var/lib/clickhouse-keeper</path>
+        <keeper_server>
+            <tcp_port from_env="CLICKHOUSE_KEEPER_TCP_PORT"></tcp_port>
+            <server_id from_env="KEEPER_SERVER_ID"></server_id>
+            <log_storage_path>/var/lib/clickhouse-keeper/coordination/log</log_storage_path>
+            <snapshot_storage_path>/var/lib/clickhouse-keeper/coordination/snapshots</snapshot_storage_path>
+        </keeper_server>
+    </clickhouse>
+---
+# Source: operator-wandb/charts/clickhouse/templates/usersd-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-clickhouse-usersd
+  namespace: "default"
+  labels:
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/version: 25.7.5
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/component: clickhouse
+    app.kubernetes.io/part-of: clickhouse
+data:
+  zz-admin-user.xml: |
+    <clickhouse>
+        <users>
+            <default>
+                <password from_env="CLICKHOUSE_ADMIN_PASSWORD"></password>
+                <access_management>1</access_management>
+            </default>
+        </users>
     </clickhouse>
 ---
 # Source: operator-wandb/charts/mysql/templates/configmap.yaml
@@ -3957,8 +4022,6 @@ spec:
           value: ?tls=false
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
           value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
-        - name: MIGRATE_ARTIFACTS_DB
-          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
         - name: RUN_STORE_ACCELERATOR_HOST
           value: chartsnap-clickhouse-headless
         - name: RUN_STORE_ACCELERATOR_PORT
@@ -3976,10 +4039,6 @@ spec:
           value: ?tls=false
         - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
           value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
-        - name: MIGRATE_RUN_STORE_ACCELERATOR_DB
-          value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
-        - name: MIGRATE_RUNS_ACCELERATOR_DB
-          value: $(MIGRATE_RUN_STORE_ACCELERATOR_DB)
         - name: GORILLA_LUMEN_ADDR
           value: :16060
         - name: BUCKET_PROXY
@@ -4258,8 +4317,6 @@ spec:
           value: ?tls=false
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
           value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
-        - name: MIGRATE_ARTIFACTS_DB
-          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
         - name: RUN_STORE_ACCELERATOR_HOST
           value: chartsnap-clickhouse-headless
         - name: RUN_STORE_ACCELERATOR_PORT
@@ -4277,10 +4334,6 @@ spec:
           value: ?tls=false
         - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
           value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
-        - name: MIGRATE_RUN_STORE_ACCELERATOR_DB
-          value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
-        - name: MIGRATE_RUNS_ACCELERATOR_DB
-          value: $(MIGRATE_RUN_STORE_ACCELERATOR_DB)
         - name: GORILLA_LUMEN_ADDR
           value: :16060
         - name: BUCKET_PROXY
@@ -6043,8 +6096,6 @@ spec:
           value: ?tls=false
         - name: GORILLA_REGISTRY_SEARCH_ADDRESS
           value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
-        - name: MIGRATE_ARTIFACTS_DB
-          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
         - name: RUN_STORE_ACCELERATOR_HOST
           value: chartsnap-clickhouse-headless
         - name: RUN_STORE_ACCELERATOR_PORT
@@ -6062,10 +6113,6 @@ spec:
           value: ?tls=false
         - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
           value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
-        - name: MIGRATE_RUN_STORE_ACCELERATOR_DB
-          value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
-        - name: MIGRATE_RUNS_ACCELERATOR_DB
-          value: $(MIGRATE_RUN_STORE_ACCELERATOR_DB)
         - name: GORILLA_LUMEN_ADDR
           value: :16060
         - name: BUCKET_PROXY
@@ -6478,8 +6525,6 @@ spec:
         - name: HISTORY_PARAMS
           value: ?max_open_conns=300&tls=false
         - name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
-          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
-        - name: MIGRATE_HISTORY_DB
           value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
         - name: GORILLA_HISTORY_STORE
           value: http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
@@ -7298,6 +7343,7 @@ spec:
   template:
     metadata:
       annotations:
+        checksum/configuration: 28e8b3cc3e08583128d3083fc8d3547900b45b5c2eb0c22dda06c7d62fa35c4e
         checksum/configd-configuration: bfdea18bbc1786d95702e6f773f35a312de0f1cd6f51dc27fdf091b40320afdd
       labels:
         app.kubernetes.io/instance: chartsnap
@@ -7331,7 +7377,7 @@ spec:
       initContainers:
       containers:
       - name: keeper
-        image: us-docker.pkg.dev/wandb-production/public/bitnamilegacy/clickhouse-keeper:25.7.5-debian-12-r0
+        image: us-docker.pkg.dev/wandb-production/public/clickhouse/clickhouse-keeper:26.4
         imagePullPolicy: "IfNotPresent"
         securityContext:
           allowPrivilegeEscalation: false
@@ -7346,6 +7392,12 @@ spec:
           seLinuxOptions: {}
           seccompProfile:
             type: RuntimeDefault
+        command:
+        - sh
+        - -ec
+        - |
+          export KEEPER_SERVER_ID="${CLICKHOUSE_KEEPER_SERVER_ID##*-}"
+          exec clickhouse-keeper --config-file=/bitnami/clickhouse-keeper/etc/keeper_config.xml
         env:
         - name: BITNAMI_DEBUG
           value: "false"
@@ -7389,7 +7441,10 @@ spec:
             memory: 64Mi
         volumeMounts:
         - name: data
-          mountPath: /bitnami/clickhouse-keeper
+          mountPath: /var/lib/clickhouse-keeper
+        - name: configuration
+          mountPath: /bitnami/clickhouse-keeper/etc/keeper_config.xml
+          subPath: keeper_config.xml
         - name: configd-configuration
           mountPath: /bitnami/clickhouse-keeper/etc/keeper_config.d
         - name: empty-dir
@@ -7407,6 +7462,9 @@ spec:
       volumes:
       - name: empty-dir
         emptyDir: {}
+      - name: configuration
+        configMap:
+          name: chartsnap-clickhouse-keeper
       - name: configd-configuration
         configMap:
           name: chartsnap-clickhouse-keeper-configd
@@ -7462,7 +7520,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/configd-configuration: dc3b278f99d27bba9daa9c189b7500c5cf80a73866e54f4e92475777381f9c59
+        checksum/configd-configuration: 8c243af91e23c69d4ed85ebb3e0cce24367419fb43919bd4db0b432991ddc1f4
+        checksum/usersd-configuration: c5ab1093996fc7b5fa2ffe1abae40154115d076f3592fa2bfc6de8efd7147bca
       labels:
         app.kubernetes.io/instance: chartsnap
         app.kubernetes.io/managed-by: Helm
@@ -7496,7 +7555,7 @@ spec:
       initContainers:
       containers:
       - name: clickhouse
-        image: us-docker.pkg.dev/wandb-production/public/bitnamilegacy/clickhouse:25.7.5-debian-12-r0
+        image: us-docker.pkg.dev/wandb-production/public/clickhouse/clickhouse-server:26.4
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
@@ -7532,8 +7591,11 @@ spec:
               fieldPath: metadata.name
         - name: CLICKHOUSE_ADMIN_USER
           value: "default"
-        - name: CLICKHOUSE_ADMIN_PASSWORD_FILE
-          value: /opt/bitnami/clickhouse/secrets/CLICKHOUSE_PASSWORD
+        - name: CLICKHOUSE_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: chartsnap-clickhouse
+              key: CLICKHOUSE_PASSWORD
         resources:
           requests:
             cpu: 40m
@@ -7568,12 +7630,11 @@ spec:
             port: http
         volumeMounts:
         - name: data
-          mountPath: /bitnami/clickhouse
+          mountPath: /var/lib/clickhouse
         - name: configd-configuration
           mountPath: /bitnami/clickhouse/etc/config.d
-        - name: secrets
-          mountPath: /opt/bitnami/clickhouse/secrets
-          readOnly: true
+        - name: usersd-configuration-configuration
+          mountPath: /bitnami/clickhouse/etc/users.d
         - name: empty-dir
           mountPath: /opt/bitnami/clickhouse/etc
           subPath: app-conf-dir
@@ -7586,16 +7647,21 @@ spec:
         - name: empty-dir
           mountPath: /tmp
           subPath: tmp-dir
+        - mountPath: /etc/clickhouse-server/config.d
+          name: configd-configuration
+        - mountPath: /etc/clickhouse-server/users.d
+          name: usersd-configuration-configuration
       volumes:
       - name: empty-dir
         emptyDir: {}
       - name: configd-configuration
         configMap:
           name: chartsnap-clickhouse-configd
-      - name: secrets
-        secret:
-          secretName: chartsnap-clickhouse
-          defaultMode: 256
+      - name: usersd-configuration-configuration
+        projected:
+          sources:
+          - configMap:
+              name: chartsnap-clickhouse-usersd
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
@@ -8062,8 +8128,6 @@ spec:
               value: ?max_open_conns=300&tls=false
             - name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
               value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
-            - name: MIGRATE_HISTORY_DB
-              value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
             - name: GORILLA_HISTORY_STORE
               value: http://chartsnap-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
             - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
@@ -8515,7 +8579,7 @@ spec:
           key: "HISTORY_PASSWORD"
     - name: HISTORY_PARAMS
       value: "?max_open_conns=300&tls=false"
-    - name: TEST_CONNECTION_URL
+    - name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
       value: "clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)"
     - name: "MIGRATE_HISTORY_DB"
       value: "clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)"
@@ -8525,7 +8589,7 @@ spec:
     - |
       echo "Testing OLAP env vars for history..."
       fail=0
-      for var in HISTORY_HOST HISTORY_PORT HISTORY_DATABASE HISTORY_USER HISTORY_PASSWORD HISTORY_PARAMS MIGRATE_HISTORY_DB; do
+      for var in HISTORY_HOST HISTORY_PORT HISTORY_DATABASE HISTORY_USER HISTORY_PASSWORD HISTORY_PARAMS GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS MIGRATE_HISTORY_DB; do
         val=$(printenv "$var" || true)
         if [ -z "$val" ]; then
           echo "FAIL: $var is not set"
@@ -8534,12 +8598,6 @@ spec:
           echo "OK: $var is set"
         fi
       done
-      if [ -z "$TEST_CONNECTION_URL" ]; then
-        echo "FAIL: TEST_CONNECTION_URL is not set"
-        fail=1
-      else
-        echo "OK: TEST_CONNECTION_URL is set"
-      fi
       exit $fail
   restartPolicy: Never
 ---
@@ -8576,9 +8634,9 @@ spec:
           key: "REGISTRY_SEARCH_PASSWORD"
     - name: REGISTRY_SEARCH_PARAMS
       value: "?tls=false"
-    - name: TEST_CONNECTION_URL
+    - name: GORILLA_REGISTRY_SEARCH_ADDRESS
       value: "clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)"
-    - name: "MIGRATE_REGISTRY_SEARCH_DB"
+    - name: "MIGRATE_ARTIFACTS_DB"
       value: "clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)"
     command:
     - sh
@@ -8586,7 +8644,7 @@ spec:
     - |
       echo "Testing OLAP env vars for registrySearch..."
       fail=0
-      for var in REGISTRY_SEARCH_HOST REGISTRY_SEARCH_PORT REGISTRY_SEARCH_DATABASE REGISTRY_SEARCH_USER REGISTRY_SEARCH_PASSWORD REGISTRY_SEARCH_PARAMS MIGRATE_REGISTRY_SEARCH_DB; do
+      for var in REGISTRY_SEARCH_HOST REGISTRY_SEARCH_PORT REGISTRY_SEARCH_DATABASE REGISTRY_SEARCH_USER REGISTRY_SEARCH_PASSWORD REGISTRY_SEARCH_PARAMS GORILLA_REGISTRY_SEARCH_ADDRESS MIGRATE_ARTIFACTS_DB; do
         val=$(printenv "$var" || true)
         if [ -z "$val" ]; then
           echo "FAIL: $var is not set"
@@ -8595,12 +8653,6 @@ spec:
           echo "OK: $var is set"
         fi
       done
-      if [ -z "$TEST_CONNECTION_URL" ]; then
-        echo "FAIL: TEST_CONNECTION_URL is not set"
-        fail=1
-      else
-        echo "OK: TEST_CONNECTION_URL is set"
-      fi
       exit $fail
   restartPolicy: Never
 ---
@@ -8637,17 +8689,19 @@ spec:
           key: "RUN_STORE_ACCELERATOR_PASSWORD"
     - name: RUN_STORE_ACCELERATOR_PARAMS
       value: "?tls=false"
-    - name: TEST_CONNECTION_URL
+    - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
       value: "clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)"
     - name: "MIGRATE_RUN_STORE_ACCELERATOR_DB"
       value: "clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)"
+    - name: MIGRATE_RUNS_ACCELERATOR_DB
+      value: "$(MIGRATE_RUN_STORE_ACCELERATOR_DB)"
     command:
     - sh
     - -c
     - |
       echo "Testing OLAP env vars for runStoreAccelerator..."
       fail=0
-      for var in RUN_STORE_ACCELERATOR_HOST RUN_STORE_ACCELERATOR_PORT RUN_STORE_ACCELERATOR_DATABASE RUN_STORE_ACCELERATOR_USER RUN_STORE_ACCELERATOR_PASSWORD RUN_STORE_ACCELERATOR_PARAMS MIGRATE_RUN_STORE_ACCELERATOR_DB; do
+      for var in RUN_STORE_ACCELERATOR_HOST RUN_STORE_ACCELERATOR_PORT RUN_STORE_ACCELERATOR_DATABASE RUN_STORE_ACCELERATOR_USER RUN_STORE_ACCELERATOR_PASSWORD RUN_STORE_ACCELERATOR_PARAMS GORILLA_RUN_STORE_ACCELERATOR_ADDRESS MIGRATE_RUN_STORE_ACCELERATOR_DB MIGRATE_RUNS_ACCELERATOR_DB; do
         val=$(printenv "$var" || true)
         if [ -z "$val" ]; then
           echo "FAIL: $var is not set"
@@ -8656,12 +8710,6 @@ spec:
           echo "OK: $var is set"
         fi
       done
-      if [ -z "$TEST_CONNECTION_URL" ]; then
-        echo "FAIL: TEST_CONNECTION_URL is not set"
-        fail=1
-      else
-        echo "OK: TEST_CONNECTION_URL is set"
-      fi
       exit $fail
   restartPolicy: Never
 ---
@@ -8880,3 +8928,318 @@ spec:
           defaultMode: 493
           name: 'chartsnap-app-rename-cleanup'
         name: app-rename-cleanup
+---
+# Source: operator-wandb/charts/clickhouseMigrationJob/templates/job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chartsnap-ch-migrate
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: clickhouseMigrationJob
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "latest"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": "post-install,pre-upgrade"
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: '###CHART_VERSION###'
+        app.kubernetes.io/name: clickhouseMigrationJob
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/version: "latest"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: ch-migrate
+        command:
+        - bash
+        - -c
+        - |
+          # No --db/--runs-db/--usage-db flags: without them the MySQL
+          # schemas are skipped (their env vars are unset here) and only the
+          # ClickHouse schemas run, keyed off the MIGRATE_*_DB env vars.
+          LOG_FILE="/tmp/migrate.log"
+          ./megabinary migrate 2>&1 | tee -a $LOG_FILE
+          EXIT_CODE=${PIPESTATUS[0]}
+          MIGRATION_FILE_MISSING_ERROR_CODE=101
+          if [[ $EXIT_CODE -eq 0 || $EXIT_CODE -eq $MIGRATION_FILE_MISSING_ERROR_CODE ]]; then
+            exit 0
+          else
+            # missing migration error log from golang-migrate@v4 -- older versions of megabinary
+            if grep -q "no migration found for version" $LOG_FILE; then
+              exit 0
+            fi
+            exit $EXIT_CODE
+          fi
+        envFrom:
+        env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: HISTORY_HOST
+          value: chartsnap-clickhouse-headless
+        - name: HISTORY_PORT
+          value: "9000"
+        - name: HISTORY_DATABASE
+          value: history
+        - name: HISTORY_USER
+          value: default
+        - name: HISTORY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: HISTORY_PASSWORD
+              name: chartsnap-olap-history
+        - name: HISTORY_PARAMS
+          value: ?max_open_conns=300&tls=false
+        - name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
+          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+        - name: MIGRATE_HISTORY_DB
+          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+        - name: REGISTRY_SEARCH_HOST
+          value: chartsnap-clickhouse-headless
+        - name: REGISTRY_SEARCH_PORT
+          value: "9000"
+        - name: REGISTRY_SEARCH_DATABASE
+          value: artifacts
+        - name: REGISTRY_SEARCH_USER
+          value: default
+        - name: REGISTRY_SEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REGISTRY_SEARCH_PASSWORD
+              name: chartsnap-olap-registry-search
+        - name: REGISTRY_SEARCH_PARAMS
+          value: ?tls=false
+        - name: GORILLA_REGISTRY_SEARCH_ADDRESS
+          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
+        - name: MIGRATE_ARTIFACTS_DB
+          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
+        - name: RUN_STORE_ACCELERATOR_HOST
+          value: chartsnap-clickhouse-headless
+        - name: RUN_STORE_ACCELERATOR_PORT
+          value: "9000"
+        - name: RUN_STORE_ACCELERATOR_DATABASE
+          value: runs
+        - name: RUN_STORE_ACCELERATOR_USER
+          value: default
+        - name: RUN_STORE_ACCELERATOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RUN_STORE_ACCELERATOR_PASSWORD
+              name: chartsnap-olap-run-store-accelerator
+        - name: RUN_STORE_ACCELERATOR_PARAMS
+          value: ?tls=false
+        - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
+          value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
+        - name: MIGRATE_RUN_STORE_ACCELERATOR_DB
+          value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
+        - name: MIGRATE_RUNS_ACCELERATOR_DB
+          value: $(MIGRATE_RUN_STORE_ACCELERATOR_DB)
+        - name: BUCKET_PROXY
+          value: "true"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+        - mountPath: /tmp/
+          name: temp-dir
+      initContainers:
+      - name: wait-for-clickhouse
+        command:
+        - bash
+        - -c
+        - |
+          wait_for() {
+            until (exec 3<>"/dev/tcp/$1/$2") 2>/dev/null; do
+              echo "waiting for clickhouse at $1:$2"
+              sleep 5
+            done
+            echo "clickhouse reachable at $1:$2"
+          }
+          if [[ -n "$HISTORY_HOST" ]]; then
+            wait_for "$HISTORY_HOST" "$HISTORY_PORT"
+          fi
+          if [[ -n "$REGISTRY_SEARCH_HOST" ]]; then
+            wait_for "$REGISTRY_SEARCH_HOST" "$REGISTRY_SEARCH_PORT"
+          fi
+          if [[ -n "$RUN_STORE_ACCELERATOR_HOST" ]]; then
+            wait_for "$RUN_STORE_ACCELERATOR_HOST" "$RUN_STORE_ACCELERATOR_PORT"
+          fi
+          exit 0
+        envFrom:
+        env:
+        - name: SSL_CERT_FILE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: SSL_CERT_DIR
+          value: /etc/ssl/certs
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
+        - name: HISTORY_HOST
+          value: chartsnap-clickhouse-headless
+        - name: HISTORY_PORT
+          value: "9000"
+        - name: HISTORY_DATABASE
+          value: history
+        - name: HISTORY_USER
+          value: default
+        - name: HISTORY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: HISTORY_PASSWORD
+              name: chartsnap-olap-history
+        - name: HISTORY_PARAMS
+          value: ?max_open_conns=300&tls=false
+        - name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
+          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+        - name: MIGRATE_HISTORY_DB
+          value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+        - name: REGISTRY_SEARCH_HOST
+          value: chartsnap-clickhouse-headless
+        - name: REGISTRY_SEARCH_PORT
+          value: "9000"
+        - name: REGISTRY_SEARCH_DATABASE
+          value: artifacts
+        - name: REGISTRY_SEARCH_USER
+          value: default
+        - name: REGISTRY_SEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: REGISTRY_SEARCH_PASSWORD
+              name: chartsnap-olap-registry-search
+        - name: REGISTRY_SEARCH_PARAMS
+          value: ?tls=false
+        - name: GORILLA_REGISTRY_SEARCH_ADDRESS
+          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
+        - name: MIGRATE_ARTIFACTS_DB
+          value: clickhouse://$(REGISTRY_SEARCH_USER):$(REGISTRY_SEARCH_PASSWORD)@$(REGISTRY_SEARCH_HOST):$(REGISTRY_SEARCH_PORT)/$(REGISTRY_SEARCH_DATABASE)$(REGISTRY_SEARCH_PARAMS)
+        - name: RUN_STORE_ACCELERATOR_HOST
+          value: chartsnap-clickhouse-headless
+        - name: RUN_STORE_ACCELERATOR_PORT
+          value: "9000"
+        - name: RUN_STORE_ACCELERATOR_DATABASE
+          value: runs
+        - name: RUN_STORE_ACCELERATOR_USER
+          value: default
+        - name: RUN_STORE_ACCELERATOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: RUN_STORE_ACCELERATOR_PASSWORD
+              name: chartsnap-olap-run-store-accelerator
+        - name: RUN_STORE_ACCELERATOR_PARAMS
+          value: ?tls=false
+        - name: GORILLA_RUN_STORE_ACCELERATOR_ADDRESS
+          value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
+        - name: MIGRATE_RUN_STORE_ACCELERATOR_DB
+          value: clickhouse://$(RUN_STORE_ACCELERATOR_USER):$(RUN_STORE_ACCELERATOR_PASSWORD)@$(RUN_STORE_ACCELERATOR_HOST):$(RUN_STORE_ACCELERATOR_PORT)/$(RUN_STORE_ACCELERATOR_DATABASE)$(RUN_STORE_ACCELERATOR_PARAMS)
+        - name: MIGRATE_RUNS_ACCELERATOR_DB
+          value: $(MIGRATE_RUN_STORE_ACCELERATOR_DB)
+        - name: BUCKET_PROXY
+          value: "true"
+        - name: GLOBAL_ADMIN_API_KEY
+          value: "local-e6473d304d3487851f5e2501657d3d81f8420874"
+        - name: GORILLA_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_GLUE_FILE_STORE_IS_PROXIED
+          value: "true"
+        - name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS
+          value: "true"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "us-docker.pkg.dev/wandb-production/public/wandb/megabinary:latest"
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: wandb-ca-certs-root
+          mountPath: /usr/local/share/ca-certificates/
+        - name: wandb-ca-certs
+          mountPath: /usr/local/share/ca-certificates/inline
+        - name: wandb-ca-certs-user
+          mountPath: /usr/local/share/ca-certificates/configmap
+        - name: redis-ca
+          mountPath: /etc/ssl/certs/redis_ca.pem
+          subPath: redis_ca.pem
+      restartPolicy: Never
+      serviceAccountName: default
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: clickhouseMigrationJob
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: clickhouseMigrationJob
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+      volumes:
+      - name: wandb-ca-certs-root
+        emptyDir: {}
+      - name: wandb-ca-certs
+        configMap:
+          name: "chartsnap-ca-certs"
+      - name: wandb-ca-certs-user
+        configMap:
+          name: 'noCertProvided'
+          optional: true
+      - name: redis-ca
+        secret:
+          secretName: 'chartsnap-redis-secret'
+          items:
+          - key: REDIS_CA_CERT
+            path: redis_ca.pem
+          optional: true
+      - emptyDir: {}
+        name: temp-dir
