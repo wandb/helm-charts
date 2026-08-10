@@ -1307,8 +1307,18 @@ filemeta:
   image:
     repository: wandb/megabinary
     tag: latest
+  pubSub:
+    # pubSub subscription comes from terraform
+    subscription: ""
+  kafka:
+    # unique consumer group so it reads the run-update shadow topic independently
+    consumerGroupId: "filemeta"
+  env:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FILEMETA:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
@@ -1318,6 +1328,7 @@ filemeta:
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
