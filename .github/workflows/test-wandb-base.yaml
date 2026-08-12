@@ -5,6 +5,7 @@ on:
     paths:
       - charts/wandb-base/**
       - test-configs/wandb-base/**
+      - scripts/test_wandb_base_go_memory_limit.sh
       - scripts/normalize_snapshot_chart_versions.py
       - snapshots.sh
       - .github/workflows/test-wandb-base.yaml
@@ -24,5 +25,8 @@ jobs:
         run: |
           helm plugin install https://github.com/origranot/helm-cascade
           helm cascade build ./charts/wandb-base/
+          helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v1.1.1
+          helm unittest ./charts/wandb-base/
+          HELM_BIN=helm bash ./scripts/test_wandb_base_go_memory_limit.sh
           helm plugin install https://github.com/jlandowner/helm-chartsnap
           ./snapshots.sh run wandb-base

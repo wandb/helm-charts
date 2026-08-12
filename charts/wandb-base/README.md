@@ -60,6 +60,32 @@ envFrom:
   app-secrets: "secretRef"
 ```
 
+### Go Runtime Memory Limit
+
+Named containers can set an optional, positive Go runtime soft memory limit:
+
+```yaml
+containers:
+  api:
+    goMemoryLimit: "8GiB"
+```
+
+The field accepts only quoted Go byte-count strings matching
+`^[1-9][0-9]*(([KMGT]i)?B)?$` whose value, after applying the suffix, does not
+exceed Go's signed 64-bit maximum of 9,223,372,036,854,775,807 bytes. For
+example, `1024`, `512MiB`, and `8GiB` are valid strings; zero, null, YAML
+numbers, fractional values, overflowing quantities, `8Gi`, and `8GB` are
+rejected. When the field is absent, the chart does not add a literal
+`GOMEMLIMIT`, so an existing templated environment entry such as a Kubernetes
+`limits.memory` `resourceFieldRef` renders exactly as before.
+
+The value applies only to the named container. It is not inherited by other
+main containers, init containers, Job containers, or CronJob containers. Those
+containers can opt in independently at their own `goMemoryLimit` field. Do not
+also set `GOMEMLIMIT` through container, chart, sizing, extra, or global `env`;
+the chart rejects that ambiguous configuration instead of choosing precedence.
+Remove `goMemoryLimit` to restore the previous environment source.
+
 ### Volumes
 
 Volumes can be defined at multiple levels and are combined by name. The chart uses the pod- or chart-level volume when a name collides with a global volume.
@@ -489,6 +515,8 @@ containers:
       tag: v1.0.0
     command: ["./start.sh"]
     args: ["--config", "/etc/config/config.yaml"]
+    # Optional; there is no chart default.
+    goMemoryLimit: "8GiB"
     env:
       LOG_LEVEL: "debug"
     ports:
