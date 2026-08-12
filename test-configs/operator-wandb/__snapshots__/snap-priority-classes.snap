@@ -4853,11 +4853,16 @@ data:
       if [ $status -eq 0 ]; then
         echo "Annotating deployment '${RELEASE}-${deployment}' in namespace '$NAMESPACE'..."
         kubectl -n "$NAMESPACE" annotate deployment "${RELEASE}-${deployment}" "helm.sh/resource-policy=keep" --overwrite
+        annotation_status=$?
+        if [ $annotation_status -ne 0 ]; then
+          echo "Error annotating deployment '${RELEASE}-${deployment}' (exit status $annotation_status)." >&2
+          exit "$annotation_status"
+        fi
       else
         if echo "$output" | grep -qi "(NotFound)\|not found"; then
           echo "Deployment '${RELEASE}-${deployment}' not found; skipping annotation."
         else
-          echo "Error checking deployment '${RELEASE}-${deployment}': $output" >&2
+          echo "Error checking deployment '${RELEASE}-${deployment}' (exit status $status)." >&2
           exit $status
         fi
       fi
@@ -4869,20 +4874,33 @@ data:
     RELEASE="chartsnap"
     DEPLOYMENTS="app parquet weave weave-trace"
 
+    log_replacement_status() {
+      replacement="$1"
+      component="$2"
+
+      kubectl -n "$NAMESPACE" get deployment "$replacement" -o 'jsonpath={.metadata.name} readyReplicas={.status.readyReplicas} availableReplicas={.status.availableReplicas} updatedReplicas={.status.updatedReplicas} unavailableReplicas={.status.unavailableReplicas} observedGeneration={.status.observedGeneration} generation={.metadata.generation}{"\n"}' >&2 || true
+      kubectl -n "$NAMESPACE" get replicasets -l "app.kubernetes.io/instance=${RELEASE},app.kubernetes.io/name=${component}" -o 'jsonpath={range .items[*]}{.metadata.name} readyReplicas={.status.readyReplicas} availableReplicas={.status.availableReplicas} replicas={.status.replicas} observedGeneration={.status.observedGeneration}{"\n"}{end}' >&2 || true
+    }
+
     for deployment in ${DEPLOYMENTS}; do
       output=$(kubectl -n "$NAMESPACE" get deployment "${RELEASE}-${deployment}" 2>&1)
       status=$?
       if [ $status -eq 0 ]; then
-        echo "Waiting for deployment '${RELEASE}-${deployment}-bc' to become available..."
-        kubectl -n "$NAMESPACE" rollout status deploy/"${RELEASE}-${deployment}-bc" || exit $?
+        replacement="${RELEASE}-${deployment}-bc"
+        echo "Waiting for deployment '${replacement}' to become available..."
+        if ! kubectl -n "$NAMESPACE" rollout status deploy/"${replacement}" --timeout=5m; then
+          echo "Deployment '${replacement}' did not become available; controlled status follows." >&2
+          log_replacement_status "$replacement" "$deployment"
+          exit 1
+        fi
 
         echo "Deleting deployment '${RELEASE}-${deployment}' in namespace '$NAMESPACE'..."
-        kubectl -n "$NAMESPACE" delete deployment "${RELEASE}-${deployment}" || exit $?
+        kubectl -n "$NAMESPACE" delete deployment "${RELEASE}-${deployment}" --ignore-not-found=true || exit $?
       else
         if echo "$output" | grep -qi "(NotFound)\|not found"; then
           echo "Deployment '${RELEASE}-${deployment}' not found; skipping delete."
         else
-          echo "Error checking deployment '${RELEASE}-${deployment}': $output" >&2
+          echo "Error checking deployment '${RELEASE}-${deployment}' (exit status $status)." >&2
           exit $status
         fi
       fi
@@ -4913,6 +4931,12 @@ rules:
   - delete
   - list
   - watch
+- apiGroups:
+  - apps
+  resources:
+  - replicasets
+  verbs:
+  - list
 ---
 # Source: operator-wandb/charts/appRenamePreHook/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -5030,6 +5054,8 @@ metadata:
     "helm.sh/hook-weight": "0"
     "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
 spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 1800
   template:
     metadata:
       labels:
@@ -5115,6 +5141,8 @@ metadata:
     "helm.sh/hook-weight": "0"
     "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
 spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 1500
   template:
     metadata:
       labels:
