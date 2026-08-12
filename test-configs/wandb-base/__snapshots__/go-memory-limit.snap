@@ -1,0 +1,255 @@
+# chartsnap: snapshot_version=v3
+---
+# Source: wandb-base/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: wandb-base
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
+# Source: wandb-base/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: wandb-base/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wandb-base
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: '###CHART_VERSION###'
+        app.kubernetes.io/name: wandb-base
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: api
+        envFrom:
+        env:
+        - name: GOMEMLIMIT
+          value: "8GiB"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "example.invalid/api:test"
+        imagePullPolicy:
+      - name: sidecar
+        envFrom:
+        env:
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "example.invalid/sidecar:test"
+        imagePullPolicy:
+      initContainers:
+      - name: migrate-db
+        envFrom:
+        env:
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "example.invalid/migrate:test"
+        imagePullPolicy:
+      serviceAccountName: chartsnap-wandb-base
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+---
+# Source: wandb-base/templates/job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chartsnap-compact
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: '###CHART_VERSION###'
+        app.kubernetes.io/name: wandb-base
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: worker
+        envFrom:
+        env:
+        - name: GOMEMLIMIT
+          value: "2GiB"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "example.invalid/worker:test"
+        imagePullPolicy:
+      restartPolicy: Never
+      serviceAccountName: chartsnap-wandb-base
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+---
+# Source: wandb-base/templates/cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chartsnap-cleanup
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  concurrencyPolicy:
+  schedule: "0 2 * * *"
+  suspend: false
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            helm.sh/chart: '###CHART_VERSION###'
+            app.kubernetes.io/name: wandb-base
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/managed-by: Helm
+        spec:
+          containers:
+          - name: worker
+            envFrom:
+            env:
+            - name: GOMEMLIMIT
+              value: "3GiB"
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                add: []
+                drop: []
+              privileged: false
+              readOnlyRootFilesystem: false
+            image: "example.invalid/worker:test"
+            imagePullPolicy:
+          restartPolicy: Never
+          serviceAccountName: chartsnap-wandb-base
+          securityContext:
+            fsGroup: 0
+            fsGroupChangePolicy: OnRootMismatch
+            runAsGroup: 0
+            runAsNonRoot: true
+            runAsUser: 999
+            seccompProfile:
+              type: RuntimeDefault
+          topologySpreadConstraints:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: chartsnap
+                app.kubernetes.io/name: wandb-base
+            maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: ScheduleAnyway
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: chartsnap
+                app.kubernetes.io/name: wandb-base
+            maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway

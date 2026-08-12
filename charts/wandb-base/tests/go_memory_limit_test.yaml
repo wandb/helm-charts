@@ -1,0 +1,135 @@
+suite: per-container Go memory limit
+templates:
+  - templates/deployment.yaml
+  - templates/job.yaml
+  - templates/cronjob.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: replaces only the selected deployment container GOMEMLIMIT
+    template: templates/deployment.yaml
+    set:
+      envTpls:
+        - |-
+          - name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+      containers:
+        api:
+          goMemoryLimit: 8GiB
+      initContainers:
+        migrate-db: {}
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            value: 8GiB
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+
+  - it: applies an init-container override without changing the main container
+    template: templates/deployment.yaml
+    set:
+      envTpls:
+        - |-
+          - name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+      containers:
+        api: {}
+      initContainers:
+        migrate-db:
+          goMemoryLimit: 512MiB
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: GOMEMLIMIT
+            value: 512MiB
+
+  - it: applies an override to one Job container only
+    template: templates/job.yaml
+    set:
+      jobs:
+        compact:
+          containers:
+            main:
+              goMemoryLimit: 2GiB
+            sidecar: {}
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            value: 2GiB
+      - equal:
+          path: spec.template.spec.containers[1].env
+          value: null
+
+  - it: applies an override to one CronJob container only
+    template: templates/cronjob.yaml
+    set:
+      cronJobs:
+        cleanup:
+          schedule: "0 2 * * *"
+          containers:
+            main:
+              goMemoryLimit: 3GiB
+            sidecar: {}
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            value: 3GiB
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[1].env
+          value: null
+
+  - it: rejects a direct GOMEMLIMIT conflict
+    template: templates/deployment.yaml
+    set:
+      containers:
+        api:
+          goMemoryLimit: 8GiB
+          env:
+            GOMEMLIMIT: 7GiB
+    asserts:
+      - failedTemplate:
+          errorMessage: 'containers.api.goMemoryLimit cannot be combined with env.GOMEMLIMIT'
+
+  - it: rejects an inherited GOMEMLIMIT conflict
+    template: templates/deployment.yaml
+    set:
+      env:
+        GOMEMLIMIT: 7GiB
+      containers:
+        api:
+          goMemoryLimit: 8GiB
+    asserts:
+      - failedTemplate:
+          errorMessage: 'containers.api.goMemoryLimit cannot be combined with env.GOMEMLIMIT'
