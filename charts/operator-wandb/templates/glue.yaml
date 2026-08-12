@@ -1,3 +1,11 @@
+{{- $collectionShardCount := .Values.artifactsGc.CollectionShardCount -}}
+{{- $collectionShardCountIsNumber := or (kindIs "int" $collectionShardCount) (kindIs "int64" $collectionShardCount) (kindIs "float64" $collectionShardCount) -}}
+{{- $collectionShardCountFloat := float64 $collectionShardCount -}}
+{{- $collectionShardCountIsInteger := and $collectionShardCountIsNumber (eq $collectionShardCountFloat (floor $collectionShardCountFloat)) -}}
+{{- $collectionShardCountIsValid := and $collectionShardCountIsInteger (or (eq $collectionShardCountFloat (float64 0)) (and (ge $collectionShardCountFloat (float64 2)) (le $collectionShardCountFloat (float64 32)))) -}}
+{{- if not $collectionShardCountIsValid -}}
+  {{- fail "artifactsGc.CollectionShardCount must be 0 or an integer from 2 through 32" -}}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -28,6 +36,8 @@ data:
   GORILLA_ARTIFACTS_GC_BATCH_SIZE: {{ .Values.artifactsGc.BatchSize | quote }}
   GORILLA_ARTIFACTS_GC_NUM_WORKERS: {{ .Values.artifactsGc.NumWorkers | quote }}
   GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS: {{ .Values.artifactsGc.DeleteFilesNumWorkers | quote }}
+  GORILLA_ARTIFACTS_GC_OBJECT_STORE_CONCURRENCY_BUDGET: {{ .Values.artifactsGc.ObjectStoreConcurrencyBudget | quote }}
+  GORILLA_ARTIFACTS_GC_COLLECTION_SHARD_COUNT: {{ .Values.artifactsGc.CollectionShardCount | quote }}
 
   # Task configuration (existing values)
   GORILLA_GLUE_TASK_PROVIDER: "memory://"

@@ -1,0 +1,127 @@
+suite: Artifact GC environment
+templates:
+  - templates/glue.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: renders the reduced Artifact GC defaults
+    asserts:
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_BATCH_SIZE
+          value: "0"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_NUM_WORKERS
+          value: "0"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
+          value: "0"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_OBJECT_STORE_CONCURRENCY_BUDGET
+          value: "0"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_COLLECTION_SHARD_COUNT
+          value: "0"
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_ENABLE_CHECKPOINT
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_SKIPPED_READY_COLLECTION_IDS
+
+  - it: renders the QA Artifact GC settings per task row
+    set:
+      artifactsGc:
+        BatchSize: 500
+        NumWorkers: 16
+        DeleteFilesNumWorkers: 32
+        ObjectStoreConcurrencyBudget: 16
+        CollectionShardCount: 4
+    asserts:
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_BATCH_SIZE
+          value: "500"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_NUM_WORKERS
+          value: "16"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
+          value: "32"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_OBJECT_STORE_CONCURRENCY_BUDGET
+          value: "16"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_COLLECTION_SHARD_COUNT
+          value: "4"
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_ENABLE_CHECKPOINT
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_SKIPPED_READY_COLLECTION_IDS
+
+  - it: renders the lower supported Artifact GC shard-count boundary
+    set:
+      artifactsGc:
+        CollectionShardCount: 2
+    asserts:
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_COLLECTION_SHARD_COUNT
+          value: "2"
+
+  - it: renders the upper supported Artifact GC shard-count boundary
+    set:
+      artifactsGc:
+        CollectionShardCount: 32
+    asserts:
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_COLLECTION_SHARD_COUNT
+          value: "32"
+
+  - it: rejects a shard count of one
+    set:
+      artifactsGc:
+        CollectionShardCount: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: artifactsGc.CollectionShardCount must be 0 or an integer from 2 through 32
+
+  - it: rejects a shard count above the supported range
+    set:
+      artifactsGc:
+        CollectionShardCount: 33
+    asserts:
+      - failedTemplate:
+          errorMessage: artifactsGc.CollectionShardCount must be 0 or an integer from 2 through 32
+
+  - it: rejects a negative shard count
+    set:
+      artifactsGc:
+        CollectionShardCount: -1
+    asserts:
+      - failedTemplate:
+          errorMessage: artifactsGc.CollectionShardCount must be 0 or an integer from 2 through 32
+
+  - it: rejects a fractional shard count
+    set:
+      artifactsGc:
+        CollectionShardCount: 2.5
+    asserts:
+      - failedTemplate:
+          errorMessage: artifactsGc.CollectionShardCount must be 0 or an integer from 2 through 32
+
+  - it: rejects a string shard count
+    set:
+      artifactsGc:
+        CollectionShardCount: "2"
+    asserts:
+      - failedTemplate:
+          errorMessage: artifactsGc.CollectionShardCount must be 0 or an integer from 2 through 32
+
+  - it: does not render removed checkpoint and skip-list settings
+    set:
+      artifactsGc:
+        EnableCheckpoint: true
+        SkippedReadyCollectionIds: "123,456"
+    asserts:
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_ENABLE_CHECKPOINT
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_SKIPPED_READY_COLLECTION_IDS
