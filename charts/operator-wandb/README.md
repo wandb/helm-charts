@@ -193,6 +193,10 @@ Each component can be configured independently. For example, to configure the AP
 api:
   enabled: true
   replicaCount: 2
+  containers:
+    api:
+      # Optional; no fleet or chart default is set.
+      goMemoryLimit: "8GiB"
   resources:
     requests:
       cpu: 100m
@@ -201,6 +205,22 @@ api:
       cpu: 1000m
       memory: 1Gi
 ```
+
+`goMemoryLimit` is scoped to the named main container. Setting
+`api.containers.api.goMemoryLimit` replaces the API container's generated
+`GOMEMLIMIT` with the literal value; API migration/init containers, updater
+workloads, and every other component keep their existing
+`limits.memory`-derived value unless configured independently. The value must
+be a quoted positive Go byte count such as `8GiB`, must fit in Go's signed
+64-bit byte-count range after applying the suffix, and cannot be combined with
+any direct or inherited `env.GOMEMLIMIT`.
+
+Core also reads `GOMEMLIMIT` as the denominator for API deep-readiness and
+request-pressure sampling. Lowering it can change the reported heap fraction
+and shadow trip point. This Helm field does not enable deep-readiness or
+backpressure enforcement, change probes, or change any gate value; review the
+effective gates separately before a rollout. Removing the field restores the
+resource-derived value.
 
 ## Use External Stateful Data
 

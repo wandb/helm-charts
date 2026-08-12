@@ -49,6 +49,39 @@
         {{- end -}}
       {{- end -}}
 
+      {{- if hasKey $container "goMemoryLimit" -}}
+        {{- $goMemoryLimit := get $container "goMemoryLimit" -}}
+        {{- $goMemoryLimitPath := printf "%s.%s.goMemoryLimit" $.source $containerName -}}
+        {{- if not (kindIs "string" $goMemoryLimit) -}}
+          {{- fail (printf "%s must be a positive Go byte-count string matching ^[1-9][0-9]*(([KMGT]i)?B)?$" $goMemoryLimitPath) -}}
+        {{- end -}}
+        {{- if not (regexMatch "^[1-9][0-9]*(([KMGT]i)?B)?$" $goMemoryLimit) -}}
+          {{- fail (printf "%s must be a positive Go byte-count string matching ^[1-9][0-9]*(([KMGT]i)?B)?$" $goMemoryLimitPath) -}}
+        {{- end -}}
+        {{- $goMemoryLimitSuffix := regexFind "([KMGT]iB|B)$" $goMemoryLimit -}}
+        {{- $goMemoryLimitMagnitude := trimSuffix $goMemoryLimitSuffix $goMemoryLimit -}}
+        {{- $goMemoryLimitMaxima := dict
+        "" "9223372036854775807"
+        "B" "9223372036854775807"
+        "KiB" "9007199254740991"
+        "MiB" "8796093022207"
+        "GiB" "8589934591"
+        "TiB" "8388607"
+        -}}
+        {{- $goMemoryLimitMaximum := get $goMemoryLimitMaxima $goMemoryLimitSuffix -}}
+        {{- $goMemoryLimitHasMoreDigits := gt (len $goMemoryLimitMagnitude) (len $goMemoryLimitMaximum) -}}
+        {{- $goMemoryLimitHasEqualDigits := eq (len $goMemoryLimitMagnitude) (len $goMemoryLimitMaximum) -}}
+        {{- $goMemoryLimitIsLexicallyLarger := gt $goMemoryLimitMagnitude $goMemoryLimitMaximum -}}
+        {{- $goMemoryLimitExceedsMaximum := or $goMemoryLimitHasMoreDigits (and $goMemoryLimitHasEqualDigits $goMemoryLimitIsLexicallyLarger) -}}
+        {{- if $goMemoryLimitExceedsMaximum -}}
+          {{- fail (printf "%s exceeds Go's maximum signed 64-bit memory limit" $goMemoryLimitPath) -}}
+        {{- end -}}
+        {{- if hasKey $container.env "GOMEMLIMIT" -}}
+          {{- fail (printf "%s cannot be combined with env.GOMEMLIMIT" $goMemoryLimitPath) -}}
+        {{- end -}}
+        {{- $_ = set $container.env "GOMEMLIMIT" $goMemoryLimit -}}
+      {{- end -}}
+
       {{- /* We prerender the envTpls and put them into an array for searching */ -}}
       {{- $envTpls := list }}
       {{- if $.root.Values.envTpls -}}

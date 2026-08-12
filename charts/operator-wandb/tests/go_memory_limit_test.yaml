@@ -1,0 +1,85 @@
+suite: container-scoped Go memory limit
+templates:
+  - charts/api/templates/deployment.yaml
+  - charts/flat-run-fields-updater/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: gives only the main API container a literal GOMEMLIMIT
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      api.containers.api.goMemoryLimit: 8GiB
+      flat-run-fields-updater.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            value: 8GiB
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+
+  - it: leaves the updater on its memory-limit-derived GOMEMLIMIT when only API is set
+    template: charts/flat-run-fields-updater/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      api.containers.api.goMemoryLimit: 8GiB
+      flat-run-fields-updater.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+
+  - it: leaves API on its memory-limit-derived GOMEMLIMIT when only the updater is set
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      flat-run-fields-updater.install: true
+      flat-run-fields-updater.containers.flat-run-fields-updater.goMemoryLimit: 4GiB
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: GOMEMLIMIT
+            valueFrom:
+              resourceFieldRef:
+                resource: limits.memory
+
+  - it: gives only the independently configured updater a literal GOMEMLIMIT
+    template: charts/flat-run-fields-updater/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      flat-run-fields-updater.install: true
+      flat-run-fields-updater.containers.flat-run-fields-updater.goMemoryLimit: 4GiB
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GOMEMLIMIT
+            value: 4GiB
