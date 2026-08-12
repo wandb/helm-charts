@@ -69,13 +69,11 @@
         "TiB" "8388607"
         -}}
         {{- $goMemoryLimitMaximum := get $goMemoryLimitMaxima $goMemoryLimitSuffix -}}
-        {{- if or
-        (gt (len $goMemoryLimitMagnitude) (len $goMemoryLimitMaximum))
-        (and
-        (eq (len $goMemoryLimitMagnitude) (len $goMemoryLimitMaximum))
-        (gt $goMemoryLimitMagnitude $goMemoryLimitMaximum)
-        )
-        -}}
+        {{- $goMemoryLimitHasMoreDigits := gt (len $goMemoryLimitMagnitude) (len $goMemoryLimitMaximum) -}}
+        {{- $goMemoryLimitHasEqualDigits := eq (len $goMemoryLimitMagnitude) (len $goMemoryLimitMaximum) -}}
+        {{- $goMemoryLimitIsLexicallyLarger := gt $goMemoryLimitMagnitude $goMemoryLimitMaximum -}}
+        {{- $goMemoryLimitExceedsMaximum := or $goMemoryLimitHasMoreDigits (and $goMemoryLimitHasEqualDigits $goMemoryLimitIsLexicallyLarger) -}}
+        {{- if $goMemoryLimitExceedsMaximum -}}
           {{- fail (printf "%s exceeds Go's maximum signed 64-bit memory limit" $goMemoryLimitPath) -}}
         {{- end -}}
         {{- if hasKey $container.env "GOMEMLIMIT" -}}
