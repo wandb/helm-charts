@@ -1,0 +1,69 @@
+suite: Artifact GC environment
+templates:
+  - templates/glue.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: renders the reduced Artifact GC defaults
+    asserts:
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_BATCH_SIZE
+          value: "0"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_NUM_WORKERS
+          value: "0"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
+          value: "0"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_OBJECT_STORE_CONCURRENCY_BUDGET
+          value: "0"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_COLLECTION_SHARD_COUNT
+          value: "0"
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_ENABLE_CHECKPOINT
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_SKIPPED_READY_COLLECTION_IDS
+
+  - it: renders the QA Artifact GC settings per task row
+    set:
+      artifactsGc:
+        BatchSize: 500
+        NumWorkers: 16
+        DeleteFilesNumWorkers: 32
+        ObjectStoreConcurrencyBudget: 16
+        CollectionShardCount: 4
+    asserts:
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_BATCH_SIZE
+          value: "500"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_NUM_WORKERS
+          value: "16"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_DELETE_FILES_NUM_WORKERS
+          value: "32"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_OBJECT_STORE_CONCURRENCY_BUDGET
+          value: "16"
+      - equal:
+          path: data.GORILLA_ARTIFACTS_GC_COLLECTION_SHARD_COUNT
+          value: "4"
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_ENABLE_CHECKPOINT
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_SKIPPED_READY_COLLECTION_IDS
+
+  - it: does not render removed checkpoint and skip-list settings
+    set:
+      artifactsGc:
+        EnableCheckpoint: true
+        SkippedReadyCollectionIds: "123,456"
+    asserts:
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_ENABLE_CHECKPOINT
+      - notExists:
+          path: data.GORILLA_ARTIFACTS_GC_SKIPPED_READY_COLLECTION_IDS
