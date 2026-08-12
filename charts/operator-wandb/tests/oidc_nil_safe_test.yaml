@@ -1,0 +1,322 @@
+suite: nil-safe OIDC configuration
+templates:
+  - templates/oidc.yaml
+  - templates/api.yaml
+  - templates/local.yaml
+  - charts/api/templates/deployment.yaml
+  - charts/app/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: leaves OIDC resources and configuration disabled by default
+    set:
+      global.api.enabled: true
+      app.internalJWTMap: []
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/oidc.yaml
+      - notExists:
+          path: data.GORILLA_OIDC_CLIENT_ID
+        template: templates/api.yaml
+      - notExists:
+          path: data.OIDC_CLIENT_ID
+        template: templates/local.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+          any: true
+        template: charts/api/templates/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+          any: true
+        template: charts/api/templates/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+          any: true
+        template: charts/app/templates/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+          any: true
+        template: charts/app/templates/deployment.yaml
+
+  - it: treats explicitly null OIDC as disabled in every affected template
+    set:
+      global.api.enabled: true
+      app.internalJWTMap: []
+      global.auth.oidc: null
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/oidc.yaml
+      - notExists:
+          path: data.GORILLA_OIDC_CLIENT_ID
+        template: templates/api.yaml
+      - notExists:
+          path: data.OIDC_CLIENT_ID
+        template: templates/local.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+          any: true
+        template: charts/api/templates/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+          any: true
+        template: charts/api/templates/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+          any: true
+        template: charts/app/templates/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+          any: true
+        template: charts/app/templates/deployment.yaml
+
+  - it: renders only supplied OIDC client configuration from a partial map
+    set:
+      global.api.enabled: true
+      app.internalJWTMap: []
+      global.auth.oidc:
+        clientId: synthetic-client
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/oidc.yaml
+      - equal:
+          path: data.GORILLA_OIDC_CLIENT_ID
+          value: synthetic-client
+        template: templates/api.yaml
+      - equal:
+          path: data.GORILLA_AUTH_METHOD
+          value: ""
+        template: templates/api.yaml
+      - equal:
+          path: data.GORILLA_OIDC_ISSUER
+          value: ""
+        template: templates/api.yaml
+      - equal:
+          path: data.OIDC_CLIENT_ID
+          value: synthetic-client
+        template: templates/local.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+          any: true
+        template: charts/api/templates/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+          any: true
+        template: charts/api/templates/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+          any: true
+        template: charts/app/templates/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+          any: true
+        template: charts/app/templates/deployment.yaml
+
+  - it: creates the chart-owned OIDC secret and uses its configured key
+    set:
+      global.api.enabled: true
+      app.internalJWTMap: []
+      global.auth.oidc:
+        clientId: synthetic-client
+        secret: synthetic-inline-secret
+        authMethod: oidc
+        issuer: https://issuer.invalid
+        oidcSecret:
+          name: ""
+          secretKey: synthetic-secret-key
+    asserts:
+      - equal:
+          path: metadata.name
+          value: wandb-oidc-secret
+        template: templates/oidc.yaml
+        documentSelector:
+          path: kind
+          value: Secret
+      - exists:
+          path: data.synthetic-secret-key
+        template: templates/oidc.yaml
+        documentSelector:
+          path: kind
+          value: Secret
+      - equal:
+          path: data.GORILLA_OIDC_CLIENT_ID
+          value: synthetic-client
+        template: templates/api.yaml
+      - equal:
+          path: data.OIDC_ISSUER
+          value: https://issuer.invalid
+        template: templates/local.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: synthetic-secret-key
+        template: charts/api/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: synthetic-secret-key
+        template: charts/api/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: synthetic-secret-key
+        template: charts/app/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: synthetic-secret-key
+        template: charts/app/templates/deployment.yaml
+
+  - it: defaults a null nested OIDC secret configuration to OIDC_SECRET
+    set:
+      global.api.enabled: true
+      app.internalJWTMap: []
+      global.auth.oidc:
+        secret: synthetic-inline-secret
+        oidcSecret: null
+    asserts:
+      - equal:
+          path: metadata.name
+          value: wandb-oidc-secret
+        template: templates/oidc.yaml
+        documentSelector:
+          path: kind
+          value: Secret
+      - exists:
+          path: data.OIDC_SECRET
+        template: templates/oidc.yaml
+        documentSelector:
+          path: kind
+          value: Secret
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+        template: charts/api/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+        template: charts/api/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+        template: charts/app/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+        template: charts/app/templates/deployment.yaml
+
+  - it: uses an external OIDC secret without creating a chart-owned one
+    set:
+      global.api.enabled: true
+      app.internalJWTMap: []
+      global.auth.oidc:
+        clientId: synthetic-client
+        authMethod: oidc
+        issuer: https://issuer.invalid
+        oidcSecret:
+          name: externally-managed-oidc
+          secretKey: externally-managed-key
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/oidc.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: externally-managed-oidc
+                key: externally-managed-key
+        template: charts/api/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: externally-managed-oidc
+                key: externally-managed-key
+        template: charts/api/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: externally-managed-oidc
+                key: externally-managed-key
+        template: charts/app/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: externally-managed-oidc
+                key: externally-managed-key
+        template: charts/app/templates/deployment.yaml

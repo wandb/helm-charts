@@ -490,17 +490,18 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.oidcEnvs" -}}
-  {{- if or .Values.global.auth.oidc.secret "" .Values.global.auth.oidc.oidcSecret.name }}
+  {{- $oidc := include "wandb.oidc.config" . | fromYaml -}}
+  {{- if or $oidc.secret $oidc.oidcSecret.name }}
 - name: GORILLA_OIDC_SECRET
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.oidc.secretSecret" . | quote }}
-      key: "{{ .Values.global.auth.oidc.oidcSecret.secretKey }}"
+      key: "{{ $oidc.oidcSecret.secretKey }}"
 - name: OIDC_SECRET
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.oidc.secretSecret" . | quote }}
-      key: "{{ .Values.global.auth.oidc.oidcSecret.secretKey }}"
+      key: "{{ $oidc.oidcSecret.secretKey }}"
   {{- end }}
 {{- end -}}
 
