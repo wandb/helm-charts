@@ -221,6 +221,9 @@ tests:
           content: {name: WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS, value: "false"}
       - contains:
           path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
           content: {name: UVICORN_WORKERS, value: "1"}
       - contains:
           path: spec.template.spec.containers[0].env
@@ -228,6 +231,78 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content: {name: MCP_DEPLOYMENT_TYPE, value: self-managed}
+
+  - it: renders the 17-tool base profile when no trace backend exists
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: false
+      weave-trace.install: false
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_RAW_GRAPHQL, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS, value: "false"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_TRACE_SERVER_URL
+
+  - it: renders the 22-tool classic Weave profile when a trace backend exists
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: true
+      weave-trace.install: true
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "true"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: https://customer.wandb.io/traces}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_RAW_GRAPHQL, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS, value: "false"}
+
+  - it: renders the explicitly approved ARIA opt-in once
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL: https://wb-agent.wandb.ai
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS, value: "true"}
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WB_AGENT_BASE_URL, value: https://wb-agent.wandb.ai}
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_RAW_GRAPHQL, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS, value: "false"}
 
   - it: isolates MCP from global administrative environment
     template: charts/mcp-server/templates/deployment.yaml

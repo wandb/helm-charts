@@ -213,6 +213,140 @@ tests:
       - failedTemplate:
           errorMessage: mcp-server.envTpls cannot render WANDB_BASE_URL, WANDB_INTERNAL_BASE_URL, or UVICORN_WORKERS outside wandb.mcpEnvs
 
+  - it: requires an explicit ARIA origin when ARIA tools are enabled
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS=true requires an explicit mcp-server.env.WB_AGENT_BASE_URL
+
+  - it: accepts an explicitly approved absolute HTTPS ARIA origin
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: true
+      mcp-server.env.WB_AGENT_BASE_URL: https://wb-agent.wandb.ai:443/
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: resolves an approved ARIA origin in MCP subchart scope
+    set:
+      mcp-server.install: true
+      mcp-server.ariaOrigin: https://wb-agent.wandb.ai
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: '{{ true }}'
+      mcp-server.env.WB_AGENT_BASE_URL: '{{ .Values.ariaOrigin }}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an invalid ARIA feature flag
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "enabled"
+      mcp-server.env.WB_AGENT_BASE_URL: https://wb-agent.wandb.ai
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS must be true or false
+
+  - it: rejects ARIA opt-in with an HTTP origin
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL: http://wb-agent.wandb.ai
+    asserts: &unsafe_aria_origin
+      - failedTemplate:
+          errorMessage: mcp-server.env.WB_AGENT_BASE_URL must be an approved absolute HTTPS origin without credentials, path, query, or fragment
+
+  - it: rejects ARIA opt-in with credentials in the origin
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL: https://user:secret@wb-agent.wandb.ai
+    asserts: *unsafe_aria_origin
+
+  - it: rejects ARIA opt-in with a URL path
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL: https://wb-agent.wandb.ai/api
+    asserts: *unsafe_aria_origin
+
+  - it: rejects ARIA opt-in with a query string
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL: "https://wb-agent.wandb.ai?token=secret"
+    asserts: *unsafe_aria_origin
+
+  - it: rejects ARIA opt-in with a fragment
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL: "https://wb-agent.wandb.ai#fragment"
+    asserts: *unsafe_aria_origin
+
+  - it: rejects ARIA opt-in with an invalid port
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL: https://wb-agent.wandb.ai:65536
+    asserts: *unsafe_aria_origin
+
+  - it: rejects a non-string ARIA origin
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL:
+        valueFrom:
+          secretKeyRef:
+            name: aria-origin
+            key: url
+    asserts: *unsafe_aria_origin
+
+  - it: keeps raw GraphQL disabled for Dedicated deployments
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL must remain false for Dedicated deployments
+
+  - it: keeps Weave Agent tools disabled for Dedicated deployments
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS must remain false for Dedicated deployments
+
+  - it: rejects ARIA opt-in outside the canonical MCP environment
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.containers.mcp-server.env.WB_AGENT_BASE_URL: https://wb-agent.wandb.ai
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_MCP_ENABLE_ARIA_TOOLS may only be set in mcp-server.env, not mcp-server.containers.mcp-server.env
+
+  - it: rejects the ARIA origin outside the canonical MCP environment
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.WB_AGENT_BASE_URL: https://wb-agent.wandb.ai
+    asserts:
+      - failedTemplate:
+          errorMessage: WB_AGENT_BASE_URL may only be set in mcp-server.env, not mcp-server.extraEnv
+
+  - it: rejects a feature flag rendered by a secondary environment template
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - name: WANDB_MCP_ENABLE_ARIA_TOOLS
+            value: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_MCP_ENABLE_ARIA_TOOLS may only be set in mcp-server.env, not mcp-server.envTpls
+
   - it: requires exactly one MCP replica
     set:
       mcp-server.install: true
