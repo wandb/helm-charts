@@ -318,6 +318,64 @@ tests:
       - failedTemplate:
           errorMessage: mcp-server.env.WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS must remain false for Dedicated deployments
 
+  - it: rejects a raw classic Weave override without a trace backend
+    set:
+      global.weave-trace.enabled: false
+      weave-trace.install: false
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS is chart-managed; use mcp-server.weave.tools
+
+  - it: rejects a classic Weave override in extraEnv
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.WANDB_MCP_ENABLE_WEAVE_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_MCP_ENABLE_WEAVE_TOOLS cannot be set in mcp-server.extraEnv; use mcp-server.weave.tools
+
+  - it: rejects a classic Weave override in the container environment
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_MCP_ENABLE_WEAVE_TOOLS cannot be set in mcp-server.containers.mcp-server.env; use mcp-server.weave.tools
+
+  - it: rejects a classic Weave override in sizing environment
+    set:
+      mcp-server.install: true
+      mcp-server.sizing.default.env.WANDB_MCP_ENABLE_WEAVE_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_MCP_ENABLE_WEAVE_TOOLS cannot be set in mcp-server.sizing.default.env; use mcp-server.weave.tools
+
+  - it: rejects a literal classic Weave override in a secondary environment template
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - name: WANDB_MCP_ENABLE_WEAVE_TOOLS
+            value: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls cannot define WANDB_MCP_ENABLE_WEAVE_TOOLS directly; use mcp-server.weave.tools
+
+  - it: rejects an obfuscated classic Weave override in a secondary environment template
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - name: '{{ printf `WANDB_MCP_%s_WEAVE_TOOLS` `ENABLE` }}'
+            value: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls cannot render WANDB_MCP_ENABLE_WEAVE_TOOLS outside wandb.mcpEnvs; use mcp-server.weave.tools
+
   - it: rejects ARIA opt-in outside the canonical MCP environment
     set:
       mcp-server.install: true

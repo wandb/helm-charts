@@ -20,6 +20,7 @@
   {{- $mcpContainerEnv := index $mcpContainer "env" | default dict -}}
   {{- $mcpSizing := index $mcp "sizing" | default dict -}}
   {{- $mcpTplContext := index .Subcharts "mcp-server" -}}
+  {{- $weaveToolsEnvName := "WANDB_MCP_ENABLE_WEAVE_TOOLS" -}}
   {{- $mcpFeatureFlags := list "WANDB_MCP_ENABLE_RAW_GRAPHQL" "WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS" "WANDB_MCP_ENABLE_ARIA_TOOLS" -}}
   {{- $canonicalMcpEnvNames := append $mcpFeatureFlags "WB_AGENT_BASE_URL" -}}
 
@@ -31,7 +32,13 @@
   {{- if hasKey $mcpEnv "WANDB_BASE_URL" -}}
     {{- fail "WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.env" -}}
   {{- end -}}
+  {{- if hasKey $mcpEnv $weaveToolsEnvName -}}
+    {{- fail "mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS is chart-managed; use mcp-server.weave.tools" -}}
+  {{- end -}}
   {{- range $channelName, $channel := dict "mcp-server.extraEnv" $mcpExtraEnv "mcp-server.containers.mcp-server.env" $mcpContainerEnv -}}
+    {{- if hasKey $channel $weaveToolsEnvName -}}
+      {{- fail (printf "WANDB_MCP_ENABLE_WEAVE_TOOLS cannot be set in %s; use mcp-server.weave.tools" $channelName) -}}
+    {{- end -}}
     {{- range $reservedName := $canonicalMcpEnvNames -}}
       {{- if hasKey $channel $reservedName -}}
         {{- fail (printf "%s may only be set in mcp-server.env, not %s" $reservedName $channelName) -}}
@@ -49,6 +56,9 @@
   {{- end -}}
   {{- range $sizeName, $sizeValues := $mcpSizing -}}
     {{- $sizeEnv := index $sizeValues "env" | default dict -}}
+    {{- if hasKey $sizeEnv $weaveToolsEnvName -}}
+      {{- fail (printf "WANDB_MCP_ENABLE_WEAVE_TOOLS cannot be set in mcp-server.sizing.%s.env; use mcp-server.weave.tools" $sizeName) -}}
+    {{- end -}}
     {{- range $reservedName := $canonicalMcpEnvNames -}}
       {{- if hasKey $sizeEnv $reservedName -}}
         {{- fail (printf "%s may only be set in mcp-server.env, not mcp-server.sizing.%s.env" $reservedName $sizeName) -}}
@@ -78,12 +88,18 @@
       {{- if $isCanonicalMcpEnvTpl -}}
         {{- $hasMcpEnvTpl = true -}}
       {{- end -}}
+      {{- if contains $weaveToolsEnvName . -}}
+        {{- fail "mcp-server.envTpls cannot define WANDB_MCP_ENABLE_WEAVE_TOOLS directly; use mcp-server.weave.tools" -}}
+      {{- end -}}
       {{- if or (contains "WANDB_BASE_URL" .) (contains "WANDB_INTERNAL_BASE_URL" .) (contains "UVICORN_WORKERS" .) -}}
         {{- fail "mcp-server.envTpls cannot define WANDB_BASE_URL, WANDB_INTERNAL_BASE_URL, or UVICORN_WORKERS directly" -}}
       {{- end -}}
       {{- if not $isCanonicalMcpEnvTpl -}}
         {{- range (tpl . $mcpTplContext | fromYamlArray) -}}
           {{- $renderedName := index . "name" | default "" | toString -}}
+          {{- if eq $renderedName $weaveToolsEnvName -}}
+            {{- fail "mcp-server.envTpls cannot render WANDB_MCP_ENABLE_WEAVE_TOOLS outside wandb.mcpEnvs; use mcp-server.weave.tools" -}}
+          {{- end -}}
           {{- if has $renderedName $canonicalMcpEnvNames -}}
             {{- fail (printf "%s may only be set in mcp-server.env, not mcp-server.envTpls" $renderedName) -}}
           {{- end -}}
