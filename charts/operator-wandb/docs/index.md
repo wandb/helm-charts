@@ -7,3 +7,8 @@ large deployments.
 For a production deployment, you should have strong working knowledge of
 Kubernetes. This method of deployment has different management, observability,
 and concepts than traditional deployments.
+
+## Operations guides
+
+- [MCP Server deployment and release handoff](mcp-server.md)
+- [Session key rotation](session-key-rotation.md)

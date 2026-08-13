@@ -202,6 +202,14 @@ api:
       memory: 1Gi
 ```
 
+### MCP Server
+
+The optional MCP Server uses separate public and internal W&B URLs, conservative
+Dedicated feature defaults, and process-local workload guardrails. Pin its image
+by digest and validate install, upgrade, internal routing, and rollback before a
+customer rollout. See [MCP Server Deployment and Release
+Handoff](docs/mcp-server.md).
+
 ## Use External Stateful Data
 
 You can configure the W&B Server Helm chart to point to external stateful storage for items like MySQL, Redis, and Storage.
