@@ -194,4 +194,13 @@ It expects a dictionary with two entries:
       name: {{ $.Release.Name }}-console
       port:
         number: 8082
+  {{- if .Values.watchtower.install }}
+- pathType: Prefix
+  path: /watchtower
+  backend:
+    service:
+      name: {{ $.Release.Name }}-watchtower
+      port:
+        number: 8080
+  {{- end }}
 {{- end }}

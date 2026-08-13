@@ -1,0 +1,66 @@
+suite: watchtower routing
+templates:
+  - templates/nginx.yaml
+  - templates/ingress.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: routes /watchtower through nginx when watchtower is installed
+    template: templates/nginx.yaml
+    set:
+      watchtower.install: true
+    asserts:
+      - matchRegex:
+          path: data["nginx.conf"]
+          pattern: 'location /watchtower \{\s+proxy_pass http://wandb-watchtower:8080;'
+      - matchRegex:
+          path: data["nginx.conf"]
+          pattern: "proxy_buffering off;"
+
+  - it: leaves /watchtower out of nginx by default
+    template: templates/nginx.yaml
+    asserts:
+      - notMatchRegex:
+          path: data["nginx.conf"]
+          pattern: "location /watchtower"
+
+  - it: adds the /watchtower ingress path when watchtower is installed
+    template: templates/ingress.yaml
+    documentSelector:
+      path: kind
+      value: Ingress
+    set:
+      global.host: "https://wandb.example.com"
+      watchtower.install: true
+    asserts:
+      - contains:
+          path: spec.rules[0].http.paths
+          content:
+            pathType: Prefix
+            path: /watchtower
+            backend:
+              service:
+                name: wandb-watchtower
+                port:
+                  number: 8080
+
+  - it: leaves the /watchtower ingress path out by default
+    template: templates/ingress.yaml
+    documentSelector:
+      path: kind
+      value: Ingress
+    set:
+      global.host: "https://wandb.example.com"
+    asserts:
+      - notContains:
+          path: spec.rules[0].http.paths
+          content:
+            pathType: Prefix
+            path: /watchtower
+            backend:
+              service:
+                name: wandb-watchtower
+                port:
+                  number: 8080
