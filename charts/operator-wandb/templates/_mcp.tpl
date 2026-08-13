@@ -52,6 +52,24 @@
 {{- end -}}
 
 {{/*
+  Reproduce wandb-base.fullname for a dependency alias using the parent or
+  subchart release scope. This is intentionally limited to default names;
+  mcp-validation requires an explicit internal URL when API/app naming is
+  overridden. Keeping the same contains/truncate rule avoids generating a
+  backend URL that differs from the Service name for release names such as
+  "customer-api" or names near Kubernetes' 63-character limit.
+*/}}
+{{- define "wandb.defaultComponentFullname" -}}
+  {{- $root := .root -}}
+  {{- $name := .name -}}
+  {{- if contains $name $root.Release.Name -}}
+{{- $root.Release.Name | trunc 63 | trimSuffix "-" -}}
+  {{- else -}}
+    {{- printf "%s-%s" $root.Release.Name $name | trunc 63 | trimSuffix "-" -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
 Environment variables for the MCP server subchart.
 
 SCOPE NOTE (please keep): wandb.mcpEnvs is invoked via envTpls -> tpl . $.root
@@ -64,12 +82,16 @@ fails helm render with "index of nil pointer".
 
 Resolves:
 - WANDB_MCP_ENABLE_WEAVE_TOOLS: whether trace-dependent MCP tools are exposed.
+- MCP_DEPLOYMENT_TYPE: the existing Dedicated/Self-Managed install classification.
 - WF_TRACE_SERVER_URL: public weave-trace URL via ingress (global.host + /traces).
   The chart's weave-trace subchart mounts the FastAPI app under API_PATH_PREFIX=/traces
   (see templates/weave-trace.yaml), so the in-cluster Service path http://<release>-weave-trace:8722
   returns 404 without the prefix. Using the ingress URL matches the convention other
   internal consumers use (see weave-trace.yaml WF_TRACE_SERVER_URL line).
-- WANDB_BASE_URL: the W&B instance URL (from global.host)
+- WANDB_BASE_URL: the public W&B instance URL (from global.host)
+- WANDB_INTERNAL_BASE_URL: the namespace-local split API or monolith Service
+  used by backend calls; custom backend naming/ports require an explicit value
+  because this helper runs in MCP subchart scope
 
 MCP can run without weave-trace. When WANDB_MCP_ENABLE_WEAVE_TOOLS=false,
 trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
@@ -85,12 +107,22 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
   {{- $enableWeaveTools := or (eq $weaveMode "true") (and (eq $weaveMode "auto") $hasTraceBackend) -}}
 - name: WANDB_MCP_ENABLE_WEAVE_TOOLS
   value: {{ ternary "true" "false" $enableWeaveTools | quote }}
+- name: MCP_DEPLOYMENT_TYPE
+  value: {{ index .Values "datadog" "deploymentType" | default "self-managed" | quote }}
   {{- if and $enableWeaveTools (not $hasExplicitTraceURL) }}
 - name: WF_TRACE_SERVER_URL
   value: "{{ .Values.global.host }}/traces"
   {{- end }}
 - name: WANDB_BASE_URL
   value: {{ .Values.global.host | quote }}
+  {{- if not (hasKey $mcpEnv "WANDB_INTERNAL_BASE_URL") }}
+- name: WANDB_INTERNAL_BASE_URL
+    {{- if .Values.global.api.enabled }}
+  value: "http://{{ include "wandb.defaultComponentFullname" (dict "root" . "name" "api") }}:8081"
+    {{- else }}
+  value: "http://{{ include "wandb.defaultComponentFullname" (dict "root" . "name" "app") }}:8080"
+    {{- end }}
+  {{- end }}
   {{/*
     Privacy level for customer-supplied content in logs. Default here is "standard"
     (redact free-text params, demote verbose log sites to DEBUG) so customer K8s
