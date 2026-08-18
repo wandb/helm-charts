@@ -13,15 +13,289 @@
 */}}
 {{- $mcp := index .Values "mcp-server" | default dict -}}
 {{- if index $mcp "install" -}}
+  {{- $mcpEnv := index $mcp "env" | default dict -}}
+  {{- $mcpExtraEnv := index $mcp "extraEnv" | default dict -}}
+  {{- $mcpContainers := index $mcp "containers" | default dict -}}
+  {{- $mcpContainer := index $mcpContainers "mcp-server" | default dict -}}
+  {{- $mcpContainerEnv := index $mcpContainer "env" | default dict -}}
+  {{- $mcpSizing := index $mcp "sizing" | default dict -}}
+  {{- $mcpTplContext := index .Subcharts "mcp-server" -}}
+  {{- $weaveToolsEnvName := "WANDB_MCP_ENABLE_WEAVE_TOOLS" -}}
+  {{- $mcpFeatureFlags := list "WANDB_MCP_ENABLE_RAW_GRAPHQL" "WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS" "WANDB_MCP_ENABLE_ARIA_TOOLS" -}}
+  {{- $canonicalMcpEnvNames := concat $mcpFeatureFlags (list "WB_AGENT_BASE_URL" "WF_TRACE_SERVER_URL" "MCP_HOSTED_MODE" "MCP_WORKLOAD_PROFILE") -}}
+
+  {{/*
+    Keep routing and worker controls single-source. wandb-base merges container,
+    chart, extra, and selected sizing env maps; allowing the same key in more
+    than one channel would make fail-closed routing dependent on merge order.
+  */}}
+  {{- if hasKey $mcpEnv "WANDB_BASE_URL" -}}
+    {{- fail "WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.env" -}}
+  {{- end -}}
+  {{- if hasKey $mcpEnv $weaveToolsEnvName -}}
+    {{- fail "mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS is chart-managed; use mcp-server.weave.tools" -}}
+  {{- end -}}
+  {{- range $channelName, $channel := dict "mcp-server.extraEnv" $mcpExtraEnv "mcp-server.containers.mcp-server.env" $mcpContainerEnv -}}
+    {{- if hasKey $channel $weaveToolsEnvName -}}
+      {{- fail (printf "WANDB_MCP_ENABLE_WEAVE_TOOLS cannot be set in %s; use mcp-server.weave.tools" $channelName) -}}
+    {{- end -}}
+    {{- range $reservedName := $canonicalMcpEnvNames -}}
+      {{- if hasKey $channel $reservedName -}}
+        {{- fail (printf "%s may only be set in mcp-server.env, not %s" $reservedName $channelName) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if hasKey $channel "WANDB_INTERNAL_BASE_URL" -}}
+      {{- fail (printf "WANDB_INTERNAL_BASE_URL may only be set in mcp-server.env, not %s" $channelName) -}}
+    {{- end -}}
+    {{- if hasKey $channel "WANDB_BASE_URL" -}}
+      {{- fail (printf "WANDB_BASE_URL is chart-managed from global.host and cannot be set in %s" $channelName) -}}
+    {{- end -}}
+    {{- if hasKey $channel "UVICORN_WORKERS" -}}
+      {{- fail (printf "UVICORN_WORKERS may only be set in mcp-server.env, not %s" $channelName) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $sizeName, $sizeValues := $mcpSizing -}}
+    {{- $sizeEnv := index $sizeValues "env" | default dict -}}
+    {{- if hasKey $sizeEnv $weaveToolsEnvName -}}
+      {{- fail (printf "WANDB_MCP_ENABLE_WEAVE_TOOLS cannot be set in mcp-server.sizing.%s.env; use mcp-server.weave.tools" $sizeName) -}}
+    {{- end -}}
+    {{- range $reservedName := $canonicalMcpEnvNames -}}
+      {{- if hasKey $sizeEnv $reservedName -}}
+        {{- fail (printf "%s may only be set in mcp-server.env, not mcp-server.sizing.%s.env" $reservedName $sizeName) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if hasKey $sizeEnv "WANDB_INTERNAL_BASE_URL" -}}
+      {{- fail (printf "WANDB_INTERNAL_BASE_URL may only be set in mcp-server.env, not mcp-server.sizing.%s.env" $sizeName) -}}
+    {{- end -}}
+    {{- if hasKey $sizeEnv "WANDB_BASE_URL" -}}
+      {{- fail (printf "WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.sizing.%s.env" $sizeName) -}}
+    {{- end -}}
+    {{- if hasKey $sizeEnv "UVICORN_WORKERS" -}}
+      {{- fail (printf "UVICORN_WORKERS may only be set in mcp-server.env, not mcp-server.sizing.%s.env" $sizeName) -}}
+    {{- end -}}
+    {{- $sizeAutoscaling := index $sizeValues "autoscaling" | default dict -}}
+    {{- $sizeHorizontal := index $sizeAutoscaling "horizontal" | default dict -}}
+    {{- $sizeKeda := index $sizeAutoscaling "keda" | default dict -}}
+    {{- if or (index $sizeHorizontal "enabled") (index $sizeKeda "enabled") -}}
+      {{- fail (printf "MCP autoscaling must remain disabled; mcp-server.sizing.%s cannot enable horizontal or KEDA autoscaling" $sizeName) -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $hasMcpEnvTpl := false -}}
+  {{- range (index $mcp "envTpls" | default list) -}}
+    {{- if kindIs "string" . -}}
+      {{- $isCanonicalMcpEnvTpl := eq (trim .) "{{ include \"wandb.mcpEnvs\" . }}" -}}
+      {{- if $isCanonicalMcpEnvTpl -}}
+        {{- $hasMcpEnvTpl = true -}}
+      {{- end -}}
+      {{- if contains $weaveToolsEnvName . -}}
+        {{- fail "mcp-server.envTpls cannot define WANDB_MCP_ENABLE_WEAVE_TOOLS directly; use mcp-server.weave.tools" -}}
+      {{- end -}}
+      {{- if or (contains "WANDB_BASE_URL" .) (contains "WANDB_INTERNAL_BASE_URL" .) (contains "UVICORN_WORKERS" .) -}}
+        {{- fail "mcp-server.envTpls cannot define WANDB_BASE_URL, WANDB_INTERNAL_BASE_URL, or UVICORN_WORKERS directly" -}}
+      {{- end -}}
+      {{- if not $isCanonicalMcpEnvTpl -}}
+        {{- range (tpl . $mcpTplContext | fromYamlArray) -}}
+          {{- $renderedName := index . "name" | default "" | toString -}}
+          {{- if eq $renderedName $weaveToolsEnvName -}}
+            {{- fail "mcp-server.envTpls cannot render WANDB_MCP_ENABLE_WEAVE_TOOLS outside wandb.mcpEnvs; use mcp-server.weave.tools" -}}
+          {{- end -}}
+          {{- if has $renderedName $canonicalMcpEnvNames -}}
+            {{- fail (printf "%s may only be set in mcp-server.env, not mcp-server.envTpls" $renderedName) -}}
+          {{- end -}}
+          {{- if has $renderedName (list "WANDB_BASE_URL" "WANDB_INTERNAL_BASE_URL" "UVICORN_WORKERS") -}}
+            {{- fail "mcp-server.envTpls cannot render WANDB_BASE_URL, WANDB_INTERNAL_BASE_URL, or UVICORN_WORKERS outside wandb.mcpEnvs" -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not $hasMcpEnvTpl -}}
+    {{- fail "mcp-server.envTpls must include wandb.mcpEnvs" -}}
+  {{- end -}}
+
+  {{/*
+    Dedicated exposes the bounded typed surface by default. Raw GraphQL and
+    Weave Agent tools are intentionally unavailable; ARIA is the one supported
+    opt-in and requires an operator-supplied, credential-safe HTTPS origin.
+  */}}
+  {{- $resolvedFeatureFlags := dict -}}
+  {{- range $featureName := $mcpFeatureFlags -}}
+    {{- $rawFeatureValue := index $mcpEnv $featureName -}}
+    {{- $resolvedFeatureValue := "" -}}
+    {{- if kindIs "bool" $rawFeatureValue -}}
+      {{- $resolvedFeatureValue = ternary "true" "false" $rawFeatureValue -}}
+    {{- else if kindIs "string" $rawFeatureValue -}}
+      {{- $resolvedFeatureValue = tpl $rawFeatureValue $mcpTplContext | trim | lower -}}
+    {{- else -}}
+      {{- fail (printf "mcp-server.env.%s must be true or false" $featureName) -}}
+    {{- end -}}
+    {{- if not (has $resolvedFeatureValue (list "true" "false")) -}}
+      {{- fail (printf "mcp-server.env.%s must be true or false" $featureName) -}}
+    {{- end -}}
+    {{- $_ := set $resolvedFeatureFlags $featureName $resolvedFeatureValue -}}
+  {{- end -}}
+  {{- if ne (index $resolvedFeatureFlags "WANDB_MCP_ENABLE_RAW_GRAPHQL") "false" -}}
+    {{- fail "mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL must remain false for Dedicated deployments" -}}
+  {{- end -}}
+  {{- if ne (index $resolvedFeatureFlags "WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS") "false" -}}
+    {{- fail "mcp-server.env.WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS must remain false for Dedicated deployments" -}}
+  {{- end -}}
+  {{- $rawHostedMode := index $mcpEnv "MCP_HOSTED_MODE" -}}
+  {{- $resolvedHostedMode := "" -}}
+  {{- if kindIs "bool" $rawHostedMode -}}
+    {{- $resolvedHostedMode = ternary "true" "false" $rawHostedMode -}}
+  {{- else if kindIs "string" $rawHostedMode -}}
+    {{- $resolvedHostedMode = tpl $rawHostedMode $mcpTplContext | trim | lower -}}
+  {{- end -}}
+  {{- if ne $resolvedHostedMode "false" -}}
+    {{- fail "mcp-server.env.MCP_HOSTED_MODE must remain false for Dedicated deployments" -}}
+  {{- end -}}
+  {{- $rawWorkloadProfile := index $mcpEnv "MCP_WORKLOAD_PROFILE" -}}
+  {{- if not (kindIs "string" $rawWorkloadProfile) -}}
+    {{- fail "mcp-server.env.MCP_WORKLOAD_PROFILE must remain dedicated" -}}
+  {{- end -}}
+  {{- if ne (tpl $rawWorkloadProfile $mcpTplContext | trim | lower) "dedicated" -}}
+    {{- fail "mcp-server.env.MCP_WORKLOAD_PROFILE must remain dedicated" -}}
+  {{- end -}}
+  {{- if eq (index $resolvedFeatureFlags "WANDB_MCP_ENABLE_ARIA_TOOLS") "true" -}}
+    {{- if not (hasKey $mcpEnv "WB_AGENT_BASE_URL") -}}
+      {{- fail "mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS=true requires an explicit mcp-server.env.WB_AGENT_BASE_URL" -}}
+    {{- end -}}
+    {{- $rawAriaBaseURL := index $mcpEnv "WB_AGENT_BASE_URL" -}}
+    {{- if not (kindIs "string" $rawAriaBaseURL) -}}
+      {{- fail "mcp-server.env.WB_AGENT_BASE_URL must be an approved absolute HTTPS origin without credentials, path, query, or fragment" -}}
+    {{- end -}}
+    {{- $ariaBaseURL := tpl $rawAriaBaseURL $mcpTplContext | trim -}}
+    {{- $ariaURLPattern := `^https://(([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)([.]([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*|\[[0-9A-Fa-f:.]+\])(:[0-9]{1,5})?/?$` -}}
+    {{- if not (regexMatch $ariaURLPattern $ariaBaseURL) -}}
+      {{- fail "mcp-server.env.WB_AGENT_BASE_URL must be an approved absolute HTTPS origin without credentials, path, query, or fragment" -}}
+    {{- end -}}
+    {{- $ariaBaseWithoutSlash := trimSuffix "/" $ariaBaseURL -}}
+    {{- $ariaPortMatch := regexFind `:[0-9]+$` $ariaBaseWithoutSlash -}}
+    {{- if $ariaPortMatch -}}
+      {{- $ariaPortDigits := trimPrefix ":" $ariaPortMatch -}}
+      {{- $ariaPort := atoi $ariaPortDigits -}}
+      {{- if or (gt (len $ariaPortDigits) 5) (lt $ariaPort 1) (gt $ariaPort 65535) -}}
+        {{- fail "mcp-server.env.WB_AGENT_BASE_URL must be an approved absolute HTTPS origin without credentials, path, query, or fragment" -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $globalOptOut := index $mcp "globalOptOut" | default dict -}}
+  {{- $globalOptOutEnv := index $globalOptOut "env" -}}
+  {{- $globalOptOutEnvEnabled := false -}}
+  {{- if kindIs "string" $globalOptOutEnv -}}
+    {{- $globalOptOutEnvEnabled = eq (tpl $globalOptOutEnv $mcpTplContext | trim) "true" -}}
+  {{- else -}}
+    {{- $globalOptOutEnvEnabled = $globalOptOutEnv -}}
+  {{- end -}}
+  {{- if not $globalOptOutEnvEnabled -}}
+    {{- fail "mcp-server.globalOptOut.env must remain true to isolate MCP from global administrative environment" -}}
+  {{- end -}}
+  {{- if ne (index $mcp "replicaCount" | toString | trim) "1" -}}
+    {{- fail "mcp-server.replicaCount must equal 1 while admission control is process-local" -}}
+  {{- end -}}
+  {{- $mcpAutoscaling := index $mcp "autoscaling" | default dict -}}
+  {{- $mcpHorizontal := index $mcpAutoscaling "horizontal" | default dict -}}
+  {{- $mcpKeda := index $mcpAutoscaling "keda" | default dict -}}
+  {{- if or (index $mcpHorizontal "enabled") (index $mcpKeda "enabled") -}}
+    {{- fail "MCP autoscaling must remain disabled while admission control is process-local" -}}
+  {{- end -}}
+  {{- $workerValue := index $mcpEnv "UVICORN_WORKERS" -}}
+  {{- $resolvedWorkerValue := $workerValue | toString | trim -}}
+  {{- if kindIs "string" $workerValue -}}
+    {{- $resolvedWorkerValue = tpl $workerValue $mcpTplContext | trim -}}
+  {{- end -}}
+  {{- if or (not (hasKey $mcpEnv "UVICORN_WORKERS")) (ne $resolvedWorkerValue "1") -}}
+    {{- fail "mcp-server.env.UVICORN_WORKERS must equal 1 while admission control is process-local" -}}
+  {{- end -}}
+
+  {{- $hasInternalURLOverride := hasKey $mcpEnv "WANDB_INTERNAL_BASE_URL" -}}
+  {{- if $hasInternalURLOverride -}}
+    {{- $internalURLOverride := index $mcpEnv "WANDB_INTERNAL_BASE_URL" -}}
+    {{- if not (kindIs "string" $internalURLOverride) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment" -}}
+    {{- end -}}
+    {{- $internalBaseURL := tpl $internalURLOverride $mcpTplContext | trim -}}
+    {{- $internalURLPattern := `^https?://(([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)([.]([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*|\[[0-9A-Fa-f:.]+\])(:[0-9]{1,5})?/?$` -}}
+    {{- if not (regexMatch $internalURLPattern $internalBaseURL) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment" -}}
+    {{- end -}}
+    {{- $internalBaseWithoutSlash := trimSuffix "/" $internalBaseURL -}}
+    {{- $internalPortMatch := regexFind `:[0-9]+$` $internalBaseWithoutSlash -}}
+    {{- if $internalPortMatch -}}
+      {{- $internalPortDigits := trimPrefix ":" $internalPortMatch -}}
+      {{- $internalPort := atoi $internalPortDigits -}}
+      {{- if or (gt (len $internalPortDigits) 5) (lt $internalPort 1) (gt $internalPort 65535) -}}
+        {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment" -}}
+      {{- end -}}
+    {{- end -}}
+  {{- else if .Values.global.api.enabled -}}
+    {{- $api := index .Values "api" | default dict -}}
+    {{- $apiService := index $api "service" | default dict -}}
+    {{- if not (index $apiService "enabled") -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when global.api.enabled=true and api.service.enabled=false" -}}
+    {{- end -}}
+    {{- $apiNameOverride := index $api "nameOverride" | default "" | toString | trim -}}
+    {{- $apiFullnameOverride := index $api "fullnameOverride" | default "" | toString | trim -}}
+    {{- $apiServiceName := index $apiService "name" | default "" | toString | trim -}}
+    {{- $apiPortIsDefault := false -}}
+    {{- range (index $apiService "ports" | default list) -}}
+      {{- if and (eq (index . "name" | default "" | toString) "http") (eq (index . "port" | toString) "8081") -}}
+        {{- $apiPortIsDefault = true -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if or (ne $apiNameOverride "") (ne $apiFullnameOverride "") (ne $apiServiceName "") (not $apiPortIsDefault) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when api naming or the http Service port is overridden" -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $app := index .Values "app" | default dict -}}
+    {{- $appService := index $app "service" | default dict -}}
+    {{- if or (not (index $app "install")) (not (index $appService "enabled")) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when the monolith app Service is disabled" -}}
+    {{- end -}}
+    {{- $appNameOverride := index $app "nameOverride" | default "" | toString | trim -}}
+    {{- $appFullnameOverride := index $app "fullnameOverride" | default "" | toString | trim -}}
+    {{- $appServiceName := index $appService "name" | default "" | toString | trim -}}
+    {{- $appPortIsDefault := false -}}
+    {{- range (index $appService "ports" | default list) -}}
+      {{- if and (eq (index . "name" | default "" | toString) "app") (eq (index . "port" | toString) "8080") -}}
+        {{- $appPortIsDefault = true -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if or (ne $appNameOverride "") (ne $appFullnameOverride "") (ne $appServiceName "") (not $appPortIsDefault) -}}
+      {{- fail "mcp-server.env.WANDB_INTERNAL_BASE_URL is required when app naming or the app Service port is overridden" -}}
+    {{- end -}}
+  {{- end -}}
   {{- $mcpWeave := index $mcp "weave" | default dict -}}
   {{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
   {{- if not (has $weaveMode (list "auto" "true" "false")) -}}
     {{- fail "mcp-server.weave.tools must be one of: auto, true, false" -}}
   {{- end -}}
   {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
-  {{- $mcpEnv := index $mcp "env" | default dict -}}
-  {{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
+  {{- $rawExplicitTraceURL := index $mcpEnv "WF_TRACE_SERVER_URL" | default "" -}}
+  {{- if and (hasKey $mcpEnv "WF_TRACE_SERVER_URL") (not (kindIs "string" $rawExplicitTraceURL)) -}}
+    {{- fail "mcp-server.env.WF_TRACE_SERVER_URL must be an absolute HTTP(S) origin or /traces URL without credentials, query, or fragment" -}}
+  {{- end -}}
+  {{- $explicitTraceURL := $rawExplicitTraceURL | toString | trim -}}
   {{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
+  {{- if $hasExplicitTraceURL -}}
+    {{- $traceURLPattern := `^https?://(([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)([.]([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*|\[[0-9A-Fa-f:.]+\])(:[0-9]{1,5})?(/traces)?/?$` -}}
+    {{- if not (regexMatch $traceURLPattern $explicitTraceURL) -}}
+      {{- fail "mcp-server.env.WF_TRACE_SERVER_URL must be an absolute HTTP(S) origin or /traces URL without credentials, query, or fragment" -}}
+    {{- end -}}
+    {{- $traceURLWithoutSlash := trimSuffix "/" $explicitTraceURL -}}
+    {{- $traceOrigin := trimSuffix "/traces" $traceURLWithoutSlash -}}
+    {{- $tracePortMatch := regexFind `:[0-9]+$` $traceOrigin -}}
+    {{- if $tracePortMatch -}}
+      {{- $tracePortDigits := trimPrefix ":" $tracePortMatch -}}
+      {{- $tracePort := atoi $tracePortDigits -}}
+      {{- if or (gt (len $tracePortDigits) 5) (lt $tracePort 1) (gt $tracePort 65535) -}}
+        {{- fail "mcp-server.env.WF_TRACE_SERVER_URL must be an absolute HTTP(S) origin or /traces URL without credentials, query, or fragment" -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
   {{- $hasBundledTrace := or (index .Values "weave-trace" "install") (index $globalWeaveTrace "enabled") -}}
   {{- $hasTraceBackend := or $hasExplicitTraceURL $hasBundledTrace -}}
   {{- if and (eq $weaveMode "true") (not $hasTraceBackend) -}}

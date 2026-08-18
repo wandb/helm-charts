@@ -1,0 +1,22 @@
+suite: MCP server health check
+templates:
+  - templates/tests/test-mcp.yaml
+release:
+  name: customer-a
+  namespace: wandb-system
+
+tests:
+  - it: checks the real MCP health endpoint
+    set:
+      mcp-server.install: true
+    asserts:
+      - equal:
+          path: spec.containers[0].args[0]
+          value: http://customer-a-mcp-server:8080/mcp/health
+
+  - it: does not render the check when MCP is disabled
+    set:
+      mcp-server.install: false
+    asserts:
+      - hasDocuments:
+          count: 0
