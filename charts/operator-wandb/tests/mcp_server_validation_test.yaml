@@ -1,0 +1,350 @@
+suite: MCP routing and safety validation
+templates:
+  - templates/mcp-validation.yaml
+release:
+  name: customer-a
+  namespace: wandb-system
+
+tests:
+  - it: ignores MCP validation when MCP is disabled
+    set:
+      mcp-server.install: false
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: ""
+      global.api.enabled: true
+      api.service.enabled: false
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: requires the chart-managed MCP environment helper
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.sslCertEnvs" . }}'
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls must include wandb.mcpEnvs
+
+  - it: keeps the public URL chart-managed
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_BASE_URL: https://bypass.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_BASE_URL is chart-managed from global.host and cannot be set in mcp-server.env
+
+  - it: keeps classic Weave enablement chart-managed
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS is chart-managed; use mcp-server.weave.tools
+
+  - it: rejects generated routing values in extraEnv
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.WANDB_INTERNAL_BASE_URL: http://bypass-api:8081
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_INTERNAL_BASE_URL cannot be set in alternate MCP environment channel mcp-server.extraEnv
+
+  - it: rejects generated routing values in the container environment
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.WANDB_BASE_URL: https://bypass.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_BASE_URL cannot be set in alternate MCP environment channel mcp-server.containers.mcp-server.env
+
+  - it: rejects generated routing values in sizing environment
+    set:
+      mcp-server.install: true
+      mcp-server.sizing.medium.env.WANDB_MCP_ENABLE_WEAVE_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_MCP_ENABLE_WEAVE_TOOLS cannot be set in alternate MCP environment channel mcp-server.sizing.medium.env
+
+  - it: rejects generated routing values in a secondary environment template
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - name: '{{ printf `WANDB_%s` `BASE_URL` }}'
+            value: https://bypass.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_BASE_URL cannot be rendered by an alternate MCP environment template
+
+  - it: rejects ARIA enablement outside the canonical environment
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_MCP_ENABLE_ARIA_TOOLS cannot be set in alternate MCP environment channel mcp-server.containers.mcp-server.env
+
+  - it: rejects an invalid ARIA feature flag
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: enabled
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS must be true or false
+
+  - it: requires an explicit ARIA origin when ARIA tools are enabled
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS=true requires an explicit mcp-server.env.WB_AGENT_BASE_URL
+
+  - it: accepts ARIA with an HTTPS origin
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: true
+      mcp-server.env.WB_AGENT_BASE_URL: https://wb-agent.wandb.ai:443/
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects ARIA with an HTTP origin
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL: http://wb-agent.wandb.ai
+    asserts: &unsafe_aria_origin
+      - failedTemplate:
+          errorMessage: mcp-server.env.WB_AGENT_BASE_URL must be an approved absolute HTTPS origin without credentials, path, query, or fragment
+
+  - it: rejects ARIA with credentials in its origin
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL: https://user:secret@wb-agent.wandb.ai
+    asserts: *unsafe_aria_origin
+
+  - it: preserves MCP isolation from global administrative environment
+    set:
+      mcp-server.install: true
+      mcp-server.globalOptOut.env: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.globalOptOut.env must remain true to isolate MCP from global administrative environment
+
+  - it: accepts a templated global environment opt-out
+    set:
+      mcp-server.install: true
+      mcp-server.disableGlobalEnv: true
+      mcp-server.globalOptOut.env: '{{ .Values.disableGlobalEnv }}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects a non-string internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL:
+        valueFrom:
+          secretKeyRef:
+            name: invalid-internal-url
+            key: url
+    asserts: &unsafe_internal_url
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
+
+  - it: rejects credentials in the internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://user:secret@custom-api:8081
+    asserts: *unsafe_internal_url
+
+  - it: rejects a path in the internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-api:8081/api
+    asserts: *unsafe_internal_url
+
+  - it: rejects an out-of-range internal URL port
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-api:65536
+    asserts: *unsafe_internal_url
+
+  - it: accepts a templated HTTPS internal origin
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+      mcp-server.customInternalURL: https://custom-api.platform.svc.cluster.local:8443/
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: '{{ .Values.customInternalURL }}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: requires an override when the split API Service is disabled
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when global.api.enabled=true and api.service.enabled=false
+
+  - it: requires an override for custom split API naming
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.fullnameOverride: custom-api
+    asserts: &custom_split_requires_url
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when api naming or the http Service port is overridden
+
+  - it: requires an override for a custom split API port
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports[0].port: 9081
+    asserts: *custom_split_requires_url
+
+  - it: requires an override when the monolith app is disabled
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.install: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when the monolith app Service is disabled
+
+  - it: requires an override when the monolith Service is disabled
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when the monolith app Service is disabled
+
+  - it: requires an override for custom monolith naming
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.name: custom-app
+    asserts: &custom_monolith_requires_url
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL is required when app naming or the app Service port is overridden
+
+  - it: requires an override for a custom monolith port
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports[0].port: 9080
+    asserts: *custom_monolith_requires_url
+
+  - it: accepts a custom split topology with an explicit internal URL
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+      api.fullnameOverride: custom-api
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-api.platform.svc.cluster.local:9090
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts a custom monolith topology with an explicit internal URL
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.install: false
+      app.fullnameOverride: custom-app
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-app.platform.svc.cluster.local:9090
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an invalid classic Weave mode
+    set:
+      mcp-server.install: true
+      mcp-server.weave.tools: sometimes
+    asserts:
+      - failedTemplate:
+          errorMessage: 'mcp-server.weave.tools must be one of: auto, true, false'
+
+  - it: accepts a Weave trace origin with the supported ingress path
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: https://customer.wandb.io:443/traces/
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an unsupported Weave trace path
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: https://trace.example.com/custom
+    asserts: &unsafe_trace_url
+      - failedTemplate:
+          errorMessage: mcp-server.env.WF_TRACE_SERVER_URL must be an absolute HTTP(S) origin or /traces URL without credentials, query, or fragment
+
+  - it: rejects a non-string Weave trace URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL:
+        valueFrom:
+          secretKeyRef:
+            name: invalid-trace-url
+            key: url
+    asserts: *unsafe_trace_url
+
+  - it: does not coerce a boolean false Weave trace URL to an empty string
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: false
+    asserts: *unsafe_trace_url
+
+  - it: rejects a Weave trace URL outside the canonical environment
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.WF_TRACE_SERVER_URL: https://trace.example.com
+    asserts:
+      - failedTemplate:
+          errorMessage: WF_TRACE_SERVER_URL cannot be set in alternate MCP environment channel mcp-server.extraEnv
+
+  - it: requires a trace backend when classic Weave tools are forced on
+    set:
+      global.weave-trace.enabled: false
+      weave-trace.install: false
+      mcp-server.install: true
+      mcp-server.weave.tools: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.weave.tools=true requires weave-trace.install=true, global.weave-trace.enabled=true, or mcp-server.env.WF_TRACE_SERVER_URL
+
+  - it: rejects forced classic Weave with an explicitly empty trace URL
+    set:
+      global.weave-trace.enabled: true
+      weave-trace.install: true
+      mcp-server.install: true
+      mcp-server.weave.tools: "true"
+      mcp-server.env.WF_TRACE_SERVER_URL: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.weave.tools=true requires weave-trace.install=true, global.weave-trace.enabled=true, or mcp-server.env.WF_TRACE_SERVER_URL
+
+  - it: accepts bundled trace when classic Weave tools are forced on
+    set:
+      global.weave-trace.enabled: false
+      weave-trace.install: true
+      mcp-server.install: true
+      mcp-server.weave.tools: "true"
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: keeps conservative runtime values overrideable by trusted operators
+    set:
+      mcp-server.install: true
+      mcp-server.replicaCount: 2
+      mcp-server.autoscaling.horizontal.enabled: true
+      mcp-server.env.UVICORN_WORKERS: "2"
+      mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL: "true"
+      mcp-server.env.WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS: "true"
+      mcp-server.env.MCP_HOSTED_MODE: "false"
+      mcp-server.env.MCP_WORKLOAD_PROFILE: custom
+    asserts:
+      - notFailedTemplate: {}

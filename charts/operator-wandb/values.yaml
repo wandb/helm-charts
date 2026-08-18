@@ -3665,16 +3665,56 @@ weave:
 ## Can run without weave-trace for W&B Models, Reports, Docs, Artifacts, and
 ## Registry tools. Weave trace tools are auto-enabled only when a trace backend
 ## is available (bundled weave-trace or mcp-server.env.WF_TRACE_SERVER_URL).
+## The v0.4 Dedicated defaults expose 17 tools without a trace backend and 22
+## with classic Weave enabled. Raw GraphQL, Weave Agent, and ARIA tools default
+## off. Trusted operators may override feature flags through mcp-server.env;
+## ARIA additionally requires the validated HTTPS origin described below.
 ## Disabled by default. Enable with: mcp-server.install: true
 ## Docs: https://github.com/wandb/wandb-mcp-server
 mcp-server:
   install: false
   image:
     repository: wandb/mcp-server
-    tag: "0.3.5"
+    tag: "0.4.0"
+  ## Keep one pod and one Uvicorn worker so the process-local admission budget
+  ## is deterministic. Revisit only with a shared/distributed admission layer.
+  replicaCount: 1
+  autoscaling:
+    horizontal:
+      enabled: false
+  ## Admission capacity scales with the existing deployment size. Explicit
+  ## values in mcp-server.env take precedence over these defaults.
+  sizing:
+    default:
+      env:
+        MCP_ADMISSION_ACTOR_CAPACITY: "4"
+        MCP_ADMISSION_PROCESS_CAPACITY: "4"
+    small:
+      env:
+        MCP_ADMISSION_ACTOR_CAPACITY: "4"
+        MCP_ADMISSION_PROCESS_CAPACITY: "4"
+    medium:
+      env:
+        MCP_ADMISSION_ACTOR_CAPACITY: "4"
+        MCP_ADMISSION_PROCESS_CAPACITY: "8"
+    large:
+      env:
+        MCP_ADMISSION_ACTOR_CAPACITY: "8"
+        MCP_ADMISSION_PROCESS_CAPACITY: "16"
+    xlarge:
+      env:
+        MCP_ADMISSION_ACTOR_CAPACITY: "8"
+        MCP_ADMISSION_PROCESS_CAPACITY: "16"
+    xxlarge:
+      env:
+        MCP_ADMISSION_ACTOR_CAPACITY: "8"
+        MCP_ADMISSION_PROCESS_CAPACITY: "16"
   weave:
     ## Controls whether trace-dependent MCP tools are exposed.
-    ## - auto: enable when bundled weave-trace is installed or WF_TRACE_SERVER_URL is set.
+    ## - auto: enable when global.weave-trace.enabled or a non-empty
+    ##   WF_TRACE_SERVER_URL is set. An explicitly empty URL disables auto mode.
+    ##   When only weave-trace.install is set, opt in with tools: "true"; the
+    ##   parent validation confirms that the bundled backend exists.
     ## - true: require a trace backend and expose Weave tools.
     ## - false: hide Weave tools for Models-only installs.
     tools: "auto"
@@ -3762,12 +3802,14 @@ mcp-server:
       ad.datadoghq.com/mcp-server.tags: {{ include "wandb.mcpDatadogTags" . | quote }}
       ad.datadoghq.com/mcp-server.logs: {{ include "wandb.mcpDatadogLogs" . | quote }}
       {{- end }}
-  envFrom:
-    "{{ .Release.Name }}-global-configmap": "configMapRef"
+  ## MCP receives only its chart-local environment. In particular, do not
+  ## inherit the global admin API key or Gorilla server-only controls.
+  globalOptOut:
+    env: true
+  envFrom: {}
   envTpls:
     - '{{ include "wandb.mcpEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
-    - '{{ include "wandb.statsigEnvs" . }}'
   env:
     WANDB_SILENT: "True"
     WEAVE_SILENT: "True"
@@ -3780,6 +3822,38 @@ mcp-server:
     MCP_RATE_LIMIT_ENABLED: "true"
     MCP_RATE_LIMIT_PER_KEY: "60/minute"
     MCP_RATE_LIMIT_GLOBAL: "1000/minute"
+    ## Hosted mode enforces the hard HTTP-service history and trace-query gates.
+    ## The dedicated workload profile below selects the larger customer limits.
+    MCP_HOSTED_MODE: "true"
+    MCP_ADMISSION_CONTROL_ENABLED: "true"
+    MCP_ADMISSION_WAIT_MS: "2000"
+    MCP_TOOL_TIMEOUT_SECONDS: "30"
+    MCP_WANDB_REQUEST_TIMEOUT_SECONDS: "20"
+    MCP_WORKLOAD_PROFILE: "dedicated"
+    WANDB_MCP_READ_ONLY: "false"
+    WANDB_MCP_ENABLE_RAW_GRAPHQL: "false"
+    WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS: "false"
+    WANDB_MCP_ENABLE_ARIA_TOOLS: "false"
+    ## ARIA forwards the caller's W&B credential to a separate hosted service.
+    ## Dedicated installs may opt in only by setting both of these values in
+    ## mcp-server.env. WB_AGENT_BASE_URL has deliberately no chart default:
+    ##
+    ## WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+    ## WB_AGENT_BASE_URL: "https://wb-agent.wandb.ai"
+    ##
+    ## Helm rejects non-HTTPS origins, credentials, paths, queries, fragments,
+    ## and configuration through another environment merge channel.
+    UVICORN_WORKERS: "1"
+    # Keep connection/task headroom above the 16-request application limit so
+    # health probes and idle MCP keep-alives cannot cause transport-level 503s.
+    UVICORN_LIMIT_CONCURRENCY: "32"
+    ## WANDB_BASE_URL stays public for client-visible links and .netrc lookup.
+    ## WANDB_INTERNAL_BASE_URL is generated from the default topology:
+    ## http://<release>-api:8081 when global.api.enabled=true, otherwise
+    ## http://<release>-app:8080. Set it explicitly for external Services or
+    ## whenever api/app nameOverride, fullnameOverride, service.name, or the
+    ## backend Service port is customized. The chart fails rendering instead
+    ## of silently pointing MCP at a Service that does not exist.
     # Note: WANDB_CACHE_DIR, WANDB_CONFIG_DIR, WANDB_DATA_DIR, and HOME=/tmp
     # are already set by the MCP Docker image. The emptyDir volume mounted
     # at /tmp/ above gives the pod isolated writable scratch space matching
