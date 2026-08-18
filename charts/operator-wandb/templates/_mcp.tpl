@@ -70,6 +70,48 @@
 {{- end -}}
 
 {{/*
+  Fail when a credential-bearing MCP upstream is not a bounded HTTP(S) URL.
+  Callers choose whether HTTPS is required and whether /traces is allowed.
+  IPv6 literals are intentionally unsupported until Helm can validate them
+  correctly instead of accepting arbitrary bracketed strings.
+*/}}
+{{- define "wandb.validateMcpEndpoint" -}}
+  {{- $url := .url -}}
+  {{- $httpsOnly := .httpsOnly | default false -}}
+  {{- $allowTraces := .allowTraces | default false -}}
+  {{- $schemePattern := ternary "https" "https?" $httpsOnly -}}
+  {{- $pathPattern := ternary "(/traces)?" "" $allowTraces -}}
+  {{- $hostPattern := `([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)([.]([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*` -}}
+  {{- $urlPattern := printf `^%s://%s(:[0-9]{1,5})?%s/?$` $schemePattern $hostPattern $pathPattern -}}
+  {{- if not (regexMatch $urlPattern $url) -}}
+    {{- fail .errorMessage -}}
+  {{- end -}}
+  {{- $origin := trimSuffix "/" $url -}}
+  {{- if $allowTraces -}}
+    {{- $origin = trimSuffix "/traces" $origin -}}
+  {{- end -}}
+  {{- $portMatch := regexFind `:[0-9]+$` $origin -}}
+  {{- if $portMatch -}}
+    {{- $portDigits := trimPrefix ":" $portMatch -}}
+    {{- $port := atoi $portDigits -}}
+    {{- if or (lt $port 1) (gt $port 65535) -}}
+      {{- fail .errorMessage -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* Preserve explicit YAML booleans while normalizing the MCP Weave mode. */}}
+{{- define "wandb.resolveMcpWeaveMode" -}}
+  {{- if kindIs "bool" .value -}}
+    {{- ternary "true" "false" .value -}}
+  {{- else if kindIs "string" .value -}}
+    {{- tpl .value .context | trim | lower -}}
+  {{- else -}}
+    {{- .value | toString | trim | lower -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
 Environment variables for the MCP server subchart.
 
 SCOPE NOTE (please keep): wandb.mcpEnvs is invoked via envTpls -> tpl . $.root
@@ -99,11 +141,19 @@ trace-dependent tools are hidden and WF_TRACE_SERVER_URL is not defaulted.
 {{- define "wandb.mcpEnvs" -}}
   {{- $mcpEnv := index .Values "env" | default dict -}}
   {{- $mcpWeave := index .Values "weave" | default dict -}}
-  {{- $weaveMode := (index $mcpWeave "tools" | default "auto" | toString | lower) -}}
+  {{- $rawWeaveMode := "auto" -}}
+  {{- if hasKey $mcpWeave "tools" -}}
+    {{- $rawWeaveMode = index $mcpWeave "tools" -}}
+  {{- end -}}
+  {{- $weaveMode := include "wandb.resolveMcpWeaveMode" (dict "value" $rawWeaveMode "context" .) -}}
   {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
   {{- $explicitTraceURL := (index $mcpEnv "WF_TRACE_SERVER_URL" | default "" | toString | trim) -}}
   {{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
-  {{- $hasTraceBackend := or $hasExplicitTraceURL (index $globalWeaveTrace "enabled") -}}
+  {{- $hasTraceURLSetting := hasKey $mcpEnv "WF_TRACE_SERVER_URL" -}}
+  {{- $hasTraceBackend := index $globalWeaveTrace "enabled" -}}
+  {{- if $hasTraceURLSetting -}}
+    {{- $hasTraceBackend = $hasExplicitTraceURL -}}
+  {{- end -}}
   {{- $enableWeaveTools := or (eq $weaveMode "true") (and (eq $weaveMode "auto") $hasTraceBackend) -}}
 - name: WANDB_MCP_ENABLE_WEAVE_TOOLS
   value: {{ ternary "true" "false" $enableWeaveTools | quote }}

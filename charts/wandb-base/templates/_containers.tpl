@@ -19,7 +19,7 @@
       {{- $globalOptOut := (default dict $.root.Values.globalOptOut) -}}
       {{- if hasKey $globalOptOut "env" -}}
         {{- if kindIs "string" $globalOptOut.env -}}
-          {{- $globalOptOutEnv = eq (tpl $globalOptOut.env $.root | trim) "true" -}}
+          {{- $globalOptOutEnv = eq (tpl $globalOptOut.env $.root | trim | lower) "true" -}}
         {{- else -}}
           {{- $globalOptOutEnv = $globalOptOut.env -}}
         {{- end -}}

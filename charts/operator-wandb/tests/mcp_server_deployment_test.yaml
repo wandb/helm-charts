@@ -257,6 +257,40 @@ tests:
           content:
             name: WF_TRACE_SERVER_URL
 
+  - it: preserves an explicit boolean false when a trace backend exists
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: true
+      weave-trace.install: true
+      mcp-server.install: true
+      mcp-server.weave.tools: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "false"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_TRACE_SERVER_URL
+
+  - it: treats an explicitly empty trace URL as an auto-mode opt-out
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: true
+      weave-trace.install: true
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: ""
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: ""}
+          count: 1
+
   - it: renders the 22-tool classic Weave profile when a trace backend exists
     template: charts/mcp-server/templates/deployment.yaml
     set:
@@ -346,6 +380,7 @@ tests:
       global.extraEnv.GORILLA_MCP_QUERY_SECONDS: "1"
       global.extraEnv.GORILLA_STATSIG_KEY: secret-statsig-canary
       mcp-server.install: true
+      mcp-server.globalOptOut.env: "TRUE"
       mcp-server.env.MCP_LOCAL_MARKER: retained
     asserts:
       - contains:
