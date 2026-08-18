@@ -1,6 +1,7 @@
 suite: MCP server deployment
 templates:
   - charts/mcp-server/templates/deployment.yaml
+  - charts/mcp-server/templates/serviceaccount.yaml
   - charts/mcp-server/templates/hpa.yaml
   - charts/api/templates/service.yaml
   - charts/app/templates/service.yaml
@@ -9,6 +10,25 @@ release:
   namespace: wandb-system
 
 tests:
+  - it: does not mount Kubernetes API credentials
+    template: charts/mcp-server/templates/serviceaccount.yaml
+    set:
+      mcp-server.install: true
+    asserts:
+      - equal:
+          path: automountServiceAccountToken
+          value: false
+
+  - it: renders an immutable MCP image override by digest
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: wandb/mcp-server@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
   - it: routes split API installs internally and keeps public links public
     template: charts/mcp-server/templates/deployment.yaml
     set:
