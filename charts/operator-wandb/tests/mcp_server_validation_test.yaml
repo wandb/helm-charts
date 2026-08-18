@@ -21,7 +21,7 @@ tests:
       mcp-server.env.WANDB_INTERNAL_BASE_URL: ""
     asserts:
       - failedTemplate:
-          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be a non-empty string when set
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
 
   - it: rejects a non-string internal URL
     set:
@@ -33,7 +33,7 @@ tests:
             key: url
     asserts:
       - failedTemplate:
-          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be a non-empty string when set
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
 
   - it: rejects an internal URL template that resolves empty in MCP scope
     set:
@@ -42,7 +42,7 @@ tests:
       mcp-server.env.WANDB_INTERNAL_BASE_URL: '{{ .Values.customInternalURL }}'
     asserts:
       - failedTemplate:
-          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be a non-empty string when set
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
 
   - it: accepts an internal URL template that resolves nonempty in MCP scope
     set:
@@ -69,7 +69,64 @@ tests:
       mcp-server.env.WANDB_INTERNAL_BASE_URL: '{{ if eq .Chart.Name `operator-wandb` }}http://wrong-scope:8081{{ end }}'
     asserts:
       - failedTemplate:
-          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be a non-empty string when set
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
+
+  - it: rejects an internal URL with an unsupported scheme
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: ftp://custom-api:8081
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
+
+  - it: rejects credentials in the internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://user:secret@custom-api:8081
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
+
+  - it: rejects a path in the internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-api:8081/api
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
+
+  - it: rejects a query in the internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-api:8081?target=public
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
+
+  - it: rejects a fragment in the internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-api:8081#fragment
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
+
+  - it: rejects an out-of-range internal URL port
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-api:65536
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_INTERNAL_BASE_URL must be an absolute HTTP(S) origin without credentials, path, query, or fragment
+
+  - it: accepts an HTTPS internal origin with a valid port
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: https://custom-api.platform.svc.cluster.local:8443/
+    asserts:
+      - notFailedTemplate: {}
 
   - it: rejects an empty internal URL in extraEnv
     set:
@@ -317,6 +374,108 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: mcp-server.env.WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS must remain false for Dedicated deployments
+
+  - it: keeps MT SaaS hosted mode disabled for Dedicated deployments
+    set:
+      mcp-server.install: true
+      mcp-server.env.MCP_HOSTED_MODE: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.MCP_HOSTED_MODE must remain false for Dedicated deployments
+
+  - it: keeps the Dedicated workload profile selected
+    set:
+      mcp-server.install: true
+      mcp-server.env.MCP_WORKLOAD_PROFILE: shared
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.MCP_WORKLOAD_PROFILE must remain dedicated
+
+  - it: rejects a hosted mode override outside the canonical MCP environment
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.MCP_HOSTED_MODE: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP_HOSTED_MODE may only be set in mcp-server.env, not mcp-server.extraEnv
+
+  - it: rejects a workload profile override in sizing environment
+    set:
+      mcp-server.install: true
+      mcp-server.sizing.default.env.MCP_WORKLOAD_PROFILE: local
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP_WORKLOAD_PROFILE may only be set in mcp-server.env, not mcp-server.sizing.default.env
+
+  - it: accepts an explicit Weave trace origin
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: http://weave-trace.wandb-system.svc.cluster.local:8722
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts the supported Weave trace ingress path
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: https://customer.wandb.io:443/traces/
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an unsupported Weave trace URL scheme
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: ftp://trace.example.com
+    asserts: &unsafe_weave_trace_url
+      - failedTemplate:
+          errorMessage: mcp-server.env.WF_TRACE_SERVER_URL must be an absolute HTTP(S) origin or /traces URL without credentials, query, or fragment
+
+  - it: rejects credentials in the Weave trace URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: https://user:secret@trace.example.com
+    asserts: *unsafe_weave_trace_url
+
+  - it: rejects an unsupported path in the Weave trace URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: https://trace.example.com/custom
+    asserts: *unsafe_weave_trace_url
+
+  - it: rejects a query in the Weave trace URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: "https://trace.example.com?target=other"
+    asserts: *unsafe_weave_trace_url
+
+  - it: rejects a fragment in the Weave trace URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: "https://trace.example.com#fragment"
+    asserts: *unsafe_weave_trace_url
+
+  - it: rejects an out-of-range Weave trace URL port
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: https://trace.example.com:65536/traces
+    asserts: *unsafe_weave_trace_url
+
+  - it: rejects a non-string Weave trace URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL:
+        valueFrom:
+          secretKeyRef:
+            name: invalid-trace-url
+            key: url
+    asserts: *unsafe_weave_trace_url
+
+  - it: rejects a Weave trace URL outside the canonical MCP environment
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.WF_TRACE_SERVER_URL: https://trace.example.com
+    asserts:
+      - failedTemplate:
+          errorMessage: WF_TRACE_SERVER_URL may only be set in mcp-server.env, not mcp-server.extraEnv
 
   - it: rejects a raw classic Weave override without a trace backend
     set:

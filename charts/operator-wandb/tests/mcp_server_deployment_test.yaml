@@ -197,7 +197,7 @@ tests:
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
-          content: {name: MCP_HOSTED_MODE, value: "true"}
+          content: {name: MCP_HOSTED_MODE, value: "false"}
       - contains:
           path: spec.template.spec.containers[0].env
           content: {name: MCP_ADMISSION_CONTROL_ENABLED, value: "true"}
@@ -280,6 +280,38 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS, value: "false"}
+
+  - it: keeps auto mode fail-closed when only the bundled trace chart is installed
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: false
+      weave-trace.install: true
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "false"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_TRACE_SERVER_URL
+
+  - it: enables bundled classic Weave explicitly when its global flag is absent
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: false
+      weave-trace.install: true
+      mcp-server.install: true
+      mcp-server.weave.tools: "true"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "true"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: https://customer.wandb.io/traces}
 
   - it: renders the explicitly approved ARIA opt-in once
     template: charts/mcp-server/templates/deployment.yaml
