@@ -1,0 +1,525 @@
+suite: MCP server deployment
+templates:
+  - charts/mcp-server/templates/deployment.yaml
+  - charts/mcp-server/templates/serviceaccount.yaml
+  - charts/mcp-server/templates/hpa.yaml
+  - charts/api/templates/service.yaml
+  - charts/app/templates/service.yaml
+release:
+  name: customer-a
+  namespace: wandb-system
+
+tests:
+  - it: does not mount Kubernetes API credentials
+    template: charts/mcp-server/templates/serviceaccount.yaml
+    set:
+      mcp-server.install: true
+    asserts:
+      - equal:
+          path: automountServiceAccountToken
+          value: false
+
+  - it: renders an immutable MCP image override by digest
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: wandb/mcp-server@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+  - it: routes split API installs internally and keeps public links public
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.api.enabled: true
+      mcp-server.install: true
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: wandb/mcp-server:0.4.0
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_BASE_URL
+            value: https://customer.wandb.io
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_INTERNAL_BASE_URL
+            value: http://customer-a-api:8081
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_WORKLOAD_PROFILE
+            value: dedicated
+
+  - it: renders the split API Service addressed by the MCP URL
+    template: charts/api/templates/service.yaml
+    set:
+      global.api.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: customer-a-api
+      - contains:
+          path: spec.ports
+          content:
+            name: http
+            port: 8081
+            targetPort: api
+            protocol: TCP
+
+  - it: reuses a split API release name that already contains the component alias
+    template: charts/mcp-server/templates/deployment.yaml
+    release:
+      name: customer-api
+      namespace: wandb-system
+    set:
+      global.api.enabled: true
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_INTERNAL_BASE_URL
+            value: http://customer-api:8081
+
+  - it: matches the split API Service name when the release contains its alias
+    template: charts/api/templates/service.yaml
+    release:
+      name: customer-api
+      namespace: wandb-system
+    set:
+      global.api.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: customer-api
+
+  - it: routes monolith installs to the internal app Service
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.api.enabled: false
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_INTERNAL_BASE_URL
+            value: http://customer-a-app:8080
+
+  - it: renders the monolith Service addressed by the MCP URL
+    template: charts/app/templates/service.yaml
+    set:
+      global.api.enabled: false
+    asserts:
+      - equal:
+          path: metadata.name
+          value: customer-a-app
+      - contains:
+          path: spec.ports
+          content:
+            name: app
+            port: 8080
+            protocol: TCP
+
+  - it: reuses a monolith release name that already contains the component alias
+    template: charts/mcp-server/templates/deployment.yaml
+    release:
+      name: customer-app
+      namespace: wandb-system
+    set:
+      global.api.enabled: false
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_INTERNAL_BASE_URL
+            value: http://customer-app:8080
+
+  - it: matches the monolith Service name when the release contains its alias
+    template: charts/app/templates/service.yaml
+    release:
+      name: customer-app
+      namespace: wandb-system
+    set:
+      global.api.enabled: false
+    asserts:
+      - equal:
+          path: metadata.name
+          value: customer-app
+
+  - it: preserves an explicit internal URL override
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.api.enabled: true
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: http://custom-api.platform.svc.cluster.local:9090
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_BASE_URL
+            value: https://customer.wandb.io
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_INTERNAL_BASE_URL
+            value: http://custom-api.platform.svc.cluster.local:9090
+          count: 1
+
+  - it: resolves an internal URL override in MCP subchart scope
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.api.enabled: true
+      api.service.enabled: false
+      mcp-server.install: true
+      mcp-server.customInternalURL: http://custom-api.platform.svc.cluster.local:9090
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: '{{ .Values.customInternalURL }}'
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_INTERNAL_BASE_URL
+            value: http://custom-api.platform.svc.cluster.local:9090
+          count: 1
+
+  - it: resolves an internal URL override with the MCP chart identity
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      api.service.enabled: false
+      mcp-server.install: true
+      mcp-server.env.WANDB_INTERNAL_BASE_URL: '{{ if eq .Chart.Name `mcp-server` }}http://custom-api:8081{{ end }}'
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_INTERNAL_BASE_URL
+            value: http://custom-api:8081
+          count: 1
+
+  - it: renders the complete conservative runtime contract
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.api.enabled: true
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_HOSTED_MODE, value: "true"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_CONTROL_ENABLED, value: "true"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_WAIT_MS, value: "2000"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_TOOL_TIMEOUT_SECONDS, value: "30"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_WANDB_REQUEST_TIMEOUT_SECONDS, value: "20"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_READ_ONLY, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_RAW_GRAPHQL, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: UVICORN_WORKERS, value: "1"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: UVICORN_LIMIT_CONCURRENCY, value: "32"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_DEPLOYMENT_TYPE, value: self-managed}
+
+  - it: renders the 17-tool base profile when no trace backend exists
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: false
+      weave-trace.install: false
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_RAW_GRAPHQL, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS, value: "false"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_TRACE_SERVER_URL
+
+  - it: preserves an explicit boolean false when a trace backend exists
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: true
+      weave-trace.install: true
+      mcp-server.install: true
+      mcp-server.weave.tools: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "false"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_TRACE_SERVER_URL
+
+  - it: treats an explicitly empty trace URL as an auto-mode opt-out
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: true
+      weave-trace.install: true
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: ""
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: ""}
+          count: 1
+
+  - it: renders the 22-tool classic Weave profile when a trace backend exists
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: true
+      weave-trace.install: true
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "true"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: https://customer.wandb.io/traces}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_RAW_GRAPHQL, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS, value: "false"}
+
+  - it: keeps auto mode fail-closed when only the bundled trace chart is installed
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: false
+      weave-trace.install: true
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "false"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_TRACE_SERVER_URL
+
+  - it: enables bundled classic Weave explicitly when its global flag is absent
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: false
+      weave-trace.install: true
+      mcp-server.install: true
+      mcp-server.weave.tools: "true"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS, value: "true"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: https://customer.wandb.io/traces}
+
+  - it: renders the explicitly approved ARIA opt-in once
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+      mcp-server.env.WB_AGENT_BASE_URL: https://wb-agent.wandb.ai
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS, value: "true"}
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WB_AGENT_BASE_URL, value: https://wb-agent.wandb.ai}
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_RAW_GRAPHQL, value: "false"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS, value: "false"}
+
+  - it: isolates MCP from global administrative environment
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.api.enabled: true
+      global.env.GLOBAL_ADMIN_API_KEY: secret-canary
+      global.extraEnv.GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS: "true"
+      global.extraEnv.GORILLA_MCP_QUERY_SECONDS: "1"
+      global.extraEnv.GORILLA_STATSIG_KEY: secret-statsig-canary
+      mcp-server.install: true
+      mcp-server.globalOptOut.env: "TRUE"
+      mcp-server.env.MCP_LOCAL_MARKER: retained
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_LOCAL_MARKER, value: retained}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GLOBAL_ADMIN_API_KEY, value: secret-canary}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS, value: "true"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_MCP_QUERY_SECONDS, value: "1"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_STATSIG_KEY, value: secret-statsig-canary}
+      - isNullOrEmpty:
+          path: spec.template.spec.containers[0].envFrom
+
+  - it: renders default admission capacity
+    template: charts/mcp-server/templates/deployment.yaml
+    set: &mcp_defaults
+      global.host: https://customer.wandb.io
+      global.api.enabled: true
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_ACTOR_CAPACITY, value: "4"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_PROCESS_CAPACITY, value: "4"}
+
+  - it: renders small admission capacity
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      <<: *mcp_defaults
+      global.size: small
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_ACTOR_CAPACITY, value: "4"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_PROCESS_CAPACITY, value: "4"}
+
+  - it: renders medium admission capacity
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      <<: *mcp_defaults
+      global.size: medium
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_ACTOR_CAPACITY, value: "4"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_PROCESS_CAPACITY, value: "8"}
+
+  - it: renders large admission capacity
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      <<: *mcp_defaults
+      global.size: large
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_ACTOR_CAPACITY, value: "8"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_PROCESS_CAPACITY, value: "16"}
+
+  - it: renders xlarge admission capacity
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      <<: *mcp_defaults
+      global.size: xlarge
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_ACTOR_CAPACITY, value: "8"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_PROCESS_CAPACITY, value: "16"}
+
+  - it: renders xxlarge admission capacity
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      <<: *mcp_defaults
+      global.size: xxlarge
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_ACTOR_CAPACITY, value: "8"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_PROCESS_CAPACITY, value: "16"}
+
+  - it: preserves explicit admission overrides
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      <<: *mcp_defaults
+      global.size: large
+      mcp-server.env.MCP_ADMISSION_ACTOR_CAPACITY: "4"
+      mcp-server.env.MCP_ADMISSION_PROCESS_CAPACITY: "8"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_ACTOR_CAPACITY, value: "4"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_PROCESS_CAPACITY, value: "8"}
+
+  - it: does not render an HPA
+    template: charts/mcp-server/templates/hpa.yaml
+    set:
+      global.host: https://customer.wandb.io
+      mcp-server.install: true
+    asserts:
+      - hasDocuments:
+          count: 0
