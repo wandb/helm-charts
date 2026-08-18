@@ -2,6 +2,8 @@ suite: MCP server deployment
 templates:
   - charts/mcp-server/templates/deployment.yaml
   - charts/mcp-server/templates/serviceaccount.yaml
+  - charts/mcp-server/templates/role.yaml
+  - charts/mcp-server/templates/rolebinding.yaml
   - charts/mcp-server/templates/hpa.yaml
   - charts/api/templates/service.yaml
   - charts/app/templates/service.yaml
@@ -18,6 +20,22 @@ tests:
       - equal:
           path: automountServiceAccountToken
           value: false
+
+  - it: does not create Kubernetes API permissions
+    template: charts/mcp-server/templates/role.yaml
+    set:
+      mcp-server.install: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not bind Kubernetes API permissions
+    template: charts/mcp-server/templates/rolebinding.yaml
+    set:
+      mcp-server.install: true
+    asserts:
+      - hasDocuments:
+          count: 0
 
   - it: renders an immutable MCP image override by digest
     template: charts/mcp-server/templates/deployment.yaml
