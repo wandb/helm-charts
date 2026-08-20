@@ -1,0 +1,498 @@
+suite: MCP profile, routing, and safety validation
+templates:
+  - templates/mcp-validation.yaml
+release:
+  name: customer-a
+  namespace: wandb-system
+
+tests:
+  - it: ignores MCP validation when MCP is disabled
+    set:
+      mcp-server.install: false
+      global.api.enabled: true
+      api.service.enabled: false
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: requires the chart-managed MCP environment helper exactly once
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.sslCertEnvs" . }}'
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls must include wandb.mcpEnvs exactly once
+
+  - it: rejects duplicate canonical MCP environment helpers
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - '{{ include "wandb.mcpEnvs" . }}'
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls must include wandb.mcpEnvs exactly once
+
+  - it: accepts canonical MCP environment helper whitespace and trim markers
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{-   include   "wandb.mcpEnvs"   .   -}}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects scalar entries rendered by alternate environment templates
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - scalar-entry
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls entries must render a YAML array of environment maps
+
+  - it: rejects a legacy feature flag in env
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS is release-controlled; use the typed MCP values
+
+  - it: rejects ARIA enablement in the Dedicated profile
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS is release-controlled; use the typed MCP values
+
+  - it: rejects raw GraphQL enablement in the Dedicated profile
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL is release-controlled; use the typed MCP values
+
+  - it: rejects the new selector in generic env
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_TOOL_PROFILE: models-weave-agents
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_TOOL_PROFILE is release-controlled; use the typed MCP values
+
+  - it: rejects low-level workload overrides
+    set:
+      mcp-server.install: true
+      mcp-server.env.MCP_TOOL_TIMEOUT_SECONDS: "300"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.MCP_TOOL_TIMEOUT_SECONDS is release-controlled; use the typed MCP values
+
+  - it: rejects future admission controls by reserved prefix
+    set:
+      mcp-server.install: true
+      mcp-server.env.MCP_ADMISSION_NEW_LIMIT: "1"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.MCP_ADMISSION_NEW_LIMIT is release-controlled; use the typed MCP values
+
+  - it: rejects generated routing values in extraEnv
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.WANDB_INTERNAL_BASE_URL: http://bypass-api:8081
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.extraEnv cannot set release-controlled MCP variable WANDB_INTERNAL_BASE_URL
+
+  - it: rejects generated profile values in the container environment
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.WANDB_MCP_ACCESS_MODE: read-only
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.containers.mcp-server.env cannot set release-controlled MCP variable WANDB_MCP_ACCESS_MODE
+
+  - it: rejects a workload-level W&B credential
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_API_KEY: secret-canary
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_API_KEY is release-controlled; use the typed MCP values
+
+  - it: rejects workload-level telemetry credentials
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.OTEL_EXPORTER_OTLP_HEADERS: Authorization=secret-canary
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.extraEnv cannot set release-controlled MCP variable OTEL_EXPORTER_OTLP_HEADERS
+
+  - it: rejects changes to the chart-owned silent mode
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_SILENT: "false"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_SILENT must remain true
+
+  - it: rejects release controls from a secondary environment template
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - name: '{{ printf `WANDB_MCP_%s` `TOOL_PROFILE` }}'
+            value: models-weave-agents
+    asserts:
+      - failedTemplate:
+          errorMessage: WANDB_MCP_TOOL_PROFILE cannot be rendered by an alternate MCP environment template
+
+  - it: rejects opaque root envFrom sources
+    set:
+      mcp-server.install: true
+      mcp-server.envFrom.unreviewed-config: configMapRef
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP envFrom is unsupported because opaque sources can shadow the release contract
+
+  - it: rejects opaque container envFrom sources
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.envFrom.unreviewed-secret: secretRef
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP envFrom is unsupported because opaque sources can shadow the release contract
+
+  - it: rejects the removed sizing interface
+    set:
+      mcp-server.install: true
+      mcp-server.sizing.medium.env.MCP_ADMISSION_ACTOR_CAPACITY: "64"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.sizing.medium.env is unsupported; the server-owned capacity class controls runtime policy
+
+  - it: rejects the removed Weave feature interface
+    set:
+      mcp-server.install: true
+      mcp-server.weave.tools: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.weave is no longer supported; migrate to the typed v0.4 MCP profile interface
+
+  - it: preserves the current Managed Spec Datadog compatibility input
+    set:
+      mcp-server.install: true
+      mcp-server.datadog.enabled: true
+      mcp-server.datadog.mode: agent
+      mcp-server.datadog.env: production
+      mcp-server.datadog.service: wandb-mcp-server-dedicated
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts a typed Datadog provider with only a legacy service label
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: datadog-agent
+      mcp-server.datadog.service: custom-mcp-service
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an explicit legacy Datadog disable with the typed provider
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: datadog-agent
+      mcp-server.datadog.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.datadog.enabled=false conflicts with mcp-server.observability.provider=datadog-agent
+
+  - it: rejects the retired Datadog direct forwarder
+    set:
+      mcp-server.install: true
+      mcp-server.datadog.enabled: true
+      mcp-server.datadog.mode: forwarder
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.datadog.mode must be agent; direct forwarding and pod-held credentials are unsupported
+
+  - it: preserves the current Managed Spec privacy compatibility input
+    set:
+      mcp-server.install: true
+      mcp-server.privacy.logLevel: standard
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts the three Dedicated tool selectors
+    set:
+      global.weave-trace.enabled: true
+      mcp-server.install: true
+      mcp-server.tools.profile: models-weave
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts read-only access
+    set:
+      mcp-server.install: true
+      mcp-server.accessMode: read-only
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an unknown deployment size instead of guessing a capacity class
+    set:
+      global.size: enormous
+      mcp-server.install: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.size must be one of: default, testing, small, medium, large, xlarge, xxlarge when MCP is installed"
+
+  - it: rejects a trace URL when traces are disabled
+    set:
+      mcp-server.install: true
+      mcp-server.traceBackend.mode: disabled
+      mcp-server.traceBackend.url: https://trace.example.com/traces
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.traceBackend.url must be empty when traceBackend.mode=disabled
+
+  - it: rejects classic Weave without a trace backend
+    set:
+      global.weave-trace.enabled: false
+      mcp-server.install: true
+      mcp-server.tools.profile: models-weave
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.tools.profile=models-weave requires global.weave-trace.enabled=true or traceBackend.url
+
+  - it: accepts classic Weave with a validated external trace backend
+    set:
+      global.weave-trace.enabled: false
+      mcp-server.install: true
+      mcp-server.tools.profile: models-weave
+      mcp-server.traceBackend.url: https://trace.example.com:443/traces/
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an unsupported trace path
+    set:
+      mcp-server.install: true
+      mcp-server.traceBackend.url: https://trace.example.com/custom
+    asserts: &unsafe_trace_url
+      - failedTemplate:
+          errorMessage: mcp-server.traceBackend.url must be an absolute HTTP(S) origin or /traces URL without credentials, query, or fragment
+
+  - it: rejects credentials in the trace URL
+    set:
+      mcp-server.install: true
+      mcp-server.traceBackend.url: https://user:secret@trace.example.com
+    asserts: *unsafe_trace_url
+
+  - it: rejects the legacy trace URL environment path
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: https://trace.example.com
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WF_TRACE_SERVER_URL is release-controlled; use the typed MCP values
+
+  - it: accepts a templated external trace URL in MCP subchart scope
+    set:
+      mcp-server.install: true
+      mcp-server.customTraceUrl: https://trace.example.com/traces
+      mcp-server.traceBackend.url: '{{ .Values.customTraceUrl }}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects credentials in the internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.routing.internalBaseUrl: http://user:secret@custom-api:8081
+    asserts: &unsafe_internal_url
+      - failedTemplate:
+          errorMessage: mcp-server.routing.internalBaseUrl must be an absolute HTTP(S) origin without credentials, path, query, or fragment
+
+  - it: rejects a path in the internal URL
+    set:
+      mcp-server.install: true
+      mcp-server.routing.internalBaseUrl: http://custom-api:8081/api
+    asserts: *unsafe_internal_url
+
+  - it: rejects an out-of-range internal URL port
+    set:
+      mcp-server.install: true
+      mcp-server.routing.internalBaseUrl: http://custom-api:65536
+    asserts: *unsafe_internal_url
+
+  - it: accepts a templated HTTPS internal origin
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+      mcp-server.customInternalUrl: https://custom-api.platform.svc.cluster.local:8443/
+      mcp-server.routing.internalBaseUrl: '{{ .Values.customInternalUrl }}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: requires an override when the split API Service is disabled
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.routing.internalBaseUrl is required when global.api.enabled=true and api.service.enabled=false
+
+  - it: requires an override for custom split API naming
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.fullnameOverride: custom-api
+    asserts: &custom_split_requires_url
+      - failedTemplate:
+          errorMessage: mcp-server.routing.internalBaseUrl is required when api naming or the http Service port is overridden
+
+  - it: requires an override for a custom split API port
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports[0].port: 9081
+    asserts: *custom_split_requires_url
+
+  - it: requires an override when the monolith app is disabled
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.install: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.routing.internalBaseUrl is required when the monolith app Service is disabled
+
+  - it: requires an override for custom monolith naming
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.name: custom-app
+    asserts: &custom_monolith_requires_url
+      - failedTemplate:
+          errorMessage: mcp-server.routing.internalBaseUrl is required when app naming or the app Service port is overridden
+
+  - it: requires an override for a custom monolith port
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports[0].port: 9080
+    asserts: *custom_monolith_requires_url
+
+  - it: accepts a custom topology with an explicit typed internal URL
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.enabled: false
+      api.fullnameOverride: custom-api
+      mcp-server.routing.internalBaseUrl: http://custom-api.platform.svc.cluster.local:9090
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects OTEL when neither an explicit collector nor the daemonset exists
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: otel
+      otel.install: false
+      otel.daemonset.install: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.observability.provider=otel requires the OTEL daemonset or global.otel.traces.host
+
+  - it: accepts a validated external OTEL collector
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: otel
+      otel.install: false
+      global.otel.traces.host: otel.example.internal
+      global.otel.traces.port: 4318
+      global.otel.traces.proto: http
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: preserves MCP isolation from global administrative environment
+    set:
+      mcp-server.install: true
+      mcp-server.globalOptOut.env: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.globalOptOut.env must remain true to isolate MCP from global administrative environment
+
+  - it: rejects use of the default Kubernetes service account
+    set:
+      mcp-server.install: true
+      mcp-server.serviceAccount.create: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server must use its dedicated service account with token automount disabled
+
+  - it: rejects Kubernetes token automount
+    set:
+      mcp-server.install: true
+      mcp-server.serviceAccount.automount: true
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server must use its dedicated service account with token automount disabled
+
+  - it: rejects Kubernetes RBAC creation
+    set:
+      mcp-server.install: true
+      mcp-server.role.create: true
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.role.create must remain false because MCP needs no Kubernetes RBAC
+
+  - it: rejects multiple MCP replicas
+    set:
+      mcp-server.install: true
+      mcp-server.replicaCount: 2
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.replicaCount must remain 1 in the Dedicated v0.4 contract
+
+  - it: rejects HPA enablement
+    set:
+      mcp-server.install: true
+      mcp-server.autoscaling.horizontal.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server HPA, VPA, and KEDA must remain disabled in the Dedicated v0.4 contract
+
+  - it: rejects VPA enablement
+    set:
+      mcp-server.install: true
+      mcp-server.autoscaling.vertical.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server HPA, VPA, and KEDA must remain disabled in the Dedicated v0.4 contract
+
+  - it: rejects KEDA enablement
+    set:
+      mcp-server.install: true
+      mcp-server.autoscaling.keda.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server HPA, VPA, and KEDA must remain disabled in the Dedicated v0.4 contract
+
+  - it: rejects an externally exposed MCP Service
+    set:
+      mcp-server.install: true
+      mcp-server.service.type: LoadBalancer
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.service must remain an enabled internal ClusterIP
+
+  - it: permits non-contract local environment values
+    set:
+      mcp-server.install: true
+      mcp-server.env.CUSTOM_CA_BUNDLE: /etc/ssl/customer.pem
+    asserts:
+      - notFailedTemplate: {}
