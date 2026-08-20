@@ -27,7 +27,10 @@
   {{- $image := index $mcp "image" | default dict -}}
   {{- $repository := index $image "repository" | default "" | toString | trim -}}
   {{- $repositoryPrefix := .Values.global.repositoryPrefix | default "" | toString | trim | trimSuffix "/" -}}
-  {{- if and $repositoryPrefix (hasPrefix (printf "%s/" $repositoryPrefix) $repository) -}}
+  {{- $repositoryParts := splitList "/" $repository -}}
+  {{- $repositoryFirst := first $repositoryParts | default "" -}}
+  {{- $repositoryHasRegistry := or (contains "." $repositoryFirst) (contains ":" $repositoryFirst) (eq $repositoryFirst "localhost") -}}
+  {{- if and $repositoryPrefix (or $repositoryHasRegistry (hasPrefix (printf "%s/" $repositoryPrefix) $repository)) -}}
     {{- fail "mcp-server.image.repository must be relative when global.repositoryPrefix is configured" -}}
   {{- end -}}
 
