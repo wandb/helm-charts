@@ -1,0 +1,35 @@
+suite: frontend runtime configuration
+templates:
+  - templates/frontend.yaml
+  - charts/frontend/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: delegates env.js generation to the frontend image entrypoint
+    template: templates/frontend.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: data["02_patch_env_js.sh"]
+      - equal:
+          path: data.SERVER_FLAG_WEAVE_1_PERCENTAGE
+          value: "100"
+
+  - it: does not mount a chart-owned entrypoint script
+    template: charts/frontend/templates/deployment.yaml
+    set:
+      frontend.install: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: wandb-setup-scripts
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: wandb-setup-scripts
+          any: true
