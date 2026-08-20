@@ -202,6 +202,52 @@ api:
       memory: 1Gi
 ```
 
+### MCP Server
+
+The MCP Server is disabled by default for direct Helm and Self-Managed installs.
+Its supported configuration is intentionally small: Helm selects a named server
+profile and keeps deployment concerns such as routing and resources separate.
+
+```yaml
+mcp-server:
+  install: true
+  image:
+    repository: wandb/mcp-server
+    tag: "0.4.0"
+    digest: "sha256:<verified-customer-digest>"
+  tools:
+    profile: auto # auto | models-only | models-weave
+  accessMode: read-write # read-write | read-only
+  traceBackend:
+    mode: auto # auto | disabled
+    url: "" # optional external HTTP(S) origin or /traces URL
+  routing:
+    internalBaseUrl: "" # derived from the split API or monolith Service
+  observability:
+    provider: none # none | datadog-agent | otel
+    privacy: standard # off | standard | strict
+  resources: {}
+```
+
+`tools.profile=auto` resolves during chart rendering to `models-only` when no
+trace backend is available and `models-weave` otherwise. The pod always receives
+the resolved profile, never `auto`. In v0.4 these correspond to exact 17/22
+read-write tool manifests (15/20 in read-only mode). Agent, ARIA, and raw GraphQL
+profiles cannot be enabled through this chart.
+
+For the v0.4 transition, the existing Managed Spec `datadog.enabled/mode/env/service`
+and `privacy.logLevel` fields remain as a narrow, validated compatibility bridge.
+They cannot enable direct forwarding, inject credentials, or override a conflicting
+non-default typed provider. New configurations should use `observability` only.
+
+The server-owned `dedicated` workload profile controls limits, admission,
+deadlines, sessions, and worker policy. Low-level environment overrides and
+opaque `envFrom` sources are rejected. MCP uses the internal ClusterIP for W&B
+API calls while `global.host` remains the public URL for user-facing links. It
+runs as one pod without HPA/VPA/KEDA, Kubernetes RBAC, or a mounted service-account
+token. Component-specific `nodeSelector`, `tolerations`, `affinity`, and
+`topologySpreadConstraints` remain supported scheduling controls.
+
 ## Use External Stateful Data
 
 You can configure the W&B Server Helm chart to point to external stateful storage for items like MySQL, Redis, and Storage.
