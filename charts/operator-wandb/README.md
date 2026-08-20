@@ -235,10 +235,11 @@ the resolved profile, never `auto`. In v0.4 these correspond to exact 17/22
 read-write tool manifests (15/20 in read-only mode). Agent, ARIA, and raw GraphQL
 profiles cannot be enabled through this chart.
 
-For the v0.4 transition, the existing Managed Spec `datadog.enabled/mode/env/service`
-and `privacy.logLevel` fields remain as a narrow, validated compatibility bridge.
-They cannot enable direct forwarding, inject credentials, or override a conflicting
-non-default typed provider. New configurations should use `observability` only.
+For the v0.4 transition, the existing Managed Spec
+`datadog.enabled/mode/env/service/deploymentType` and `privacy.logLevel` fields
+remain as a narrow, validated compatibility bridge. They cannot enable direct
+forwarding, inject credentials, or override a conflicting non-default typed
+provider. New configurations should use `observability` only.
 
 The server-owned `dedicated` workload profile controls limits, admission,
 deadlines, sessions, and worker policy. Low-level environment overrides and

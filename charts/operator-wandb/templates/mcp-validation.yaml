@@ -69,15 +69,19 @@
   {{- $canonicalMcpEnvTplCount := 0 -}}
   {{- range (index $mcp "envTpls" | default list) -}}
     {{- if kindIs "string" . -}}
-      {{- $isCanonicalMcpEnvTpl := eq (trim .) "{{ include \"wandb.mcpEnvs\" . }}" -}}
+      {{- $isCanonicalMcpEnvTpl := regexMatch `^\{\{-?\s*include\s+"wandb\.mcpEnvs"\s+\.\s*-?\}\}$` (trim .) -}}
       {{- if $isCanonicalMcpEnvTpl -}}
         {{- $canonicalMcpEnvTplCount = add1 $canonicalMcpEnvTplCount -}}
       {{- else -}}
         {{- range (tpl . $mcpTplContext | fromYamlArray) -}}
-          {{- $renderedName := index . "name" | default "" | toString -}}
-          {{- $reserved := include "wandb.isMcpReservedEnvName" (dict "name" $renderedName "reservedNames" $reservedEnvNames "reservedPrefixes" $reservedEnvPrefixes) -}}
-          {{- if eq $reserved "true" -}}
-            {{- fail (printf "%s cannot be rendered by an alternate MCP environment template" $renderedName) -}}
+          {{- if not (kindIs "map" .) -}}
+            {{- fail "mcp-server.envTpls entries must render a YAML array of environment maps" -}}
+          {{- else -}}
+            {{- $renderedName := index . "name" | default "" | toString -}}
+            {{- $reserved := include "wandb.isMcpReservedEnvName" (dict "name" $renderedName "reservedNames" $reservedEnvNames "reservedPrefixes" $reservedEnvPrefixes) -}}
+            {{- if eq $reserved "true" -}}
+              {{- fail (printf "%s cannot be rendered by an alternate MCP environment template" $renderedName) -}}
+            {{- end -}}
           {{- end -}}
         {{- end -}}
       {{- end -}}
@@ -225,7 +229,7 @@
     {{- if and $legacyEnabled (not (has $provider (list "none" "datadog-agent"))) -}}
       {{- fail "mcp-server.datadog.enabled=true conflicts with mcp-server.observability.provider" -}}
     {{- end -}}
-    {{- if and (not $legacyEnabled) (eq $provider "datadog-agent") -}}
+    {{- if and (hasKey $legacyDatadog "enabled") (not $legacyEnabled) (eq $provider "datadog-agent") -}}
       {{- fail "mcp-server.datadog.enabled=false conflicts with mcp-server.observability.provider=datadog-agent" -}}
     {{- end -}}
     {{- range $field := list "env" "service" "deploymentType" -}}

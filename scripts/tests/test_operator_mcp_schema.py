@@ -28,6 +28,16 @@ class OperatorMcpSchemaTest(unittest.TestCase):
             self.mcp["observability"]["properties"]["provider"]["enum"],
             ["none", "datadog-agent", "otel"],
         )
+        self.assertEqual(
+            self.mcp["observability"]["properties"]["privacy"]["enum"],
+            ["off", "standard", "strict"],
+        )
+
+    def test_trace_backend_mode_is_typed(self) -> None:
+        self.assertEqual(
+            self.mcp["traceBackend"]["properties"]["mode"]["enum"],
+            ["auto", "disabled"],
+        )
 
     def test_image_digest_is_immutable_sha256_or_unset(self) -> None:
         self.assertEqual(

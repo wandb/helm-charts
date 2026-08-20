@@ -277,7 +277,7 @@ Resolves:
   value: {{ $explicitTraceURL | quote }}
   {{- else if and (eq $resolvedProfile "models-weave") $hasTraceBackend }}
 - name: WF_TRACE_SERVER_URL
-  value: "{{ .Values.global.host }}/traces"
+  value: {{ printf "%s/traces" (trimSuffix "/" (.Values.global.host | toString)) | quote }}
   {{- end }}
 - name: WANDB_BASE_URL
   value: {{ .Values.global.host | quote }}

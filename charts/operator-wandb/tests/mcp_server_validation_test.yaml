@@ -33,6 +33,25 @@ tests:
       - failedTemplate:
           errorMessage: mcp-server.envTpls must include wandb.mcpEnvs exactly once
 
+  - it: accepts canonical MCP environment helper whitespace and trim markers
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{-   include   "wandb.mcpEnvs"   .   -}}'
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects scalar entries rendered by alternate environment templates
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |-
+          - scalar-entry
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envTpls entries must render a YAML array of environment maps
+
   - it: rejects a legacy feature flag in env
     set:
       mcp-server.install: true
@@ -174,6 +193,23 @@ tests:
       mcp-server.datadog.service: wandb-mcp-server-dedicated
     asserts:
       - notFailedTemplate: {}
+
+  - it: accepts a typed Datadog provider with only a legacy service label
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: datadog-agent
+      mcp-server.datadog.service: custom-mcp-service
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an explicit legacy Datadog disable with the typed provider
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: datadog-agent
+      mcp-server.datadog.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.datadog.enabled=false conflicts with mcp-server.observability.provider=datadog-agent
 
   - it: rejects the retired Datadog direct forwarder
     set:

@@ -67,10 +67,13 @@ inheritance without changing other subcharts:
 ```yaml
 globalOptOut:
   env: true
+  volumes: true
 ```
 
-This option does not remove chart-local `env`, `extraEnv`, `envTpls`, or
-`envFrom` values. Existing installations remain unchanged when the option is
+`globalOptOut.env` does not remove chart-local `env`, `extraEnv`, `envTpls`, or
+`envFrom` values. `globalOptOut.volumes` excludes inherited `global.volumes`
+and `global.volumesTpls` while retaining chart-local `volumes` and
+`volumesTpls`. Existing installations remain unchanged when either option is
 omitted.
 
 ### Volumes

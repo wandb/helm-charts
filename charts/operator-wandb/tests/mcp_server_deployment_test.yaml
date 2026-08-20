@@ -163,21 +163,27 @@ tests:
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: MCP_HOSTED_MODE}
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: MCP_ADMISSION_CONTROL_ENABLED}
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: MCP_TOOL_TIMEOUT_SECONDS}
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: UVICORN_WORKERS}
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS}
+          any: true
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: WANDB_MCP_ENABLE_RAW_GRAPHQL}
+          any: true
 
   - it: resolves auto to the Models-only profile without a trace backend
     template: charts/mcp-server/templates/deployment.yaml
@@ -191,6 +197,7 @@ tests:
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: WF_TRACE_SERVER_URL}
+          any: true
 
   - it: resolves auto to classic Weave when the topology enables traces
     template: charts/mcp-server/templates/deployment.yaml
@@ -206,6 +213,19 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content: {name: WF_TRACE_SERVER_URL, value: https://customer.wandb.io/traces}
+
+  - it: normalizes the generated trace URL when the public host has a trailing slash
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io/
+      global.weave-trace.enabled: true
+      weave-trace.install: true
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: https://customer.wandb.io/traces}
+          count: 1
 
   - it: resolves auto to classic Weave with an external trace backend
     template: charts/mcp-server/templates/deployment.yaml
@@ -245,6 +265,7 @@ tests:
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: WF_TRACE_SERVER_URL}
+          any: true
 
   - it: emits read-only as a monotonic access selector
     template: charts/mcp-server/templates/deployment.yaml
@@ -366,6 +387,7 @@ tests:
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: DD_API_KEY}
+          any: true
       - exists:
           path: metadata.name
 
@@ -394,6 +416,19 @@ tests:
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: DD_API_KEY}
+          any: true
+
+  - it: combines a typed Datadog provider with a legacy service label
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: datadog-agent
+      mcp-server.datadog.service: custom-mcp-service
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: DD_SERVICE, value: custom-mcp-service}
+          count: 1
 
   - it: enables the in-cluster OTEL provider
     template: charts/mcp-server/templates/deployment.yaml
