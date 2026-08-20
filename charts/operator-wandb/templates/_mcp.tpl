@@ -47,6 +47,23 @@
 {{- end -}}
 
 {{/*
+  Resolve the effective Kubernetes observability provider once for every
+  consumer. The legacy Datadog flag remains only as a narrow bridge for the
+  current Managed Spec fragment; validation rejects conflicting combinations.
+
+  SCOPE NOTE: .Values is the mcp-server subchart scope.
+*/}}
+{{- define "wandb.mcpObservabilityProvider" -}}
+  {{- $observability := index .Values "observability" | default dict -}}
+  {{- $provider := index $observability "provider" | default "none" | toString | trim | lower -}}
+  {{- $legacyDatadog := index .Values "datadog" | default dict -}}
+  {{- if index $legacyDatadog "enabled" | default false -}}
+    {{- $provider = "datadog-agent" -}}
+  {{- end -}}
+{{- $provider -}}
+{{- end -}}
+
+{{/*
   Reproduce wandb-base.fullname for a dependency alias using the parent or
   subchart release scope. This is intentionally limited to default names;
   mcp-validation requires an explicit internal URL when API/app naming is
@@ -66,18 +83,16 @@
 
 {{/*
   Fail when a credential-bearing MCP upstream is not a bounded HTTP(S) URL.
-  Callers choose whether HTTPS is required and whether /traces is allowed.
+  Callers choose whether /traces is allowed.
   IPv6 literals are intentionally unsupported until Helm can validate them
   correctly instead of accepting arbitrary bracketed strings.
 */}}
 {{- define "wandb.validateMcpEndpoint" -}}
   {{- $url := .url -}}
-  {{- $httpsOnly := .httpsOnly | default false -}}
   {{- $allowTraces := .allowTraces | default false -}}
-  {{- $schemePattern := ternary "https" "https?" $httpsOnly -}}
   {{- $pathPattern := ternary "(/traces)?" "" $allowTraces -}}
   {{- $hostPattern := `([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)([.]([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*` -}}
-  {{- $urlPattern := printf `^%s://%s(:[0-9]{1,5})?%s/?$` $schemePattern $hostPattern $pathPattern -}}
+  {{- $urlPattern := printf `^https?://%s(:[0-9]{1,5})?%s/?$` $hostPattern $pathPattern -}}
   {{- if not (regexMatch $urlPattern $url) -}}
     {{- fail .errorMessage -}}
   {{- end -}}
@@ -245,12 +260,8 @@ Resolves:
   {{- $resolvedProfile := include "wandb.resolveMcpToolProfile" (dict "profile" $profile "hasTraceBackend" $hasTraceBackend) -}}
   {{- $routing := index .Values "routing" | default dict -}}
   {{- $internalBaseURL := tpl (index $routing "internalBaseUrl" | default "" | toString) . | trim -}}
+  {{- $provider := include "wandb.mcpObservabilityProvider" . | trim -}}
   {{- $observability := index .Values "observability" | default dict -}}
-  {{- $provider := index $observability "provider" | default "none" | toString | trim | lower -}}
-  {{- $legacyDatadog := index .Values "datadog" | default dict -}}
-  {{- if index $legacyDatadog "enabled" | default false -}}
-    {{- $provider = "datadog-agent" -}}
-  {{- end -}}
   {{- $privacy := index $observability "privacy" | default "standard" | toString | trim | lower -}}
   {{- $legacyPrivacy := index .Values "privacy" | default dict -}}
   {{- if hasKey $legacyPrivacy "logLevel" -}}

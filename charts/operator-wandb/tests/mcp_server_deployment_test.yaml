@@ -48,6 +48,18 @@ tests:
           path: spec.template.spec.containers[0].image
           value: wandb/mcp-server@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
+  - it: composes the managed repository prefix with the relative MCP repository once
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.repositoryPrefix: us-docker.pkg.dev/wandb-production/public
+      mcp-server.install: true
+      mcp-server.image.repository: wandb/mcp-server
+      mcp-server.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: us-docker.pkg.dev/wandb-production/public/wandb/mcp-server@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
   - it: routes split API installs internally and keeps public links public
     template: charts/mcp-server/templates/deployment.yaml
     set:
@@ -388,8 +400,12 @@ tests:
           path: spec.template.spec.containers[0].env
           content: {name: DD_API_KEY}
           any: true
-      - exists:
-          path: metadata.name
+      - equal:
+          path: spec.template.metadata.annotations["ad.datadoghq.com/mcp-server.tags"]
+          value: '["product:wandb","component:mcp-server","deployment_type:self-managed"]'
+      - equal:
+          path: spec.template.metadata.annotations["ad.datadoghq.com/mcp-server.logs"]
+          value: '[{"service":"wandb-mcp-server-onprem","source":"python"}]'
 
   - it: maps the current Managed Spec telemetry fragment without credentials
     template: charts/mcp-server/templates/deployment.yaml
@@ -417,6 +433,12 @@ tests:
           path: spec.template.spec.containers[0].env
           content: {name: DD_API_KEY}
           any: true
+      - equal:
+          path: spec.template.metadata.annotations["ad.datadoghq.com/mcp-server.tags"]
+          value: '["product:wandb","component:mcp-server","deployment_type:self-managed"]'
+      - equal:
+          path: spec.template.metadata.annotations["ad.datadoghq.com/mcp-server.logs"]
+          value: '[{"service":"wandb-mcp-server-dedicated","source":"python"}]'
 
   - it: combines a typed Datadog provider with a legacy service label
     template: charts/mcp-server/templates/deployment.yaml

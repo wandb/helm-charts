@@ -17,6 +17,20 @@
   {{- $reservedEnvPrefixes := list "WANDB_" "WEAVE_TRACE_" "WF_TRACE_" "WB_AGENT_" "MCP_" "MAX_" "SESSION_" "UVICORN_" "DD_" "OTEL_" -}}
   {{- $ownedBenignEnvNames := list "WANDB_SILENT" "WEAVE_SILENT" "WEAVE_DISABLED" "ENVIRONMENT" -}}
 
+  {{/* The top-level image tuple is the sole immutable MCP image authority. */}}
+  {{- $rootImageTpl := index $mcp "imageTpl" | default "" | toString | trim -}}
+  {{- $containerImage := index $mcpContainer "image" | default dict -}}
+  {{- $containerImageTpl := index $mcpContainer "imageTpl" | default "" | toString | trim -}}
+  {{- if or $rootImageTpl $containerImage $containerImageTpl -}}
+    {{- fail "MCP image overrides must use only mcp-server.image.repository, tag, and digest" -}}
+  {{- end -}}
+  {{- $image := index $mcp "image" | default dict -}}
+  {{- $repository := index $image "repository" | default "" | toString | trim -}}
+  {{- $repositoryPrefix := .Values.global.repositoryPrefix | default "" | toString | trim | trimSuffix "/" -}}
+  {{- if and $repositoryPrefix (hasPrefix (printf "%s/" $repositoryPrefix) $repository) -}}
+    {{- fail "mcp-server.image.repository must be relative when global.repositoryPrefix is configured" -}}
+  {{- end -}}
+
   {{/* Removed typed blocks fail closed instead of being silently ignored. */}}
   {{- range $legacyKey := list "weave" "otel" "analytics" -}}
     {{- if hasKey $mcp $legacyKey -}}

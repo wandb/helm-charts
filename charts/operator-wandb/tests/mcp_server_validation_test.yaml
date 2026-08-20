@@ -168,6 +168,40 @@ tests:
       - failedTemplate:
           errorMessage: MCP envFrom is unsupported because opaque sources can shadow the release contract
 
+  - it: rejects a root image template that bypasses the immutable image tuple
+    set:
+      mcp-server.install: true
+      mcp-server.imageTpl: 'repository: evil.example/mcp'
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP image overrides must use only mcp-server.image.repository, tag, and digest
+
+  - it: rejects a nested container image that bypasses the immutable image tuple
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.image.repository: evil.example/mcp
+      mcp-server.containers.mcp-server.image.tag: latest
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP image overrides must use only mcp-server.image.repository, tag, and digest
+
+  - it: rejects a nested container image template that bypasses the immutable image tuple
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.imageTpl: 'repository: evil.example/mcp'
+    asserts:
+      - failedTemplate:
+          errorMessage: MCP image overrides must use only mcp-server.image.repository, tag, and digest
+
+  - it: rejects a repository that repeats the managed repository prefix
+    set:
+      global.repositoryPrefix: us-docker.pkg.dev/wandb-production/public
+      mcp-server.install: true
+      mcp-server.image.repository: us-docker.pkg.dev/wandb-production/public/wandb/mcp-server
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.image.repository must be relative when global.repositoryPrefix is configured
+
   - it: rejects the removed sizing interface
     set:
       mcp-server.install: true
