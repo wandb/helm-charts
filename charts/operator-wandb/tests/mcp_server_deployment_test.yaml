@@ -1,0 +1,501 @@
+suite: MCP server deployment
+templates:
+  - charts/mcp-server/templates/deployment.yaml
+  - charts/mcp-server/templates/serviceaccount.yaml
+  - charts/mcp-server/templates/role.yaml
+  - charts/mcp-server/templates/rolebinding.yaml
+  - charts/mcp-server/templates/hpa.yaml
+  - charts/mcp-server/templates/vpa.yaml
+  - charts/api/templates/service.yaml
+  - charts/app/templates/service.yaml
+release:
+  name: customer-a
+  namespace: wandb-system
+
+tests:
+  - it: does not mount Kubernetes API credentials
+    template: charts/mcp-server/templates/serviceaccount.yaml
+    set:
+      mcp-server.install: true
+    asserts:
+      - equal:
+          path: automountServiceAccountToken
+          value: false
+
+  - it: does not create Kubernetes API permissions
+    template: charts/mcp-server/templates/role.yaml
+    set:
+      mcp-server.install: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not bind Kubernetes API permissions
+    template: charts/mcp-server/templates/rolebinding.yaml
+    set:
+      mcp-server.install: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders an immutable MCP image override by digest
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: wandb/mcp-server@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+  - it: composes the managed repository prefix with the relative MCP repository once
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.repositoryPrefix: us-docker.pkg.dev/wandb-production/public
+      mcp-server.install: true
+      mcp-server.image.repository: wandb/mcp-server
+      mcp-server.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: us-docker.pkg.dev/wandb-production/public/wandb/mcp-server@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+  - it: routes split API installs internally and keeps public links public
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.api.enabled: true
+      mcp-server.install: true
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: wandb/mcp-server:0.4.0
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_BASE_URL, value: https://customer.wandb.io}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_INTERNAL_BASE_URL, value: http://customer-a-api:8081}
+
+  - it: renders the split API Service addressed by the MCP URL
+    template: charts/api/templates/service.yaml
+    set:
+      global.api.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: customer-a-api
+      - contains:
+          path: spec.ports
+          content:
+            name: http
+            port: 8081
+            targetPort: api
+            protocol: TCP
+
+  - it: routes monolith installs to the internal app Service
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.api.enabled: false
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_INTERNAL_BASE_URL, value: http://customer-a-app:8080}
+
+  - it: renders the monolith Service addressed by the MCP URL
+    template: charts/app/templates/service.yaml
+    set:
+      global.api.enabled: false
+    asserts:
+      - equal:
+          path: metadata.name
+          value: customer-a-app
+      - contains:
+          path: spec.ports
+          content:
+            name: app
+            port: 8080
+            protocol: TCP
+
+  - it: preserves a typed internal URL override
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.api.enabled: true
+      mcp-server.install: true
+      mcp-server.routing.internalBaseUrl: http://custom-api.platform.svc.cluster.local:9090
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_INTERNAL_BASE_URL, value: http://custom-api.platform.svc.cluster.local:9090}
+          count: 1
+
+  - it: renders a templated internal URL before emitting runtime configuration
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      api.service.enabled: false
+      mcp-server.install: true
+      mcp-server.customInternalUrl: https://custom-api.platform.svc.cluster.local:8443
+      mcp-server.routing.internalBaseUrl: '{{ .Values.customInternalUrl }}'
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_INTERNAL_BASE_URL, value: https://custom-api.platform.svc.cluster.local:8443}
+
+  - it: renders the exact Dedicated runtime selectors and no legacy controls
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_TOOL_PROFILE, value: models-only}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ACCESS_MODE, value: read-write}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_WORKLOAD_PROFILE, value: dedicated}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_CAPACITY_CLASS, value: small}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_TRANSPORT, value: http}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_AUTH_DISABLED, value: "false"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_HOSTED_MODE}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_ADMISSION_CONTROL_ENABLED}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_TOOL_TIMEOUT_SECONDS}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: UVICORN_WORKERS}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_RAW_GRAPHQL}
+          any: true
+
+  - it: resolves auto to the Models-only profile without a trace backend
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.weave-trace.enabled: false
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_TOOL_PROFILE, value: models-only}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL}
+          any: true
+
+  - it: resolves auto to classic Weave when the topology enables traces
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io
+      global.weave-trace.enabled: true
+      weave-trace.install: true
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_TOOL_PROFILE, value: models-weave}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: https://customer.wandb.io/traces}
+
+  - it: normalizes the generated trace URL when the public host has a trailing slash
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.host: https://customer.wandb.io/
+      global.weave-trace.enabled: true
+      weave-trace.install: true
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: https://customer.wandb.io/traces}
+          count: 1
+
+  - it: resolves auto to classic Weave with an external trace backend
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.weave-trace.enabled: false
+      mcp-server.install: true
+      mcp-server.traceBackend.url: https://trace.example.com/traces
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_TOOL_PROFILE, value: models-weave}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: https://trace.example.com/traces}
+
+  - it: renders a templated external trace URL before emitting runtime evidence
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.customTraceUrl: https://trace.example.com/traces
+      mcp-server.traceBackend.url: '{{ .Values.customTraceUrl }}'
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: https://trace.example.com/traces}
+
+  - it: keeps an explicit Models-only profile when traces are available
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.weave-trace.enabled: true
+      mcp-server.install: true
+      mcp-server.tools.profile: models-only
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_TOOL_PROFILE, value: models-only}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL}
+          any: true
+
+  - it: emits read-only as a monotonic access selector
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.accessMode: read-only
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ACCESS_MODE, value: read-only}
+
+  - it: isolates MCP from global administrative environment
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      global.env.GLOBAL_ADMIN_API_KEY: secret-canary
+      global.extraEnv.GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS: "true"
+      global.extraEnv.GORILLA_STATSIG_KEY: secret-statsig-canary
+      mcp-server.install: true
+      mcp-server.env.MCP_LOCAL_MARKER: retained
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_LOCAL_MARKER, value: retained}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GLOBAL_ADMIN_API_KEY, value: secret-canary}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS, value: "true"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_STATSIG_KEY, value: secret-statsig-canary}
+      - isNullOrEmpty:
+          path: spec.template.spec.containers[0].envFrom
+
+  - it: maps default and small installations to the small capacity class
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.size: small
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_CAPACITY_CLASS, value: small}
+
+  - it: maps medium installations to the medium capacity class
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.size: medium
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_CAPACITY_CLASS, value: medium}
+
+  - it: maps large installations to the large capacity class
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.size: large
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_CAPACITY_CLASS, value: large}
+
+  - it: maps xlarge installations to the large capacity class
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.size: xlarge
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_CAPACITY_CLASS, value: large}
+
+  - it: maps xxlarge installations to the large capacity class
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.size: xxlarge
+      mcp-server.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_CAPACITY_CLASS, value: large}
+
+  - it: applies supported resource and scheduling overrides
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.resources.requests.cpu: 250m
+      mcp-server.nodeSelector.pool: mcp
+      mcp-server.tolerations:
+        - key: dedicated
+          operator: Exists
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: 250m
+      - equal:
+          path: spec.template.spec.nodeSelector.pool
+          value: mcp
+      - contains:
+          path: spec.template.spec.tolerations
+          content: {key: dedicated, operator: Exists}
+
+  - it: enables credential-free Datadog Agent collection
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: datadog-agent
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_DATADOG_ENABLED, value: "true"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: DD_AGENT_HOST, valueFrom: {fieldRef: {fieldPath: status.hostIP}}}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: DD_API_KEY}
+          any: true
+      - equal:
+          path: spec.template.metadata.annotations["ad.datadoghq.com/mcp-server.tags"]
+          value: '["product:wandb","component:mcp-server","deployment_type:self-managed"]'
+      - equal:
+          path: spec.template.metadata.annotations["ad.datadoghq.com/mcp-server.logs"]
+          value: '[{"service":"wandb-mcp-server-onprem","source":"python"}]'
+
+  - it: maps the current Managed Spec telemetry fragment without credentials
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.datadog.enabled: true
+      mcp-server.datadog.mode: agent
+      mcp-server.datadog.env: production
+      mcp-server.datadog.service: wandb-mcp-server-dedicated
+      mcp-server.privacy.logLevel: standard
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_DATADOG_ENABLED, value: "true"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: DD_SERVICE, value: wandb-mcp-server-dedicated}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: DD_ENV, value: production}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_LOG_PRIVACY_LEVEL, value: standard}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: DD_API_KEY}
+          any: true
+      - equal:
+          path: spec.template.metadata.annotations["ad.datadoghq.com/mcp-server.tags"]
+          value: '["product:wandb","component:mcp-server","deployment_type:self-managed"]'
+      - equal:
+          path: spec.template.metadata.annotations["ad.datadoghq.com/mcp-server.logs"]
+          value: '[{"service":"wandb-mcp-server-dedicated","source":"python"}]'
+
+  - it: combines a typed Datadog provider with a legacy service label
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: datadog-agent
+      mcp-server.datadog.service: custom-mcp-service
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: DD_SERVICE, value: custom-mcp-service}
+          count: 1
+
+  - it: enables the in-cluster OTEL provider
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: otel
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: MCP_OTEL_ENABLED, value: "true"}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: http://customer-a-otel-daemonset:4317}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: grpc}
+
+  - it: uses the canonical external OTEL endpoint
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: otel
+      global.otel.traces.host: otel.example.internal
+      global.otel.traces.port: 4318
+      global.otel.traces.proto: http
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: http://otel.example.internal:4318}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf}
+
+  - it: does not render an HPA
+    template: charts/mcp-server/templates/hpa.yaml
+    set:
+      mcp-server.install: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not render a VPA
+    template: charts/mcp-server/templates/vpa.yaml
+    set:
+      mcp-server.install: true
+    asserts:
+      - hasDocuments:
+          count: 0
