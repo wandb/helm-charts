@@ -6,26 +6,40 @@ Expand the name of the chart.
 {{- end }}
 
 {{/*
+Normalize an auth hostname the same way ctrlplane does: lowercase it and
+remove the protocol's default port while preserving non-default ports.
+*/}}
+{{- define "orchestrator.normalizeAuthHost" -}}
+  {{- $host := .host | lower | trimPrefix "https://" | trimPrefix "http://" | trimSuffix "/" -}}
+  {{- if and (eq .protocol "https") (hasSuffix ":443" $host) -}}
+    {{- $host = trimSuffix ":443" $host -}}
+  {{- else if and (eq .protocol "http") (hasSuffix ":80" $host) -}}
+    {{- $host = trimSuffix ":80" $host -}}
+  {{- end -}}
+{{- $host -}}
+{{- end }}
+
+{{/*
 Return the unique hostnames accepted by authentication. global.fqdn is
 canonical and global.additionalHosts adds auth-aware alternate names.
 */}}
 {{- define "orchestrator.authHosts" -}}
   {{- $hosts := list -}}
-  {{- $fqdn := .Values.global.fqdn | trimPrefix "https://" | trimPrefix "http://" | trimSuffix "/" -}}
+  {{- $protocol := "https" -}}
+  {{- if hasPrefix "http://" (.Values.global.fqdn | lower) -}}
+    {{- $protocol = "http" -}}
+  {{- end -}}
+  {{- $fqdn := include "orchestrator.normalizeAuthHost" (dict "host" .Values.global.fqdn "protocol" $protocol) -}}
   {{- if $fqdn -}}
     {{- $hosts = append $hosts $fqdn -}}
   {{- end -}}
   {{- $additionalHosts := default (list) .Values.global.additionalHosts -}}
-  {{- $protocol := "https" -}}
-  {{- if hasPrefix "http://" .Values.global.fqdn -}}
-    {{- $protocol = "http" -}}
-  {{- end -}}
   {{- range $additionalHosts -}}
-    {{- $configuredHost := . -}}
+    {{- $configuredHost := . | lower -}}
     {{- if or (and (hasPrefix "http://" $configuredHost) (ne $protocol "http")) (and (hasPrefix "https://" $configuredHost) (ne $protocol "https")) -}}
       {{- fail "global.additionalHosts protocols must match global.fqdn" -}}
     {{- end -}}
-    {{- $host := $configuredHost | trimPrefix "https://" | trimPrefix "http://" | trimSuffix "/" -}}
+    {{- $host := include "orchestrator.normalizeAuthHost" (dict "host" $configuredHost "protocol" $protocol) -}}
     {{- if and $host (not (has $host $hosts)) -}}
       {{- $hosts = append $hosts $host -}}
     {{- end -}}
