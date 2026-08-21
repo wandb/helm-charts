@@ -48,17 +48,11 @@ canonical and global.additionalHosts adds auth-aware alternate names.
 {{- end }}
 
 {{/*
-Return the hostnames routed by the ingress. Deprecated ingress.additionalHosts
-remain routing-only and cannot expand the authentication trust boundary.
+Return the hostnames routed by the ingress, preserving the hostless rule used
+when global.fqdn is empty.
 */}}
 {{- define "orchestrator.applicationHosts" -}}
   {{- $hosts := include "orchestrator.authHosts" . | fromYamlArray -}}
-  {{- range (default (list) .Values.ingress.additionalHosts) -}}
-    {{- $host := . | trimPrefix "https://" | trimPrefix "http://" | trimSuffix "/" -}}
-    {{- if and $host (not (has $host $hosts)) -}}
-      {{- $hosts = append $hosts $host -}}
-    {{- end -}}
-  {{- end -}}
   {{- if eq (len $hosts) 0 -}}
     {{- $hosts = list "" -}}
   {{- end -}}
