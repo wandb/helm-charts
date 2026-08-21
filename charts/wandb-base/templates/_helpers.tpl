@@ -87,6 +87,8 @@ Create the name of the service account to use
 {{- define "wandb-base.serviceAccountName" -}}
   {{- if include "wandb-base.azureStorageServiceAccountEnabled" . | trim | eq "true" }}
 {{- include "wandb-base.azureStorageServiceAccountName" . }}
+  {{- else if .Values.serviceAccount.useWeaveTraceIdentity }}
+{{- include "wandb-base.weaveTraceServiceAccountName" . }}
   {{- else if .Values.serviceAccount.create }}
 {{- default (include "wandb-base.fullname" .) .Values.serviceAccount.name }}
   {{- else }}
@@ -128,6 +130,13 @@ their component accounts.
   {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
   {{- $serviceAccount := default (dict) $identity.serviceAccount -}}
 {{- default "wandb-bucket-access" $serviceAccount.name -}}
+{{- end }}
+
+{{/*
+Create the name of the shared Weave Trace service account.
+*/}}
+{{- define "wandb-base.weaveTraceServiceAccountName" -}}
+  {{- printf "%s-weave-trace" .Release.Name -}}
 {{- end }}
 
 {{- define "wandb-base.deploymentRolloutStrategy" -}}
