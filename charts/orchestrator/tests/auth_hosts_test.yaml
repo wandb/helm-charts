@@ -1,0 +1,165 @@
+suite: auth hosts
+templates:
+  - templates/ingress.yaml
+  - charts/identity/templates/deployment.yaml
+  - charts/workspace-engine/templates/deployment.yaml
+release:
+  name: orchestrator
+
+tests:
+  - it: routes every globally configured application host
+    template: templates/ingress.yaml
+    set:
+      global:
+        fqdn: "https://ctrlplane-qa.wandb.io"
+        additionalHosts:
+          - "https://orca-qa.wandb.io/"
+    asserts:
+      - equal:
+          path: spec.rules[1].host
+          value: orca-qa.wandb.io
+
+  - it: configures identity for every routed application host
+    template: charts/identity/templates/deployment.yaml
+    set:
+      global:
+        fqdn: "https://ctrlplane-qa.wandb.io"
+        additionalHosts:
+          - "https://orca-qa.wandb.io/"
+          - ""
+        jwt:
+          audience: ctrlplane
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_ALLOWED_HOSTS
+            value: "ctrlplane-qa.wandb.io,orca-qa.wandb.io"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASE_URL
+            value: "https://ctrlplane-qa.wandb.io"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_JWT_AUDIENCE
+            value: ctrlplane
+          any: true
+
+  - it: accepts JWT issuers for every routed application host
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        fqdn: "https://ctrlplane-qa.wandb.io"
+        additionalHosts:
+          - "https://orca-qa.wandb.io/"
+          - ""
+        jwt:
+          audience: ctrlplane
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_VALID_ISSUERS
+            value: "https://ctrlplane-qa.wandb.io,https://orca-qa.wandb.io"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_JWKS_URL
+            value: "http://orchestrator-identity:8081/api/auth/jwks"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_AUDIENCE
+            value: ctrlplane
+          any: true
+
+  - it: preserves single-host identity configuration by default
+    template: charts/identity/templates/deployment.yaml
+    set:
+      global:
+        fqdn: "https://ctrlplane-qa.wandb.io"
+        additionalHosts:
+          - "ctrlplane-qa.wandb.io"
+          - ""
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_ALLOWED_HOSTS
+          any: true
+
+  - it: preserves the canonical JWT issuer for a single-host installation
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        fqdn: "https://ctrlplane-qa.wandb.io/"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_VALID_ISSUERS
+            value: "https://ctrlplane-qa.wandb.io/"
+          any: true
+
+  - it: keeps deprecated ingress hosts out of identity auth configuration
+    template: charts/identity/templates/deployment.yaml
+    set:
+      global:
+        fqdn: "https://ctrlplane-qa.wandb.io"
+      ingress:
+        additionalHosts:
+          - "legacy-route.wandb.io"
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_ALLOWED_HOSTS
+          any: true
+
+  - it: keeps deprecated ingress hosts out of valid JWT issuers
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        fqdn: "https://ctrlplane-qa.wandb.io"
+      ingress:
+        additionalHosts:
+          - "legacy-route.wandb.io"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_VALID_ISSUERS
+            value: "https://ctrlplane-qa.wandb.io"
+          any: true
+
+  - it: preserves HTTP for every configured auth issuer
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        fqdn: "http://ctrlplane.test"
+        additionalHosts:
+          - "http://orca.test/"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_VALID_ISSUERS
+            value: "http://ctrlplane.test,http://orca.test"
+          any: true
+
+  - it: rejects an explicit additional-host protocol that differs from the canonical URL
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        fqdn: "https://ctrlplane-qa.wandb.io"
+        additionalHosts:
+          - "http://orca-qa.wandb.io"
+    asserts:
+      - failedTemplate:
+          errorMessage: global.additionalHosts protocols must match global.fqdn
