@@ -134,6 +134,9 @@ their component accounts.
 
 {{/*
 Create the name of the shared Weave Trace service account.
+The SA object itself is owned by the operator-wandb umbrella chart
+(templates/weave-trace-serviceaccount.yaml); this must stay identical to
+"wandb.weaveTraceServiceAccountName" in operator-wandb/templates/_bucket.tpl.
 */}}
 {{- define "wandb-base.weaveTraceServiceAccountName" -}}
   {{- printf "%s-weave-trace" .Release.Name -}}
