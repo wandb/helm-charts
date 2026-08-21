@@ -1,5 +1,13 @@
 {{- if .Values.ingress.create }}
   {{- $fqdn := .Values.global.fqdn | trimPrefix "https://" | trimPrefix "http://" | trimSuffix "/" -}}
+  {{- $releaseName := .Release.Name -}}
+  {{- $hosts := list $fqdn -}}
+  {{- range .Values.ingress.additionalHosts }}
+    {{- $host := . | trimPrefix "https://" | trimPrefix "http://" | trimSuffix "/" -}}
+    {{- if $host }}
+      {{- $hosts = append $hosts $host -}}
+    {{- end }}
+  {{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -20,7 +28,9 @@ spec:
   {{- if and $fqdn .Values.ingress.tls.enabled }}
   tls:
     - hosts:
-        - {{ $fqdn }}
+    {{- range $hosts }}
+        - {{ . }}
+    {{- end }}
       secretName: {{ .Values.ingress.tls.secretName | default (printf "%s-tls" (include "orchestrator.fullname" .)) }}
   {{- end }}
   defaultBackend:
@@ -29,16 +39,17 @@ spec:
       port:
         number: 3000
   rules:
-    - {{- if $fqdn }}
-      host: {{ $fqdn }}
-{{- end }}
+  {{- range $hosts }}
+    - {{- if . }}
+      host: {{ . }}
+  {{- end }}
       http:
         paths:
           - pathType: Prefix
             path: /
             backend:
               service:
-                name: {{ .Release.Name }}-web
+                name: {{ $releaseName }}-web
                 port:
                   number: 3000
           # Identity (apps/identity) owns /api/* — better-auth (/api/auth),
@@ -47,7 +58,7 @@ spec:
             path: /api
             backend:
               service:
-                name: {{ .Release.Name }}-identity
+                name: {{ $releaseName }}-identity
                 port:
                   number: 8081
           # The workspace-engine serves its Connect API under /engine natively
@@ -56,7 +67,8 @@ spec:
             path: /engine
             backend:
               service:
-                name: {{ .Release.Name }}-workspace-engine
+                name: {{ $releaseName }}-workspace-engine
                 port:
                   number: 8086
+{{- end }}
 {{- end }}
