@@ -385,6 +385,31 @@ global:
 
   auth:
     sessionLengthHours: 720
+    # Override the chart-managed session key with a literal value or a
+    # Kubernetes EnvVarSource map such as valueFrom.secretKeyRef.
+    sessionKey:
+      # valueFrom:
+      #   secretKeyRef:
+      #     name: gorilla-session-keys
+      #     key: current
+    # Comma-separated verification-only keys. This accepts the same literal or
+    # Kubernetes EnvVarSource forms as sessionKey.
+    sessionKeyPrevious:
+      # valueFrom:
+      #   secretKeyRef:
+      #     name: gorilla-session-keys
+      #     key: previous
+    # Change this value after updating external session-key Secret data to
+    # force the API and app pod templates to roll. It does not contain key
+    # material and can be used with sessionKey/sessionKeyPrevious overrides.
+    sessionKeyRolloutId: ""
+    # Managed rotation uses the release's existing gorilla-session-key Secret.
+    # Use a new id for each rotation. Routine rotations advance phase through
+    # prepare -> activate -> clear. hard-cutover immediately replaces the
+    # current key without retaining verification keys.
+    sessionKeyRotation:
+      id: ""
+      phase: ""
     # Internal URL for the auth service should be using oidc or auth0
     jwkUrl: ""
     oidc:
@@ -396,6 +421,29 @@ global:
         name: ""
         secretKey: "OIDC_SECRET"
 
+  # Infrastructure-managed Azure workload identity for this deployment. The
+  # managed default bucket uses this identity. A customer Azure bucket can opt
+  # in with global.bucket.azureAuthMethod: workloadIdentity.
+  # Each value can be a literal string or a Kubernetes EnvVarSource-style map:
+  #   clientId:
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: azure-storage-identity
+  #         key: client-id
+  azureStorageIdentity:
+    tenantId: null
+    clientId: null
+    # One deployment-wide account for Azure storage workload identity. Set
+    # create: false when infrastructure creates and federates this account.
+    serviceAccount:
+      name: "wandb-bucket-access"
+      create: true
+      annotations: {}
+      labels: {}
+    # Principal ID is exposed to administrators for Azure role assignments.
+    # The chart does not use it for pod authentication.
+    principalId: null
+
   # Storage bucket that will be used by the application by default but can be overridden by the user in the wandb-console.
   defaultBucket:
     # az, s3, gcs
@@ -404,9 +452,25 @@ global:
     path: ""
     region: ""
     kmsKey: ""
+    # Azure (provider "az") identity-based auth. Each value can be a literal
+    # string or a Kubernetes EnvVarSource-style map. When both are set the application
+    # authenticates to Blob storage with an Entra ID workload identity
+    # (user-delegation SAS) and the storage account access key is optional.
+    # The chart adds the required workload-identity pod label to services that
+    # consume bucket credentials. The customer's infrastructure must separately
+    # configure federated credentials. ServiceAccount names and annotations
+    # remain infrastructure-owned because other Azure clients may use them.
+    azureTenantId: null
+    azureClientId: null
 
   # If specified, the application will use this bucket for all storage operations, and will not be overridable by the user.
   bucket:
+    # Azure only. Existing configurations default to access-key authentication.
+    # Set to workloadIdentity to use global.azureStorageIdentity.
+    azureAuthMethod: null
+    # Legacy bucket-scoped identity values remain supported.
+    # azureTenantId: ""
+    # azureClientId: ""
     secret:
       secretName: ""
       accessKeyName: "ACCESS_KEY"
@@ -487,6 +551,10 @@ global:
 
   weave-trace:
     enabled: false
+    # Weave stores files in ClickHouse unless this is explicitly enabled.
+    # Enable only with a Weave image that supports Azure workload identity.
+    fileStorage:
+      useDefaultBucket: false
 
   # As part of the migration away from using local, the `bypass` setting will
   # control whether the gorilla services will use the app service (and, thus, local)
@@ -577,6 +645,8 @@ artifactsGc:
   DeleteFilesNumWorkers: 0
 
 api:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   service:
     enabled: true
     loadBalancerHealthCheckPath: "/ready"
@@ -603,6 +673,7 @@ api:
     "{{ .Release.Name }}-gorilla-session-key": "secretRef"
   envTpls:
     - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.sessionKeyEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
@@ -773,6 +844,8 @@ api:
           minReplicas: 2
 
 app:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: true
   deploymentPostfix: "bc"
   image:
@@ -811,6 +884,7 @@ app:
     "{{ .Release.Name }}-local-configmap": "configMapRef"
   envTpls:
     - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.sessionKeyEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
@@ -1012,6 +1086,8 @@ appRenamePostHook:
         verbs: ["get", "delete", "list", "watch"]
 
 console:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: true
   deploymentPostfix: "bc"
   service:
@@ -1105,6 +1181,8 @@ console:
         verbs: ["get"]
 
 executor:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   deploymentPostfix: "bc"
   workerConcurrency: 10
@@ -1223,12 +1301,24 @@ executor:
           minReplicas: 2
 
 filemeta:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
     tag: latest
+  pubSub:
+    # pubSub subscription comes from terraform
+    subscription: ""
+  kafka:
+    # unique consumer group so it reads the run-update shadow topic independently
+    consumerGroupId: "filemeta"
+  env:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FILEMETA:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
@@ -1238,6 +1328,7 @@ filemeta:
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
@@ -1386,6 +1477,8 @@ anaconda2:
           minReplicas: 2
 
 filestream:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   deploymentPostfix: "bc"
   pubSub:
@@ -1493,6 +1586,8 @@ filestream:
           minReplicas: 1
 
 flat-run-fields-updater:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   deploymentPostfix: "bc"
   pubSub:
@@ -1794,6 +1889,8 @@ flat-run-fields-updater:
           # triggers must be provided by user when enabling KEDA
 
 history-updater:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   pubSub:
     # pubSub subscription comes from terraform
@@ -2072,8 +2169,315 @@ history-updater:
                   selectPolicy: Max
           # triggers must be provided by user when enabling KEDA
 
+# run-store-accelerator-run-updater drains the run-update snapshot queue into
+# the run-store accelerator (ClickHouse). Enable only on instances that have the
+# run-store accelerator turned on (global.olap.runStoreAccelerator.enabled).
+run-store-accelerator-run-updater:
+  install: false
+  pubSub:
+    # pubSub subscription comes from terraform
+    subscription: ""
+  kafka:
+    # unique consumer group so it reads the run-update shadow topic independently
+    # of the other consumers (flat-run-fields-updater, history-updater, metric-observer)
+    consumerGroupId: "run-store-accelerator-run-updater"
+  env:
+    GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_RUN_STORE_ACCELERATOR:
+      value: '{{ include "wandb.runUpdateShadowQueue" . }}'
+    # Set frontend-host (= global.host) to match gorilla's run-updater deploy
+    # template, which defines it alongside the other RSA workloads.
+    GORILLA_FRONTEND_HOST:
+      value: '{{ .Values.global.host }}'
+  envFrom:
+    "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+    "{{ .Release.Name }}-kafka-configmap": "configMapRef"
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-run-store-accelerator-run-updater-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.bucketEnvs" . }}'
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+    - '{{ include "wandb.lumen.gorillaEnvs" .}}'
+  podAnnotationsTpls:
+    - '{{ include "wandb.lumen.agent.target" . }}'
+  containers:
+    run-store-accelerator-run-updater:
+      args: ["run-store-accelerator-run-updater"]
+      portsTpls:
+        - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  size: ""
+  # Sized from production. CPU limit is 2 (burst headroom); requests are sub-core
+  # and scale with tier (250m small ... 750m xxl). The busiest SaaS pod runs
+  # ~0.8 core at ~16.6k field-rows/s, but under the HPA per-pod CPU converges to
+  # ~80% of the request regardless of tier (bigger tiers add pods, not hotter
+  # ones) and smaller instances mostly idle, so the request tracks each tier's
+  # baseline while the limit leaves burst room. Scaling is CPU-only: memory tracks
+  # project/field cardinality, not throughput, so it is excluded from the HPA.
+  # minReplicas is 1 everywhere; per-size maxReplicas is set from observed
+  # dedicated-instance load (the busiest managed instance runs ~70 run-updates/s,
+  # a few pods), well below multi-tenant SaaS. Memory mirrors flat-run-fields-updater,
+  # the same run-update consumer; wide-run tenants can exceed these defaults and set
+  # per-instance overrides. For queue-depth (Kafka-lag) autoscaling, enable the KEDA
+  # block and supply triggers (see flat-run-fields-updater and
+  # test-configs/operator-wandb/keda-frfu.yaml).
+  sizing:
+    small:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "250m"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 0
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 2
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 2
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 1
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    medium:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "250m"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 0
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 3
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 2
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 3
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    large:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 4Gi
+        requests:
+          cpu: "500m"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 5
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 0
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 5
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 3
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 4
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    xlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "500m"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 8
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 0
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 8
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 5
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 5
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+    xxlarge:
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "750m"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 12
+          minReplicas: 1
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 0
+        keda:
+          enabled: false
+          minReplicaCount: 1
+          maxReplicaCount: 12
+          pollingInterval: 15
+          cooldownPeriod: 300
+          fallback:
+            failureThreshold: 5
+            replicas: 8
+          advanced:
+            horizontalPodAutoscalerConfig:
+              behavior:
+                scaleDown:
+                  stabilizationWindowSeconds: 300
+                  policies:
+                    - type: Percent
+                      value: 25
+                      periodSeconds: 60
+                    - type: Pods
+                      value: 2
+                      periodSeconds: 60
+                  selectPolicy: Min
+                scaleUp:
+                  stabilizationWindowSeconds: 0
+                  policies:
+                    - type: Percent
+                      value: 100
+                      periodSeconds: 30
+                    - type: Pods
+                      value: 6
+                      periodSeconds: 30
+                  selectPolicy: Max
+          # triggers must be provided by user when enabling KEDA
+
 # history-reader is a gRPC service that serves run history from ClickHouse.
 history-reader:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -2326,6 +2730,8 @@ frontend:
           minReplicas: 2
 
 glue:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -2508,6 +2914,8 @@ internalSignerPreHook:
         verbs: ["get", "patch", "create", "update"]
 
 metric-observer:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -2646,6 +3054,8 @@ metric-observer:
           minReplicas: 8
 
 parquet:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: true
   deploymentPostfix: "bc"
   image:
@@ -2847,6 +3257,8 @@ parquet:
           minReplicas: 2
 
 parquet-metadata-cache:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   maxColumnChunks: 10000000
   install: false
   serviceAccount:
@@ -2976,6 +3388,8 @@ parquet-metadata-cache:
           minReplicas: 1
 
 settingsMigrationJob:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   image:
     repository: wandb/megabinary
@@ -3026,16 +3440,15 @@ settingsMigrationJob:
   podDisruptionBudget:
     enabled: false
 
-# Runs ClickHouse schema migrations once per helm operation as a hook Job, so
-# concurrent migrate-db initContainers cannot race on ClickHouse, which has no
-# DB-level locking. The migrate binary skips any schema whose MIGRATE_*_DB env
-# var is unset, so the job is a fast no-op unless OLAP features are enabled;
-# MySQL schemas stay with the initContainers. The image must carry the same
+# Runs ClickHouse schema migrations once per helm operation as a hook Job.
+# This Job is the sole ClickHouse migrator: only its envTpls use the
+# wandb.*MigrateEnvs helpers that set MIGRATE_*_DB, and the migrate binary
+# skips any schema whose MIGRATE_*_DB env var is unset. App-pod migrate-db
+# initContainers therefore run MySQL schemas only and cannot race on
+# ClickHouse, which has no DB-level locking. The image must carry the same
 # migration files as the deployed code -- keep its tag in lockstep with api.
-# TODO: default to true once the deployer stamps this job's image tag
-# alongside api's (wandb/deployments user-spec/deploy.py).
 clickhouseMigrationJob:
-  install: false
+  install: true
   kind: Job
   podDisruptionBudget:
     enabled: false
@@ -3052,9 +3465,9 @@ clickhouseMigrationJob:
     hook: "post-install,pre-upgrade"
   envTpls:
     - '{{ include "wandb.sslCertEnvs" . }}'
-    - '{{ include "wandb.historyEnvs" . }}'
-    - '{{ include "wandb.registrySearchEnvs" . }}'
-    - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
+    - '{{ include "wandb.historyMigrateEnvs" . }}'
+    - '{{ include "wandb.registrySearchMigrateEnvs" . }}'
+    - '{{ include "wandb.runStoreAcceleratorMigrateEnvs" . }}'
   jobs:
     ch-migrate:
       # Only render when at least one global.olap feature is enabled.
@@ -3460,6 +3873,9 @@ mcp-server:
 weave-trace:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  azureStorageUseSharedServiceAccount: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -3598,6 +4014,9 @@ weave-trace:
 weave-trace-worker:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  azureStorageUseSharedServiceAccount: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -3707,6 +4126,9 @@ weave-trace-worker:
 weave-evaluate-model-worker:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  azureStorageUseSharedServiceAccount: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -3810,6 +4232,9 @@ weave-evaluate-model-worker:
 weave-trace-agent-scoring-worker:
   install: false
   deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  azureStorageUseSharedServiceAccount: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
   image:
     repository: wandb/weave-trace
     tag: latest
@@ -4147,6 +4572,8 @@ bufstream:
           memory: 4Gi
 
 lumen-agent:
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
   kind: CronJob
   image:
@@ -4231,17 +4658,56 @@ reloader:
 
 clickhouse:
   install: false
+  # The bundled ClickHouse is for CI/dev only; production platforms use
+  # ClickHouse Cloud or customer-provided instances. Official images replace
+  # the frozen bitnamilegacy archive (stuck at 25.7; core's migrations need
+  # 26.x). The overrides below do what the Bitnami entrypoint did: admin user,
+  # logging, config/data paths, keeper server id.
   image:
-    repository: bitnamilegacy/clickhouse
+    repository: clickhouse/clickhouse-server
+    tag: "26.4"
   global:
     security:
       allowInsecureImages: true
   auth:
     existingSecret: '{{ include "wandb.clickhouse.passwordSecret" . }}'
     existingSecretKey: "{{- .Values.global.clickhouse.passwordSecret.passwordKey -}}"
+  # Keep the admin password as an env var so from_env works in usersdFiles below.
+  usePasswordFiles: false
 
   shards: 1
   replicaCount: 1
+
+  # /var/log/clickhouse-server is not writable as the chart's non-root uid;
+  # log to console like the Bitnami build did.
+  configdFiles:
+    00-logger-console.xml: |
+      <clickhouse>
+          <logger>
+              <console>1</console>
+              <log remove="remove"></log>
+              <errorlog remove="remove"></errorlog>
+          </logger>
+      </clickhouse>
+  # The Bitnami entrypoint provisioned the admin user; with the official image
+  # declare it via users.d, fed by the env var the chart already sets.
+  usersdFiles:
+    zz-admin-user.xml: |
+      <clickhouse>
+          <users>
+              <{{ .Values.auth.username }}>
+                  <password from_env="CLICKHOUSE_ADMIN_PASSWORD"></password>
+                  <access_management>1</access_management>
+              </{{ .Values.auth.username }}>
+          </users>
+      </clickhouse>
+  # Re-mount the chart's config/users fragments where the official image reads
+  # them (the chart itself mounts them at Bitnami's /bitnami/clickhouse/etc).
+  extraVolumeMounts:
+    - name: configd-configuration
+      mountPath: /etc/clickhouse-server/config.d
+    - name: usersd-configuration-configuration
+      mountPath: /etc/clickhouse-server/users.d
 
   # Apply global nodeSelector and tolerations to ClickHouse
   nodeSelector: {}
@@ -4255,8 +4721,40 @@ clickhouse:
     enabled: true
     size: 30Gi
     storageClass: ""
+    # The official image's config keeps data under /var/lib/clickhouse.
+    mountPath: /var/lib/clickhouse
 
   keeper:
+    image:
+      repository: clickhouse/clickhouse-keeper
+      tag: "26.4"
+    # Full keeper config replacing the Bitnami entrypoint-generated one. Raft
+    # membership still comes from the chart's keeper_config.d fragment, which
+    # ClickHouse merges from the directory next to the main config file.
+    configuration: |
+      <clickhouse>
+          <listen_host>0.0.0.0</listen_host>
+          <logger>
+              <console>1</console>
+              <log remove="remove"></log>
+              <errorlog remove="remove"></errorlog>
+          </logger>
+          <path>/var/lib/clickhouse-keeper</path>
+          <keeper_server>
+              <tcp_port from_env="CLICKHOUSE_KEEPER_TCP_PORT"></tcp_port>
+              <server_id from_env="KEEPER_SERVER_ID"></server_id>
+              <log_storage_path>/var/lib/clickhouse-keeper/coordination/log</log_storage_path>
+              <snapshot_storage_path>/var/lib/clickhouse-keeper/coordination/snapshots</snapshot_storage_path>
+          </keeper_server>
+      </clickhouse>
+    # The Bitnami entrypoint derived the numeric keeper server id from the pod
+    # ordinal; from_env needs an integer, so do the same here.
+    command:
+      - sh
+      - -ec
+      - |
+        export KEEPER_SERVER_ID="${CLICKHOUSE_KEEPER_SERVER_ID##*-}"
+        exec clickhouse-keeper --config-file=/bitnami/clickhouse-keeper/etc/keeper_config.xml
     # Apply global nodeSelector and tolerations to ClickHouse Keeper
     nodeSelector: {}
     tolerations: []
@@ -4268,3 +4766,4 @@ clickhouse:
       enabled: true
       size: 8Gi
       storageClass: ""
+      mountPath: /var/lib/clickhouse-keeper

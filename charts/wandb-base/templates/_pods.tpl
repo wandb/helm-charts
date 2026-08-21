@@ -72,9 +72,9 @@ spec:
   {{- $globalOptOut := (default dict $.root.Values.globalOptOut) -}}
   {{- if and (hasKey $globalOptOut "volumes") -}}
     {{- if kindIs "string" $globalOptOut.volumes -}}
-        {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes $.root | trim) "true" -}}
+      {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes $.root | trim) "true" -}}
     {{- else -}}
-        {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
+      {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
     {{- end -}}
   {{- end -}}
   {{- $localVolumes := default list .podData.volumes }}
