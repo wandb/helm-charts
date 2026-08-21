@@ -1,0 +1,67 @@
+suite: ingress additional hosts
+templates:
+  - templates/ingress.yaml
+release:
+  name: orchestrator
+
+tests:
+  - it: renders every application route for an additional host
+    set:
+      global:
+        fqdn: "https://ctrlplane-qa.wandb.io"
+      ingress:
+        additionalHosts:
+          - "https://orca-qa.wandb.io/"
+    asserts:
+      - equal:
+          path: spec.rules[1].host
+          value: orca-qa.wandb.io
+      - contains:
+          path: spec.rules[1].http.paths
+          content:
+            pathType: Prefix
+            path: /
+            backend:
+              service:
+                name: orchestrator-web
+                port:
+                  number: 3000
+          any: true
+      - contains:
+          path: spec.rules[1].http.paths
+          content:
+            pathType: Prefix
+            path: /api
+            backend:
+              service:
+                name: orchestrator-identity
+                port:
+                  number: 8081
+          any: true
+      - contains:
+          path: spec.rules[1].http.paths
+          content:
+            pathType: Prefix
+            path: /engine
+            backend:
+              service:
+                name: orchestrator-workspace-engine
+                port:
+                  number: 8086
+          any: true
+
+  - it: includes additional hosts in the TLS host list
+    set:
+      global:
+        fqdn: "https://ctrlplane-qa.wandb.io"
+      ingress:
+        additionalHosts:
+          - "orca-qa.wandb.io"
+        tls:
+          enabled: true
+    asserts:
+      - equal:
+          path: spec.tls[0].hosts
+          value:
+            - ctrlplane-qa.wandb.io
+            - orca-qa.wandb.io
