@@ -124,6 +124,15 @@ cannot be represented without changing Weave's object layout.
 {{- and (index $fileStorage "useDefaultBucket" | default false) $identityConfigured -}}
 {{- end }}
 
+{{/*
+Name of the shared Weave Trace ServiceAccount, owned at the umbrella level by
+templates/weave-trace-serviceaccount.yaml. Must stay identical to
+"wandb-base.weaveTraceServiceAccountName" in charts/wandb-base/templates/_helpers.tpl.
+*/}}
+{{- define "wandb.weaveTraceServiceAccountName" -}}
+  {{- printf "%s-weave-trace" .Release.Name -}}
+{{- end }}
+
 
 {{- define "wandb.bucket" -}}
   {{- $url := "" -}}
