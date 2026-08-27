@@ -321,6 +321,46 @@ Global values will override any chart-specific values.
 {{ include "wandb.clickhouseConfigEnvs" . }}
 {{- end -}}
 
+{{- define "wandb.weaveTraceOlapEnv" -}}
+  {{- $env := dict "name" .name -}}
+  {{- if kindIs "map" .value -}}
+    {{- $env = merge $env (deepCopy .value) -}}
+  {{- else -}}
+    {{- $_ := set $env "value" (tpl (.value | toString) .root) -}}
+  {{- end -}}
+{{- toYaml $env -}}
+{{- end -}}
+
+{{- define "wandb.weaveTraceClickhouseEnvs" -}}
+  {{- /*
+    Weave Trace still consumes WF_CLICKHOUSE_* variables. Select the new OLAP
+    connection only when it is explicitly enabled; otherwise preserve the
+    legacy global.clickhouse behavior for existing and bundled installations.
+
+    OLAP normally emits <PREFIX>_PASSWORD. Weave expects WF_CLICKHOUSE_PASS,
+    so this compatibility helper renders the Weave contract directly.
+  */ -}}
+  {{- $config := include "wandb.olapConfig" (dict "root" . "featureName" "weaveTrace") | fromYaml -}}
+  {{- if $config.enabled }}
+    {{- $envs := list -}}
+    {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_HOST" "value" $config.host) | fromYaml) -}}
+    {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_PORT" "value" $config.port) | fromYaml) -}}
+    {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_DATABASE" "value" $config.database) | fromYaml) -}}
+    {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_USER" "value" $config.user) | fromYaml) -}}
+    {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_REPLICATED" "value" $config.replicated) | fromYaml) -}}
+    {{- if kindIs "map" $config.password }}
+      {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_PASS" "value" $config.password) | fromYaml) -}}
+    {{- else }}
+      {{- $secretName := include "wandb.olapSecretName" (dict "root" . "featureName" "weaveTrace") }}
+      {{- $secretKey := include "wandb.olapSecretKey" (dict "envVarPrefix" "WEAVE_TRACE") }}
+      {{- $envs = append $envs (dict "name" "WF_CLICKHOUSE_PASS" "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "key" $secretKey))) -}}
+    {{- end }}
+{{- toYaml $envs }}
+  {{- else }}
+    {{- include "wandb.clickhouseConfigEnvs" . }}
+  {{- end }}
+{{- end -}}
+
 {{- define "wandb.olapFeatureEnvs" -}}
   {{- /*
     Shared template for OLAP feature environment variables.
@@ -458,14 +498,6 @@ Global values will override any chart-specific values.
 {{- define "wandb.historyMigrateEnvs" -}}
 {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "emitMigrate" true "migratePrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS") -}}
 {{- end -}}
-
-{{/* 
-# TODO: uncomment when weave trace is ready to be integrated.
-# Note, right now it is using WF_CLICKHOUSE as the env var prefix, but we might want to change this to something else if not overly coupled in the weaveTrace code.
-# {{- define "wandb.weaveTraceEnvs" -}}
-# {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "weaveTrace" "envVarPrefix" "WEAVE_TRACE" "finalEnvName" "GORILLA_WEAVE_TRACE_ADDRESS") -}}
-# {{- end -}}
-*/}}
 
 {{- define "wandb.historyStoreEnvs" -}}
 - name: GORILLA_HISTORY_STORE

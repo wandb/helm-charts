@@ -228,11 +228,16 @@ The following credentials can be pulled from external Kubernetes Secrets:
 |-----------|-------------------|------------------------|
 | **MySQL** | `global.mysql.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
 | **Redis** | `global.redis.secret` | `secretName`, `secretKey` |
-| **ClickHouse** | `global.clickhouse.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
+| **Weave Trace ClickHouse** | `global.clickhouse.*` (default) or `global.olap.weaveTrace.*` (opt-in) | Each connection field can be a string or a map with `valueFrom` |
 | **Kafka** | `global.kafka.passwordSecret` | `name`, `passwordKey` |
 | **OIDC** | `global.auth.oidc.oidcSecret` | `name`, `secretKey` |
 | **Session signing** | `global.auth.sessionKey`, `global.auth.sessionKeyPrevious` | Literal value or a map with `valueFrom` |
 | **SMTP** | `global.email.smtp.*` | Each field (host, port, user, password) can be a string or a map with `valueFrom` |
+
+`global.olap.weaveTrace.enabled` is `false` by default. Setting it to `true`
+explicitly switches Weave Trace and its workers to that OLAP connection. The
+chart does not infer enrollment from `global.clickhouse`, so existing and
+bundled ClickHouse installations keep their current behavior.
 
 ### Example: Using External Secrets with MySQL/ClickHouse/SMTP
 
