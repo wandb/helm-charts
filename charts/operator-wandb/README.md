@@ -228,11 +228,19 @@ The following credentials can be pulled from external Kubernetes Secrets:
 |-----------|-------------------|------------------------|
 | **MySQL** | `global.mysql.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
 | **Redis** | `global.redis.secret` | `secretName`, `secretKey` |
-| **ClickHouse** | `global.clickhouse.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
+| **Weave Trace ClickHouse** | `global.clickhouse.*` (default) or `global.olap.weaveTrace.*` (opt-in) | Select with `global.weaveTrace.clickhouseSource`; each connection field can be a string or a map with `valueFrom` |
 | **Kafka** | `global.kafka.passwordSecret` | `name`, `passwordKey` |
 | **OIDC** | `global.auth.oidc.oidcSecret` | `name`, `secretKey` |
 | **Session signing** | `global.auth.sessionKey`, `global.auth.sessionKeyPrevious` | Literal value or a map with `valueFrom` |
 | **SMTP** | `global.email.smtp.*` | Each field (host, port, user, password) can be a string or a map with `valueFrom` |
+
+`global.weaveTrace.clickhouseSource` defaults to `legacy`, so Weave Trace and
+its workers continue to use `global.clickhouse` even when the OLAP profile is
+enabled. Set `global.olap.weaveTrace.enabled: true` to make the profile
+available, then set `global.weaveTrace.clickhouseSource: olap` to perform the
+cutover. Selecting a disabled OLAP profile or an unknown source fails chart
+rendering. The chart does not infer enrollment from either connection, so
+existing and bundled ClickHouse installations keep their current behavior.
 
 ### Example: Using External Secrets with MySQL/ClickHouse/SMTP
 

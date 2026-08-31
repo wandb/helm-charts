@@ -227,6 +227,12 @@ global:
   #         name: "clickhouse-settings-secret"
   #         key: "password"
 
+  weaveTrace:
+    # Selects which ClickHouse connection is rendered into Weave Trace workloads.
+    # "legacy" preserves global.clickhouse; "olap" selects global.olap.weaveTrace.
+    # Enabling the OLAP profile alone does not change the active connection.
+    clickhouseSource: legacy
+
   # OLAP database configuration (ClickHouse)
   #
   # Features like Registry Search, Runs Accelerator, and History Updater each
@@ -291,12 +297,14 @@ global:
       database: "history"
       params:
         max_open_conns: 300
-    # TODO: wire this up when weave trace is ready to be migrated from global.clickhouse. to global.olap.weaveTrace.
-    # weaveTrace:
-    #   enabled: false
-    #   port: 8443
-    #   database: "weave_trace_db"
-    #   params: {} # TBD if even needed.
+    # Weave Trace keeps its legacy WF_CLICKHOUSE_* environment variable names.
+    # Enabling this makes the profile available. Set
+    # global.weaveTrace.clickhouseSource to "olap" to select it.
+    weaveTrace:
+      enabled: false
+      port: "8443"
+      database: "weave_trace_db"
+      replicated: false
 
   #
   # FOR ADVANCED USERS:
@@ -3870,7 +3878,7 @@ weave-trace:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
-    - '{{ include "wandb.clickhouseEnvs" . }}'
+    - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
     weave-trace-migrate:
@@ -4012,7 +4020,7 @@ weave-trace-worker:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
-    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     WANDB_INTERNAL_SERVICE_TOKEN:
@@ -4126,7 +4134,7 @@ weave-evaluate-model-worker:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
-    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     WANDB_INTERNAL_SERVICE_TOKEN:
@@ -4232,7 +4240,7 @@ weave-trace-agent-scoring-worker:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
-    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     WANDB_INTERNAL_SERVICE_TOKEN:

@@ -1,0 +1,310 @@
+suite: Weave Trace ClickHouse environment
+templates:
+  - templates/olap.yaml
+  - charts/weave-trace/templates/deployment.yaml
+  - charts/weave-trace-worker/templates/deployment.yaml
+  - charts/weave-evaluate-model-worker/templates/deployment.yaml
+  - charts/weave-trace-agent-scoring-worker/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: preserves the legacy ClickHouse configuration by default
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.clickhouse:
+        host: legacy-clickhouse.example.com
+        port: "8443"
+        database: legacy_weave
+        user: legacy-user
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: legacy-clickhouse
+              key: password
+        replicated: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: legacy-clickhouse.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: legacy-clickhouse
+                key: password
+
+  - it: uses OLAP value references for Weave Trace
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.weaveTrace:
+        enabled: true
+        host:
+          valueFrom:
+            configMapKeyRef:
+              name: weave-clickhouse
+              key: host
+        port:
+          valueFrom:
+            configMapKeyRef:
+              name: weave-clickhouse
+              key: port
+        database:
+          valueFrom:
+            configMapKeyRef:
+              name: weave-clickhouse
+              key: database
+        user:
+          valueFrom:
+            secretKeyRef:
+              name: weave-clickhouse
+              key: username
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: weave-clickhouse
+              key: password
+        replicated:
+          valueFrom:
+            configMapKeyRef:
+              name: weave-clickhouse
+              key: replicated
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            valueFrom:
+              configMapKeyRef:
+                name: weave-clickhouse
+                key: host
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: weave-clickhouse
+                key: port
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_DATABASE
+            valueFrom:
+              configMapKeyRef:
+                name: weave-clickhouse
+                key: database
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: weave-clickhouse
+                key: username
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: weave-clickhouse
+                key: password
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_REPLICATED
+            valueFrom:
+              configMapKeyRef:
+                name: weave-clickhouse
+                key: replicated
+
+  - it: keeps the legacy connection when the OLAP profile is only enabled
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.clickhouse.host: legacy-clickhouse.example.com
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: managed-clickhouse
+              key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: legacy-clickhouse.example.com
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
+
+  - it: selects the OLAP connection explicitly when both are configured
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.clickhouse.host: legacy-clickhouse.example.com
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: managed-clickhouse
+              key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: legacy-clickhouse.example.com
+
+  - it: rejects selecting a disabled OLAP connection
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+    asserts:
+      - failedTemplate:
+          errorMessage: global.olap.weaveTrace.enabled must be true when global.weaveTrace.clickhouseSource is olap
+
+  - it: rejects an unknown ClickHouse source
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: automatic
+    asserts:
+      - failedTemplate:
+          errorMessage: 'global.weaveTrace.clickhouseSource must be one of: legacy, olap; got "automatic"'
+
+  - it: stores a literal OLAP password in a chart-owned Secret
+    template: templates/olap.yaml
+    set:
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        password: test-password
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: wandb-olap-weave-trace
+      - equal:
+          path: data.WEAVE_TRACE_PASSWORD
+          value: dGVzdC1wYXNzd29yZA==
+
+  - it: references the chart-owned Secret for a literal OLAP password
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        password: test-password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: wandb-olap-weave-trace
+                key: WEAVE_TRACE_PASSWORD
+
+  - it: keeps bundled ClickHouse on the legacy connection
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      clickhouse.install: true
+      weave-trace.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: wandb-clickhouse-headless
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PORT
+            value: "8123"
+
+  - it: wires the OLAP connection into the trace worker
+    template: charts/weave-trace-worker/templates/deployment.yaml
+    set:
+      weave-trace-worker.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: managed-clickhouse
+              key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
+
+  - it: wires the OLAP connection into the evaluate-model worker
+    template: charts/weave-evaluate-model-worker/templates/deployment.yaml
+    set:
+      weave-evaluate-model-worker.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: managed-clickhouse
+              key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
+
+  - it: wires the OLAP connection into the agent-scoring worker
+    template: charts/weave-trace-agent-scoring-worker/templates/deployment.yaml
+    set:
+      weave-trace-agent-scoring-worker.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: managed-clickhouse
+              key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
