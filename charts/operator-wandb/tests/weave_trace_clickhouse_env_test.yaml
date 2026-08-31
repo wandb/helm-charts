@@ -44,6 +44,7 @@ tests:
     template: charts/weave-trace/templates/deployment.yaml
     set:
       weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
       global.olap.weaveTrace:
         enabled: true
         host:
@@ -126,10 +127,36 @@ tests:
                 name: weave-clickhouse
                 key: replicated
 
-  - it: prefers the explicitly enabled OLAP connection over legacy values
+  - it: keeps the legacy connection when the OLAP profile is only enabled
     template: charts/weave-trace/templates/deployment.yaml
     set:
       weave-trace.install: true
+      global.clickhouse.host: legacy-clickhouse.example.com
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: managed-clickhouse
+              key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: legacy-clickhouse.example.com
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
+
+  - it: selects the OLAP connection explicitly when both are configured
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
       global.clickhouse.host: legacy-clickhouse.example.com
       global.olap.weaveTrace:
         enabled: true
@@ -150,6 +177,24 @@ tests:
           content:
             name: WF_CLICKHOUSE_HOST
             value: legacy-clickhouse.example.com
+
+  - it: rejects selecting a disabled OLAP connection
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+    asserts:
+      - failedTemplate:
+          errorMessage: global.olap.weaveTrace.enabled must be true when global.weaveTrace.clickhouseSource is olap
+
+  - it: rejects an unknown ClickHouse source
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: automatic
+    asserts:
+      - failedTemplate:
+          errorMessage: 'global.weaveTrace.clickhouseSource must be one of: legacy, olap; got "automatic"'
 
   - it: stores a literal OLAP password in a chart-owned Secret
     template: templates/olap.yaml
@@ -172,6 +217,7 @@ tests:
     template: charts/weave-trace/templates/deployment.yaml
     set:
       weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
       global.olap.weaveTrace:
         enabled: true
         host: managed-clickhouse.example.com
@@ -207,6 +253,7 @@ tests:
     template: charts/weave-trace-worker/templates/deployment.yaml
     set:
       weave-trace-worker.install: true
+      global.weaveTrace.clickhouseSource: olap
       global.olap.weaveTrace:
         enabled: true
         host: managed-clickhouse.example.com
@@ -226,6 +273,7 @@ tests:
     template: charts/weave-evaluate-model-worker/templates/deployment.yaml
     set:
       weave-evaluate-model-worker.install: true
+      global.weaveTrace.clickhouseSource: olap
       global.olap.weaveTrace:
         enabled: true
         host: managed-clickhouse.example.com
@@ -245,6 +293,7 @@ tests:
     template: charts/weave-trace-agent-scoring-worker/templates/deployment.yaml
     set:
       weave-trace-agent-scoring-worker.install: true
+      global.weaveTrace.clickhouseSource: olap
       global.olap.weaveTrace:
         enabled: true
         host: managed-clickhouse.example.com

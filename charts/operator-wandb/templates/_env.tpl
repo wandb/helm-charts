@@ -334,14 +334,22 @@ Global values will override any chart-specific values.
 {{- define "wandb.weaveTraceClickhouseEnvs" -}}
   {{- /*
     Weave Trace still consumes WF_CLICKHOUSE_* variables. Select the new OLAP
-    connection only when it is explicitly enabled; otherwise preserve the
-    legacy global.clickhouse behavior for existing and bundled installations.
+    connection only when global.weaveTrace.clickhouseSource is explicitly set
+    to "olap"; otherwise preserve the legacy global.clickhouse behavior for
+    existing and bundled installations.
 
     OLAP normally emits <PREFIX>_PASSWORD. Weave expects WF_CLICKHOUSE_PASS,
     so this compatibility helper renders the Weave contract directly.
   */ -}}
   {{- $config := include "wandb.olapConfig" (dict "root" . "featureName" "weaveTrace") | fromYaml -}}
-  {{- if $config.enabled }}
+  {{- $source := default "legacy" .Values.global.weaveTrace.clickhouseSource -}}
+  {{- if not (has $source (list "legacy" "olap")) -}}
+    {{- fail (printf "global.weaveTrace.clickhouseSource must be one of: legacy, olap; got %q" $source) -}}
+  {{- end -}}
+  {{- if and (eq $source "olap") (not $config.enabled) -}}
+    {{- fail "global.olap.weaveTrace.enabled must be true when global.weaveTrace.clickhouseSource is olap" -}}
+  {{- end -}}
+  {{- if eq $source "olap" }}
     {{- $envs := list -}}
     {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_HOST" "value" $config.host) | fromYaml) -}}
     {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_PORT" "value" $config.port) | fromYaml) -}}
