@@ -12,6 +12,10 @@ missing keys fall through from default.
 {{- define "wandb.olapConfig" -}}
   {{- $default := deepCopy (default (dict) (index .root.Values.global.olap "default")) -}}
   {{- $feature := deepCopy (default (dict) (index .root.Values.global.olap .featureName)) -}}
+  {{- /* History enrollment is owned by the deployment-wide feature flag. */ -}}
+  {{- if eq .featureName "history" -}}
+    {{- $_ := set $feature "enabled" .root.Values.global.nextGenHistoryStore -}}
+  {{- end -}}
 {{- toYaml (merge $feature $default) -}}
 {{- end -}}
 
@@ -27,8 +31,9 @@ Returns: "true" or "false"
 */}}
 {{- define "wandb.olapAnyFeatureEnabled" -}}
   {{- $any := false -}}
-  {{- range $name, $cfg := omit (default (dict) .Values.global.olap) "default" -}}
-    {{- if and (kindIs "map" $cfg) $cfg.enabled -}}
+  {{- range $name, $_ := omit (default (dict) .Values.global.olap) "default" -}}
+    {{- $config := include "wandb.olapConfig" (dict "root" $ "featureName" $name) | fromYaml -}}
+    {{- if $config.enabled -}}
       {{- $any = true -}}
     {{- end -}}
   {{- end -}}

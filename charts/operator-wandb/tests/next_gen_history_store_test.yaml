@@ -1,0 +1,97 @@
+suite: next generation history store
+templates:
+  - templates/olap.yaml
+  - charts/history-updater/templates/deployment.yaml
+  - charts/clickhouseMigrationJob/templates/job.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: deploys the history updater with full tracing when the global flag is enabled
+    template: charts/history-updater/templates/deployment.yaml
+    set:
+      global.nextGenHistoryStore: true
+      history-updater.install: false
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: wandb-history-updater
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_TRACER
+            value: otlp+grpc://wandb-otel-daemonset:4317?trace_ratio=1
+
+  - it: wires the history OLAP connection into the updater when enabled
+    template: charts/history-updater/templates/deployment.yaml
+    set:
+      global:
+        nextGenHistoryStore: true
+        olap:
+          default:
+            host: history-clickhouse.example.com
+            password: history-password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HISTORY_HOST
+            value: history-clickhouse.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
+            value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+
+  - it: creates the history OLAP secret when enabled
+    template: templates/olap.yaml
+    set:
+      global:
+        nextGenHistoryStore: true
+        olap:
+          default:
+            password: history-password
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: wandb-olap-history
+      - equal:
+          path: data.HISTORY_PASSWORD
+          value: aGlzdG9yeS1wYXNzd29yZA==
+
+  - it: ignores legacy history enablement when the feature is disabled
+    template: templates/olap.yaml
+    set:
+      global:
+        nextGenHistoryStore: false
+        olap:
+          default:
+            password: history-password
+          history:
+            enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: runs the history OLAP migration when enabled
+    template: charts/clickhouseMigrationJob/templates/job.yaml
+    set:
+      global:
+        nextGenHistoryStore: true
+        olap:
+          default:
+            host: history-clickhouse.example.com
+            password: history-password
+    asserts:
+      - hasDocuments:
+          count: 1
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MIGRATE_HISTORY_DB
+            value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
