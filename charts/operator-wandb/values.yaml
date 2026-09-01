@@ -10,6 +10,9 @@
 
 # The global properties are used to configure multiple charts at once.
 global:
+  # Enables the next-generation history store and its supporting workloads.
+  nextGenHistoryStore: false
+
   # This should be the fqdn of where your users will be accessing the instance.
   host: "http://localhost:8080"
 
@@ -242,11 +245,12 @@ global:
   #   1. "default" defines shared connection settings (host, port, user, password, params, type).
   #      Do not set "enabled: true" on default — it is not a feature itself.
   #
-  #   2. Each feature (registrySearch, runStoreAccelerator, etc.) only declares what
-  #      differs from the default — typically just "enabled" and "database".
+  #   2. Each feature only declares what differs from the default — typically
+  #      just "enabled" and "database".
   #      All other fields are inherited from default automatically.
   #
-  #   3. To enable a feature: set enabled: true on the feature key and ensure
+  #   3. To enable Registry Search or Runs Accelerator, set enabled: true on its
+  #      feature key. History is enabled by global.nextGenHistoryStore. Ensure
   #      the default has a valid host/password (or use valueFrom K8s refs).
   #
   #   4. To override a field for one feature (e.g. a different host), set it
@@ -258,7 +262,8 @@ global:
   #   - A composed connection URL env var (e.g. GORILLA_REGISTRY_SEARCH_ADDRESS)
   #   - An internal K8s Secret for the password (unless password is a valueFrom map)
   #
-  # Example — shared instance, two features with different databases:
+  # Example — shared instance, three features with different databases:
+  #   nextGenHistoryStore: true
   #   olap:
   #     default:
   #       host: "clickhouse.example.com"
@@ -270,7 +275,6 @@ global:
   #       enabled: true
   #       database: "runs"
   #     history:
-  #       enabled: true
   #       database: "history"
   #
   olap:
@@ -293,7 +297,7 @@ global:
       enabled: false
       database: "runs"
     history:
-      enabled: false
+      # Enabled by global.nextGenHistoryStore.
       database: "history"
       params:
         max_open_conns: 300
@@ -1881,7 +1885,7 @@ flat-run-fields-updater:
 history-updater:
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
-  install: false
+  traceRatio: 1
   pubSub:
     # pubSub subscription comes from terraform
     subscription: ""
