@@ -242,6 +242,14 @@ cutover. Selecting a disabled OLAP profile or an unknown source fails chart
 rendering. The chart does not infer enrollment from either connection, so
 existing and bundled ClickHouse installations keep their current behavior.
 
+For a separate migration identity, enable
+`global.olap.weaveTrace.migrator` and provide its user and password through
+Kubernetes `valueFrom` references. Only the `weave-trace-migrate` init
+container receives those credentials. Runtime Weave containers continue to
+use `global.olap.weaveTrace.user` and `global.olap.weaveTrace.password`.
+During A/B rotation, update the runtime and migrator password references to
+the matching slot in the same rollout.
+
 ### Example: Using External Secrets with MySQL/ClickHouse/SMTP
 
 For MySQL, ClickHouse, and SMTP, each field can be configured as either a simple value or a Kubernetes secret reference:
