@@ -387,6 +387,12 @@ Global values will override any chart-specific values.
     {{- if not (hasKey $migrator.password "valueFrom") -}}
       {{- fail "global.olap.weaveTrace.migrator.password must use valueFrom" -}}
     {{- end -}}
+    {{- if not (kindIs "map" $migrator.user) -}}
+      {{- fail "global.olap.weaveTrace.migrator.user must use valueFrom" -}}
+    {{- end -}}
+    {{- if not (hasKey $migrator.user "valueFrom") -}}
+      {{- fail "global.olap.weaveTrace.migrator.user must use valueFrom" -}}
+    {{- end -}}
     {{- $envs := list -}}
     {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_USER" "value" $migrator.user) | fromYaml) -}}
     {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_PASS" "value" $migrator.password) | fromYaml) -}}

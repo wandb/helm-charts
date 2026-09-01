@@ -230,6 +230,26 @@ tests:
       - failedTemplate:
           errorMessage: global.olap.weaveTrace.migrator.password must use valueFrom
 
+  - it: rejects an inline migration user
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        migrator:
+          enabled: true
+          user: weave_migrator
+          password:
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-migrator-a
+                key: password
+    asserts:
+      - failedTemplate:
+          errorMessage: global.olap.weaveTrace.migrator.user must use valueFrom
+
   - it: keeps the legacy connection when the OLAP profile is only enabled
     template: charts/weave-trace/templates/deployment.yaml
     set:
