@@ -202,6 +202,25 @@ api:
       memory: 1Gi
 ```
 
+### Next-generation history store
+
+Enable the next-generation history store and its supporting workload with one
+global feature flag:
+
+```yaml
+global:
+  nextGenHistoryStore: true
+  olap:
+    default:
+      host: "clickhouse.example.com"
+      password: "shared-password"
+```
+
+The flag enables the history OLAP profile, deploys the history updater with a
+trace ratio of `1`, and runs the history ClickHouse migration. Configure shared
+connection settings under `global.olap.default` and put any history-specific
+overrides, such as `database`, under `global.olap.history`.
+
 ## Use External Stateful Data
 
 You can configure the W&B Server Helm chart to point to external stateful storage for items like MySQL, Redis, and Storage.
