@@ -1,0 +1,139 @@
+suite: Console service ownership preflight
+templates:
+  - templates/console-ownership-validation.yaml
+release:
+  name: wandb
+  namespace: customer
+kubernetesProvider:
+  scheme:
+    "v1/Service":
+      gvr:
+        version: v1
+        resource: services
+      namespaced: true
+
+tests:
+  - it: allows the standalone Console service when bundled Console is disabled
+    set:
+      console.install: false
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: wandb-console
+            namespace: customer
+            annotations:
+              meta.helm.sh/release-name: console
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: allows bundled Console when the target service does not exist
+    set:
+      console.install: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: allows bundled Console when another release owns the target service
+    set:
+      console.install: true
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: wandb-console
+            namespace: customer
+            annotations:
+              meta.helm.sh/release-name: another-release
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: allows the Console release to reconcile its own service
+    release:
+      name: console
+      namespace: customer
+    set:
+      console.install: true
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: console-console
+            namespace: customer
+            annotations:
+              meta.helm.sh/release-name: console
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: skips the check when the bundled Console service is disabled
+    set:
+      console.install: true
+      console.service.enabled: false
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: wandb-console
+            namespace: customer
+            annotations:
+              meta.helm.sh/release-name: console
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: rejects bundled Console when the standalone release owns the default service
+    set:
+      console.install: true
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: wandb-console
+            namespace: customer
+            annotations:
+              meta.helm.sh/release-name: console
+    asserts:
+      - failedTemplate:
+          errorMessage: bundled Console cannot use Service customer/wandb-console because Helm release console owns it; keep console.install=false while standalone Console is installed
+
+  - it: checks an explicitly configured Console service name
+    set:
+      console.install: true
+      console.service.name: custom-console
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: custom-console
+            namespace: customer
+            annotations:
+              meta.helm.sh/release-name: console
+    asserts:
+      - failedTemplate:
+          errorMessage: bundled Console cannot use Service customer/custom-console because Helm release console owns it; keep console.install=false while standalone Console is installed
+
+  - it: resolves a templated Console service name before checking ownership
+    set:
+      console.install: true
+      console.service.name: '{{ .Release.Name }}-console'
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Service
+          metadata:
+            name: wandb-console
+            namespace: customer
+            annotations:
+              meta.helm.sh/release-name: console
+    asserts:
+      - failedTemplate:
+          errorMessage: bundled Console cannot use Service customer/wandb-console because Helm release console owns it; keep console.install=false while standalone Console is installed
