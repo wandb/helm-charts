@@ -369,6 +369,37 @@ Global values will override any chart-specific values.
   {{- end }}
 {{- end -}}
 
+{{- define "wandb.weaveTraceClickhouseMigratorEnvs" -}}
+  {{- /*
+    The migration init container shares the selected Weave ClickHouse
+    connection, but may override its user and password with a dedicated
+    identity. Runtime containers continue to receive the standard Weave
+    credentials.
+  */ -}}
+  {{- $config := include "wandb.olapConfig" (dict "root" . "featureName" "weaveTrace") | fromYaml -}}
+  {{- $source := default "legacy" .Values.global.weaveTrace.clickhouseSource -}}
+  {{- $migrator := default (dict) $config.migrator -}}
+  {{- $migratorEnabled := default false $migrator.enabled -}}
+  {{- if and (eq $source "olap") $migratorEnabled -}}
+    {{- if not (kindIs "map" $migrator.password) -}}
+      {{- fail "global.olap.weaveTrace.migrator.password must use valueFrom" -}}
+    {{- end -}}
+    {{- if not (hasKey $migrator.password "valueFrom") -}}
+      {{- fail "global.olap.weaveTrace.migrator.password must use valueFrom" -}}
+    {{- end -}}
+    {{- if not (kindIs "map" $migrator.user) -}}
+      {{- fail "global.olap.weaveTrace.migrator.user must use valueFrom" -}}
+    {{- end -}}
+    {{- if not (hasKey $migrator.user "valueFrom") -}}
+      {{- fail "global.olap.weaveTrace.migrator.user must use valueFrom" -}}
+    {{- end -}}
+    {{- $envs := list -}}
+    {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_USER" "value" $migrator.user) | fromYaml) -}}
+    {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_PASS" "value" $migrator.password) | fromYaml) -}}
+{{- toYaml $envs }}
+  {{- end -}}
+{{- end -}}
+
 {{- define "wandb.olapFeatureEnvs" -}}
   {{- /*
     Shared template for OLAP feature environment variables.
