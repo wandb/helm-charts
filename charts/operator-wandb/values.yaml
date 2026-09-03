@@ -307,6 +307,12 @@ global:
       port: "8443"
       database: "weave_trace_db"
       replicated: false
+      # The migration init container can use a separate ClickHouse identity.
+      # Credentials must be supplied through Kubernetes valueFrom references.
+      migrator:
+        enabled: false
+        user: {}
+        password: {}
 
   #
   # FOR ADVANCED USERS:
@@ -3889,6 +3895,8 @@ weave-trace:
   initContainers:
     weave-trace-migrate:
       args: ["python", "migrator.py"]
+      envTpls:
+        - '{{ include "wandb.weaveTraceClickhouseMigratorEnvs" . }}'
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
