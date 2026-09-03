@@ -135,6 +135,52 @@ tests:
                 name: weave-clickhouse
                 key: username
 
+  - it: replaces default value references with Weave-specific references
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.default:
+        user:
+          valueFrom:
+            configMapKeyRef:
+              name: clickhouse-default
+              key: user
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-default
+              key: password
+      global.olap.weaveTrace:
+        enabled: true
+        user:
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-weave
+              key: username
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-weave
+              key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: username
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: password
+
   - it: gives only the migration init container its dedicated identity
     template: charts/weave-trace/templates/deployment.yaml
     set:
