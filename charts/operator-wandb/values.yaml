@@ -227,6 +227,12 @@ global:
   #         name: "clickhouse-settings-secret"
   #         key: "password"
 
+  weaveTrace:
+    # Selects which ClickHouse connection is rendered into Weave Trace workloads.
+    # "legacy" preserves global.clickhouse; "olap" selects global.olap.weaveTrace.
+    # Enabling the OLAP profile alone does not change the active connection.
+    clickhouseSource: legacy
+
   # OLAP database configuration (ClickHouse)
   #
   # Features like Registry Search, Runs Accelerator, and History Updater each
@@ -287,16 +293,26 @@ global:
       enabled: false
       database: "runs"
     history:
-      enabled: false
+      # When set, this also controls installation of the history updater. It is
+      # unset by default to fall back to the legacy history-updater.install value.
+      # enabled: false
       database: "history"
       params:
         max_open_conns: 300
-    # TODO: wire this up when weave trace is ready to be migrated from global.clickhouse. to global.olap.weaveTrace.
-    # weaveTrace:
-    #   enabled: false
-    #   port: 8443
-    #   database: "weave_trace_db"
-    #   params: {} # TBD if even needed.
+    # Weave Trace keeps its legacy WF_CLICKHOUSE_* environment variable names.
+    # Enabling this makes the profile available. Set
+    # global.weaveTrace.clickhouseSource to "olap" to select it.
+    weaveTrace:
+      enabled: false
+      port: "8443"
+      database: "weave_trace_db"
+      replicated: false
+      # The migration init container can use a separate ClickHouse identity.
+      # Credentials must be supplied through Kubernetes valueFrom references.
+      migrator:
+        enabled: false
+        user: {}
+        password: {}
 
   #
   # FOR ADVANCED USERS:
@@ -853,9 +869,7 @@ app:
     tag: latest
   # TODO(dpanzella) Read from here for backwards compatability, needs to be moved so API can access as well
   internalJWTMap:
-    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace"
-      issuer: "https://kubernetes.default.svc.cluster.local"
-    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ .Release.Name }}-weave-trace-worker"
+    - subject: "system:serviceaccount:{{ .Release.Namespace }}:{{ include `wandb.weaveTraceServiceAccountName` . }}"
       issuer: "https://kubernetes.default.svc.cluster.local"
   env:
     GORILLA_LICENSE_CERT_PATH: "/var/app/jwks.json"
@@ -1875,7 +1889,9 @@ flat-run-fields-updater:
 history-updater:
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
+  # Deprecated compatibility fallback for global.olap.history.enabled.
   install: false
+  traceRatio: 1
   pubSub:
     # pubSub subscription comes from terraform
     subscription: ""
@@ -2604,6 +2620,8 @@ history-reader:
 
 frontend:
   install: false
+  podAnnotations:
+    ad.datadoghq.com/frontend.logs: '[{"source": "nginx", "service": "frontend"}]'
   podSecurityContext:
     runAsUser: 101
   image:
@@ -3856,6 +3874,8 @@ mcp-server:
 
 weave-trace:
   install: false
+  serviceAccount:
+    useWeaveTraceIdentity: true
   deploymentPostfix: "bc"
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
@@ -3870,11 +3890,13 @@ weave-trace:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
-    - '{{ include "wandb.clickhouseEnvs" . }}'
+    - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   initContainers:
     weave-trace-migrate:
       args: ["python", "migrator.py"]
+      envTpls:
+        - '{{ include "wandb.weaveTraceClickhouseMigratorEnvs" . }}'
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
@@ -3998,6 +4020,8 @@ weave-trace:
 
 weave-trace-worker:
   install: false
+  serviceAccount:
+    useWeaveTraceIdentity: true
   deploymentPostfix: "bc"
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
@@ -4011,7 +4035,7 @@ weave-trace-worker:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
-    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     WANDB_INTERNAL_SERVICE_TOKEN:
@@ -4110,6 +4134,8 @@ weave-trace-worker:
 
 weave-evaluate-model-worker:
   install: false
+  serviceAccount:
+    useWeaveTraceIdentity: true
   deploymentPostfix: "bc"
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
@@ -4123,7 +4149,7 @@ weave-evaluate-model-worker:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
-    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     WANDB_INTERNAL_SERVICE_TOKEN:
@@ -4216,6 +4242,8 @@ weave-evaluate-model-worker:
 
 weave-trace-agent-scoring-worker:
   install: false
+  serviceAccount:
+    useWeaveTraceIdentity: true
   deploymentPostfix: "bc"
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
@@ -4227,7 +4255,7 @@ weave-trace-agent-scoring-worker:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
   envTpls:
-    - '{{ include "wandb.clickhouseConfigEnvs" . }}'
+    - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   env:
     WANDB_INTERNAL_SERVICE_TOKEN:

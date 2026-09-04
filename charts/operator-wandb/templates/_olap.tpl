@@ -6,13 +6,20 @@ Usage:
 
 Returns: YAML string of the merged config map.
 
-Sprig `merge` deep-merges nested maps (like params). Feature keys win,
-missing keys fall through from default.
+Feature values replace defaults as complete values, including valueFrom maps.
+The params map is the exception: its nested keys are merged so a feature can
+override one parameter while inheriting the others.
 */}}
 {{- define "wandb.olapConfig" -}}
   {{- $default := deepCopy (default (dict) (index .root.Values.global.olap "default")) -}}
   {{- $feature := deepCopy (default (dict) (index .root.Values.global.olap .featureName)) -}}
-{{- toYaml (merge $feature $default) -}}
+  {{- $config := merge (deepCopy $feature) $default -}}
+  {{- range $key, $value := $feature -}}
+    {{- if ne $key "params" -}}
+      {{- $_ := set $config $key (deepCopy $value) -}}
+    {{- end -}}
+  {{- end -}}
+{{- toYaml $config -}}
 {{- end -}}
 
 {{/*
