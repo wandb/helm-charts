@@ -293,7 +293,9 @@ global:
       enabled: false
       database: "runs"
     history:
-      enabled: false
+      # When set, this also controls installation of the history updater. It is
+      # unset by default to fall back to the legacy history-updater.install value.
+      # enabled: false
       database: "history"
       params:
         max_open_conns: 300
@@ -305,6 +307,12 @@ global:
       port: "8443"
       database: "weave_trace_db"
       replicated: false
+      # The migration init container can use a separate ClickHouse identity.
+      # Credentials must be supplied through Kubernetes valueFrom references.
+      migrator:
+        enabled: false
+        user: {}
+        password: {}
 
   #
   # FOR ADVANCED USERS:
@@ -1883,7 +1891,9 @@ flat-run-fields-updater:
 history-updater:
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
+  # Deprecated compatibility fallback for global.olap.history.enabled.
   install: false
+  traceRatio: 1
   pubSub:
     # pubSub subscription comes from terraform
     subscription: ""
@@ -3887,6 +3897,8 @@ weave-trace:
   initContainers:
     weave-trace-migrate:
       args: ["python", "migrator.py"]
+      envTpls:
+        - '{{ include "wandb.weaveTraceClickhouseMigratorEnvs" . }}'
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
@@ -3899,6 +3911,7 @@ weave-trace:
         - "0.0.0.0"
         - "--port"
         - "8080"
+        - "--reset-contextvars"
       livenessProbe:
         httpGet:
           path: /traces/health

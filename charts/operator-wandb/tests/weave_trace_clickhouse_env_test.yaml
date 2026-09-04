@@ -126,6 +126,175 @@ tests:
               configMapKeyRef:
                 name: weave-clickhouse
                 key: replicated
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: weave-clickhouse
+                key: username
+
+  - it: replaces default value references with Weave-specific references
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.default:
+        user:
+          valueFrom:
+            configMapKeyRef:
+              name: clickhouse-default
+              key: user
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-default
+              key: password
+      global.olap.weaveTrace:
+        enabled: true
+        user:
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-weave
+              key: username
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-weave
+              key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: username
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: password
+
+  - it: gives only the migration init container its dedicated identity
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        user:
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-weave
+              key: username
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: clickhouse-weave
+              key: password
+        migrator:
+          enabled: true
+          user:
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-migrator
+                key: username
+          password:
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-migrator
+                key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-migrator
+                key: username
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-migrator
+                key: password
+      - notContains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: username
+      - notContains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: password
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: username
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: password
+
+  - it: rejects an inline migration password
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        migrator:
+          enabled: true
+          password: inline-password
+    asserts:
+      - failedTemplate:
+          errorMessage: global.olap.weaveTrace.migrator.password must use valueFrom
+
+  - it: rejects an inline migration user
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.weaveTrace:
+        enabled: true
+        host: managed-clickhouse.example.com
+        migrator:
+          enabled: true
+          user: weave_migrator
+          password:
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-migrator
+                key: password
+    asserts:
+      - failedTemplate:
+          errorMessage: global.olap.weaveTrace.migrator.user must use valueFrom
 
   - it: keeps the legacy connection when the OLAP profile is only enabled
     template: charts/weave-trace/templates/deployment.yaml
