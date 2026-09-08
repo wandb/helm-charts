@@ -1,0 +1,30 @@
+suite: explicit pod service account token mounting
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: leaves token mounting to Kubernetes when the pod option is omitted
+    asserts:
+      - notExists:
+          path: spec.template.spec.automountServiceAccountToken
+  - it: disables token mounting even when the service account permits it
+    set:
+      automountServiceAccountToken: false
+      serviceAccount.automount: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+  - it: allows an explicit pod opt-in independently of the service account
+    set:
+      automountServiceAccountToken: true
+      serviceAccount.automount: false
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+  - it: rejects a string instead of treating false as truthy
+    set:
+      automountServiceAccountToken: "false"
+    asserts:
+      - failedTemplate:
+          errorMessage: automountServiceAccountToken must be a boolean or null
