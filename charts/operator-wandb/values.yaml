@@ -3728,11 +3728,12 @@ mcp-server:
   serviceAccount:
     create: true
     automount: false
+  automountServiceAccountToken: false
   role:
     create: false
-  ## Keep one pod and one Uvicorn worker so the process-local admission budget
-  ## is deterministic. Workload policy is owned by the `dedicated` server
-  ## profile; replicas and autoscaling are chart invariants for v0.4.
+  ## Keep one steady-state pod and one Uvicorn worker. Rolling updates preserve
+  ## availability with maxSurge=1, temporarily allowing two process-local
+  ## admission budgets. Workload policy belongs to the dedicated server profile.
   replicaCount: 1
   autoscaling:
     horizontal:
@@ -3751,7 +3752,7 @@ mcp-server:
         - "entrypoint.sh"
       livenessProbe:
         httpGet:
-          path: /mcp/health
+          path: /mcp/livez
           port: 8080
         initialDelaySeconds: 10
         periodSeconds: 30

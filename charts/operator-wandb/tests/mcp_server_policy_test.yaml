@@ -1,0 +1,187 @@
+suite: MCP effective deployment policy
+templates:
+  - templates/mcp-validation.yaml
+release:
+  name: customer-a
+tests:
+  - it: rejects a container template overriding read-only access
+    set:
+      mcp-server.install: true
+      mcp-server.accessMode: read-only
+      mcp-server.containers.mcp-server.envTpls:
+        - |
+          - name: WANDB_MCP_ACCESS_MODE
+            value: read-write
+    asserts:
+      - failedTemplate: {}
+  - it: rejects container templates disabling authentication or privacy
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.envTpls:
+        - |
+          - name: MCP_AUTH_DISABLED
+            value: "true"
+          - name: MCP_LOG_PRIVACY_LEVEL
+            value: "off"
+    asserts:
+      - failedTemplate: {}
+  - it: rejects templated environment map keys before rendering
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv:
+        '{{ `MCP_WORKLOAD_PROFILE` }}': local
+    asserts:
+      - failedTemplate: {}
+  - it: rejects container overrides of the SDK privacy defaults
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.WEAVE_DISABLED: "false"
+    asserts:
+      - failedTemplate: {}
+  - it: rejects an environment value map trying to replace its declared name
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.CUSTOM_ENTRY:
+        name: MCP_AUTH_DISABLED
+        value: "true"
+    asserts:
+      - failedTemplate: {}
+  - it: rejects duplicate benign environment entries
+    set:
+      mcp-server.install: true
+      mcp-server.envTpls:
+        - '{{ include "wandb.mcpEnvs" . }}'
+        - |
+          - name: CUSTOM_MARKER
+            value: first
+          - name: CUSTOM_MARKER
+            value: second
+    asserts:
+      - failedTemplate: {}
+  - it: rejects malformed rendered environment names
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.envTpls:
+        - |
+          - name: "bad=name"
+            value: unused
+    asserts:
+      - failedTemplate: {}
+  - it: keeps benign parent and container environment extensions
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.CUSTOM_PARENT: retained
+      mcp-server.containers.mcp-server.env.CUSTOM_CONTAINER: retained
+      mcp-server.containers.mcp-server.envTpls:
+        - |
+          - name: CUSTOM_TEMPLATE
+            value: retained
+    asserts:
+      - notFailedTemplate: {}
+  - it: rejects a shared Weave service account
+    set:
+      mcp-server.install: true
+      mcp-server.serviceAccount.useWeaveTraceIdentity: true
+    asserts:
+      - failedTemplate: {}
+  - it: rejects the shared Azure identity selector
+    set:
+      mcp-server.install: true
+      mcp-server.azureStorageUseSharedServiceAccount: true
+    asserts:
+      - failedTemplate: {}
+  - it: rejects automatic selection of the shared Azure identity
+    set:
+      mcp-server.install: true
+      global.azureStorageIdentity.tenantId: audit-tenant
+      global.azureStorageIdentity.clientId: audit-client
+      global.defaultBucket.provider: az
+      mcp-server.podLabels:
+        azure.workload.identity/use: "true"
+    asserts:
+      - failedTemplate: {}
+  - it: rejects an unrelated explicit service account name
+    set:
+      mcp-server.install: true
+      mcp-server.serviceAccount.name: another-component
+    asserts:
+      - failedTemplate: {}
+  - it: rejects pod token mounting even when the account disables it
+    set:
+      mcp-server.install: true
+      mcp-server.automountServiceAccountToken: true
+    asserts:
+      - failedTemplate: {}
+  - it: rejects an explicitly null pod token policy
+    set:
+      mcp-server.install: true
+      mcp-server.automountServiceAccountToken: null
+    asserts:
+      - failedTemplate: {}
+  - it: rejects zero replicas
+    set:
+      mcp-server.install: true
+      mcp-server.replicaCount: 0
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a replica count string
+    set:
+      mcp-server.install: true
+      mcp-server.replicaCount: "1"
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a replica count boolean
+    set:
+      mcp-server.install: true
+      mcp-server.replicaCount: false
+    asserts:
+      - failedTemplate: {}
+  - it: accepts a custom HTTP service port targeting the fixed application port
+    set:
+      mcp-server.install: true
+      mcp-server.service.ports:
+        - {name: http, port: 9090, targetPort: 8080, protocol: TCP}
+    asserts:
+      - notFailedTemplate: {}
+  - it: rejects a missing HTTP service port
+    set:
+      mcp-server.install: true
+      mcp-server.service.ports: []
+    asserts:
+      - failedTemplate: {}
+  - it: rejects duplicate HTTP service ports
+    set:
+      mcp-server.install: true
+      mcp-server.service.ports:
+        - {name: http, port: 8080, targetPort: 8080, protocol: TCP}
+        - {name: http, port: 9090, targetPort: 8080, protocol: TCP}
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a service port outside the TCP range
+    set:
+      mcp-server.install: true
+      mcp-server.service.ports:
+        - {name: http, port: 65536, targetPort: 8080, protocol: TCP}
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a string HTTP service port
+    set:
+      mcp-server.install: true
+      mcp-server.service.ports:
+        - {name: http, port: "8080", targetPort: 8080, protocol: TCP}
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a UDP HTTP service port
+    set:
+      mcp-server.install: true
+      mcp-server.service.ports:
+        - {name: http, port: 8080, targetPort: 8080, protocol: UDP}
+    asserts:
+      - failedTemplate: {}
+  - it: rejects a service port targeting the wrong application port
+    set:
+      mcp-server.install: true
+      mcp-server.service.ports:
+        - {name: http, port: 8080, targetPort: 9000, protocol: TCP}
+    asserts:
+      - failedTemplate: {}

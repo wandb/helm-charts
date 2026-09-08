@@ -245,9 +245,30 @@ The server-owned `dedicated` workload profile controls limits, admission,
 deadlines, sessions, and worker policy. Low-level environment overrides and
 opaque `envFrom` sources are rejected. MCP uses the internal ClusterIP for W&B
 API calls while `global.host` remains the public URL for user-facing links. It
-runs as one pod without HPA/VPA/KEDA, Kubernetes RBAC, or a mounted service-account
-token. Component-specific `nodeSelector`, `tolerations`, `affinity`, and
+runs as one steady-state pod without HPA/VPA/KEDA, Kubernetes RBAC, or a mounted
+service-account token. Rolling updates retain `maxSurge: 1` for availability,
+so two independent process budgets can briefly overlap. Liveness uses
+`/mcp/livez`; readiness and the Helm health hook use `/mcp/health` so saturation
+does not restart a healthy process. Component-specific `nodeSelector`, `tolerations`, `affinity`, and
 `topologySpreadConstraints` remain supported scheduling controls.
+
+Capacity follows `global.size`: `default`, `testing`, and `small` select `small`;
+`medium` selects `medium`; `large`, `xlarge`, and `xxlarge` select `large`.
+These select server concurrency budgets, not CPU or memory requests. Resource
+settings remain explicit deployment controls; changing capacity does not resize
+the pod. The numeric defaults stay unchanged pending the release benchmarks.
+
+MCP uses its own ServiceAccount and disables automatic token mounting on both
+the account and Pod. Shared Weave/Azure identity selectors are rejected. Generic
+environment extensions must have literal names and cannot override the typed
+contract or SDK privacy flags, including through container templates. Final
+rendered environment entries must be unique. The inherited CA certificate
+mounts remain available for private upstream certificates.
+
+Ingress and the health hook follow the actual MCP Service name, including
+component name overrides. `mcp-server.service.ports` must contain exactly one
+named `http` TCP port from 1 to 65535 with `targetPort: 8080`. For example, a
+Service port of 9090 is supported while application and probe ports remain 8080.
 
 ## Use External Stateful Data
 

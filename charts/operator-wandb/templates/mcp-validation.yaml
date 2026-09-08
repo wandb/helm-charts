@@ -3,9 +3,9 @@
   resources. It runs only when MCP is installed because it relies on the
   dependency's subchart scope to evaluate operator-provided templates.
 */}}
-{{- $mcp := index .Values "mcp-server" | default dict -}}
+{{- $mcp := deepCopy (index .Values "mcp-server" | default dict) -}}
 {{- if index $mcp "install" -}}
-  {{- $mcpTplContext := index .Subcharts "mcp-server" -}}
+  {{- $mcpTplContext := deepCopy (index .Subcharts "mcp-server") -}}
   {{- $mcpEnv := index $mcp "env" | default dict -}}
   {{- $mcpExtraEnv := index $mcp "extraEnv" | default dict -}}
   {{- $mcpContainers := index $mcp "containers" | default dict -}}
@@ -16,6 +16,14 @@
   {{- $reservedEnvNames := include "wandb.mcpReservedEnvNames" . | fromJsonArray -}}
   {{- $reservedEnvPrefixes := list "WANDB_" "WEAVE_TRACE_" "WF_TRACE_" "WB_AGENT_" "MCP_" "MAX_" "SESSION_" "UVICORN_" "DD_" "OTEL_" -}}
   {{- $ownedBenignEnvNames := list "WANDB_SILENT" "WEAVE_SILENT" "WEAVE_DISABLED" "ENVIRONMENT" -}}
+  {{- $reservedEnvNames = concat $reservedEnvNames $ownedBenignEnvNames -}}
+  {{- range $channel := list $mcpEnv $mcpExtraEnv $mcpContainerEnv -}}
+    {{- range $name, $_ := $channel -}}
+      {{- if not (regexMatch `^[A-Za-z_][A-Za-z0-9_]*$` $name) -}}
+        {{- fail "MCP environment map keys must be literal shell-style names" -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
 
   {{/* The top-level image tuple is the sole immutable MCP image authority. */}}
   {{- $rootImageTpl := index $mcp "imageTpl" | default "" | toString | trim -}}
@@ -90,7 +98,7 @@
       {{- if $isCanonicalMcpEnvTpl -}}
         {{- $canonicalMcpEnvTplCount = add1 $canonicalMcpEnvTplCount -}}
       {{- else -}}
-        {{- range (tpl . $mcpTplContext | fromYamlArray) -}}
+        {{- range (tpl . (deepCopy $mcpTplContext) | fromYamlArray) -}}
           {{- if not (kindIs "map" .) -}}
             {{- fail "mcp-server.envTpls entries must render a YAML array of environment maps" -}}
           {{- else -}}
@@ -106,6 +114,20 @@
   {{- end -}}
   {{- if ne $canonicalMcpEnvTplCount 1 -}}
     {{- fail "mcp-server.envTpls must include wandb.mcpEnvs exactly once" -}}
+  {{- end -}}
+  {{- range (index $mcpContainer "envTpls" | default list) -}}
+    {{- if not (kindIs "string" .) -}}
+      {{- fail "MCP container environment templates must be strings" -}}
+    {{- end -}}
+    {{- range (tpl . (deepCopy $mcpTplContext) | fromYamlArray) -}}
+      {{- if not (kindIs "map" .) -}}
+        {{- fail "MCP container environment templates must render environment maps" -}}
+      {{- end -}}
+      {{- $name := index . "name" | default "" | toString -}}
+      {{- if eq (include "wandb.isMcpReservedEnvName" (dict "name" $name "reservedNames" $reservedEnvNames "reservedPrefixes" $reservedEnvPrefixes)) "true" -}}
+        {{- fail (printf "%s cannot be rendered by a container MCP environment template" $name) -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
 
   {{/* Tool profile and access mode are the complete Dedicated product surface. */}}
@@ -142,7 +164,7 @@
   {{- if not (kindIs "string" $rawTraceURL) -}}
     {{- fail $traceError -}}
   {{- end -}}
-  {{- $traceURL := tpl $rawTraceURL $mcpTplContext | trim -}}
+  {{- $traceURL := tpl $rawTraceURL (deepCopy $mcpTplContext) | trim -}}
   {{- $hasTraceURL := ne $traceURL "" -}}
   {{- if and (eq $traceMode "disabled") $hasTraceURL -}}
     {{- fail "mcp-server.traceBackend.url must be empty when traceBackend.mode=disabled" -}}
@@ -170,7 +192,7 @@
   {{- if not (kindIs "string" $rawInternalURL) -}}
     {{- fail $internalError -}}
   {{- end -}}
-  {{- $internalURL := tpl $rawInternalURL $mcpTplContext | trim -}}
+  {{- $internalURL := tpl $rawInternalURL (deepCopy $mcpTplContext) | trim -}}
   {{- $hasInternalURLOverride := ne $internalURL "" -}}
   {{- if $hasInternalURLOverride -}}
     {{- include "wandb.validateMcpEndpoint" (dict "url" $internalURL "errorMessage" $internalError) -}}
@@ -282,7 +304,7 @@
     {{- if not (kindIs "string" $rawOtelHost) -}}
       {{- fail "global.otel.traces.host must be a DNS hostname" -}}
     {{- end -}}
-    {{- $otelHost := tpl $rawOtelHost $mcpTplContext | trim -}}
+    {{- $otelHost := tpl $rawOtelHost (deepCopy $mcpTplContext) | trim -}}
     {{- if and (ne $otelHost "") (not (regexMatch `^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)([.]([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$` $otelHost)) -}}
       {{- fail "global.otel.traces.host must be a DNS hostname" -}}
     {{- end -}}
@@ -304,7 +326,7 @@
   {{- $rawGlobalOptOutEnv := index $globalOptOut "env" -}}
   {{- $globalOptOutEnv := false -}}
   {{- if kindIs "string" $rawGlobalOptOutEnv -}}
-    {{- $globalOptOutEnv = eq (tpl $rawGlobalOptOutEnv $mcpTplContext | trim | lower) "true" -}}
+    {{- $globalOptOutEnv = eq (tpl $rawGlobalOptOutEnv (deepCopy $mcpTplContext) | trim | lower) "true" -}}
   {{- else -}}
     {{- $globalOptOutEnv = $rawGlobalOptOutEnv -}}
   {{- end -}}
@@ -312,14 +334,28 @@
     {{- fail "mcp-server.globalOptOut.env must remain true to isolate MCP from global administrative environment" -}}
   {{- end -}}
   {{- $serviceAccount := index $mcp "serviceAccount" | default dict -}}
-  {{- if or (not (index $serviceAccount "create")) (index $serviceAccount "automount") -}}
+  {{- $sharedAzureIdentity := index $mcp "azureStorageUseSharedServiceAccount" | default false -}}
+  {{- if kindIs "string" $sharedAzureIdentity -}}
+    {{- $sharedAzureIdentity = eq (tpl $sharedAzureIdentity (deepCopy $mcpTplContext) | trim | lower) "true" -}}
+  {{- end -}}
+  {{- if or (index $serviceAccount "useWeaveTraceIdentity") $sharedAzureIdentity (eq (include "wandb-base.azureStorageServiceAccountEnabled" (deepCopy $mcpTplContext) | trim) "true") -}}
+    {{- fail "MCP cannot use a shared Weave or Azure service account" -}}
+  {{- end -}}
+  {{- if or (ne (toJson (index $serviceAccount "create")) "true") (ne (toJson (index $serviceAccount "automount")) "false") -}}
     {{- fail "mcp-server must use its dedicated service account with token automount disabled" -}}
+  {{- end -}}
+  {{- if ne (toJson (index $mcp "automountServiceAccountToken")) "false" -}}
+    {{- fail "mcp-server.automountServiceAccountToken must remain false" -}}
+  {{- end -}}
+  {{- $dedicatedServiceAccountName := include "wandb-base.fullname" (deepCopy $mcpTplContext) -}}
+  {{- if ne (include "wandb-base.serviceAccountName" (deepCopy $mcpTplContext)) $dedicatedServiceAccountName -}}
+    {{- fail "MCP must use its own component service account" -}}
   {{- end -}}
   {{- $role := index $mcp "role" | default dict -}}
   {{- if index $role "create" -}}
     {{- fail "mcp-server.role.create must remain false because MCP needs no Kubernetes RBAC" -}}
   {{- end -}}
-  {{- if ne (index $mcp "replicaCount" | default 1 | int) 1 -}}
+  {{- if ne (toJson (index $mcp "replicaCount")) "1" -}}
     {{- fail "mcp-server.replicaCount must remain 1 in the Dedicated v0.4 contract" -}}
   {{- end -}}
   {{- $autoscaling := index $mcp "autoscaling" | default dict -}}
@@ -333,4 +369,6 @@
   {{- if or (not (index $service "enabled")) (ne (index $service "type" | default "" | toString) "ClusterIP") -}}
     {{- fail "mcp-server.service must remain an enabled internal ClusterIP" -}}
   {{- end -}}
+  {{- $_ := include "wandb.mcpServicePort" . -}}
+  {{- include "wandb.validateMcpEffectiveEnv" (dict "context" $mcpTplContext "reservedNames" $reservedEnvNames "reservedPrefixes" $reservedEnvPrefixes) -}}
 {{- end -}}

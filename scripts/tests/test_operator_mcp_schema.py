@@ -39,6 +39,9 @@ class OperatorMcpSchemaTest(unittest.TestCase):
             ["auto", "disabled"],
         )
 
+    def test_replica_count_is_the_integer_one(self) -> None:
+        self.assertEqual(self.mcp["replicaCount"], {"type": "integer", "const": 1})
+
     def test_image_digest_is_immutable_sha256_or_unset(self) -> None:
         self.assertEqual(
             self.mcp["image"]["properties"]["digest"]["pattern"],
