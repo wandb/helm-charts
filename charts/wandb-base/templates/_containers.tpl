@@ -49,7 +49,7 @@
         {{- end -}}
       {{- end -}}
 
-      {{- /* We prerender the envTpls and put them into an array for searching */ -}}
+      {{- /* Render shared and container-specific env templates. */ -}}
       {{- $envTpls := list }}
       {{- if $.root.Values.envTpls -}}
         {{- range $.root.Values.envTpls }}
@@ -57,7 +57,24 @@
         {{- end -}}
       {{- end -}}
 
-      {{- /* Iterate over the envvars rendered from envTpls, and remove any specified in env to avoid setElementOrder errors */ -}}
+      {{- $containerEnvTpls := list }}
+      {{- if $container.envTpls -}}
+        {{- range $container.envTpls }}
+          {{- $containerEnvTpls = concat $containerEnvTpls (tpl . $.root | fromYamlArray) -}}
+        {{- end -}}
+      {{- end -}}
+
+      {{- /* Container templates override shared templates by variable name. */ -}}
+      {{- range $containerEnvVar := $containerEnvTpls }}
+        {{- range $envVar := $envTpls }}
+          {{- if eq $containerEnvVar.name $envVar.name -}}
+            {{- $envTpls = without $envTpls $envVar -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $envTpls = concat $envTpls $containerEnvTpls -}}
+
+      {{- /* Explicit env values override all rendered env templates. */ -}}
       {{- range $index, $envVar := $envTpls }}
         {{- if hasKey $container.env $envVar.name -}}
           {{- $envTpls = without $envTpls $envVar -}}

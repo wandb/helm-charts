@@ -9,8 +9,10 @@
 "registrySearch" (list "GORILLA_REGISTRY_SEARCH_ADDRESS" "MIGRATE_ARTIFACTS_DB")
 "runStoreAccelerator" (list "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS" "MIGRATE_RUN_STORE_ACCELERATOR_DB" "MIGRATE_RUNS_ACCELERATOR_DB")
 -}}
+{{- /* Weave Trace runs its Python migrator in the workload's initContainer. */ -}}
+{{- $featuresWithOwnMigrator := list "weaveTrace" -}}
 {{- range $featureName, $featureConfig := .Values.global.olap -}}
-  {{- if ne $featureName "default" -}}
+  {{- if and (ne $featureName "default") (not (has $featureName $featuresWithOwnMigrator)) -}}
     {{- $config := include "wandb.olapConfig" (dict "root" $ "featureName" $featureName) | fromYaml -}}
     {{- if $config.enabled -}}
       {{- if not (hasKey $featureSpecificVars $featureName) -}}
