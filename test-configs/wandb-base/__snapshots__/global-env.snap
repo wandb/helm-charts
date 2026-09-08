@@ -1,0 +1,109 @@
+# chartsnap: snapshot_version=v3
+---
+# Source: wandb-base/templates/pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selector:
+    matchExpressions:
+    - key: batch.kubernetes.io/job-name
+      operator: DoesNotExist
+    matchLabels:
+      app.kubernetes.io/name: wandb-base
+      app.kubernetes.io/instance: chartsnap
+  maxUnavailable: 1
+---
+# Source: wandb-base/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: wandb-base/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chartsnap-wandb-base
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: wandb-base
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wandb-base
+      app.kubernetes.io/instance: chartsnap
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: '###CHART_VERSION###'
+        app.kubernetes.io/name: wandb-base
+        app.kubernetes.io/instance: chartsnap
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      containers:
+      - name: app
+        envFrom:
+        env:
+        - name: CHART_LOCAL
+          value: "retained"
+        - name: GLOBAL_CURRENT
+          value: "inherited"
+        - name: GLOBAL_LEGACY
+          value: "inherited"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add: []
+            drop: []
+          privileged: false
+          readOnlyRootFilesystem: false
+        image: "nginx:1.27"
+        imagePullPolicy:
+      serviceAccountName: chartsnap-wandb-base
+      securityContext:
+        fsGroup: 0
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: ScheduleAnyway
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/name: wandb-base
+        maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
