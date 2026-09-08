@@ -105,6 +105,27 @@ global:
   priorityClassName: ""
 ```
 
+### Azure managed storage workload identity
+
+Before setting `global.azureStorageIdentity`, deploy a server build containing
+[instance-level Azure identity support and blob-scoped SAS signing](https://github.com/wandb/core/pull/48160).
+Check the images running in every storage-consuming workload, including component
+image overrides. A chart upgrade or a projected Azure token does not make an older
+server use workload identity; it can still sign requests with an empty account key
+after the chart removes `AZURE_STORAGE_KEY`.
+
+Provision the instance managed identity, storage permissions, and federated
+credentials through Terraform before enabling the chart setting. For an initial
+rollout, set `global.azureStorageIdentity.serviceAccount.mode: component` to keep
+the existing Kubernetes service accounts. Consolidation with `grouped` is a separate
+migration.
+
+Keep the existing storage key secret during validation so removing the identity
+opt-in restores key authentication. Verify actual run-file and artifact uploads
+and downloads, and check that server-issued SAS URLs use the intended managed
+identity with blob scope (`sr=b`). Pod readiness alone does not validate storage
+authentication.
+
 ### Global Pod Scheduling
 
 The chart supports global `nodeSelector`, `tolerations`, and `priorityClassName` configuration that applies to **ALL components** (W&B services, databases, monitoring, etc.). This provides centralized control over pod scheduling and priority across your entire W&B deployment.

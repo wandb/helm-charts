@@ -440,6 +440,8 @@ global:
   # Infrastructure-managed Azure workload identity for this deployment. The
   # managed default bucket uses this identity. A customer Azure bucket can opt
   # in with global.bucket.azureAuthMethod: workloadIdentity.
+  # Requires a server build containing wandb/core#48160 in every storage consumer.
+  # Verify running component images before opting in; see the README rollout steps.
   # Each value can be a literal string or a Kubernetes EnvVarSource-style map:
   #   clientId:
   #     valueFrom:
@@ -452,6 +454,12 @@ global:
     # One deployment-wide account for Azure storage workload identity. Set
     # create: false when infrastructure creates and federates this account.
     serviceAccount:
+      # Existing WIF installations retain shared behavior unless explicitly
+      # migrated. New managed rollouts use component, then optionally grouped.
+      # component: preserve all component ServiceAccounts and federation.
+      # grouped: share ordinary storage workers, preserving privileged accounts
+      # and Weave internal authentication. Retain old FICs during migration.
+      mode: shared
       name: "wandb-bucket-access"
       create: true
       annotations: {}
