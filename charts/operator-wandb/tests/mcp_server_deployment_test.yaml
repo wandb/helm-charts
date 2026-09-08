@@ -13,6 +13,24 @@ release:
   namespace: wandb-system
 
 tests:
+  - it: disables pod token mounting and separates liveness from readiness
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /mcp/livez
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /mcp/health
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 1
+
   - it: does not mount Kubernetes API credentials
     template: charts/mcp-server/templates/serviceaccount.yaml
     set:
@@ -297,11 +315,11 @@ tests:
       global.extraEnv.GORILLA_INSECURE_ALLOW_API_KEY_ADMIN_ACCESS: "true"
       global.extraEnv.GORILLA_STATSIG_KEY: secret-statsig-canary
       mcp-server.install: true
-      mcp-server.env.MCP_LOCAL_MARKER: retained
+      mcp-server.env.CUSTOM_LOCAL_MARKER: retained
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
-          content: {name: MCP_LOCAL_MARKER, value: retained}
+          content: {name: CUSTOM_LOCAL_MARKER, value: retained}
       - notContains:
           path: spec.template.spec.containers[0].env
           content: {name: GLOBAL_ADMIN_API_KEY, value: secret-canary}

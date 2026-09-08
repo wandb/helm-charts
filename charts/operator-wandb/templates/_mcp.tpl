@@ -1,3 +1,76 @@
+{{/* Resolve the same Service name used by the dependency itself. */}}
+{{- define "wandb.mcpServiceName" -}}
+  {{- $context := deepCopy (index .Subcharts "mcp-server") -}}
+  {{- $name := $context.Values.service.name | default (include "wandb-base.fullname" $context) -}}
+{{- tpl $name $context | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/* Service ports may change; the application and probes still use 8080. */}}
+{{- define "wandb.mcpServicePort" -}}
+  {{- $mcp := index .Values "mcp-server" -}}
+  {{- $httpPorts := list -}}
+  {{- range $mcp.service.ports -}}
+    {{- if eq (.name | default "") "http" -}}
+      {{- $httpPorts = append $httpPorts . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if ne (len $httpPorts) 1 -}}
+    {{- fail "MCP Service must have exactly one named http port" -}}
+  {{- end -}}
+  {{- $http := first $httpPorts -}}
+  {{- if or (not (regexMatch `^[0-9]+$` (toJson $http.port))) (lt (int $http.port) 1) (gt (int $http.port) 65535) (ne (toJson $http.targetPort) "8080") (ne ($http.protocol | default "TCP") "TCP") -}}
+    {{- fail "MCP http Service port must be an integer from 1 to 65535 using TCP and targetPort 8080" -}}
+  {{- end -}}
+{{- $http.port -}}
+{{- end -}}
+
+{{/*
+  Validate the environment emitted by the base renderer, rather than duplicating
+  its merge precedence. Every render gets an isolated values copy because tpl
+  and merge helpers can mutate their input. Error messages never contain values.
+*/}}
+{{- define "wandb.validateMcpEffectiveEnv" -}}
+  {{- $expected := dict -}}
+  {{- range (include "wandb.mcpEnvs" (deepCopy .context) | fromYamlArray) -}}
+    {{- $_ := set $expected .name . -}}
+  {{- end -}}
+  {{- range $name := list "WANDB_SILENT" "WEAVE_SILENT" "WEAVE_DISABLED" "ENVIRONMENT" -}}
+    {{- $_ := set $expected $name (dict "name" $name "value" (index $.context.Values.env $name | toString)) -}}
+  {{- end -}}
+  {{- $renderContext := deepCopy .context -}}
+  {{- $container := deepCopy (index $renderContext.Values.containers "mcp-server") -}}
+  {{- $rendered := include "wandb-base.containers" (dict "containers" (dict "mcp-server" $container) "root" $renderContext "source" "containers") | fromYamlArray -}}
+  {{- if or (ne (len $rendered) 1) (not (kindIs "map" (first $rendered))) -}}
+    {{- fail "MCP must render exactly one enabled mcp-server container" -}}
+  {{- end -}}
+  {{- $seen := dict -}}
+  {{- range (first $rendered).env -}}
+    {{- if not (kindIs "map" .) -}}
+      {{- fail "MCP environment entries must be maps" -}}
+    {{- end -}}
+    {{- $name := index . "name" | default "" -}}
+    {{- if or (not (kindIs "string" $name)) (not (regexMatch `^[A-Za-z_][A-Za-z0-9_]*$` ($name | toString))) -}}
+      {{- fail "MCP rendered environment names must be literal shell-style names" -}}
+    {{- end -}}
+    {{- if hasKey $seen $name -}}
+      {{- fail (printf "MCP rendered environment contains duplicate variable %s" $name) -}}
+    {{- end -}}
+    {{- $_ := set $seen $name true -}}
+    {{- if hasKey $expected $name -}}
+      {{- if not (deepEqual . (index $expected $name)) -}}
+        {{- fail (printf "MCP rendered environment changed release-controlled variable %s" $name) -}}
+      {{- end -}}
+    {{- else if eq (include "wandb.isMcpReservedEnvName" (dict "name" $name "reservedNames" $.reservedNames "reservedPrefixes" $.reservedPrefixes)) "true" -}}
+      {{- fail (printf "MCP rendered environment contains unsupported release-controlled variable %s" $name) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $name, $_ := $expected -}}
+    {{- if not (hasKey $seen $name) -}}
+      {{- fail (printf "MCP rendered environment is missing release-controlled variable %s" $name) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
 {{/*
   Datadog Autodiscovery tag JSON for the MCP container. Invoked from the mcp-server
   subchart's podAnnotations[ad.datadoghq.com/mcp-server.tags].
