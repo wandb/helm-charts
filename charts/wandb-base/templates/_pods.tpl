@@ -15,6 +15,12 @@ metadata:
     {{- tpl (include "wandb-base.labels" $.root | nindent 4) $.root }}
     {{- tpl (include "wandb-base.podLabels" $.root | nindent 4) $.root }}
 spec:
+  {{- if ne .podData.automountServiceAccountToken nil }}
+    {{- if not (kindIs "bool" .podData.automountServiceAccountToken) }}
+      {{- fail "automountServiceAccountToken must be a boolean or null" }}
+    {{- end }}
+  automountServiceAccountToken: {{ .podData.automountServiceAccountToken }}
+  {{- end }}
   {{- with .podData.affinity }}
   affinity:
     {{- toYaml . | nindent 4 }}
