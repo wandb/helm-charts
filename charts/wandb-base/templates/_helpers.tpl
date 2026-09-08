@@ -103,6 +103,11 @@ their component accounts.
 */}}
 {{- define "wandb-base.azureStorageServiceAccountEnabled" -}}
   {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
+  {{- $serviceAccount := default (dict) $identity.serviceAccount -}}
+  {{- $mode := default "shared" $serviceAccount.mode -}}
+  {{- if not (has $mode (list "shared" "component" "grouped")) -}}
+    {{- fail "global.azureStorageIdentity.serviceAccount.mode must be shared, component, or grouped" -}}
+  {{- end -}}
   {{- $globalConfigured := and (not (empty $identity.tenantId)) (not (empty $identity.clientId)) -}}
   {{- $bucket := default (dict) .Values.global.bucket -}}
   {{- $hasCustomerBucket := not (empty $bucket.name) -}}
@@ -123,7 +128,12 @@ their component accounts.
   {{- else -}}
     {{- $enabled = $workloadIdentity -}}
   {{- end -}}
-{{- and $globalConfigured (or $usesDeploymentIdentity $explicitSharedServiceAccount) $enabled -}}
+  {{- /* Keep Kubernetes RBAC and Weave internal-JWT subjects separate. */ -}}
+  {{- $role := default (dict) .Values.role -}}
+  {{- $componentAccount := default (dict) .Values.serviceAccount -}}
+  {{- $canGroup := and (not $role.create) (not $explicitSharedServiceAccount) (not $componentAccount.useWeaveTraceIdentity) -}}
+  {{- $share := or (eq $mode "shared") (and (eq $mode "grouped") $canGroup) -}}
+{{- and $globalConfigured (or $usesDeploymentIdentity $explicitSharedServiceAccount) $enabled $share -}}
 {{- end }}
 
 {{- define "wandb-base.azureStorageServiceAccountName" -}}
