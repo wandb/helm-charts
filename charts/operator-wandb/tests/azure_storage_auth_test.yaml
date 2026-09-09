@@ -5,6 +5,9 @@ templates:
   - charts/app/templates/deployment.yaml
   - charts/app/templates/serviceaccount.yaml
   - charts/app/templates/rolebinding.yaml
+  - charts/console/templates/deployment.yaml
+  - charts/console/templates/rolebinding.yaml
+  - charts/parquet/templates/deployment.yaml
   - charts/weave-trace/templates/deployment.yaml
   - charts/bufstream/templates/deployment.yaml
   - charts/bufstream/templates/service-account.yaml
@@ -588,3 +591,397 @@ tests:
       - equal:
           path: spec.template.spec.serviceAccountName
           value: externally-created-bucket-access
+
+  - it: keeps app on the correct account in component mode
+    template: charts/app/templates/deployment.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container/prefix
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: component
+      weave-trace:
+        install: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: chartsnap-app
+
+  - it: keeps console on the correct account in component mode
+    template: charts/console/templates/deployment.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container/prefix
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: component
+      weave-trace:
+        install: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: chartsnap-console
+
+  - it: keeps parquet on the correct account in component mode
+    template: charts/parquet/templates/deployment.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container/prefix
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: component
+      weave-trace:
+        install: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: chartsnap-parquet
+
+  - it: keeps weave-trace on the correct account in component mode
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global:
+        weave-trace:
+          fileStorage:
+            useDefaultBucket: true
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: component
+      weave-trace:
+        install: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: chartsnap-weave-trace
+
+  - it: keeps Console cluster permissions separate in component mode
+    template: charts/console/templates/rolebinding.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container/prefix
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: component
+    asserts:
+      - equal:
+          path: subjects[0].name
+          value: chartsnap-console
+
+  - it: keeps app on the correct account in grouped mode
+    template: charts/app/templates/deployment.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container/prefix
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: grouped
+      weave-trace:
+        install: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: chartsnap-app
+
+  - it: keeps console on the correct account in grouped mode
+    template: charts/console/templates/deployment.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container/prefix
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: grouped
+      weave-trace:
+        install: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: chartsnap-console
+
+  - it: keeps parquet on the correct account in grouped mode
+    template: charts/parquet/templates/deployment.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container/prefix
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: grouped
+      weave-trace:
+        install: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-bucket-access
+
+  - it: keeps weave-trace on the correct account in grouped mode
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global:
+        weave-trace:
+          fileStorage:
+            useDefaultBucket: true
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: grouped
+      weave-trace:
+        install: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: chartsnap-weave-trace
+
+  - it: keeps Console cluster permissions separate in grouped mode
+    template: charts/console/templates/rolebinding.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container/prefix
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: grouped
+    asserts:
+      - equal:
+          path: subjects[0].name
+          value: chartsnap-console
+
+  - it: allows prefixed internal Azure WIF without enabling Weave file storage
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container/prefix
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: component
+    asserts:
+      - notExists:
+          path: data.ACCESS_KEY
+
+  - it: preserves legacy BYOB federation subjects during grouped internal WIF
+    template: charts/app/templates/deployment.yaml
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container/prefix
+          accessKey: stale-managed-key
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: grouped
+        bucket:
+          provider: az
+          name: customer-storage
+          path: customer-container/prefix
+          azureTenantId: legacy-tenant
+          azureClientId: legacy-client
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: chartsnap-app
+
+  - it: preserves the Bufstream identity and node-reader isolation in component mode for deployment.yaml
+    template: charts/bufstream/templates/deployment.yaml
+    set:
+      bufstream:
+        install: true
+        discoverZoneFromNode: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: component
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: bufstream-service-account
+      - equal:
+          path: spec.template.metadata.labels["azure.workload.identity/use"]
+          value: "true"
+
+  - it: preserves the Bufstream identity and node-reader isolation in component mode for service-account.yaml
+    template: charts/bufstream/templates/service-account.yaml
+    set:
+      bufstream:
+        install: true
+        discoverZoneFromNode: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: component
+    asserts:
+      - equal:
+          path: metadata.name
+          value: bufstream-service-account
+      - equal:
+          path: metadata.annotations["azure.workload.identity/client-id"]
+          value: client-id
+
+  - it: preserves the Bufstream identity and node-reader isolation in component mode for cluster-role-bind.yaml
+    template: charts/bufstream/templates/cluster-role-bind.yaml
+    set:
+      bufstream:
+        install: true
+        discoverZoneFromNode: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: component
+    asserts:
+      - equal:
+          path: subjects[0].name
+          value: bufstream-service-account
+
+  - it: preserves the Bufstream identity and node-reader isolation in grouped mode for deployment.yaml
+    template: charts/bufstream/templates/deployment.yaml
+    set:
+      bufstream:
+        install: true
+        discoverZoneFromNode: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: grouped
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: bufstream-service-account
+      - equal:
+          path: spec.template.metadata.labels["azure.workload.identity/use"]
+          value: "true"
+
+  - it: preserves the Bufstream identity and node-reader isolation in grouped mode for service-account.yaml
+    template: charts/bufstream/templates/service-account.yaml
+    set:
+      bufstream:
+        install: true
+        discoverZoneFromNode: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: grouped
+    asserts:
+      - equal:
+          path: metadata.name
+          value: bufstream-service-account
+      - equal:
+          path: metadata.annotations["azure.workload.identity/client-id"]
+          value: client-id
+
+  - it: preserves the Bufstream identity and node-reader isolation in grouped mode for cluster-role-bind.yaml
+    template: charts/bufstream/templates/cluster-role-bind.yaml
+    set:
+      bufstream:
+        install: true
+        discoverZoneFromNode: true
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+          serviceAccount:
+            mode: grouped
+    asserts:
+      - equal:
+          path: subjects[0].name
+          value: bufstream-service-account
