@@ -120,6 +120,13 @@ rollout, set `global.azureStorageIdentity.serviceAccount.mode: component` to kee
 the existing Kubernetes service accounts. Consolidation with `grouped` is a separate
 migration.
 
+Inventory optional storage consumers and workloads left over from older chart
+releases. If parquet uses the metadata cache, keep
+`parquet-metadata-cache.install: true` and configure its service account for Azure
+identity too. It can reuse the parquet account when their permissions match.
+Check that every replacement pod is ready and every old replica has terminated;
+an available old pod can hide a replacement that is failing to start.
+
 Keep the existing storage key secret during validation so removing the identity
 opt-in restores key authentication. Verify actual run-file and artifact uploads
 and downloads, and check that server-issued SAS URLs use the intended managed
