@@ -1,0 +1,164 @@
+suite: Default Azure bucket authentication selection
+templates:
+  - templates/bucket.yaml
+  - charts/app/templates/deployment.yaml
+release:
+  name: chartsnap
+set:
+  global:
+    defaultBucket:
+      provider: az
+      name: managed-account
+      path: managed-container
+      accessKey: managed-key
+    azureStorageIdentity:
+      tenantId: tenant-id
+      clientId: client-id
+      serviceAccount:
+        mode: component
+
+tests:
+  - it: renders the default key when accessKey is selected with identity available
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.defaultBucket.azureAuthMethod: accessKey
+    asserts:
+      - equal:
+          path: data.ACCESS_KEY
+          value: bWFuYWdlZC1rZXk=
+
+  - it: injects the default key while retaining workload identity token injection
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.defaultBucket.azureAuthMethod: accessKey
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["azure.workload.identity/use"]
+          value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: chartsnap-bucket
+                key: ACCESS_KEY
+                optional: true
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_CLIENT_ID
+          any: true
+
+  - it: suppresses the default key when workloadIdentity is explicitly selected
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.defaultBucket.azureAuthMethod: workloadIdentity
+    asserts:
+      - notExists:
+          path: data.ACCESS_KEY
+
+  - it: passes deployment identity credentials when explicitly selected
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.defaultBucket.azureAuthMethod: workloadIdentity
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_CLIENT_ID
+            value: client-id
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_KEY
+          any: true
+
+  - it: preserves identity inference when the default selector is omitted
+    template: templates/bucket.yaml
+    documentIndex: 1
+    asserts:
+      - notExists:
+          path: data.ACCESS_KEY
+
+  - it: preserves default key authentication without a configured identity
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.azureStorageIdentity: null
+    asserts:
+      - equal:
+          path: data.ACCESS_KEY
+          value: bWFuYWdlZC1rZXk=
+
+  - it: does not inherit default workload identity into an implicit key BYOB bucket
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.defaultBucket.azureAuthMethod: workloadIdentity
+      global.bucket:
+        provider: az
+        name: customer-account
+        path: customer-container
+        accessKey: customer-key
+    asserts:
+      - equal:
+          path: data.ACCESS_KEY
+          value: Y3VzdG9tZXIta2V5
+
+  - it: allows workload identity BYOB while the default bucket uses a key
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.defaultBucket.azureAuthMethod: accessKey
+      global.bucket:
+        provider: az
+        name: customer-account
+        path: customer-container
+        azureAuthMethod: workloadIdentity
+    asserts:
+      - notExists:
+          path: data.ACCESS_KEY
+
+  - it: ignores the bucket selector without a named bucket override
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.defaultBucket.azureAuthMethod: workloadIdentity
+      global.bucket.azureAuthMethod: accessKey
+    asserts:
+      - notExists:
+          path: data.ACCESS_KEY
+
+  - it: permits explicit key auth over a legacy default identity
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.defaultBucket.azureAuthMethod: accessKey
+      global.defaultBucket.azureTenantId: legacy-tenant
+      global.defaultBucket.azureClientId: legacy-client
+    asserts:
+      - equal:
+          path: data.ACCESS_KEY
+          value: bWFuYWdlZC1rZXk=
+
+  - it: rejects an invalid default authentication method
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.defaultBucket.azureAuthMethod: invalid
+    asserts:
+      - failedTemplate:
+          errorMessage: global.defaultBucket.azureAuthMethod must be accessKey or workloadIdentity
+
+  - it: requires a deployment identity for explicit default workload identity
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.defaultBucket.azureAuthMethod: workloadIdentity
+      global.azureStorageIdentity: null
+    asserts:
+      - failedTemplate:
+          errorMessage: global.azureStorageIdentity.tenantId and clientId are required when global.defaultBucket.azureAuthMethod is workloadIdentity
