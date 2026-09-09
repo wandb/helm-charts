@@ -27,6 +27,14 @@ the component account.
 */}}
 {{- define "bufstream.azureStorageServiceAccountEnabled" -}}
   {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
+  {{- $serviceAccount := default (dict) $identity.serviceAccount -}}
+  {{- $mode := default "shared" $serviceAccount.mode -}}
+  {{- /* Bufstream has cluster-scoped node permissions; retain its account. */ -}}
+{{- and (include "bufstream.azureStorageIdentityEnabled" . | trim | eq "true") (eq $mode "shared") -}}
+{{- end -}}
+
+{{- define "bufstream.azureStorageIdentityEnabled" -}}
+  {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
   {{- $globalConfigured := and (not (empty $identity.tenantId)) (not (empty $identity.clientId)) -}}
   {{- $bucket := default (dict) .Values.global.bucket -}}
   {{- $hasCustomerBucket := not (empty $bucket.name) -}}
