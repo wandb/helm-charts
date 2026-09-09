@@ -28,7 +28,11 @@ key path unless they explicitly select workload identity.
   {{- $clientId := default "" $bucket.azureClientId -}}
   {{- $globalConfigured := and (not (empty $globalTenantId)) (not (empty $globalClientId)) -}}
   {{- $bucketIdentityConfigured := and (not (empty $tenantId)) (not (empty $clientId)) -}}
-  {{- $authMethod := default "" .Values.global.bucket.azureAuthMethod -}}
+  {{- $authMethod := default "" $bucket.azureAuthMethod -}}
+  {{- $bucketConfigPath := "global.defaultBucket" -}}
+  {{- if $hasCustomerBucket -}}
+    {{- $bucketConfigPath = "global.bucket" -}}
+  {{- end -}}
   {{- if ne (empty $globalTenantId) (empty $globalClientId) -}}
     {{- fail "global.azureStorageIdentity.tenantId and clientId must be provided together" -}}
   {{- end -}}
@@ -36,17 +40,17 @@ key path unless they explicitly select workload identity.
     {{- fail "Azure bucket azureTenantId and azureClientId must be provided together" -}}
   {{- end -}}
   {{- if and (not (empty $authMethod)) (not (has $authMethod (list "accessKey" "workloadIdentity"))) -}}
-    {{- fail "global.bucket.azureAuthMethod must be accessKey or workloadIdentity" -}}
+    {{- fail (printf "%s.azureAuthMethod must be accessKey or workloadIdentity" $bucketConfigPath) -}}
   {{- end -}}
   {{- $enabled := false -}}
-  {{- if and $hasCustomerBucket (eq $authMethod "workloadIdentity") -}}
+  {{- if and (eq $bucket.provider "az") (eq $authMethod "workloadIdentity") -}}
     {{- if not $globalConfigured -}}
-      {{- fail "global.azureStorageIdentity.tenantId and clientId are required when global.bucket.azureAuthMethod is workloadIdentity" -}}
+      {{- fail (printf "global.azureStorageIdentity.tenantId and clientId are required when %s.azureAuthMethod is workloadIdentity" $bucketConfigPath) -}}
     {{- end -}}
     {{- $tenantId = $globalTenantId -}}
     {{- $clientId = $globalClientId -}}
     {{- $enabled = true -}}
-  {{- else if and $hasCustomerBucket (eq $authMethod "accessKey") -}}
+  {{- else if eq $authMethod "accessKey" -}}
     {{- $enabled = false -}}
   {{- else if and $hasCustomerBucket (eq $bucket.provider "az") $bucketIdentityConfigured -}}
     {{- /* Backward compatibility for existing bucket-scoped identity values. */ -}}
@@ -147,6 +151,7 @@ templates/weave-trace-serviceaccount.yaml. Must stay identical to
   {{- $secretKey := "" -}}
   {{- $azureTenantId := "" -}}
   {{- $azureClientId := "" -}}
+  {{- $azureAuthMethod := "" -}}
   {{- if .Values.global.bucket.name -}}
     {{- $provider = .Values.global.bucket.provider -}}
     {{- $path = .Values.global.bucket.path -}}
@@ -154,6 +159,7 @@ templates/weave-trace-serviceaccount.yaml. Must stay identical to
     {{- $secretKey = default "" .Values.global.bucket.secretKey -}}
     {{- $azureTenantId = default "" .Values.global.bucket.azureTenantId -}}
     {{- $azureClientId = default "" .Values.global.bucket.azureClientId -}}
+    {{- $azureAuthMethod = default "" .Values.global.bucket.azureAuthMethod -}}
 name: {{ .Values.global.bucket.name }}
 region: {{ .Values.global.bucket.region }}
 kmsKey: {{ .Values.global.bucket.kmsKey }}
@@ -164,6 +170,7 @@ kmsKey: {{ .Values.global.bucket.kmsKey }}
     {{- $secretKey = default "" .Values.global.defaultBucket.secretKey -}}
     {{- $azureTenantId = default "" .Values.global.defaultBucket.azureTenantId -}}
     {{- $azureClientId = default "" .Values.global.defaultBucket.azureClientId -}}
+    {{- $azureAuthMethod = default "" .Values.global.defaultBucket.azureAuthMethod -}}
 name: {{ .Values.global.defaultBucket.name }}
 region: {{ .Values.global.defaultBucket.region }}
 kmsKey: {{ .Values.global.defaultBucket.kmsKey }}
@@ -174,6 +181,7 @@ accessKey: {{ $accessKey }}
 secretKey: {{ $secretKey }}
 azureTenantId: {{ $azureTenantId | toJson }}
 azureClientId: {{ $azureClientId | toJson }}
+azureAuthMethod: {{ $azureAuthMethod | toJson }}
 accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
 secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}

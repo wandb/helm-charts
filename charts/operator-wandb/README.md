@@ -120,6 +120,14 @@ rollout, set `global.azureStorageIdentity.serviceAccount.mode: component` to kee
 the existing Kubernetes service accounts. Consolidation with `grouped` is a separate
 migration.
 
+Set `global.defaultBucket.azureAuthMethod: workloadIdentity` to select the
+deployment identity for the managed bucket. Set it to `accessKey` to use the
+storage key while keeping the identity available. When omitted, the chart retains
+the previous behavior: a configured global or legacy default-bucket identity
+selects workload identity; otherwise it uses the key. A named `global.bucket`
+overrides the complete default bucket configuration, including authentication;
+its own `azureAuthMethod` selects the method independently.
+
 Inventory optional storage consumers and workloads left over from older chart
 releases. If parquet uses the metadata cache, keep
 `parquet-metadata-cache.install: true` and configure its service account for Azure
@@ -127,8 +135,8 @@ identity too. It can reuse the parquet account when their permissions match.
 Check that every replacement pod is ready and every old replica has terminated;
 an available old pod can hide a replacement that is failing to start.
 
-Keep the existing storage key secret during validation so removing the identity
-opt-in restores key authentication. Verify actual run-file and artifact uploads
+Retain the storage key securely during validation so selecting `accessKey` and
+supplying the key restores key authentication. Verify actual run-file and artifact uploads
 and downloads, and check that server-issued SAS URLs use the intended managed
 identity with blob scope (`sr=b`). Pod readiness alone does not validate storage
 authentication.

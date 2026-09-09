@@ -437,9 +437,10 @@ global:
         name: ""
         secretKey: "OIDC_SECRET"
 
-  # Infrastructure-managed Azure workload identity for this deployment. The
-  # managed default bucket uses this identity. A customer Azure bucket can opt
-  # in with global.bucket.azureAuthMethod: workloadIdentity.
+  # Infrastructure-managed Azure workload identity for this deployment.
+  # Select authentication separately with defaultBucket.azureAuthMethod or
+  # bucket.azureAuthMethod. Configuring this identity enables token injection
+  # even when the effective bucket explicitly uses accessKey authentication.
   # Requires a server build containing wandb/core#48160 in every storage consumer.
   # Verify running component images before opting in; see the README rollout steps.
   # Each value can be a literal string or a Kubernetes EnvVarSource-style map:
@@ -476,8 +477,14 @@ global:
     path: ""
     region: ""
     kmsKey: ""
-    # Azure (provider "az") identity-based auth. Each value can be a literal
-    # string or a Kubernetes EnvVarSource-style map. When both are set the application
+    # Azure only: accessKey or workloadIdentity (uses global.azureStorageIdentity).
+    # Unset preserves existing behavior: a configured global or legacy bucket
+    # identity selects workload identity; otherwise the storage key is used.
+    # A named global.bucket overrides this bucket, including its auth method.
+    azureAuthMethod: null
+    # Legacy Azure (provider "az") identity-based auth. Each value can be a literal
+    # string or a Kubernetes EnvVarSource-style map. With no azureAuthMethod set,
+    # when both are set the application
     # authenticates to Blob storage with an Entra ID workload identity
     # (user-delegation SAS) and the storage account access key is optional.
     # The chart adds the required workload-identity pod label to services that
@@ -489,7 +496,7 @@ global:
 
   # If specified, the application will use this bucket for all storage operations, and will not be overridable by the user.
   bucket:
-    # Azure only. Existing configurations default to access-key authentication.
+    # Azure only. Unset preserves key auth or an existing legacy bucket identity.
     # Set to workloadIdentity to use global.azureStorageIdentity.
     azureAuthMethod: null
     # Legacy bucket-scoped identity values remain supported.
