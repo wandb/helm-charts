@@ -98,6 +98,94 @@ tests:
                 key: MY_AES
           any: true
 
+  - it: omits VARIABLES_AES_256_KEY_PREVIOUS by default
+    template: charts/workspace-engine/templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VARIABLES_AES_256_KEY_PREVIOUS
+          any: true
+
+  - it: wires workspace-engine to a previous encryption key via valueFrom
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        secrets:
+          encryptionKeyPrevious:
+            valueFrom:
+              secretKeyRef:
+                name: my-ext-aes
+                key: AES_256_KEY_PREVIOUS
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VARIABLES_AES_256_KEY_PREVIOUS
+            valueFrom:
+              secretKeyRef:
+                name: my-ext-aes
+                key: AES_256_KEY_PREVIOUS
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VARIABLES_AES_256_KEY
+            valueFrom:
+              secretKeyRef:
+                name: orchestrator-encryption-key
+                key: AES_256_KEY
+          any: true
+
+  - it: wires both current and previous encryption keys from external secrets
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        secrets:
+          encryptionKey:
+            valueFrom:
+              secretKeyRef:
+                name: my-ext-aes
+                key: AES_256_KEY
+          encryptionKeyPrevious:
+            valueFrom:
+              secretKeyRef:
+                name: my-ext-aes
+                key: AES_256_KEY_PREVIOUS
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VARIABLES_AES_256_KEY
+            valueFrom:
+              secretKeyRef:
+                name: my-ext-aes
+                key: AES_256_KEY
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VARIABLES_AES_256_KEY_PREVIOUS
+            valueFrom:
+              secretKeyRef:
+                name: my-ext-aes
+                key: AES_256_KEY_PREVIOUS
+          any: true
+
+  - it: sets VARIABLES_AES_256_KEY_PREVIOUS from a plain string value
+    template: charts/workspace-engine/templates/deployment.yaml
+    set:
+      global:
+        secrets:
+          encryptionKeyPrevious: old-key-material
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: VARIABLES_AES_256_KEY_PREVIOUS
+            value: old-key-material
+          any: true
+
   - it: includes github bot env vars as plain strings
     template: charts/workspace-engine/templates/deployment.yaml
     set:

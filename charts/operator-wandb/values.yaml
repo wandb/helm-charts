@@ -37,6 +37,13 @@ global:
     customer: ""
     publish:
       envVars: false
+    # Source of the collector rules. When enabled, the agent reads its rules
+    # only from url and fails the run if that object is unreadable; the
+    # configmap-mounted copy at wandb.lumen.rulePath is used only when
+    # disabled, which also makes disabling the flag a rollback path.
+    remoteConfig:
+      enabled: false
+      url: ""
     # Terraform-provided per cluster aws-eks / azure-aks / google-gke.
     # It can be empty for GCP-direct deployments, where no WIF is rendered.
     gcpWorkloadIdentity:
@@ -437,9 +444,12 @@ global:
         name: ""
         secretKey: "OIDC_SECRET"
 
-  # Infrastructure-managed Azure workload identity for this deployment. The
-  # managed default bucket uses this identity. A customer Azure bucket can opt
-  # in with global.bucket.azureAuthMethod: workloadIdentity.
+  # Infrastructure-managed Azure workload identity for this deployment.
+  # Select authentication separately with defaultBucket.azureAuthMethod or
+  # bucket.azureAuthMethod. Configuring this identity enables token injection
+  # even when the effective bucket explicitly uses accessKey authentication.
+  # Requires a server build containing wandb/core#48160 in every storage consumer.
+  # Verify running component images before opting in; see the README rollout steps.
   # Each value can be a literal string or a Kubernetes EnvVarSource-style map:
   #   clientId:
   #     valueFrom:
@@ -452,6 +462,12 @@ global:
     # One deployment-wide account for Azure storage workload identity. Set
     # create: false when infrastructure creates and federates this account.
     serviceAccount:
+      # Existing WIF installations retain shared behavior unless explicitly
+      # migrated. New managed rollouts use component, then optionally grouped.
+      # component: preserve all component ServiceAccounts and federation.
+      # grouped: share ordinary storage workers, preserving privileged accounts
+      # and Weave internal authentication. Retain old FICs during migration.
+      mode: shared
       name: "wandb-bucket-access"
       create: true
       annotations: {}
@@ -468,8 +484,14 @@ global:
     path: ""
     region: ""
     kmsKey: ""
-    # Azure (provider "az") identity-based auth. Each value can be a literal
-    # string or a Kubernetes EnvVarSource-style map. When both are set the application
+    # Azure only: accessKey or workloadIdentity (uses global.azureStorageIdentity).
+    # Unset preserves existing behavior: a configured global or legacy bucket
+    # identity selects workload identity; otherwise the storage key is used.
+    # A named global.bucket overrides this bucket, including its auth method.
+    azureAuthMethod: null
+    # Legacy Azure (provider "az") identity-based auth. Each value can be a literal
+    # string or a Kubernetes EnvVarSource-style map. With no azureAuthMethod set,
+    # when both are set the application
     # authenticates to Blob storage with an Entra ID workload identity
     # (user-delegation SAS) and the storage account access key is optional.
     # The chart adds the required workload-identity pod label to services that
@@ -481,7 +503,7 @@ global:
 
   # If specified, the application will use this bucket for all storage operations, and will not be overridable by the user.
   bucket:
-    # Azure only. Existing configurations default to access-key authentication.
+    # Azure only. Unset preserves key auth or an existing legacy bucket identity.
     # Set to workloadIdentity to use global.azureStorageIdentity.
     azureAuthMethod: null
     # Legacy bucket-scoped identity values remain supported.
