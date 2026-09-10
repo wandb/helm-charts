@@ -264,19 +264,36 @@ The following credentials can be pulled from external Kubernetes Secrets:
 |-----------|-------------------|------------------------|
 | **MySQL** | `global.mysql.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
 | **Redis** | `global.redis.secret` | `secretName`, `secretKey` |
-| **Weave Trace ClickHouse** | `global.clickhouse.*` (default) or `global.olap.weaveTrace.*` (opt-in) | Select with `global.weaveTrace.clickhouseSource`; each connection field can be a string or a map with `valueFrom` |
+| **Weave Trace ClickHouse** | `global.clickhouse.*` or an enabled `global.olap.weaveTrace.*` profile | `global.weaveTrace.clickhouseSource` defaults to `auto`; each connection field can be a string or a map with `valueFrom` |
 | **Kafka** | `global.kafka.passwordSecret` | `name`, `passwordKey` |
 | **OIDC** | `global.auth.oidc.oidcSecret` | `name`, `secretKey` |
 | **Session signing** | `global.auth.sessionKey`, `global.auth.sessionKeyPrevious` | Literal value or a map with `valueFrom` |
 | **SMTP** | `global.email.smtp.*` | Each field (host, port, user, password) can be a string or a map with `valueFrom` |
 
-`global.weaveTrace.clickhouseSource` defaults to `legacy`, so Weave Trace and
-its workers continue to use `global.clickhouse` even when the OLAP profile is
-enabled. Set `global.olap.weaveTrace.enabled: true` to make the profile
-available, then set `global.weaveTrace.clickhouseSource: olap` to perform the
-cutover. Selecting a disabled OLAP profile or an unknown source fails chart
-rendering. The chart does not infer enrollment from either connection, so
-existing and bundled ClickHouse installations keep their current behavior.
+`global.weaveTrace.clickhouseSource` defaults to `auto`. Once Weave is installed
+and its OLAP connection and credentials are provisioned, setting
+`global.olap.weaveTrace.enabled: true` selects that profile automatically if
+there is no customized `global.clickhouse` configuration and `clickhouse.install`
+is false. The stock chart defaults, including the templated bundled hostname,
+do not count as a configured legacy connection. Nonempty custom settings,
+including host or credential references, retain the legacy connection.
+
+| Source | Enabled OLAP profile | Customized legacy configuration or bundled ClickHouse | Selected connection |
+| --- | --- | --- | --- |
+| `auto` (default) | Yes | No | OLAP |
+| `auto` (default) | Yes | Yes | Legacy |
+| `auto` (default) | No | Either | Legacy |
+| `legacy` | Either | Either | Legacy |
+| `olap` | Yes | Either | OLAP |
+| `olap` | No | Either | Render error |
+
+Set `global.weaveTrace.clickhouseSource: olap` explicitly to cut over an existing
+legacy installation. An explicit `legacy` value, including a value retained in
+an older release or user spec, prevents automatic selection. Unknown source
+values fail rendering. These settings select a connection; they do not install
+Weave, create database users, or provision Secrets. Configure the Weave-specific
+credential references in the OLAP profile before enabling it; missing fields
+still inherit from `global.olap.default`.
 
 For a separate migration identity, enable
 `global.olap.weaveTrace.migrator` and provide its user and password through
