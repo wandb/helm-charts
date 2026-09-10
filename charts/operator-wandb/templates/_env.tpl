@@ -333,22 +333,15 @@ Global values will override any chart-specific values.
 
 {{- define "wandb.weaveTraceClickhouseEnvs" -}}
   {{- /*
-    Weave Trace still consumes WF_CLICKHOUSE_* variables. Select the new OLAP
-    connection only when global.weaveTrace.clickhouseSource is explicitly set
-    to "olap"; otherwise preserve the legacy global.clickhouse behavior for
-    existing and bundled installations.
+    Weave Trace still consumes WF_CLICKHOUSE_* variables. Resolve the connection
+    through the shared source helper so runtime and migration identities follow
+    the same automatic selection or explicit legacy/olap override.
 
     OLAP normally emits <PREFIX>_PASSWORD. Weave expects WF_CLICKHOUSE_PASS,
     so this compatibility helper renders the Weave contract directly.
   */ -}}
   {{- $config := include "wandb.olapConfig" (dict "root" . "featureName" "weaveTrace") | fromYaml -}}
-  {{- $source := default "legacy" .Values.global.weaveTrace.clickhouseSource -}}
-  {{- if not (has $source (list "legacy" "olap")) -}}
-    {{- fail (printf "global.weaveTrace.clickhouseSource must be one of: legacy, olap; got %q" $source) -}}
-  {{- end -}}
-  {{- if and (eq $source "olap") (not $config.enabled) -}}
-    {{- fail "global.olap.weaveTrace.enabled must be true when global.weaveTrace.clickhouseSource is olap" -}}
-  {{- end -}}
+  {{- $source := include "wandb.weaveTraceClickhouseSource" . -}}
   {{- if eq $source "olap" }}
     {{- $envs := list -}}
     {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WF_CLICKHOUSE_HOST" "value" $config.host) | fromYaml) -}}
@@ -377,7 +370,7 @@ Global values will override any chart-specific values.
     credentials.
   */ -}}
   {{- $config := include "wandb.olapConfig" (dict "root" . "featureName" "weaveTrace") | fromYaml -}}
-  {{- $source := default "legacy" .Values.global.weaveTrace.clickhouseSource -}}
+  {{- $source := include "wandb.weaveTraceClickhouseSource" . -}}
   {{- $migrator := default (dict) $config.migrator -}}
   {{- $migratorEnabled := default false $migrator.enabled -}}
   {{- if and (eq $source "olap") $migratorEnabled -}}
