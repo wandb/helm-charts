@@ -1664,6 +1664,21 @@ flat-run-fields-updater:
       args: ["flat-run-fields-updater"]
       portsTpls:
         - '{{ include "wandb.lumen.gorilla.containerPort" . }}'
+      # The app's own stall threshold gates /healthz; failureThreshold only confirms it.
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        initialDelaySeconds: 30
+        periodSeconds: 15
+        failureThreshold: 4
+        timeoutSeconds: 3
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: 8080
+        periodSeconds: 10
+        failureThreshold: 3
   image:
     repository: wandb/megabinary
     tag: latest
