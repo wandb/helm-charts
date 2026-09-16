@@ -19,6 +19,15 @@ The chart is designed to be highly configurable while providing sensible default
 
 One of the key features of this chart is its hierarchical configuration system. Many values can be set at multiple levels, with a clear precedence order. Understanding this precedence is crucial for effective configuration.
 
+### Service-account tokens
+
+`automountServiceAccountToken` optionally controls token mounting on the Pod
+itself. Its default, `null`, leaves Kubernetes and the selected service account
+in control. Set it to `false` when a workload must never receive an automatically
+mounted token, including when it uses an existing service account. Only booleans
+and `null` are accepted; `serviceAccount.automount` still configures the chart's
+ServiceAccount resource independently.
+
 ### Environment Variables
 
 Environment variables can be defined at multiple levels, with the following precedence (highest to lowest):
@@ -59,6 +68,22 @@ envFrom:
   app-config: "configMapRef"
   app-secrets: "secretRef"
 ```
+
+Subcharts inherit `global.env` and the legacy `global.extraEnv` by default. A
+workload that must receive only its chart-local environment can disable that
+inheritance without changing other subcharts:
+
+```yaml
+globalOptOut:
+  env: true
+  volumes: true
+```
+
+`globalOptOut.env` does not remove chart-local `env`, `extraEnv`, `envTpls`, or
+`envFrom` values. `globalOptOut.volumes` excludes inherited `global.volumes`
+and `global.volumesTpls` while retaining chart-local `volumes` and
+`volumesTpls`. Existing installations remain unchanged when either option is
+omitted.
 
 ### Volumes
 
