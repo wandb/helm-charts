@@ -1,0 +1,99 @@
+suite: MCP ingress Service routing
+templates:
+  - templates/ingress.yaml
+tests:
+  - it: routes a release that already contains the component name
+    release:
+      name: mcp-server
+    set:
+      mcp-server.install: true
+      ingress.install: true
+      ingress.create: true
+    asserts:
+      - contains:
+          path: spec.rules[0].http.paths
+          content:
+            pathType: Prefix
+            path: /mcp
+            backend:
+              service:
+                name: mcp-server
+                port:
+                  number: 8080
+  - it: routes custom Service name and port
+    release:
+      name: customer-a
+    set:
+      mcp-server.install: true
+      ingress.install: true
+      ingress.create: true
+      mcp-server.service.name: custom-mcp
+      mcp-server.service.ports:
+        - {name: http, port: 9090, targetPort: 8080, protocol: TCP}
+    asserts:
+      - contains:
+          path: spec.rules[0].http.paths
+          content:
+            pathType: Prefix
+            path: /mcp
+            backend:
+              service:
+                name: custom-mcp
+                port:
+                  number: 9090
+  - it: routes a fullname override
+    release:
+      name: customer-a
+    set:
+      mcp-server.install: true
+      ingress.install: true
+      ingress.create: true
+      mcp-server.fullnameOverride: isolated-mcp
+    asserts:
+      - contains:
+          path: spec.rules[0].http.paths
+          content:
+            pathType: Prefix
+            path: /mcp
+            backend:
+              service:
+                name: isolated-mcp
+                port:
+                  number: 8080
+  - it: routes a name override
+    release:
+      name: customer-a
+    set:
+      mcp-server.install: true
+      ingress.install: true
+      ingress.create: true
+      mcp-server.nameOverride: assistant
+    asserts:
+      - contains:
+          path: spec.rules[0].http.paths
+          content:
+            pathType: Prefix
+            path: /mcp
+            backend:
+              service:
+                name: customer-a-assistant
+                port:
+                  number: 8080
+  - it: routes the maximum Helm release name length
+    release:
+      name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    set:
+      mcp-server.install: true
+      ingress.install: true
+      ingress.create: true
+    asserts:
+      - contains:
+          path: spec.rules[0].http.paths
+          content:
+            pathType: Prefix
+            path: /mcp
+            backend:
+              service:
+                name: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-mcp-serve
+                port:
+                  number: 8080
