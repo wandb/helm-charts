@@ -408,9 +408,6 @@ Global values will override any chart-specific values.
                        hook Job the sole ClickHouse migrator, so concurrent
                        app-pod initContainers cannot race on ClickHouse DDL.
       migratePrefix  - (optional) prefix for MIGRATE_*_DB env var; defaults to envVarPrefix
-      params         - (optional) component-specific params merged over the
-                       feature's params, so one workload can tune its own
-                       connection pool without changing the shared config.
 
     Merges global.olap.<featureName> over global.olap.default.
     Each field supports both plain values and K8s refs (valueFrom maps).
@@ -492,10 +489,9 @@ Global values will override any chart-specific values.
       name: {{ $secretName | quote }}
       key: {{ $secretKey | quote }}
     {{- end }}
-    {{- $params := merge (deepCopy (default (dict) .params)) (default (dict) $config.params) -}}
     {{- $finalConnectionUrl := printf "%s://$(%s_USER):$(%s_PASSWORD)@$(%s_HOST):$(%s_PORT)/$(%s_DATABASE)$(%s_PARAMS)" $config.type $prefix $prefix $prefix $prefix $prefix $prefix }}
 - name: {{ $prefix }}_PARAMS
-  value: {{ include "wandb.olapParamsQuery" (dict "params" $params) | quote }}
+  value: {{ include "wandb.olapParamsQuery" (dict "params" $config.params) | quote }}
 - name: {{ .finalEnvName }}
   value: {{ $finalConnectionUrl | quote }}
     {{- if .emitMigrate }}
@@ -529,17 +525,6 @@ Global values will override any chart-specific values.
 
 {{- define "wandb.historyEnvs" -}}
 {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS") -}}
-{{- end -}}
-
-{{- /*
-  wandb.parquetHistoryEnvs renders the history OLAP envs for the parquet
-  workload, layering parquet.olap.history.params over global.olap.history.params.
-  Called with the parquet subchart's root context, so .Values is parquet's values.
-*/ -}}
-{{- define "wandb.parquetHistoryEnvs" -}}
-  {{- $olap := default (dict) .Values.olap -}}
-  {{- $history := default (dict) $olap.history -}}
-  {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS" "params" (default (dict) $history.params)) -}}
 {{- end -}}
 
 {{- define "wandb.historyMigrateEnvs" -}}
