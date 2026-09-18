@@ -250,7 +250,9 @@ mcp-server:
   image:
     repository: wandb/mcp-server
     tag: "0.4.0"
-    digest: "sha256:<verified-customer-digest>"
+    # For an immutable release, set this to sha256: followed by 64 lowercase
+    # hexadecimal characters.
+    digest: ""
   tools:
     profile: auto # auto | models-only | models-weave
   accessMode: read-write # read-write | read-only
