@@ -380,6 +380,60 @@ tests:
     asserts:
       - notFailedTemplate: {}
 
+  - it: accepts the named split API target port
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports:
+        - {name: http, port: 8081, targetPort: api, protocol: TCP}
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts the numeric split API target port
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports:
+        - {name: http, port: 8081, targetPort: 8081, protocol: TCP}
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts omitted split API target port and protocol defaults
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports:
+        - {name: http, port: 8081}
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts the named monolith app target port
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080, targetPort: http, protocol: TCP}
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts the numeric monolith app target port
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080, targetPort: 8080, protocol: TCP}
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts omitted monolith app target port and protocol defaults
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080}
+    asserts:
+      - notFailedTemplate: {}
+
   - it: requires an override when the split API Service is disabled
     set:
       mcp-server.install: true
@@ -396,7 +450,7 @@ tests:
       api.fullnameOverride: custom-api
     asserts: &custom_split_requires_url
       - failedTemplate:
-          errorMessage: mcp-server.routing.internalBaseUrl is required when api naming or the http Service port is overridden
+          errorMessage: mcp-server.routing.internalBaseUrl is required when api naming or canonical HTTP routing is overridden
 
   - it: requires an override for a custom split API port
     set:
@@ -404,6 +458,81 @@ tests:
       global.api.enabled: true
       api.service.ports[0].port: 9081
     asserts: *custom_split_requires_url
+
+  - it: requires an override when the split API Service targets another port
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports:
+        - {name: http, port: 8081, targetPort: wrong-api, protocol: TCP}
+    asserts: *custom_split_requires_url
+
+  - it: requires an override when the split API Service does not use TCP
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports:
+        - {name: http, port: 8081, targetPort: api, protocol: UDP}
+    asserts: *custom_split_requires_url
+
+  - it: rejects a quoted numeric split API target port
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports:
+        - {name: http, port: 8081, targetPort: "8081", protocol: TCP}
+    asserts: *custom_split_requires_url
+
+  - it: rejects a quoted split API Service port
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports:
+        - {name: http, port: "8081", targetPort: api, protocol: TCP}
+    asserts: *custom_split_requires_url
+
+  - it: requires an override when the named split API target changes port
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.containers.api.ports:
+        - {name: api, containerPort: 9999, protocol: TCP}
+    asserts: *custom_split_requires_url
+
+  - it: rejects a quoted split API container port
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.containers.api.ports:
+        - {name: api, containerPort: "8081", protocol: TCP}
+    asserts: *custom_split_requires_url
+
+  - it: requires an override when the named split API target does not use TCP
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.containers.api.ports:
+        - {name: api, containerPort: 8081, protocol: UDP}
+    asserts: *custom_split_requires_url
+
+  - it: requires exactly one canonical named split API target
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.containers.api.ports:
+        - {name: api, containerPort: 8081, protocol: TCP}
+        - {name: api, containerPort: 8081, protocol: TCP}
+    asserts: *custom_split_requires_url
+
+  - it: accepts an explicit internal URL when split API Service routing is custom
+    set:
+      mcp-server.install: true
+      global.api.enabled: true
+      api.service.ports:
+        - {name: http, port: 8081, targetPort: wrong-api, protocol: UDP}
+      mcp-server.routing.internalBaseUrl: http://custom-api.platform.svc.cluster.local:9090
+    asserts:
+      - notFailedTemplate: {}
 
   - it: requires an override when the monolith app is disabled
     set:
@@ -421,7 +550,7 @@ tests:
       app.service.name: custom-app
     asserts: &custom_monolith_requires_url
       - failedTemplate:
-          errorMessage: mcp-server.routing.internalBaseUrl is required when app naming or the app Service port is overridden
+          errorMessage: mcp-server.routing.internalBaseUrl is required when app naming or canonical HTTP routing is overridden
 
   - it: requires an override for a custom monolith port
     set:
@@ -429,6 +558,89 @@ tests:
       global.api.enabled: false
       app.service.ports[0].port: 9080
     asserts: *custom_monolith_requires_url
+
+  - it: requires an override when the monolith app Service targets another port
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080, targetPort: wrong-app, protocol: TCP}
+    asserts: *custom_monolith_requires_url
+
+  - it: requires an override when the monolith app Service does not use TCP
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080, protocol: UDP}
+    asserts: *custom_monolith_requires_url
+
+  - it: rejects a quoted numeric monolith app target port
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080, targetPort: "8080", protocol: TCP}
+    asserts: *custom_monolith_requires_url
+
+  - it: rejects a quoted monolith app Service port
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: "8080", targetPort: http, protocol: TCP}
+    asserts: *custom_monolith_requires_url
+
+  - it: requires an override when the named monolith app target changes port
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080, targetPort: http, protocol: TCP}
+      app.containers.app.ports:
+        - {name: http, containerPort: 9999, protocol: TCP}
+    asserts: *custom_monolith_requires_url
+
+  - it: rejects a quoted monolith app container port
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080, targetPort: http, protocol: TCP}
+      app.containers.app.ports:
+        - {name: http, containerPort: "8080", protocol: TCP}
+    asserts: *custom_monolith_requires_url
+
+  - it: requires an override when the named monolith app target does not use TCP
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080, targetPort: http, protocol: TCP}
+      app.containers.app.ports:
+        - {name: http, containerPort: 8080, protocol: UDP}
+    asserts: *custom_monolith_requires_url
+
+  - it: requires exactly one canonical named monolith app target
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080, targetPort: http, protocol: TCP}
+      app.containers.app.ports:
+        - {name: http, containerPort: 8080, protocol: TCP}
+        - {name: http, containerPort: 8080, protocol: TCP}
+    asserts: *custom_monolith_requires_url
+
+  - it: accepts an explicit internal URL when monolith app Service routing is custom
+    set:
+      mcp-server.install: true
+      global.api.enabled: false
+      app.service.ports:
+        - {name: app, port: 8080, targetPort: wrong-app, protocol: UDP}
+      mcp-server.routing.internalBaseUrl: http://custom-app.platform.svc.cluster.local:9090
+    asserts:
+      - notFailedTemplate: {}
 
   - it: accepts a custom topology with an explicit typed internal URL
     set:
@@ -460,6 +672,16 @@ tests:
       global.otel.traces.proto: http
     asserts:
       - notFailedTemplate: {}
+
+  - it: rejects an explicit zero OTEL port instead of treating it as omitted
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: otel
+      mcp-server.routing.internalBaseUrl: http://custom-app.platform.svc.cluster.local:8080
+      global.otel.traces.port: 0
+    asserts:
+      - failedTemplate:
+          errorMessage: global.otel.traces.port must be between 1 and 65535
 
   - it: preserves MCP isolation from global administrative environment
     set:
@@ -531,6 +753,29 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: mcp-server.service must remain an enabled internal ClusterIP
+
+  - it: rejects a quoted MCP Service port
+    set:
+      mcp-server.install: true
+      mcp-server.service.ports:
+        - {name: http, port: "8080", targetPort: 8080, protocol: TCP}
+    asserts: &invalid_mcp_service_port
+      - failedTemplate:
+          errorMessage: MCP http Service port must be an integer from 1 to 65535 using TCP and targetPort 8080
+
+  - it: rejects a quoted MCP Service target port
+    set:
+      mcp-server.install: true
+      mcp-server.service.ports:
+        - {name: http, port: 8080, targetPort: "8080", protocol: TCP}
+    asserts: *invalid_mcp_service_port
+
+  - it: rejects a non-string MCP Service protocol
+    set:
+      mcp-server.install: true
+      mcp-server.service.ports:
+        - {name: http, port: 8080, targetPort: 8080, protocol: false}
+    asserts: *invalid_mcp_service_port
 
   - it: permits non-contract local environment values
     set:

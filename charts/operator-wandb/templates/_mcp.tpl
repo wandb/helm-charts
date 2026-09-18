@@ -18,10 +18,39 @@
     {{- fail "MCP Service must have exactly one named http port" -}}
   {{- end -}}
   {{- $http := first $httpPorts -}}
-  {{- if or (not (regexMatch `^[0-9]+$` (toJson $http.port))) (lt (int $http.port) 1) (gt (int $http.port) 65535) (ne (toJson $http.targetPort) "8080") (ne ($http.protocol | default "TCP") "TCP") -}}
+  {{- $protocolIsTCP := not (hasKey $http "protocol") -}}
+  {{- if hasKey $http "protocol" -}}
+    {{- $protocolIsTCP = eq (toJson (index $http "protocol")) (toJson "TCP") -}}
+  {{- end -}}
+  {{- if or (not (regexMatch `^[0-9]+$` (toJson $http.port))) (lt (int $http.port) 1) (gt (int $http.port) 65535) (ne (toJson $http.targetPort) "8080") (not $protocolIsTCP) -}}
     {{- fail "MCP http Service port must be an integer from 1 to 65535 using TCP and targetPort 8080" -}}
   {{- end -}}
 {{- $http.port -}}
+{{- end -}}
+
+{{/*
+Report whether a named Service target resolves to exactly one canonical TCP
+container port. Numeric-looking strings remain names in Kubernetes, so compare
+the port through JSON to preserve its Helm type.
+*/}}
+{{- define "wandb.mcpCanonicalNamedContainerPort" -}}
+  {{- $container := index (.containers | default dict) .containerName | default dict -}}
+  {{- $matches := list -}}
+  {{- range (index $container "ports" | default list) -}}
+    {{- if eq (toJson (index . "name")) (toJson $.portName) -}}
+      {{- $matches = append $matches . -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $valid := false -}}
+  {{- if eq (len $matches) 1 -}}
+    {{- $port := first $matches -}}
+    {{- $protocolIsTCP := not (hasKey $port "protocol") -}}
+    {{- if hasKey $port "protocol" -}}
+      {{- $protocolIsTCP = eq (toJson (index $port "protocol")) (toJson "TCP") -}}
+    {{- end -}}
+    {{- $valid = and (eq (toJson (index $port "containerPort")) (toJson $.containerPort)) $protocolIsTCP -}}
+  {{- end -}}
+{{- $valid -}}
 {{- end -}}
 
 {{/*
@@ -412,8 +441,8 @@ Resolves:
     {{- if eq $otelHost "" -}}
       {{- $otelHost = printf "%s-otel-daemonset" .Release.Name -}}
     {{- end -}}
-    {{- $otelPort := index $otelTraces "port" | default 4317 -}}
     {{- $otelProto := index $otelTraces "proto" | default "grpc" | toString | trim | lower }}
+    {{- $otelPort := include "wandb.otelTracesPort" . }}
 - name: MCP_OTEL_ENABLED
   value: "true"
 - name: OTEL_SERVICE_NAME

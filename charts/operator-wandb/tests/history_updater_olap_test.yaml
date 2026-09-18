@@ -50,6 +50,27 @@ tests:
           path: metadata.name
           value: wandb-history-updater
 
+  - it: defaults shared HTTP tracing to the HTTP receiver port
+    template: charts/history-updater/templates/deployment.yaml
+    set:
+      global:
+        olap:
+          default:
+            host: history-clickhouse.example.com
+            password: history-password
+          history:
+            enabled: true
+        otel:
+          traces:
+            proto: http
+      history-updater.install: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_TRACER
+            value: otlp+http://wandb-otel-daemonset:4318?trace_ratio=1
+
   - it: runs the history OLAP migration from the same flag
     template: charts/clickhouseMigrationJob/templates/job.yaml
     set:

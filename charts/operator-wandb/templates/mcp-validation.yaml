@@ -202,15 +202,26 @@
     {{- if not (index $apiService "enabled") -}}
       {{- fail "mcp-server.routing.internalBaseUrl is required when global.api.enabled=true and api.service.enabled=false" -}}
     {{- end -}}
-    {{- $apiPortIsDefault := false -}}
+    {{- $apiNamedTargetIsDefault := eq (include "wandb.mcpCanonicalNamedContainerPort" (dict "containers" (index $api "containers" | default dict) "containerName" "api" "portName" "api" "containerPort" 8081)) "true" -}}
+    {{- $apiRouteIsDefault := false -}}
     {{- range (index $apiService "ports" | default list) -}}
-      {{- if and (eq (index . "name" | default "" | toString) "http") (eq (index . "port" | toString) "8081") -}}
-        {{- $apiPortIsDefault = true -}}
+      {{- $apiTargetIsDefault := not (hasKey . "targetPort") -}}
+      {{- if hasKey . "targetPort" -}}
+        {{- $apiTargetPort := index . "targetPort" -}}
+        {{- $apiTargetIsDefault = or (eq (toJson $apiTargetPort) "8081") (and (eq (toJson $apiTargetPort) (toJson "api")) $apiNamedTargetIsDefault) -}}
+      {{- end -}}
+      {{- $apiProtocolIsTCP := not (hasKey . "protocol") -}}
+      {{- if hasKey . "protocol" -}}
+        {{- $apiProtocolIsTCP = eq (toJson (index . "protocol")) (toJson "TCP") -}}
+      {{- end -}}
+      {{- $apiHTTPRouteIsDefault := and (eq (toJson (index . "name")) (toJson "http")) (eq (toJson (index . "port")) "8081") $apiTargetIsDefault $apiProtocolIsTCP -}}
+      {{- if $apiHTTPRouteIsDefault -}}
+        {{- $apiRouteIsDefault = true -}}
       {{- end -}}
     {{- end -}}
     {{- $apiNamingIsCustom := or (ne (index $api "nameOverride" | default "" | toString | trim) "") (ne (index $api "fullnameOverride" | default "" | toString | trim) "") (ne (index $apiService "name" | default "" | toString | trim) "") -}}
-    {{- if or $apiNamingIsCustom (not $apiPortIsDefault) -}}
-      {{- fail "mcp-server.routing.internalBaseUrl is required when api naming or the http Service port is overridden" -}}
+    {{- if or $apiNamingIsCustom (not $apiRouteIsDefault) -}}
+      {{- fail "mcp-server.routing.internalBaseUrl is required when api naming or canonical HTTP routing is overridden" -}}
     {{- end -}}
   {{- else -}}
     {{- $app := index .Values "app" | default dict -}}
@@ -218,15 +229,26 @@
     {{- if or (not (index $app "install")) (not (index $appService "enabled")) -}}
       {{- fail "mcp-server.routing.internalBaseUrl is required when the monolith app Service is disabled" -}}
     {{- end -}}
-    {{- $appPortIsDefault := false -}}
+    {{- $appNamedTargetIsDefault := eq (include "wandb.mcpCanonicalNamedContainerPort" (dict "containers" (index $app "containers" | default dict) "containerName" "app" "portName" "http" "containerPort" 8080)) "true" -}}
+    {{- $appRouteIsDefault := false -}}
     {{- range (index $appService "ports" | default list) -}}
-      {{- if and (eq (index . "name" | default "" | toString) "app") (eq (index . "port" | toString) "8080") -}}
-        {{- $appPortIsDefault = true -}}
+      {{- $appTargetIsDefault := not (hasKey . "targetPort") -}}
+      {{- if hasKey . "targetPort" -}}
+        {{- $appTargetPort := index . "targetPort" -}}
+        {{- $appTargetIsDefault = or (eq (toJson $appTargetPort) "8080") (and (eq (toJson $appTargetPort) (toJson "http")) $appNamedTargetIsDefault) -}}
+      {{- end -}}
+      {{- $appProtocolIsTCP := not (hasKey . "protocol") -}}
+      {{- if hasKey . "protocol" -}}
+        {{- $appProtocolIsTCP = eq (toJson (index . "protocol")) (toJson "TCP") -}}
+      {{- end -}}
+      {{- $appHTTPRouteIsDefault := and (eq (toJson (index . "name")) (toJson "app")) (eq (toJson (index . "port")) "8080") $appTargetIsDefault $appProtocolIsTCP -}}
+      {{- if $appHTTPRouteIsDefault -}}
+        {{- $appRouteIsDefault = true -}}
       {{- end -}}
     {{- end -}}
     {{- $appNamingIsCustom := or (ne (index $app "nameOverride" | default "" | toString | trim) "") (ne (index $app "fullnameOverride" | default "" | toString | trim) "") (ne (index $appService "name" | default "" | toString | trim) "") -}}
-    {{- if or $appNamingIsCustom (not $appPortIsDefault) -}}
-      {{- fail "mcp-server.routing.internalBaseUrl is required when app naming or the app Service port is overridden" -}}
+    {{- if or $appNamingIsCustom (not $appRouteIsDefault) -}}
+      {{- fail "mcp-server.routing.internalBaseUrl is required when app naming or canonical HTTP routing is overridden" -}}
     {{- end -}}
   {{- end -}}
 
@@ -308,7 +330,7 @@
     {{- if and (ne $otelHost "") (not (regexMatch `^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)([.]([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?))*$` $otelHost)) -}}
       {{- fail "global.otel.traces.host must be a DNS hostname" -}}
     {{- end -}}
-    {{- $otelPort := index $otelTraces "port" | default 4317 | int -}}
+    {{- $otelPort := include "wandb.otelTracesPort" . | int -}}
     {{- if or (lt $otelPort 1) (gt $otelPort 65535) -}}
       {{- fail "global.otel.traces.port must be between 1 and 65535" -}}
     {{- end -}}

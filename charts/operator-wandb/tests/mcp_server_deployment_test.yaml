@@ -502,6 +502,35 @@ tests:
           path: spec.template.spec.containers[0].env
           content: {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf}
 
+  - it: defaults the MCP HTTP OTEL endpoint to the HTTP receiver port
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: otel
+      global.otel.traces.proto: http
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: http://customer-a-otel-daemonset:4318}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf}
+
+  - it: preserves an explicit custom MCP OTEL port
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: otel
+      global.otel.traces.proto: http
+      global.otel.traces.port: 55681
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_EXPORTER_OTLP_ENDPOINT, value: http://customer-a-otel-daemonset:55681}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf}
+
   - it: does not render an HPA
     template: charts/mcp-server/templates/hpa.yaml
     set:
