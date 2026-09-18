@@ -381,3 +381,9 @@ helm install wandb ./charts/operator-wandb \
 ## Additional Resources
 
 For more detailed information and advanced configuration options, please refer to the [W&B documentation](https://docs.wandb.ai/).
+
+## Optional resource request tuning
+
+See [the resource request profile documentation](docs/resource-requests.md) before enabling
+`values-resource-requests-conservative.yaml`. The profile is opt-in; chart defaults
+remain unchanged.

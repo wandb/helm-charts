@@ -1,0 +1,92 @@
+suite: preferred pod anti-affinity
+templates:
+  - deployment.yaml
+  - job.yaml
+  - cronjob.yaml
+release:
+  name: customer-wandb
+  namespace: customer
+set:
+  containers.worker: {}
+tests:
+  - it: leaves affinity absent by default
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.affinity
+
+  - it: prefers another hostname for the same service and release
+    template: deployment.yaml
+    set:
+      nameOverride: executor
+      preferredPodAntiAffinity: true
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity
+          value:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    topologyKey: kubernetes.io/hostname
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/name: executor
+                        app.kubernetes.io/instance: customer-wandb
+
+  - it: preserves explicit affinity instead of adding the preference
+    template: deployment.yaml
+    set:
+      preferredPodAntiAffinity: true
+      affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-pool
+              operator: In
+              values:
+                - dedicated
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity
+          value:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: node-pool
+                        operator: In
+                        values:
+                          - dedicated
+
+  - it: does not inherit the service preference into jobs
+    template: job.yaml
+    set:
+      preferredPodAntiAffinity: true
+      jobs.cleanup.containers.cleanup: {}
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.template.spec.affinity
+
+  - it: does not inherit the service preference into cronjobs
+    template: cronjob.yaml
+    set:
+      preferredPodAntiAffinity: true
+      cronJobs.cleanup.schedule: "0 * * * *"
+      cronJobs.cleanup.concurrencyPolicy: Forbid
+      cronJobs.cleanup.containers.cleanup: {}
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notExists:
+          path: spec.jobTemplate.spec.template.spec.affinity
+
+  - it: allows a job to opt into its own preference
+    template: job.yaml
+    set:
+      jobs.cleanup.preferredPodAntiAffinity: true
+      jobs.cleanup.containers.cleanup: {}
+    asserts:
+      - equal:
+          path: spec.template.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].weight
+          value: 100

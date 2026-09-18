@@ -1,0 +1,301 @@
+suite: KEDA optional resource threshold preservation
+templates:
+- scaledobject.yaml
+set:
+  global.size: small
+  sizing.small.autoscaling.keda.resourceRequestBaseline:
+    cpuMillicores: 2000
+    memoryBytes: 1073741824
+  autoscaling.keda:
+    enabled: true
+    minReplicaCount: 2
+    maxReplicaCount: 9
+    cooldownPeriod: 90
+    pollingInterval: 20
+    advanced: &id002
+      horizontalPodAutoscalerConfig:
+        behavior:
+          scaleDown:
+            stabilizationWindowSeconds: 300
+    triggers:
+    - &id001
+      type: kafka
+      name: queue-work
+      metadata:
+        bootstrapServers: broker.example:9092
+        consumerGroup: example-consumer
+        topic: example-topic
+        lagThreshold: '25'
+      authenticationRef:
+        name: example-auth
+    - &id003
+      type: cpu
+      metricType: Utilization
+      name: cpu-load
+      metadata:
+        value: '60'
+    - &id004
+      type: memory
+      metricType: Utilization
+      metadata:
+        value: '70'
+tests:
+- it: converts effective percentages and preserves queue authentication and controller
+    policy
+  set: {}
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - *id001
+      - &id005
+        type: cpu
+        metricType: AverageValue
+        name: cpu-load
+        metadata:
+          value: 1200m
+      - &id006
+        type: memory
+        metricType: AverageValue
+        metadata:
+          value: '751619277'
+  - equal:
+      path: spec.minReplicaCount
+      value: 2
+  - equal:
+      path: spec.maxReplicaCount
+      value: 9
+  - equal:
+      path: spec.cooldownPeriod
+      value: 90
+  - equal:
+      path: spec.pollingInterval
+      value: 20
+  - equal:
+      path: spec.advanced
+      value: *id002
+- it: preserves the entire trigger list without opted-in baselines
+  set:
+    sizing.small.autoscaling.keda.resourceRequestBaseline:
+      cpuMillicores: 0
+      memoryBytes: 0
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - *id001
+      - *id003
+      - *id004
+- it: converts only the dimension with a baseline
+  set:
+    sizing.small.autoscaling.keda.resourceRequestBaseline.memoryBytes: 0
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - *id001
+      - *id005
+      - *id004
+- it: leaves existing absolute targets untouched
+  set:
+    autoscaling.keda.triggers:
+    - *id001
+    - *id005
+    - *id006
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - *id001
+      - *id005
+      - *id006
+- it: leaves a queue-only controller unchanged
+  set:
+    autoscaling.keda.triggers:
+    - *id001
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - *id001
+- it: does not enable a disabled controller
+  set:
+    autoscaling.keda.enabled: false
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: preserves CPU utilization for explicit service CPU requests
+  set:
+    resources.requests.cpu: '3'
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - *id001
+      - *id003
+      - *id006
+- it: preserves memory utilization for explicit container memory requests
+  set:
+    containers.worker.resources.requests.memory: 3Gi
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - *id001
+      - *id005
+      - *id004
+- it: ignores disabled container request overrides
+  set:
+    containers.worker.enabled: false
+    containers.worker.resources.requests.cpu: '3'
+    containers.worker.resources.requests.memory: 3Gi
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - *id001
+      - *id005
+      - *id006
+- it: ignores templated disabled container request overrides
+  set:
+    global.workerEnabled: false
+    containers.worker.enabled: '{{ .Values.global.workerEnabled }}'
+    containers.worker.resources.requests.cpu: '3'
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - *id001
+      - *id005
+      - *id006
+- it: evaluates resource trigger templates before converting configured percentages
+  set:
+    global.cpuPercent: 60
+    autoscaling.keda.triggers:
+    - *id001
+    - type: cpu
+      metricType: Utilization
+      name: cpu-load
+      metadata:
+        value: '{{ .Values.global.cpuPercent }}'
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - *id001
+      - *id005
+- it: converts legacy metadata utilization types
+  set:
+    autoscaling.keda.triggers:
+    - type: cpu
+      metadata:
+        type: Utilization
+        value: '60'
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - type: cpu
+        metricType: AverageValue
+        metadata:
+          value: 1200m
+- it: rejects whole-pod conversion of container-scoped utilization
+  set:
+    autoscaling.keda.triggers:
+    - type: cpu
+      metricType: Utilization
+      name: cpu-load
+      metadata:
+        value: '60'
+        containerName: worker
+  asserts:
+  - failedTemplate:
+      errorMessage: KEDA resourceRequestBaseline describes the whole pod; clear that
+        resource baseline before using containerName
+- it: allows container-scoped triggers after clearing that resource baseline
+  set:
+    sizing.small.autoscaling.keda.resourceRequestBaseline.cpuMillicores: 0
+    autoscaling.keda.triggers:
+    - type: cpu
+      metricType: Utilization
+      name: cpu-load
+      metadata:
+        value: '60'
+        containerName: worker
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - type: cpu
+        metricType: Utilization
+        name: cpu-load
+        metadata:
+          value: '60'
+          containerName: worker
+- it: rejects invalid normalized request baselines
+  set:
+    sizing.small.autoscaling.keda.resourceRequestBaseline.cpuMillicores: 2Gi
+  asserts:
+  - failedTemplate:
+      errorMessage: KEDA resourceRequestBaseline values must be positive whole numbers,
+        or zero to disable conversion
+- it: rejects invalid utilization instead of creating a zero target
+  set:
+    autoscaling.keda.triggers:
+    - type: cpu
+      metricType: Utilization
+      name: cpu-load
+      metadata:
+        value: bad
+  asserts:
+  - failedTemplate:
+      errorMessage: KEDA resource utilization must be a positive integer percentage
+- it: preserves literal queue and authentication templates while converting resource
+    templates
+  set:
+    global.exampleTopic: should-not-render
+    global.exampleAuth: should-not-render
+    global.examplePercent: 60
+    autoscaling.keda.triggers:
+    - type: kafka
+      name: literal-queue
+      metadata: &id007
+        topic: '{{ .Values.global.exampleTopic }}'
+        lagThreshold: '25'
+      authenticationRef: &id008
+        name: '{{ .Values.global.exampleAuth }}'
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: '{{ .Values.global.examplePercent }}'
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - type: kafka
+        name: literal-queue
+        metadata: *id007
+        authenticationRef: *id008
+      - type: cpu
+        metricType: AverageValue
+        metadata:
+          value: 1200m
+- it: does not convert a non-resource utilization trigger with an unknown baseline
+    key
+  set:
+    sizing.small.autoscaling.keda.resourceRequestBaseline:
+      ? ''
+      : 1000
+    autoscaling.keda.triggers:
+    - type: external
+      metricType: Utilization
+      metadata:
+        value: '60'
+  asserts:
+  - equal:
+      path: spec.triggers
+      value:
+      - type: external
+        metricType: Utilization
+        metadata:
+          value: '60'
