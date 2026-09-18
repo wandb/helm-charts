@@ -183,30 +183,14 @@ type: OnDelete
   {{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
   {{- $overrides := default dict .Values.autoscaling.horizontal }}
   {{- $hpaSizing := mergeOverwrite $sizingInfo.autoscaling.horizontal $overrides }}
-  {{- $serviceResources := default dict .Values.resources }}
-  {{- $serviceRequests := default dict $serviceResources.requests }}
   {{- /* Keep existing request-based scaling when direct overrides are present. */}}
   {{- range $resource := list "CPU" "Memory" }}
     {{- $percentageKey := printf "target%sUtilizationPercentage" $resource }}
     {{- $absoluteKey := printf "target%sAverageValue" $resource }}
     {{- $requestKey := lower $resource }}
-    {{- $hasRequestOverride := hasKey $serviceRequests $requestKey }}
-    {{- range $container := $.Values.containers }}
-      {{- $enabled := true }}
-      {{- if hasKey $container "enabled" }}
-        {{- if kindIs "string" $container.enabled }}
-          {{- $enabled = eq (tpl $container.enabled $ | trim) "true" }}
-        {{- else }}
-          {{- $enabled = $container.enabled }}
-        {{- end }}
-      {{- end }}
-      {{- if $enabled }}
-        {{- $containerResources := default dict $container.resources }}
-        {{- $containerRequests := default dict $containerResources.requests }}
-        {{- $hasRequestOverride = or $hasRequestOverride (hasKey $containerRequests $requestKey) }}
-      {{- end }}
-    {{- end }}
-    {{- $preserveUtilization := and (or (hasKey $overrides $percentageKey) $hasRequestOverride) (empty (get $overrides $absoluteKey)) }}
+    {{- $hasRequestOverride := eq (include "wandb-base.hasDirectRequestOverride" (dict "root" $ "resource" $requestKey)) "true" }}
+    {{- $preserveRequestScaling := and $hasRequestOverride (not $hpaSizing.preserveAbsoluteTargetsWithRequestOverrides) }}
+    {{- $preserveUtilization := and (or (hasKey $overrides $percentageKey) $preserveRequestScaling) (empty (get $overrides $absoluteKey)) }}
     {{- if $preserveUtilization }}
       {{- $_ := set $hpaSizing $absoluteKey "" }}
     {{- end }}
@@ -218,6 +202,9 @@ type: OnDelete
 {{- define "wandb-base.sizingInfoKeda" }}
   {{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
   {{- $kedaSizing := mergeOverwrite $sizingInfo.autoscaling.keda .Values.autoscaling.keda }}
+  {{- if and $kedaSizing.enabled $kedaSizing.resourceRequestBaseline $kedaSizing.triggers }}
+    {{- $_ := set $kedaSizing "triggers" (include "wandb-base.kedaResourceTriggers" (dict "root" . "keda" $kedaSizing) | fromYamlArray) }}
+  {{- end }}
 
 {{- toYaml $kedaSizing }}
 {{- end }}

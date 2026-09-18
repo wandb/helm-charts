@@ -360,6 +360,11 @@ autoscaling:
   # targets: Helm merges those overrides with presets before templates execute.
   #    targetCPUAverageValue: ""
   #    targetMemoryAverageValue: ""
+  # Explicitly keep size absolute targets despite direct request settings, for
+  # example when the target already includes fixed sidecar requests. Review any
+  # custom requests before opting in. Explicit percentage/absolute overrides
+  # above still take precedence. This option defaults to false.
+  #    preserveAbsoluteTargetsWithRequestOverrides: false
   vertical: {}
   #    enabled: false
   #    updateMode: "Auto"
@@ -372,6 +377,17 @@ autoscaling:
   # More information: https://keda.sh/docs/latest/concepts/scaling-deployments/
   # NOTE: KEDA and HPA are mutually exclusive. When KEDA is enabled, it manages its own HPA.
   keda: {}
+# Optional prior full-pod requests for preserving resource trigger thresholds
+# when sizing requests change. Only Utilization CPU/memory triggers convert to
+# AverageValue, using their configured percentages; other triggers are unchanged.
+# Memory targets round upward by less than one byte. Explicit direct request
+# overrides keep the original trigger for that resource. Baselines must be
+# reviewed when custom sizing or sidecars change the original pod denominator.
+# A resource trigger with containerName requires clearing its whole-pod baseline.
+# Set a baseline to 0 to disable its conversion. Disabled KEDA stays disabled.
+#    resourceRequestBaseline:
+#      cpuMillicores: 0
+#      memoryBytes: 0
 #    enabled: false
 #    pollingInterval: 30  # Optional: Interval to check each trigger (seconds)
 #    cooldownPeriod: 300  # Optional: Period to wait after last trigger before scaling to 0 (seconds)

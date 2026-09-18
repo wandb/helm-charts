@@ -360,3 +360,73 @@ tests:
       - equal:
           path: spec.metrics[1].resource.target.type
           value: Utilization
+
+  - it: keeps reviewed full-pod absolute targets with fixed sidecar requests
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 900m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1700Mi
+      sizing.small.autoscaling.horizontal.preserveAbsoluteTargetsWithRequestOverrides: true
+      containers.sidecar.resources.requests.cpu: 125m
+      containers.sidecar.resources.requests.memory: 128Mi
+    asserts:
+    - equal:
+        path: spec.metrics[0].resource.target
+        value:
+          type: AverageValue
+          averageValue: 900m
+    - equal:
+        path: spec.metrics[1].resource.target
+        value:
+          type: AverageValue
+          averageValue: 1700Mi
+  - it: retains explicit percentages over opted-in full-pod absolute targets
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 900m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1700Mi
+      sizing.small.autoscaling.horizontal.preserveAbsoluteTargetsWithRequestOverrides: true
+      containers.sidecar.resources.requests.cpu: 125m
+      containers.sidecar.resources.requests.memory: 128Mi
+      autoscaling.horizontal.targetCPUUtilizationPercentage: 60
+    asserts:
+    - equal:
+        path: spec.metrics[0].resource.target
+        value:
+          type: Utilization
+          averageUtilization: 60
+    - equal:
+        path: spec.metrics[1].resource.target.type
+        value: AverageValue
+  - it: retains explicit absolute values over reviewed size targets
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 900m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1700Mi
+      sizing.small.autoscaling.horizontal.preserveAbsoluteTargetsWithRequestOverrides: true
+      containers.sidecar.resources.requests.cpu: 125m
+      containers.sidecar.resources.requests.memory: 128Mi
+      autoscaling.horizontal.targetCPUUtilizationPercentage: 60
+      autoscaling.horizontal.targetCPUAverageValue: 500m
+    asserts:
+    - equal:
+        path: spec.metrics[0].resource.target
+        value:
+          type: AverageValue
+          averageValue: 500m
+  - it: allows the request compatibility opt-in to be disabled explicitly
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 900m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1700Mi
+      sizing.small.autoscaling.horizontal.preserveAbsoluteTargetsWithRequestOverrides: true
+      containers.sidecar.resources.requests.cpu: 125m
+      containers.sidecar.resources.requests.memory: 128Mi
+      autoscaling.horizontal.preserveAbsoluteTargetsWithRequestOverrides: false
+    asserts:
+    - equal:
+        path: spec.metrics[0].resource.target.type
+        value: Utilization
+    - equal:
+        path: spec.metrics[1].resource.target.type
+        value: Utilization
