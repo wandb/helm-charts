@@ -181,7 +181,36 @@ type: OnDelete
 
 {{- define "wandb-base.sizingInfoHorizontal" }}
   {{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
-  {{- $hpaSizing := mergeOverwrite $sizingInfo.autoscaling.horizontal .Values.autoscaling.horizontal }}
+  {{- $overrides := default dict .Values.autoscaling.horizontal }}
+  {{- $hpaSizing := mergeOverwrite $sizingInfo.autoscaling.horizontal $overrides }}
+  {{- $serviceResources := default dict .Values.resources }}
+  {{- $serviceRequests := default dict $serviceResources.requests }}
+  {{- /* Keep existing request-based scaling when direct overrides are present. */}}
+  {{- range $resource := list "CPU" "Memory" }}
+    {{- $percentageKey := printf "target%sUtilizationPercentage" $resource }}
+    {{- $absoluteKey := printf "target%sAverageValue" $resource }}
+    {{- $requestKey := lower $resource }}
+    {{- $hasRequestOverride := hasKey $serviceRequests $requestKey }}
+    {{- range $container := $.Values.containers }}
+      {{- $enabled := true }}
+      {{- if hasKey $container "enabled" }}
+        {{- if kindIs "string" $container.enabled }}
+          {{- $enabled = eq (tpl $container.enabled $ | trim) "true" }}
+        {{- else }}
+          {{- $enabled = $container.enabled }}
+        {{- end }}
+      {{- end }}
+      {{- if $enabled }}
+        {{- $containerResources := default dict $container.resources }}
+        {{- $containerRequests := default dict $containerResources.requests }}
+        {{- $hasRequestOverride = or $hasRequestOverride (hasKey $containerRequests $requestKey) }}
+      {{- end }}
+    {{- end }}
+    {{- $preserveUtilization := and (or (hasKey $overrides $percentageKey) $hasRequestOverride) (empty (get $overrides $absoluteKey)) }}
+    {{- if $preserveUtilization }}
+      {{- $_ := set $hpaSizing $absoluteKey "" }}
+    {{- end }}
+  {{- end }}
 
 {{- toYaml $hpaSizing }}
 {{- end }}

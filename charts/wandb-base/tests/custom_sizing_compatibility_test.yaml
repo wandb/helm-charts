@@ -1,0 +1,34 @@
+suite: custom sizing without an absolute-target profile
+templates:
+  - hpa.yaml
+  - deployment.yaml
+set:
+  global.size: small
+  containers.worker: {}
+  sizing.small.resources.requests.cpu: "2"
+  sizing.small.resources.requests.memory: 2Gi
+  sizing.small.autoscaling.horizontal.enabled: true
+  sizing.small.autoscaling.horizontal.targetCPUUtilizationPercentage: 50
+  sizing.small.autoscaling.horizontal.targetMemoryUtilizationPercentage: 0
+tests:
+  - it: retains custom CPU utilization and disabled memory scaling
+    template: hpa.yaml
+    asserts:
+      - equal:
+          path: spec.metrics
+          value:
+            - type: Resource
+              resource:
+                name: cpu
+                target:
+                  type: Utilization
+                  averageUtilization: 50
+
+  - it: retains the custom CPU and memory requests
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests
+          value:
+            cpu: "2"
+            memory: 2Gi

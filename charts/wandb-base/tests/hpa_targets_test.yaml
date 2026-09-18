@@ -1,0 +1,362 @@
+suite: HPA absolute resource targets
+templates:
+  - hpa.yaml
+set:
+  autoscaling.horizontal.enabled: true
+tests:
+  - it: preserves the default CPU and memory utilization targets
+    asserts:
+      - equal:
+          path: spec.metrics
+          value:
+            - type: Resource
+              resource:
+                name: cpu
+                target:
+                  type: Utilization
+                  averageUtilization: 80
+            - type: Resource
+              resource:
+                name: memory
+                target:
+                  type: Utilization
+                  averageUtilization: 80
+
+  - it: prefers size-specific absolute targets over default utilization percentages
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+    asserts:
+      - equal:
+          path: spec.metrics
+          value:
+            - type: Resource
+              resource:
+                name: cpu
+                target:
+                  type: AverageValue
+                  averageValue: 800m
+            - type: Resource
+              resource:
+                name: memory
+                target:
+                  type: AverageValue
+                  averageValue: 1600Mi
+
+  - it: permits an absolute CPU target with utilization-based memory
+    set:
+      autoscaling.horizontal.targetCPUAverageValue: 1200m
+      autoscaling.horizontal.targetMemoryUtilizationPercentage: 70
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target
+          value:
+            type: AverageValue
+            averageValue: 1200m
+      - equal:
+          path: spec.metrics[1].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 70
+
+  - it: preserves existing explicit percentage overrides over size absolute targets
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      autoscaling.horizontal.targetCPUUtilizationPercentage: 65
+      autoscaling.horizontal.targetMemoryUtilizationPercentage: 75
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 65
+      - equal:
+          path: spec.metrics[1].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 75
+
+  - it: prefers an explicit absolute target over an explicit percentage
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      autoscaling.horizontal.targetCPUAverageValue: 400m
+      autoscaling.horizontal.targetCPUUtilizationPercentage: 65
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target
+          value:
+            type: AverageValue
+            averageValue: 400m
+
+  - it: clears a size absolute target when the explicit percentage disables the resource
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      autoscaling.horizontal.targetMemoryUtilizationPercentage: 0
+    asserts:
+      - lengthEqual:
+          path: spec.metrics
+          count: 1
+      - equal:
+          path: spec.metrics[0].resource.name
+          value: cpu
+
+  - it: clears an absolute target to inherit the default percentage
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      autoscaling.horizontal.targetCPUAverageValue: ""
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 80
+
+  - it: lets an explicit absolute target override the size preset
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      autoscaling.horizontal.targetCPUAverageValue: 400m
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target.averageValue
+          value: 400m
+
+  - it: keeps a disabled resource metric absent
+    set:
+      autoscaling.horizontal.targetMemoryUtilizationPercentage: 0
+    asserts:
+      - lengthEqual:
+          path: spec.metrics
+          count: 1
+      - equal:
+          path: spec.metrics[0].resource.name
+          value: cpu
+
+  - it: supports an absolute target when the percentage is disabled
+    set:
+      autoscaling.horizontal.targetMemoryUtilizationPercentage: 0
+      autoscaling.horizontal.targetMemoryAverageValue: 2Gi
+    asserts:
+      - equal:
+          path: spec.metrics[1].resource.target
+          value:
+            type: AverageValue
+            averageValue: 2Gi
+
+  - it: leaves autoscaling disabled when only an absolute target is set
+    set:
+      autoscaling.horizontal.enabled: false
+      autoscaling.horizontal.targetCPUAverageValue: 800m
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: leaves KEDA in control when both autoscalers are configured
+    set:
+      autoscaling.keda.enabled: true
+      autoscaling.horizontal.targetCPUAverageValue: 800m
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: preserves utilization targets for existing service request overrides
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      resources.requests.cpu: 2
+      resources.requests.memory: 4Gi
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 80
+      - equal:
+          path: spec.metrics[1].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 80
+
+  - it: preserves utilization targets for existing container request overrides
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      containers.worker.resources.requests.cpu: 2
+      containers.worker.resources.requests.memory: 4Gi
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 80
+      - equal:
+          path: spec.metrics[1].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 80
+
+  - it: preserves an absolute memory target when only CPU requests are overridden
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      resources.requests.cpu: 2
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 80
+      - equal:
+          path: spec.metrics[1].resource.target
+          value:
+            type: AverageValue
+            averageValue: 1600Mi
+
+  - it: preserves an absolute CPU target when only container memory is overridden
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      containers.worker.resources.requests.memory: 4Gi
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target
+          value:
+            type: AverageValue
+            averageValue: 800m
+      - equal:
+          path: spec.metrics[1].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 80
+
+  - it: lets explicit absolute targets win over service and container request overrides
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      resources.requests.cpu: 2
+      containers.worker.resources.requests.memory: 4Gi
+      autoscaling.horizontal.targetCPUAverageValue: 1200m
+      autoscaling.horizontal.targetMemoryAverageValue: 3Gi
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target
+          value:
+            type: AverageValue
+            averageValue: 1200m
+      - equal:
+          path: spec.metrics[1].resource.target
+          value:
+            type: AverageValue
+            averageValue: 3Gi
+
+  - it: leaves absolute targets intact for limits-only overrides
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      resources.limits.cpu: 4
+      containers.worker.resources.limits.memory: 8Gi
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target.type
+          value: AverageValue
+      - equal:
+          path: spec.metrics[1].resource.target.type
+          value: AverageValue
+
+  - it: ignores request overrides on a disabled container
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      containers.worker.enabled: false
+      containers.worker.resources.requests.cpu: 2
+      containers.worker.resources.requests.memory: 4Gi
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target.type
+          value: AverageValue
+      - equal:
+          path: spec.metrics[1].resource.target.type
+          value: AverageValue
+
+  - it: ignores request overrides when a container is disabled by a string
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      containers.worker.enabled: "false"
+      containers.worker.resources.requests.cpu: 2
+      containers.worker.resources.requests.memory: 4Gi
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target.type
+          value: AverageValue
+      - equal:
+          path: spec.metrics[1].resource.target.type
+          value: AverageValue
+
+  - it: ignores request overrides when a container enablement template evaluates false
+    set:
+      global.size: small
+      global.testWorkerEnabled: false
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      containers.worker.enabled: '{{ .Values.global.testWorkerEnabled }}'
+      containers.worker.resources.requests.cpu: 2
+      containers.worker.resources.requests.memory: 4Gi
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target.type
+          value: AverageValue
+      - equal:
+          path: spec.metrics[1].resource.target.type
+          value: AverageValue
+
+  - it: preserves utilization when a container enablement template evaluates true
+    set:
+      global.size: small
+      global.testWorkerEnabled: true
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      containers.worker.enabled: '{{ .Values.global.testWorkerEnabled }}'
+      containers.worker.resources.requests.cpu: 2
+      containers.worker.resources.requests.memory: 4Gi
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 80
+      - equal:
+          path: spec.metrics[1].resource.target
+          value:
+            type: Utilization
+            averageUtilization: 80
+
+  - it: preserves utilization for an explicitly enabled container with requests
+    set:
+      global.size: small
+      sizing.small.autoscaling.horizontal.targetCPUAverageValue: 800m
+      sizing.small.autoscaling.horizontal.targetMemoryAverageValue: 1600Mi
+      containers.worker.enabled: true
+      containers.worker.resources.requests.cpu: 2
+      containers.worker.resources.requests.memory: 4Gi
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.target.type
+          value: Utilization
+      - equal:
+          path: spec.metrics[1].resource.target.type
+          value: Utilization
