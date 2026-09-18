@@ -405,8 +405,7 @@ Resolves:
     */}}
 - name: MCP_LOG_FORMAT
   value: "json"
-  {{- end }}
-  {{- if eq $provider "otel" }}
+  {{- else if eq $provider "otel" }}
     {{- $otel := index .Values.global "otel" | default dict -}}
     {{- $otelTraces := index $otel "traces" | default dict -}}
     {{- $otelHost := tpl (index $otelTraces "host" | default "" | toString) . | trim -}}
