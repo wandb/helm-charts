@@ -349,6 +349,17 @@ autoscaling:
   #    maxReplicas: 5
   #    targetCPUUtilizationPercentage: 80
   #    targetMemoryUtilizationPercentage: 80
+  # Absolute per-pod targets take precedence within the same configuration level.
+  # Use quantities such as "800m" for CPU or "1600Mi" for memory.
+  # An explicit percentage here overrides a size's absolute target unless an
+  # absolute target is also explicitly set here. Set the percentage to 0 to
+  # disable that metric, or clear AverageValue with "" to inherit the percentage.
+  # Direct resources.requests or enabled containers.<name>.resources.requests
+  # preserve utilization scaling unless an absolute target is set here.
+  # Review custom sizing overrides before opting into a profile with absolute
+  # targets: Helm merges those overrides with presets before templates execute.
+  #    targetCPUAverageValue: ""
+  #    targetMemoryAverageValue: ""
   vertical: {}
   #    enabled: false
   #    updateMode: "Auto"
@@ -440,6 +451,11 @@ tolerations: []
 
 affinity: {}
 
+# Prefer separate nodes for replicas of this service in this Helm release.
+# An explicit nonempty affinity map takes precedence. Jobs and CronJobs do not
+# inherit this setting; set it on their own pod definitions to opt them in.
+preferredPodAntiAffinity: false
+
 # Chart-level priority class (can override global.priorityClassName)
 priorityClassName: ""
 
@@ -465,6 +481,8 @@ sizing:
         maxReplicas: 5
         targetCPUUtilizationPercentage: 80
         targetMemoryUtilizationPercentage: 80
+        targetCPUAverageValue: ""
+        targetMemoryAverageValue: ""
       vertical:
         enabled: false
         updateMode: "Auto"
