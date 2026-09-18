@@ -1,0 +1,175 @@
+suite: Consolidated Azure storage subjects
+templates:
+  - templates/azure-storage-serviceaccount.yaml
+  - charts/parquet/templates/deployment.yaml
+  - charts/parquet/templates/serviceaccount.yaml
+  - charts/app/templates/deployment.yaml
+  - charts/app/templates/rolebinding.yaml
+  - charts/console/templates/rolebinding.yaml
+  - charts/weave-trace/templates/deployment.yaml
+release:
+  name: wandb
+tests:
+  - it: consolidates a customer bucket without substituting deployment credentials
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/parquet/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-bucket-access
+      - equal:
+          path: spec.template.metadata.labels["azure.workload.identity/use"]
+          value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_TENANT_ID
+            value: customer-tenant
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_CLIENT_ID
+            value: customer-client
+
+  - it: retains the deployment identity annotation for services using the default bucket
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: templates/azure-storage-serviceaccount.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: wandb-bucket-access
+      - equal:
+          path: metadata.annotations["azure.workload.identity/client-id"]
+          value: deployment-client
+
+  - it: suppresses the consolidated worker component account
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/parquet/templates/serviceaccount.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: also consolidates the deployment default bucket
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/parquet/templates/deployment.yaml
+    set:
+      global.bucket.name: null
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-bucket-access
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_CLIENT_ID
+            value: deployment-client
+
+  - it: preserves access-key BYOB service accounts
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/parquet/templates/deployment.yaml
+    set:
+      global.bucket.azureAuthMethod: accessKey
+      global.bucket.accessKey: customer-key
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-parquet
+
+  - it: preserves default-bucket key authentication service accounts
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/parquet/templates/deployment.yaml
+    set:
+      global.bucket.name: null
+      global.defaultBucket.azureAuthMethod: accessKey
+      global.defaultBucket.accessKey: deployment-key
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-parquet
+
+  - it: does not migrate customer subjects when an existing grouped installation upgrades
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/parquet/templates/deployment.yaml
+    set:
+      global.azureStorageIdentity.serviceAccount.mode: grouped
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-parquet
+
+  - it: preserves customer credential references when consolidating
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/parquet/templates/deployment.yaml
+    set:
+      global.bucket.azureClientId:
+        valueFrom:
+          secretKeyRef:
+            name: customer-identity
+            key: client-id
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-bucket-access
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: customer-identity
+                key: client-id
+
+  - it: supports a pre-provisioned storage account
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/parquet/templates/deployment.yaml
+    set:
+      global.azureStorageIdentity.serviceAccount.create: false
+      global.azureStorageIdentity.serviceAccount.name: existing-storage-account
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: existing-storage-account
+
+  - it: does not render a pre-provisioned storage account
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: templates/azure-storage-serviceaccount.yaml
+    set:
+      global.azureStorageIdentity.serviceAccount.create: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: keeps the app on its Kubernetes identity
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-app
+
+  - it: keeps app permissions off the storage worker account
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/app/templates/rolebinding.yaml
+    asserts:
+      - equal:
+          path: subjects[0].name
+          value: wandb-app
+
+  - it: keeps Console cluster permissions off the storage worker account
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/console/templates/rolebinding.yaml
+    asserts:
+      - equal:
+          path: subjects[0].name
+          value: wandb-console
+
+  - it: preserves Weave internal authentication when using the deployment bucket
+    values: [fixtures/azure_storage_consolidated.yaml]
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      global.weave-trace.fileStorage.useDefaultBucket: true
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-weave-trace

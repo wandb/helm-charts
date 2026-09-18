@@ -77,18 +77,23 @@ the deployment. Bucket authentication can still use a storage key.
 {{- end }}
 
 {{/*
-Return whether workloads can use the deployment-wide Azure storage account.
-Legacy bucket-scoped identities deliberately retain their component accounts.
+Return whether the shared Kubernetes account is needed for Azure storage.
+Consolidated mode includes bucket-scoped identities. The Kubernetes account's
+annotation still identifies the deployment identity; storage SDK credentials
+are selected independently by wandb.azureStorageIdentity.
 */}}
 {{- define "wandb.azureStorageServiceAccountEnabled" -}}
   {{- $identity := include "wandb.azureStorageIdentity" . | fromYaml -}}
   {{- $globalIdentity := default (dict) .Values.global.azureStorageIdentity -}}
   {{- $serviceAccount := default (dict) $globalIdentity.serviceAccount -}}
   {{- $mode := default "shared" $serviceAccount.mode -}}
-  {{- if not (has $mode (list "shared" "component" "grouped")) -}}
-    {{- fail "global.azureStorageIdentity.serviceAccount.mode must be shared, component, or grouped" -}}
+  {{- if not (has $mode (list "shared" "component" "grouped" "consolidated")) -}}
+    {{- fail "global.azureStorageIdentity.serviceAccount.mode must be shared, component, grouped, or consolidated" -}}
   {{- end -}}
   {{- $globalConfigured := and (not (empty $globalIdentity.tenantId)) (not (empty $globalIdentity.clientId)) -}}
+  {{- if and (eq $mode "consolidated") (not $globalConfigured) -}}
+    {{- fail "consolidated Azure storage accounts require global.azureStorageIdentity.tenantId and clientId" -}}
+  {{- end -}}
   {{- $weaveUsesDefaultBucket := include "wandb.weaveTraceUsesAzureWorkloadIdentity" . | trim | eq "true" -}}
 {{- and $globalConfigured (or $identity.enabled $weaveUsesDefaultBucket) (ne $mode "component") -}}
 {{- end }}
