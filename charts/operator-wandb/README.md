@@ -141,6 +141,73 @@ and downloads, and check that server-issued SAS URLs use the intended managed
 identity with blob scope (`sr=b`). Pod readiness alone does not validate storage
 authentication.
 
+#### Consolidating customer bucket federation
+
+Set `global.azureStorageIdentity.serviceAccount.mode: consolidated` to use
+`wandb-bucket-access` for ordinary storage workers with either the deployment
+bucket or an explicit customer bucket identity. This is an opt-in migration:
+`component`, `grouped`, and `shared` retain their existing subject selection.
+In particular, upgrading a `grouped` installation does not change customer
+bucket federation subjects.
+
+```yaml
+global:
+  azureStorageIdentity:
+    tenantId: <deployment-tenant-id>
+    clientId: <deployment-client-id>
+    serviceAccount:
+      mode: consolidated
+      name: wandb-bucket-access
+  bucket:
+    provider: az
+    name: <customer-storage-account>
+    path: <container>/<optional-prefix>
+    azureTenantId: <customer-tenant-id>
+    azureClientId: <customer-managed-identity-client-id>
+```
+
+Leave `bucket.azureAuthMethod` unset for the explicit customer tenant/client
+path; `workloadIdentity` selects the deployment identity instead. The shared
+Kubernetes account keeps the deployment client-ID annotation, while the storage
+SDK receives the customer tenant/client IDs. The customer identity must trust
+the cluster's OIDC issuer, audience `api://AzureADTokenExchange`, and subject
+`system:serviceaccount:<namespace>:wandb-bucket-access`. Assign storage permissions
+to the customer identity in the customer's tenant. Explicit access-key buckets
+keep their component accounts.
+
+Consolidation preserves accounts with Kubernetes RBAC permissions and Weave's
+internal JWT identity. With release name `wandb` and default account names, the
+chart's storage federation subjects come from this fixed set (all prefixed with
+`system:serviceaccount:<namespace>:`):
+
+| Account | Consumers |
+| --- | --- |
+| `wandb-bucket-access` | Ordinary storage workers, including newly added workers |
+| `wandb-app`, `wandb-api` | App/API with Kubernetes secret permissions |
+| `wandb-glue` | Glue with Kubernetes secret and leader-election permissions |
+| `wandb-metric-observer` | Metric observer with Kubernetes read permissions |
+| `wandb-settings-migration-job` | Settings migration with Kubernetes secret permissions |
+| `wandb-console` | Console with cluster permissions |
+| `lumen` | Lumen with Kubernetes read permissions and its own GCP federation |
+| `wandb-weave-trace` | Weave Trace and its workers, when using the deployment bucket |
+
+Federate only the accounts that access a given bucket. Weave's deployment-bucket
+identity does not require customer-bucket access. Account overrides and release
+names can change the subjects; inventory the rendered workloads before migration.
+Managed Bufstream has separate internal storage and is not part of customer BYOB
+trust. A separately deployed Console must be configured in its own deployment.
+
+Provision the new shared subject on every affected Azure identity before
+switching modes. Keep old federated credentials until all old pods and Jobs have
+finished and storage access (including user delegation SAS) has been verified.
+The chart creates Kubernetes resources; Terraform or the customer creates Azure
+federated credentials. Reverting the mode while retaining old credentials restores
+the previous subject selection.
+
+`scripts/test_azure_storage_subjects.py` renders optional consumers and checks this
+set, RBAC separation, and a new worker using the existing shared subject. A new
+service should reuse a subject rather than extend customer trust requirements.
+
 ### Global Pod Scheduling
 
 The chart supports global `nodeSelector`, `tolerations`, and `priorityClassName` configuration that applies to **ALL components** (W&B services, databases, monitoring, etc.). This provides centralized control over pod scheduling and priority across your entire W&B deployment.

@@ -98,17 +98,21 @@ Create the name of the service account to use
 
 {{/*
 Use the shared account only for workloads that already opt into Azure workload
-identity. This keeps legacy bucket-scoped identities and key-based BYOB on
-their component accounts.
+identity. Consolidated mode also shares bucket-scoped identities, without
+changing which Azure tenant/client the storage SDK uses. Older modes preserve
+their existing federation subjects.
 */}}
 {{- define "wandb-base.azureStorageServiceAccountEnabled" -}}
   {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
   {{- $serviceAccount := default (dict) $identity.serviceAccount -}}
   {{- $mode := default "shared" $serviceAccount.mode -}}
-  {{- if not (has $mode (list "shared" "component" "grouped")) -}}
-    {{- fail "global.azureStorageIdentity.serviceAccount.mode must be shared, component, or grouped" -}}
+  {{- if not (has $mode (list "shared" "component" "grouped" "consolidated")) -}}
+    {{- fail "global.azureStorageIdentity.serviceAccount.mode must be shared, component, grouped, or consolidated" -}}
   {{- end -}}
   {{- $globalConfigured := and (not (empty $identity.tenantId)) (not (empty $identity.clientId)) -}}
+  {{- if and (eq $mode "consolidated") (not $globalConfigured) -}}
+    {{- fail "consolidated Azure storage accounts require global.azureStorageIdentity.tenantId and clientId" -}}
+  {{- end -}}
   {{- $bucket := default (dict) .Values.global.bucket -}}
   {{- $hasCustomerBucket := not (empty $bucket.name) -}}
   {{- $defaultBucket := default (dict) .Values.global.defaultBucket -}}
@@ -116,6 +120,19 @@ their component accounts.
   (and (not $hasCustomerBucket) (eq $defaultBucket.provider "az"))
   (and $hasCustomerBucket (eq $bucket.azureAuthMethod "workloadIdentity"))
   -}}
+  {{- $usesStorageIdentity := $usesDeploymentIdentity -}}
+  {{- if eq $mode "consolidated" -}}
+    {{- $effectiveBucket := $bucket -}}
+    {{- if not $hasCustomerBucket -}}
+      {{- $effectiveBucket = $defaultBucket -}}
+    {{- end -}}
+    {{- $bucketIdentityConfigured := and (not (empty $effectiveBucket.azureTenantId)) (not (empty $effectiveBucket.azureClientId)) -}}
+    {{- $usesStorageIdentity = and
+    (eq $effectiveBucket.provider "az")
+    (ne (default "" $effectiveBucket.azureAuthMethod) "accessKey")
+    (or $usesDeploymentIdentity $bucketIdentityConfigured)
+    -}}
+  {{- end -}}
   {{- $explicitSharedServiceAccount := default false .Values.azureStorageUseSharedServiceAccount -}}
   {{- if kindIs "string" $explicitSharedServiceAccount -}}
     {{- $explicitSharedServiceAccount = eq (tpl $explicitSharedServiceAccount . | trim) "true" -}}
@@ -132,8 +149,9 @@ their component accounts.
   {{- $role := default (dict) .Values.role -}}
   {{- $componentAccount := default (dict) .Values.serviceAccount -}}
   {{- $canGroup := and (not $role.create) (not $explicitSharedServiceAccount) (not $componentAccount.useWeaveTraceIdentity) -}}
-  {{- $share := or (eq $mode "shared") (and (eq $mode "grouped") $canGroup) -}}
-{{- and $globalConfigured (or $usesDeploymentIdentity $explicitSharedServiceAccount) $enabled $share -}}
+  {{- $preservesSeparateAccounts := has $mode (list "grouped" "consolidated") -}}
+  {{- $share := or (eq $mode "shared") (and $preservesSeparateAccounts $canGroup) -}}
+{{- and $globalConfigured (or $usesStorageIdentity $explicitSharedServiceAccount) $enabled $share -}}
 {{- end }}
 
 {{- define "wandb-base.azureStorageServiceAccountName" -}}
