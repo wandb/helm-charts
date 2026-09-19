@@ -1,37 +1,44 @@
 # Optional resource request profile
 
-Pass `-f values-resource-requests-conservative.yaml` to enable the optional resource request profile. Chart defaults remain unchanged when the profile is omitted.
+Pass `-f values-resource-requests-conservative.yaml` to opt in. Normal chart defaults are unchanged. These are rounded candidates informed by a month of managed-install telemetry, not validated throughput or capacity guarantees. The [evidence and method](resource-requests-evidence.md) explain each tier's coverage and why some defaults are retained.
 
-The profile adjusts the service and size entries listed in the values file. Unlisted requests stay unchanged, and the profile does not enable disabled services. Most request reductions are at most 25%. For medium only, Parquet and parquet-metadata-cache instead request 8 CPUs rather than 15, retaining their 15-CPU limits and 64-GiB memory requests/limits. These pods change from Guaranteed to Burstable QoS. Other pod QoS classes, all limits, replica bounds, and queue targets remain unchanged.
+CPU requests use quarter-core increments. Memory uses simple GiB sizes or 256/512 MiB. Limits, replica bounds, queue targets and enabled services are unchanged. Reducing requests below equal limits changes affected Guaranteed pods to Burstable; API, app and Parquet are among the affected services. Lower CPU requests also reduce CPU weight under contention even when the limit stays the same.
 
-Where a changed request contributes to a resource HPA, the profile uses an absolute CPU or memory target. This target equals the prior full-pod request sum multiplied by the configured utilization percentage, preserving the default scaling threshold. Resources whose requests stay unchanged retain their existing target type.
+## Effective requests
 
-Review custom sizing, resource requests, sidecars, and autoscaling overrides before enabling the profile. Helm merges size presets and overrides before rendering, so an inherited absolute target may require an explicit override to preserve the intended scaling threshold.
+Each cell is **CPU cores / GiB memory**, including unchanged defaults. Unlisted services retain their defaults. The profile keeps larger tiers at least as large as the preceding tier; a tier without enough evidence retains its default and can therefore limit reductions in later tiers.
 
-The base chart supports `targetCPUAverageValue` and `targetMemoryAverageValue`. Explicit service-level percentage targets and direct request overrides retain utilization behavior unless an explicit absolute target is supplied. An empty absolute override clears an inherited absolute target.
+| Service | Small | Medium | Large | Xlarge | Xxlarge |
+| --- | --- | --- | --- | --- | --- |
+| api | 1 / 2 | 4 / 16 | 4.5 / 16 | 6 / 16 | 6 / 16 |
+| app | 0.5 / 2 | 0.5 / 2 | 0.5 / 2 | 4 / 8 | 4 / 8 |
+| frontend | 0.25 / 0.25 | 0.5 / 0.25 | 0.5 / 0.25 | 0.5 / 0.25 | 0.75 / 0.25 |
+| filemeta | 0.25 / 0.25 | 0.5 / 0.25 | 0.5 / 0.25 | 0.5 / 0.25 | 0.75 / 0.25 |
+| glue | 0.5 / 2 | 1 / 4 | 1.25 / 4 | 1.25 / 4 | 2.25 / 6 |
+| metric-observer | 0.5 / 0.5 | 0.75 / 1 | 0.75 / 1 | 0.75 / 1 | 1 / 4 |
+| weave-trace | 1 / 4 | 1 / 4 | 1 / 4 | 1 / 6 | 1 / 6 |
+| parquet | 1 / 8 | 8 / 64 | 15 / 64 | 15 / 64 | 15 / 64 |
+| parquet-metadata-cache | 4 / 16 | 8 / 64 | 15 / 64 | 15 / 64 | 15 / 64 |
+| weave | 1 / 8 | 2 / 24 | 3 / 24 | 3 / 24 | 3 / 48 |
+| flat-run-fields-updater | 1 / 2 | 1 / 2 | 1 / 3 | 1 / 6 | 1 / 6 |
+| history-updater | 1 / 1 | 1 / 1 | 1 / 1.5 | 1 / 3 | 1 / 3 |
+| weave-trace-worker | 1 / 4 | 1 / 4 | 1 / 4 | 1 / 4 | 1 / 4 |
+| weave-trace-agent-scoring-worker | 1 / 3 | 1 / 3 | 1 / 3 | 1 / 3 | 1 / 3 |
 
-`preserveAbsoluteTargetsWithRequestOverrides` explicitly keeps size-level absolute targets when direct container requests are already included in the full-pod threshold. Review custom sidecar requests before using this option. Explicit service-level percentage or absolute targets still take precedence.
+The two medium Parquet replicas and one metadata-cache replica request **8 CPUs each**, retaining 15-CPU limits and 64-GiB memory requests/limits. This is the agreed QA experiment. Metadata-cache has insufficient representative medium fleet coverage; its 8-CPU request is an explicit experiment, not a telemetry-derived recommendation. Other Parquet/cache sizes retain defaults. Earlier QA runs used 15-CPU requests and do not validate these new settings.
 
-For services with `autoscaling.keda.resourceRequestBaseline`, CPU and memory `Utilization` triggers convert to `AverageValue` using each trigger's configured percentage and the prior full-pod request sum. CPU baselines are expressed in `cpuMillicores` and memory baselines in `memoryBytes`; memory targets round upward by less than one byte. Queue triggers, existing absolute targets, authentication, and controller policies remain unchanged. The profile does not enable KEDA. Direct request overrides preserve the original trigger for that resource; custom sizing or sidecar changes require reviewing the baseline. Set a resource baseline to `0` to disable its conversion. Whole-pod baselines cannot be used with a resource trigger's `containerName`.
+## Percentage autoscaling
 
-For services adjusted across every standard size, `preferredPodAntiAffinity` prefers separate hostnames for replicas of the same service and release. This is a scheduling preference, so replicas can share a node when needed. Explicit affinity takes precedence. Jobs and CronJobs must opt in independently.
+HPA targets use Kubernetes `Utilization` percentages of the new full-pod requests. There is no absolute-target conversion. Both CPU and memory remain configured; Kubernetes uses the larger replica recommendation. With sufficient controller coverage, a clearly higher normalized pressure signal gets a 70% target and the other resource stays at 80%; balanced or uncertain rows stay at 80%/80%. These are operator-selected policy thresholds, not an empirically proven latency boundary. See the evidence table for the pressure signal and final targets.
 
-Parquet and parquet-metadata-cache use required hostname anti-affinity across both service names, including between Parquet replicas, at every size when this profile is enabled. The selector is namespace-wide, including other releases in that namespace. At least one eligible node per combined replica is required; rolling updates may need an additional node for a surge pod. Preserve this separation if overriding affinity or service name labels. Small-size requests retain their existing profile settings; large, xlarge, and xxlarge retain their original 15-CPU requests for these services.
+For example, medium metric-observer uses CPU 70% / memory 80%, while filemeta uses CPU 80% / memory 70%. A smaller request lowers the absolute scale-out threshold intentionally. Fixed min=max workloads cannot add replicas regardless of the percentage; their bounds remain unchanged and their targets stay at 80%/80%. The profile does not turn on autoscaling for app, glue or metadata-cache.
 
-An 8-CPU request also prevents two of these pods sharing a QA worker with 15.82 allocatable CPUs. The explicit affinity keeps that separation on larger workers. CPU limits allow bursts only when CPU is available; pod priority does not reserve burst capacity. This profile does not set a PriorityClass.
+Queue workers and cache-heavy services retain their existing resource targets rather than interpreting low idle CPU or resident cache memory as evidence for new scaling behavior. KEDA keeps its configured queue/resource triggers, percentages, authentication and replica bounds. A custom KEDA utilization trigger still uses the new request denominator; its absolute scale-out point can therefore change. Service-level custom percentage targets retain precedence over size presets. Review custom requests and sidecars because HPA utilization includes every container's requests and usage.
 
-These are candidate settings, not validated capacity sizing for each tier. The render checks establish configuration correctness, not workload performance.
+## Placement and validation
 
-| Size | Parquet CPU request | Metadata-cache CPU request | Evidence for these settings |
-| --- | ---: | ---: | --- |
-| small | 1 (unchanged) | 3 (existing profile) | No per-tier performance validation established by this PR |
-| medium | 8 (was 15) | 8 (was 15) | Proposed QA compaction experiment; performance validation pending |
-| large | 15 (unchanged) | 15 (unchanged) | No reduction inferred from medium QA |
-| xlarge | 15 (unchanged) | 15 (unchanged) | No reduction inferred from medium QA |
-| xxlarge | 15 (unchanged) | 15 (unchanged) | No reduction inferred from medium QA |
+Required hostname anti-affinity separates Parquet and metadata-cache from each other and from Parquet replicas at every size. It selects both service names within the namespace, including other releases. At least one eligible node per combined replica is required; a rolling surge can need another node. Preserve the selector if changing service name labels or affinity. On current QA workers, two 8-CPU requests also exceed the 15.82 allocatable CPUs; the affinity keeps separation on larger workers. This profile does not set a PriorityClass.
 
-Other service/size entries also require tier-specific validation. Record deployment samples, observation windows, per-pod CPU and memory distributions, burst/startup behavior, replica counts, load and latency targets, and failure headroom before promoting a candidate to a recommended tier setting. Identical requests across tiers can be appropriate when capacity scales through replicas; they need workload evidence rather than a fixed reduction percentage.
+Frontend, filemeta and metric-observer retain preferred hostname anti-affinity for replicas of the same release. Explicit affinity takes precedence; jobs must opt in independently.
 
-The 8-CPU configuration has not yet been performance-tested in QA. Earlier QA results used 15-CPU Parquet/cache requests. Validate scheduling, application performance under concurrent Parquet/cache and neighboring workloads, and autoscaling before adopting the profile.
-
-After building chart dependencies, run `python scripts/validate_resource_requests_profile.py` from the repository root with Helm and PyYAML installed. It lints and renders every standard size using default controllers and synthetic KEDA fixtures, checks request bounds and full-pod scaling thresholds, and rejects changes to limits, replica bounds, queue behavior, or unrelated objects. It allows only the documented Parquet QoS transition and verifies required separation for both services.
+After building dependencies, run `python scripts/validate_resource_requests_profile.py` with Helm and PyYAML installed. It lints and renders all five sizes with normal and synthetic KEDA controllers, checks the rounded requests and percentage targets, and rejects unexpected changes to limits, replica bounds, queues and unrelated objects. Render tests do not establish performance. Test the revised profile under representative concurrent load, sustained pressure, bursts, and worker loss before rollout; watch latency, backlog, throttling, OOMs and HPA ceilings.

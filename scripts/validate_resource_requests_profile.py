@@ -36,8 +36,7 @@ PARQUET_AFFINITY = {
     },
 }
 RESOURCE_KEYS = {"cpu", "memory"}
-ABSOLUTE_KEYS = {"targetCPUAverageValue", "targetMemoryAverageValue"}
-BASELINE_KEYS = {"cpuMillicores", "memoryBytes"}
+PERCENTAGE_KEYS = {"targetCPUUtilizationPercentage", "targetMemoryUtilizationPercentage"}
 QUANTITY = re.compile(r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)([A-Za-z]*)$")
 FACTORS = {"": Decimal(1), "m": Decimal(".001"), "u": Decimal(".000001"), "n": Decimal(".000000001")}
 FACTORS.update({suffix: Decimal(1024) ** power for power, suffix in enumerate(("Ki", "Mi", "Gi", "Ti", "Pi", "Ei"), 1)})
@@ -80,11 +79,10 @@ def check_profile(profile: dict) -> None:
             require(set(preset) <= {"resources", "autoscaling"}, f"{service}/{size}: unexpected preset setting")
             check_resources(preset.get("resources", {}), f"{service}/{size}")
             scaling = preset.get("autoscaling", {})
-            require(set(scaling) <= {"horizontal", "keda"}, f"{service}/{size}: unexpected autoscaler")
-            require(set(scaling.get("horizontal", {})) <= ABSOLUTE_KEYS | {"preserveAbsoluteTargetsWithRequestOverrides"}, f"{service}/{size}: only absolute HPA targets may change")
-            keda = scaling.get("keda", {})
-            require(set(keda) <= {"resourceRequestBaseline"}, f"{service}/{size}: only KEDA request baselines may change")
-            require(set(keda.get("resourceRequestBaseline", {})) <= BASELINE_KEYS, f"{service}/{size}: unexpected KEDA baseline")
+            require(set(scaling) <= {"horizontal"}, f"{service}/{size}: only HPA percentages may change")
+            targets = scaling.get("horizontal", {})
+            require(set(targets) <= PERCENTAGE_KEYS, f"{service}/{size}: unexpected HPA setting")
+            require(all(v in (70, 80) for v in targets.values()), f"{service}/{size}: use reviewed percentage targets")
 
 
 def enable_values(profile: dict) -> dict:
@@ -149,11 +147,8 @@ def expected_requests(settings: dict, defaults: dict, size: str, container: str)
 def check_workload(old: dict, new: dict, settings: dict, defaults: dict, size: str) -> bool:
     before, after = old["spec"]["template"]["spec"], new["spec"]["template"]["spec"]
     service = old["metadata"]["labels"]["app.kubernetes.io/name"]
-    parquet_reduction = service in PARQUET_SERVICES and size == "medium"
-    if parquet_reduction:
-        require(qos(before) == "Guaranteed" and qos(after) == "Burstable", f"{size}/{service}: unexpected Parquet QoS transition")
-    else:
-        require(qos(before) == qos(after), f"{size}/{old['metadata']['name']}: QoS class changed")
+    require(qos(before) == qos(after) or (qos(before), qos(after)) == ("Guaranteed", "Burstable"),
+            f"{size}/{service}: unexpected QoS transition")
     old_containers = {item["name"]: item for item in before["containers"]}
     new_containers = {item["name"]: item for item in after["containers"]}
     require(old_containers.keys() == new_containers.keys(), "Container set changed")
@@ -166,10 +161,9 @@ def check_workload(old: dict, new: dict, settings: dict, defaults: dict, size: s
             previous = original.get("resources", {}).get("requests", {}).get(resource)
             require(actual is not None and previous is not None, f"{name}: request missing")
             require(quantity(actual) == quantity(target), f"{size}/{name}/{resource}: profile request was not applied")
-            if parquet_reduction and resource == "cpu":
-                require(quantity(previous) == 15 and quantity(actual) == 8, f"{size}/{name}: Parquet CPU must change from 15 to 8")
-            else:
-                require(Decimal(".75") * quantity(previous) <= quantity(actual) <= quantity(previous), f"{size}/{name}/{resource}: request change exceeds profile bounds")
+            require(0 < quantity(actual) <= quantity(previous), f"{size}/{name}/{resource}: requests must be positive and no larger than defaults")
+            step = Decimal(".25") if resource == "cpu" else Decimal(256 * 1024 * 1024)
+            require(quantity(actual) % step == 0, f"{size}/{name}/{resource}: request must use a human-readable increment")
             changed |= quantity(actual) != quantity(previous)
             replacement["resources"]["requests"][resource] = previous
     if "affinity" in settings:
@@ -186,45 +180,22 @@ def check_workload(old: dict, new: dict, settings: dict, defaults: dict, size: s
     return changed
 
 
-def check_hpa(old: dict, new: dict, workloads: dict, updated_workloads: dict, settings: dict, size: str) -> None:
-    before, after = old["spec"], new["spec"]
-    target_name = before["scaleTargetRef"]["name"]
-    pod = workloads[target_name]["spec"]["template"]["spec"]
-    updated_pod = updated_workloads[target_name]["spec"]["template"]["spec"]
-    horizontal = settings.get("sizing", {}).get(size, {}).get("autoscaling", {}).get("horizontal", {})
-    configured = {key: value for key, value in horizontal.items() if key in ABSOLUTE_KEYS}
-    pending = set(configured)
-    old_metrics, new_metrics = before["metrics"], after["metrics"]
-    require(len(old_metrics) == len(new_metrics), f"{size}/{target_name}: HPA metric set changed")
-    for original, replacement in zip(old_metrics, new_metrics):
-        if original.get("type") == "Resource":
-            resource = original["resource"]["name"]
-            key = {"cpu": "targetCPUAverageValue", "memory": "targetMemoryAverageValue"}.get(resource)
-            current = replacement.get("resource", {}).get("target", {})
-            if key in configured:
-                require(current.get("type") == "AverageValue" and quantity(current["averageValue"]) == quantity(configured[key]), f"{size}/{target_name}/{resource}: profile HPA target was not applied")
-                pending.remove(key)
-            old_requests = [container.get("resources", {}).get("requests", {}).get(resource) for container in pod["containers"]]
-            new_requests = [container.get("resources", {}).get("requests", {}).get(resource) for container in updated_pod["containers"]]
-            if old_requests != new_requests and original["resource"]["target"]["type"] == "Utilization":
-                require(current.get("type") == "AverageValue", f"{size}/{target_name}/{resource}: request changed without preserving absolute HPA threshold")
-        if original == replacement:
-            continue
-        require(original.get("type") == replacement.get("type") == "Resource", "Only resource HPA targets may change")
+def check_hpa(old: dict, new: dict, settings: dict, size: str) -> None:
+    configured = settings.get("sizing", {}).get(size, {}).get("autoscaling", {}).get("horizontal", {})
+    before, after = old["spec"]["metrics"], new["spec"]["metrics"]
+    require(len(before) == len(after), f"{size}: HPA metric set changed")
+    seen = set()
+    for original, replacement in zip(before, after):
+        require(original.get("type") == replacement.get("type") == "Resource", "Expected resource HPA metrics")
         resource = original["resource"]["name"]
-        require(resource == replacement["resource"]["name"], "HPA resource changed")
-        previous, current = original["resource"]["target"], replacement["resource"]["target"]
-        require(previous["type"] == "Utilization" and current["type"] == "AverageValue", "Unexpected HPA target conversion")
-        requests = []
-        for container in pod["containers"]:
-            request = container.get("resources", {}).get("requests", {}).get(resource)
-            require(request is not None, f"{size}/{target_name}: incomplete HPA request denominator")
-            requests.append(quantity(request))
-        expected = sum(requests) * Decimal(previous["averageUtilization"]) / 100
-        require(quantity(current["averageValue"]) == expected, f"{size}/{target_name}/{resource}: absolute target differs from prior full-pod threshold")
-        replacement["resource"]["target"] = deepcopy(previous)
-    require(not pending, f"{size}/{target_name}: a configured HPA resource did not render")
-    require(old == new, f"{size}/{target_name}: other HPA settings changed")
+        key = {"cpu": "targetCPUUtilizationPercentage", "memory": "targetMemoryUtilizationPercentage"}[resource]
+        target = replacement["resource"]["target"]
+        expected = configured.get(key, original["resource"]["target"]["averageUtilization"])
+        require(target == {"type": "Utilization", "averageUtilization": expected}, f"{size}/{resource}: incorrect percentage HPA target")
+        seen.add(key)
+        replacement["resource"]["target"] = deepcopy(original["resource"]["target"])
+    require(set(configured) <= seen, f"{size}: configured HPA resource did not render")
+    require(old == new, f"{size}: HPA replica bounds or other settings changed")
 
 
 def normalize_generated_secrets(document: dict) -> None:
@@ -235,18 +206,16 @@ def normalize_generated_secrets(document: dict) -> None:
                 document["data"][key] = "generated-for-offline-render"
 
 
-def keda_fixture(enabled: dict, profile: dict) -> dict | None:
+def keda_fixture(enabled: dict, profile: dict) -> dict:
     fixture = deepcopy(enabled)
-    services = [service for service, settings in profile.items() if any(preset.get("autoscaling", {}).get("keda") for preset in settings.get("sizing", {}).values())]
-    if not services:
-        return None
-    for service in services:
+    # Exercise a queue worker and Parquet with synthetic resource triggers.
+    # Custom KEDA percentages and queue settings must remain unchanged.
+    for service in ("metric-observer", "parquet"):
+        if service not in profile:
+            continue
         fixture.setdefault(service, {}).setdefault("autoscaling", {})["keda"] = {
-            "enabled": True,
-            "minReplicaCount": 2,
-            "maxReplicaCount": 9,
+            "enabled": True, "minReplicaCount": 2, "maxReplicaCount": 9,
             "cooldownPeriod": 90,
-            "advanced": {"horizontalPodAutoscalerConfig": {"behavior": {"scaleDown": {"stabilizationWindowSeconds": 300}}}},
             "triggers": [
                 {"type": "kafka", "name": "queue-work", "metadata": {"bootstrapServers": "broker.example:9092", "consumerGroup": "example-consumer", "topic": "example-topic", "lagThreshold": "25"}, "authenticationRef": {"name": "example-auth"}},
                 {"type": "cpu", "metricType": "Utilization", "metadata": {"value": "60"}},
@@ -256,42 +225,8 @@ def keda_fixture(enabled: dict, profile: dict) -> dict | None:
     return fixture
 
 
-def check_keda(old: dict, new: dict, workloads: dict, updated_workloads: dict, settings: dict, size: str) -> None:
-    target_name = old["spec"]["scaleTargetRef"]["name"]
-    pod = workloads[target_name]["spec"]["template"]["spec"]
-    updated_pod = updated_workloads[target_name]["spec"]["template"]["spec"]
-    baselines = settings.get("sizing", {}).get(size, {}).get("autoscaling", {}).get("keda", {}).get("resourceRequestBaseline", {})
-    before, after = old["spec"]["triggers"], new["spec"]["triggers"]
-    require(len(before) == len(after), f"{size}/{target_name}: KEDA trigger count changed")
-    for original, replacement in zip(before, after):
-        resource = original["type"]
-        if resource not in RESOURCE_KEYS:
-            require(original == replacement, f"{size}/{target_name}: non-resource trigger changed")
-            continue
-        old_requests = [container.get("resources", {}).get("requests", {}).get(resource) for container in pod["containers"]]
-        new_requests = [container.get("resources", {}).get("requests", {}).get(resource) for container in updated_pod["containers"]]
-        if old_requests != new_requests and original["metricType"] == "Utilization":
-            require(replacement.get("metricType") == "AverageValue", f"{size}/{target_name}/{resource}: changed request lost its original KEDA threshold")
-        if original == replacement:
-            continue
-        require(original["metricType"] == "Utilization" and replacement.get("metricType") == "AverageValue", "Unexpected KEDA conversion")
-        require(all(value is not None for value in old_requests), "Incomplete KEDA request denominator")
-        old_sum = sum(quantity(value) for value in old_requests)
-        baseline_key = "cpuMillicores" if resource == "cpu" else "memoryBytes"
-        baseline_unit = Decimal(".001") if resource == "cpu" else Decimal(1)
-        require(Decimal(baselines[baseline_key]) * baseline_unit == old_sum, f"{size}/{target_name}/{resource}: KEDA baseline differs from original full-pod requests")
-        expected = old_sum * Decimal(original["metadata"]["value"]) / 100
-        difference = quantity(replacement["metadata"]["value"]) - expected
-        require(difference == 0 if resource == "cpu" else 0 <= difference < 1, f"{size}/{target_name}/{resource}: KEDA threshold changed")
-        replacement["metricType"] = original["metricType"]
-        replacement["metadata"]["value"] = original["metadata"]["value"]
-    require(old == new, f"{size}/{target_name}: other KEDA configuration changed")
-
-
 def validate_render(baseline: dict, updated: dict, profile: dict, defaults: dict, size: str, changes: dict) -> None:
     require(baseline.keys() == updated.keys(), f"{size}: object set changed")
-    workloads = {name: item for (kind, name), item in baseline.items() if kind == "Deployment"}
-    updated_workloads = {name: item for (kind, name), item in updated.items() if kind == "Deployment"}
     seen, autoscalers_seen = set(), set()
     for key, original in baseline.items():
         replacement = updated[key]
@@ -302,10 +237,10 @@ def validate_render(baseline: dict, updated: dict, profile: dict, defaults: dict
                 changes[service].add(size)
         elif original["kind"] == "HorizontalPodAutoscaler" and service in profile:
             autoscalers_seen.add(service)
-            check_hpa(deepcopy(original), deepcopy(replacement), workloads, updated_workloads, profile[service], size)
+            check_hpa(deepcopy(original), deepcopy(replacement), profile[service], size)
         elif original["kind"] == "ScaledObject" and service in profile:
             autoscalers_seen.add(service)
-            check_keda(deepcopy(original), deepcopy(replacement), workloads, updated_workloads, profile[service], size)
+            require(original == replacement, f"{size}/{service}: KEDA triggers or controller settings changed")
         else:
             left, right = deepcopy(original), deepcopy(replacement)
             normalize_generated_secrets(left)

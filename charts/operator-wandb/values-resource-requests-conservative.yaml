@@ -1,389 +1,291 @@
-# Optional resource request profile; not loaded by default.
-# Review custom sizing/HPA overrides before applying. See docs/resource-requests.md.
+# Optional request profile, informed by 30 days of managed-install telemetry.
+# CPU requests use 0.25-core steps; limits and replica bounds stay unchanged.
+# Percentage HPA targets intentionally scale against these new requests.
+# Candidates require load validation. See docs/resource-requests.md and
+# docs/resource-requests-evidence.md for coverage, pressure and retained defaults.
 app:
   sizing:
     small:
       resources:
         requests:
-          cpu: 750m
-          memory: 1536Mi
+          cpu: "0.5"
+          memory: 2Gi
     medium:
       resources:
         requests:
-          cpu: 3000m
-          memory: 6144Mi
+          cpu: "0.5"
+          memory: 2Gi
     large:
       resources:
         requests:
-          cpu: 3000m
-          memory: 6144Mi
-    xxlarge:
-      resources:
-        requests:
-          cpu: 3000m
-          memory: 6144Mi
+          cpu: "0.5"
+          memory: 2Gi
 api:
   sizing:
     medium:
       resources:
         requests:
-          cpu: 4500m
+          cpu: "4"
+          memory: 16Gi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 4800m
-weave-trace:
-  sizing:
-    medium:
-      resources:
-        requests:
-          memory: 3360Mi
-      autoscaling:
-        horizontal:
-          targetMemoryAverageValue: 3276.8Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
     large:
       resources:
         requests:
-          cpu: 900m
+          cpu: "4.5"
+          memory: 16Gi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-    xxlarge:
-      resources:
-        requests:
-          memory: 5840Mi
-      autoscaling:
-        horizontal:
-          targetMemoryAverageValue: 4915.2Mi
-weave-trace-worker:
-  sizing:
-    small:
-      resources:
-        requests:
-          cpu: 925m
-          memory: 3072Mi
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 3276.8Mi
-    medium:
-      resources:
-        requests:
-          cpu: 750m
-          memory: 3072Mi
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 3276.8Mi
-    xxlarge:
-      resources:
-        requests:
-          cpu: 825m
-          memory: 3072Mi
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 3276.8Mi
-weave-trace-agent-scoring-worker:
-  sizing:
-    small:
-      resources:
-        requests:
-          cpu: 775m
-          memory: 2304Mi
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 2457.6Mi
-    medium:
-      resources:
-        requests:
-          cpu: 750m
-          memory: 2304Mi
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 2457.6Mi
-    xxlarge:
-      resources:
-        requests:
-          cpu: 750m
-          memory: 2304Mi
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 2457.6Mi
-parquet:
-  # Separate both Parquet services across hostnames within the namespace.
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - topologyKey: kubernetes.io/hostname
-          labelSelector:
-            matchExpressions:
-              - key: app.kubernetes.io/name
-                operator: In
-                values: [parquet, parquet-metadata-cache]
-  sizing:
-    medium:
-      resources:
-        requests:
-          cpu: "8"
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: "12"
-        keda:
-          resourceRequestBaseline:
-            cpuMillicores: 15000
-parquet-metadata-cache:
-  # Separate both Parquet services across hostnames within the namespace.
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        - topologyKey: kubernetes.io/hostname
-          labelSelector:
-            matchExpressions:
-              - key: app.kubernetes.io/name
-                operator: In
-                values: [parquet, parquet-metadata-cache]
-  sizing:
-    small:
-      resources:
-        requests:
-          cpu: 3000m
-          memory: 12288Mi
-      autoscaling:
-        keda:
-          resourceRequestBaseline:
-            cpuMillicores: 4000
-            memoryBytes: 17179869184
-    medium:
-      resources:
-        requests:
-          cpu: "8"
-      autoscaling:
-        keda:
-          resourceRequestBaseline:
-            cpuMillicores: 15000
-history-updater:
-  sizing:
-    small:
-      resources:
-        requests:
-          cpu: 750m
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: 800m
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
 frontend:
   preferredPodAntiAffinity: true
   sizing:
     small:
       resources:
         requests:
-          cpu: 750m
-          memory: 768Mi
+          cpu: "0.25"
+          memory: 256Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 819.2Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
     medium:
       resources:
         requests:
-          cpu: 750m
-          memory: 768Mi
+          cpu: "0.5"
+          memory: 256Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 819.2Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
     large:
       resources:
         requests:
-          cpu: 750m
-          memory: 768Mi
+          cpu: "0.5"
+          memory: 256Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 819.2Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
     xlarge:
       resources:
         requests:
-          cpu: 750m
-          memory: 768Mi
+          cpu: "0.5"
+          memory: 256Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 819.2Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
     xxlarge:
       resources:
         requests:
-          cpu: 850m
-          memory: 768Mi
+          cpu: "0.75"
+          memory: 256Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 819.2Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
 filemeta:
   preferredPodAntiAffinity: true
   sizing:
     small:
       resources:
         requests:
-          cpu: 750m
-          memory: 768Mi
+          cpu: "0.25"
+          memory: 256Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 819.2Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
     medium:
       resources:
         requests:
-          cpu: 750m
-          memory: 768Mi
+          cpu: "0.5"
+          memory: 256Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 819.2Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
     large:
       resources:
         requests:
-          cpu: 750m
-          memory: 768Mi
+          cpu: "0.5"
+          memory: 256Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 819.2Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
     xlarge:
       resources:
         requests:
-          cpu: 750m
-          memory: 768Mi
+          cpu: "0.5"
+          memory: 256Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 819.2Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
     xxlarge:
       resources:
         requests:
-          cpu: 750m
-          memory: 768Mi
+          cpu: "0.75"
+          memory: 256Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 819.2Mi
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
 glue:
   sizing:
+    small:
+      resources:
+        requests:
+          cpu: "0.5"
+          memory: 2Gi
     medium:
       resources:
         requests:
-          memory: 4608Mi
+          cpu: "1"
+          memory: 4Gi
     large:
       resources:
         requests:
-          memory: 4608Mi
+          cpu: "1.25"
+          memory: 4Gi
     xlarge:
       resources:
         requests:
-          cpu: 2525m
-          memory: 4608Mi
-weave:
-  sizing:
-    medium:
+          cpu: "1.25"
+          memory: 4Gi
+    xxlarge:
       resources:
         requests:
-          cpu: 1500m
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: 1680m
-          preserveAbsoluteTargetsWithRequestOverrides: true
-    large:
-      resources:
-        requests:
-          cpu: 2250m
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: 2480m
-          preserveAbsoluteTargetsWithRequestOverrides: true
-    xlarge:
-      resources:
-        requests:
-          cpu: 2250m
-      autoscaling:
-        horizontal:
-          targetCPUAverageValue: 2480m
-          preserveAbsoluteTargetsWithRequestOverrides: true
-flat-run-fields-updater:
-  sizing:
-    xlarge:
-      resources:
-        requests:
-          memory: 5392Mi
-      autoscaling:
-        horizontal:
-          targetMemoryAverageValue: 4915.2Mi
-        keda:
-          resourceRequestBaseline:
-            memoryBytes: 6442450944
+          cpu: "2.25"
+          memory: 6Gi
 metric-observer:
   preferredPodAntiAffinity: true
   sizing:
     small:
       resources:
         requests:
-          cpu: 750m
-          memory: 1536Mi
+          cpu: "0.5"
+          memory: 512Mi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 1638.4Mi
-        keda:
-          resourceRequestBaseline:
-            cpuMillicores: 1000
-            memoryBytes: 2147483648
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
     medium:
       resources:
         requests:
-          cpu: 750m
-          memory: 1536Mi
+          cpu: "0.75"
+          memory: 1Gi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 1638.4Mi
-        keda:
-          resourceRequestBaseline:
-            cpuMillicores: 1000
-            memoryBytes: 2147483648
+          targetCPUUtilizationPercentage: 70
+          targetMemoryUtilizationPercentage: 80
     large:
       resources:
         requests:
-          cpu: 750m
-          memory: 2304Mi
+          cpu: "0.75"
+          memory: 1Gi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 2457.6Mi
-        keda:
-          resourceRequestBaseline:
-            cpuMillicores: 1000
-            memoryBytes: 3221225472
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
     xlarge:
       resources:
         requests:
-          cpu: 750m
-          memory: 4608Mi
+          cpu: "0.75"
+          memory: 1Gi
       autoscaling:
         horizontal:
-          targetCPUAverageValue: 800m
-          targetMemoryAverageValue: 4915.2Mi
-        keda:
-          resourceRequestBaseline:
-            cpuMillicores: 1000
-            memoryBytes: 6442450944
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
     xxlarge:
       resources:
         requests:
-          memory: 5072Mi
+          cpu: "1"
+          memory: 4Gi
       autoscaling:
         horizontal:
-          targetMemoryAverageValue: 4915.2Mi
-        keda:
-          resourceRequestBaseline:
-            memoryBytes: 6442450944
+          targetCPUUtilizationPercentage: 70
+          targetMemoryUtilizationPercentage: 80
+weave-trace:
+  sizing:
+    small:
+      resources:
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          targetCPUUtilizationPercentage: 70
+          targetMemoryUtilizationPercentage: 80
+    medium:
+      resources:
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          targetCPUUtilizationPercentage: 70
+          targetMemoryUtilizationPercentage: 80
+    large:
+      resources:
+        requests:
+          cpu: "1"
+          memory: 4Gi
+      autoscaling:
+        horizontal:
+          targetCPUUtilizationPercentage: 70
+          targetMemoryUtilizationPercentage: 80
+    xxlarge:
+      resources:
+        requests:
+          cpu: "1"
+          memory: 6Gi
+      autoscaling:
+        horizontal:
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 70
+parquet:
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - topologyKey: kubernetes.io/hostname
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - parquet
+            - parquet-metadata-cache
+  sizing:
+    medium:
+      resources:
+        requests:
+          cpu: "8"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
+parquet-metadata-cache:
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - topologyKey: kubernetes.io/hostname
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - parquet
+            - parquet-metadata-cache
+  sizing:
+    medium:
+      resources:
+        requests:
+          cpu: "8"
+          memory: 64Gi
