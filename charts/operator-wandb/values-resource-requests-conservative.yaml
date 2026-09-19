@@ -20,8 +20,29 @@ app:
         requests:
           cpu: "0.5"
           memory: 2Gi
+    # Legacy app is optional. Retain defaults where cohort coverage is sparse.
+    xlarge:
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
+    xxlarge:
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
 api:
   sizing:
+    # Retain small and xlarge/xxlarge capacity for observed resource pressure.
+    small:
+      resources:
+        requests:
+          cpu: "1"
+          memory: 2Gi
+      autoscaling:
+        horizontal:
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
     medium:
       resources:
         requests:
@@ -35,6 +56,24 @@ api:
       resources:
         requests:
           cpu: "4"
+          memory: 16Gi
+      autoscaling:
+        horizontal:
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
+    xlarge:
+      resources:
+        requests:
+          cpu: "6"
+          memory: 16Gi
+      autoscaling:
+        horizontal:
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
+    xxlarge:
+      resources:
+        requests:
+          cpu: "6"
           memory: 16Gi
       autoscaling:
         horizontal:
@@ -272,6 +311,16 @@ parquet:
             - parquet
             - parquet-metadata-cache
   sizing:
+    # Retain small memory and xxlarge CPU capacity for observed pressure.
+    small:
+      resources:
+        requests:
+          cpu: "1"
+          memory: 8Gi
+      autoscaling:
+        horizontal:
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
     medium:
       resources:
         requests:
@@ -300,6 +349,15 @@ parquet:
         horizontal:
           targetCPUUtilizationPercentage: 80
           targetMemoryUtilizationPercentage: 80
+    xxlarge:
+      resources:
+        requests:
+          cpu: "15"
+          memory: 64Gi
+      autoscaling:
+        horizontal:
+          targetCPUUtilizationPercentage: 80
+          targetMemoryUtilizationPercentage: 80
 parquet-metadata-cache:
   affinity:
     podAntiAffinity:
@@ -313,20 +371,30 @@ parquet-metadata-cache:
             - parquet
             - parquet-metadata-cache
   sizing:
+    # Retain memory at every tier; cache-load coverage is not representative.
+    small:
+      resources:
+        requests:
+          cpu: "4"
+          memory: 16Gi
     medium:
       resources:
         requests:
           cpu: "8"
           memory: 64Gi
-    # Experimental: warm-cache load tests must validate the lower reservation.
-    # Limits and the runtime memory budget remain 64Gi.
+    # CPU-only compaction experiment; memory requests/limits remain 64Gi.
     large:
       resources:
         requests:
           cpu: "8"
-          memory: 32Gi
+          memory: 64Gi
     xlarge:
       resources:
         requests:
           cpu: "8"
-          memory: 32Gi
+          memory: 64Gi
+    xxlarge:
+      resources:
+        requests:
+          cpu: "15"
+          memory: 64Gi
