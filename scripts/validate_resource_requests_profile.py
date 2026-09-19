@@ -35,6 +35,23 @@ PARQUET_AFFINITY = {
         }],
     },
 }
+EVICTION_VOLUMES = {
+    'app': 'wandb-ca-certs-root,datadog-socket',
+    'api': 'wandb-ca-certs-root,datadog-socket,temp-dir',
+    'frontend': 'wandb-ca-certs-root,datadog-socket',
+    'filemeta': 'wandb-ca-certs-root,datadog-socket',
+    'glue': 'wandb-ca-certs-root,datadog-socket,temp-dir',
+    'metric-observer': 'wandb-ca-certs-root,datadog-socket',
+    'parquet': 'wandb-ca-certs-root,datadog-socket',
+    'parquet-metadata-cache': 'wandb-ca-certs-root,datadog-socket',
+    'weave-trace': 'wandb-ca-certs-root,datadog-socket,temp-dir',
+    'anaconda2': 'wandb-ca-certs-root,datadog-socket',
+    'executor': 'wandb-ca-certs-root,datadog-socket',
+    'flat-run-fields-updater': 'wandb-ca-certs-root,datadog-socket',
+    'history-updater': 'wandb-ca-certs-root,datadog-socket',
+    'mcp-server': 'wandb-ca-certs-root,datadog-socket,temp-dir',
+    'weave': 'wandb-ca-certs-root,datadog-socket,temp-dir,cache',
+}
 RESOURCE_KEYS = {"cpu", "memory"}
 PERCENTAGE_KEYS = {"targetCPUUtilizationPercentage", "targetMemoryUtilizationPercentage"}
 QUANTITY = re.compile(r"^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)([A-Za-z]*)$")
@@ -66,8 +83,7 @@ def check_profile(profile: dict) -> None:
     for service, settings in profile.items():
         require(set(settings) <= {"sizing", "resources", "containers", "preferredPodAntiAffinity", "affinity", "podAnnotations", "podDisruptionBudget"}, f"{service}: unexpected profile setting")
         if "podAnnotations" in settings:
-            volumes = "wandb-ca-certs-root,datadog-socket" + (",temp-dir" if service == "weave-trace" else "")
-            require(service in {"app", "weave-trace"} and settings["podAnnotations"] == {"cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes": volumes}, f"{service}: unexpected eviction exemption")
+            require(service in EVICTION_VOLUMES and settings["podAnnotations"] == {"cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes": EVICTION_VOLUMES[service]}, f"{service}: unexpected eviction exemption")
         if "podDisruptionBudget" in settings:
             require(service in {"app", "parquet-metadata-cache"} and settings["podDisruptionBudget"] == {"maxUnavailable": "0%"}, f"{service}: preserve a serving replica")
         if "affinity" in settings:
@@ -182,7 +198,7 @@ def check_workload(old: dict, new: dict, settings: dict, defaults: dict, size: s
         require(after.get("affinity") == expected_affinity, f"{size}: incorrect preferred anti-affinity")
         after.pop("affinity", None)
     if "podAnnotations" in settings:
-        old_annotations = old["spec"]["template"]["metadata"].get("annotations", {})
+        old_annotations = (old["spec"]["template"]["metadata"].get("annotations") or {})
         new_annotations = new["spec"]["template"]["metadata"]["annotations"]
         for key, value in settings["podAnnotations"].items():
             require(new_annotations.get(key) == value, f"{size}/{service}: missing durable eviction annotation")
@@ -190,8 +206,11 @@ def check_workload(old: dict, new: dict, settings: dict, defaults: dict, size: s
                 new_annotations[key] = old_annotations[key]
             else:
                 new_annotations.pop(key)
-        if not new_annotations and "annotations" not in old["spec"]["template"]["metadata"]:
-            new["spec"]["template"]["metadata"].pop("annotations")
+        if not new_annotations:
+            if "annotations" in old["spec"]["template"]["metadata"]:
+                new["spec"]["template"]["metadata"]["annotations"] = deepcopy(old["spec"]["template"]["metadata"]["annotations"])
+            else:
+                new["spec"]["template"]["metadata"].pop("annotations")
     require(old == new, f"{size}/{old['metadata']['name']}: unexpected workload change")
     return changed
 
@@ -294,7 +313,8 @@ def validate(helm: str, profile_path: Path) -> None:
                 validate_render(baseline, updated, profile, defaults, size, changes)
                 print(f"Profile contract passed for {size} ({fixture_name})")
     for service, settings in profile.items():
-        require(bool(changes[service]), f"{service}: profile does not change any request")
+        if settings.get("sizing") or settings.get("resources") or settings.get("containers"):
+            require(bool(changes[service]), f"{service}: profile does not change any request")
         if settings.get("preferredPodAntiAffinity"):
             require(changes[service] == set(SIZES), f"{service}: preference affects sizes without request changes")
 

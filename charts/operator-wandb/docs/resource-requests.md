@@ -57,12 +57,20 @@ After building dependencies, run `python scripts/validate_resource_requests_prof
 
 ## Graceful consolidation
 
-The opt-in profile annotates app and Weave Trace pod templates with an explicit
-`safe-to-evict-local-volumes` list: generated CA certificates and the Datadog
-socket, plus Weave Trace's request-scoped `/tmp` scratch volume. Replacement
-pods retain these annotations. Additional customer local volumes are not
-exempted; do not replace this list with blanket `safe-to-evict: true`. Persistent
-volumes, other services and shutdown grace periods are unchanged.
+The opt-in profile supplies per-service `safe-to-evict-local-volumes` annotations
+for the nine sized services and six supporting services (anaconda2, executor,
+flat-run-fields-updater, history-updater, mcp-server and Weave). Supporting
+services keep their existing requests and replica counts. The allowlist covers
+only generated `wandb-ca-certs-root` certificates and `datadog-socket`, plus:
+
+- API, glue, mcp-server and Weave Trace: request-scoped `temp-dir` scratch space.
+- Weave: `temp-dir` and its disposable `cache`; the existing cache-clear sidecar
+  already removes cached filesystem entries under `/vol/weave/cache`.
+
+Replacement pods retain these annotations. Additional customer local volumes
+are not exempted; do not replace the list with blanket `safe-to-evict: true`.
+Persistent volumes, install switches and shutdown grace periods are unchanged.
+Jobs and CronJobs keep their own pod annotations.
 
 App and metadata-cache use `maxUnavailable: "0%"`. This blocks autoscaler
 eviction, including installations running a singleton. After confirming
