@@ -9,8 +9,8 @@ The collection completed 91 partitioned metric queries. At least one profiled se
 - Container CPU usage (`kubernetes.cpu.usage.total`, nanocores converted to cores) and memory working set (`kubernetes.memory.working_set`, bytes converted to GiB) use the maximum across containers of a service per customer, then hourly maximum rollups. Mean series are also retained separately. **CPU P95 below means the 95th percentile of a customer's hourly container maxima**, then the largest customer P95 in the cohort; it is not a request-latency percentile or a raw per-pod percentile. Memory peak is the highest reported hourly maximum. Retention and sampling can miss short spikes.
 - Require at least 336 reported hourly CPU/memory samples (14 days) per customer/service/size. Missing telemetry is excluded, never counted as zero. Fewer than three matching customers means no telemetry-based reduction.
 - Match stable observed minimum requests and limits to the chart defaults throughout the available monthly allocation samples. This removes observed custom/changed minima; it cannot prove every replica had identical allocations. A larger custom replica can still influence a maximum, so these are conservative cohort bounds rather than exact per-pod profiles. Different chart versions and cloud hardware remain mixed when their allocation minima match. No customer identifiers are published here.
-- For eligible ordinary services, the CPU starting point is 1.5 times the largest customer CPU P95, rounded up to 0.25 cores, with a 0.25-core floor (0.5 for app/API/glue/metric-observer/weave-trace). Memory starts at 1.25 times the observed peak, rounded up to a simple memory size (0.25, 0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64 GiB). These margins and floors are explicit policy choices. Do not raise requests above current defaults in this reduction profile; flag pressure for separate review. Preserve nondecreasing requests across tiers. This deliberately leaves app xlarge/xxlarge at defaults because xlarge coverage is sparse.
-- Retain queue-worker and cache-heavy requests without representative queue/cache load evidence. The medium 8-CPU Parquet and metadata-cache experiment is the explicit exception. Retain all memory and CPU limits.
+- For eligible ordinary services, the CPU starting point is 1.5 times the largest customer CPU P95, rounded up to 0.25 cores, with a 0.25-core floor (0.5 for app/API/glue/metric-observer/weave-trace). Memory starts at 1.25 times the observed peak, rounded up to a simple memory size (0.25, 0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64 GiB). These margins and floors are explicit policy choices. Do not raise requests above current defaults in this reduction profile; flag pressure for separate review. Preserve nondecreasing requests across tiers for formula-derived candidates; the explicit large/xlarge metadata-cache experiment below is an exception. This deliberately leaves app xlarge/xxlarge at defaults because xlarge coverage is sparse.
+- Retain queue-worker and cache-heavy requests without representative queue/cache load evidence. The medium, large and xlarge Parquet/metadata-cache experiments below are explicit exceptions. Medium API memory and large API CPU also use explicit tuning choices rather than the formula. Retain all memory and CPU limits.
 - HPA evidence joins `kubernetes_state.hpa.status_target_metric` with `spec_target_metric` by customer, controller, resource, target type and hour; compare observed/target ratios. Controller eligibility also requires at least 336 matched hours and a matching allocation cohort. Check `current_replicas`, `min_replicas`, and `max_replicas` to identify fixed bounds and ceilings. Rescale the worst customer/controller P95 ratio for the proposed request denominator. A ratio more than 1.25 times the other resource selects the 70% primary target; otherwise use 80%/80%. Fixed, protected and under-covered rows retain 80%/80%. Independently rolled-up hourly maxima do not prove which resource crossed first within an hour or caused latency.
 - This is observational sizing, not a controlled load test. It does not establish burst CPU entitlement, horizontal scalability of caches, queue throughput, failover capacity, or absence of throttling/OOMs. HPA percentages may increase replicas, so smaller requests do not alone prove lower cost. Validate before rollout.
 
@@ -34,7 +34,7 @@ N is matching customers with at least 14 days of data. CPU and memory observatio
 | small | weave-trace-worker | 9 | 0.02 | 0.75 | 0.41 | 1/4 | memory | 80/80 |
 | small | weave-trace | 48 | 0.84 | 1.81 | 6.72 | 1/4 | cpu | 70/80 |
 | small | weave | 140 | 0.49 | 5.01 | 16.00 | 1/8 | memory | 80/80 fixed |
-| medium | api | 24 | 2.55 | 4.50 | 15.97 | 4/16 | balanced | 80/80 fixed |
+| medium | api | 24 | 2.55 | 4.50 | 15.97 | 4/12 | balanced | 80/80 fixed |
 | medium | app | 8 | 0.14 | 0.25 | 0.35 | 0.5/2 | unknown | — |
 | medium | filemeta | 24 | 0.19 | 0.24 | 0.12 | 0.5/0.25 | memory | 80/70 |
 | medium | flat-run-fields-updater | 23 | 1.01 | 3.53 | 4.00 | 1/2 | memory | 80/80 |
@@ -48,7 +48,7 @@ N is matching customers with at least 14 days of data. CPU and memory observatio
 | medium | weave-trace-worker | 1 | 0.01 | 0.52 | 0.32 | 1/4 | unknown | 80/80 |
 | medium | weave-trace | 9 | 0.42 | 1.24 | 2.05 | 1/4 | cpu | 70/80 |
 | medium | weave | 23 | 0.14 | 1.36 | 20.84 | 2/24 | memory | 80/80 |
-| large | api | 11 | 2.86 | 7.12 | 15.98 | 4.5/16 | balanced | 80/80 fixed |
+| large | api | 11 | 2.86 | 7.12 | 15.98 | 4/16 | balanced | 80/80 fixed |
 | large | app | 7 | 0.06 | 0.23 | 0.36 | 0.5/2 | unknown | — |
 | large | filemeta | 12 | 0.03 | 0.22 | 0.11 | 0.5/0.25 | memory | 80/70 |
 | large | flat-run-fields-updater | 12 | 0.54 | 1.13 | 1.72 | 1/3 | memory | 80/80 |
@@ -56,8 +56,8 @@ N is matching customers with at least 14 days of data. CPU and memory observatio
 | large | glue | 12 | 0.82 | 4.69 | 0.46 | 1.25/4 | unknown | — |
 | large | history-updater | 0 | — | — | — | 1/1.5 | unknown | 80/80 |
 | large | metric-observer | 12 | 0.19 | 0.28 | 0.18 | 0.75/1 | memory | 80/70 |
-| large | parquet-metadata-cache | 0 | — | — | — | 15/64 | unknown | — |
-| large | parquet | 12 | 2.09 | 15.83 | 63.99 | 15/64 | memory | 80/80 fixed |
+| large | parquet-metadata-cache | 0 | — | — | — | 8/32 | unknown | — |
+| large | parquet | 12 | 2.09 | 15.83 | 63.99 | 8/64 | memory | 80/80 fixed |
 | large | weave-trace-agent-scoring-worker | 0 | — | — | — | 1/3 | unknown | 80/80 |
 | large | weave-trace-worker | 0 | — | — | — | 1/4 | unknown | 80/80 |
 | large | weave-trace | 4 | 0.36 | 0.80 | 0.93 | 1/4 | cpu | 70/80 |
@@ -70,8 +70,8 @@ N is matching customers with at least 14 days of data. CPU and memory observatio
 | xlarge | glue | 7 | 0.59 | 2.80 | 1.66 | 1.25/4 | unknown | — |
 | xlarge | history-updater | 0 | — | — | — | 1/3 | unknown | 80/80 |
 | xlarge | metric-observer | 7 | 0.17 | 0.52 | 0.26 | 0.75/1 | balanced | 80/80 |
-| xlarge | parquet-metadata-cache | 1 | 0.16 | 0.58 | 1.44 | 15/64 | unknown | — |
-| xlarge | parquet | 7 | 17.81 | 24.05 | 63.98 | 15/64 | balanced | 80/80 |
+| xlarge | parquet-metadata-cache | 1 | 0.16 | 0.58 | 1.44 | 8/32 | unknown | — |
+| xlarge | parquet | 7 | 17.81 | 24.05 | 63.98 | 12/64 | balanced | 80/80 |
 | xlarge | weave-trace-agent-scoring-worker | 0 | — | — | — | 1/3 | unknown | 80/80 |
 | xlarge | weave-trace-worker | 0 | — | — | — | 1/4 | unknown | 80/80 |
 | xlarge | weave-trace | 0 | — | — | — | 1/6 | unknown | 80/80 |
@@ -94,7 +94,9 @@ N is matching customers with at least 14 days of data. CPU and memory observatio
 ## Findings that constrain reductions
 
 - Small API and Parquet memory peaks approached their limits. Their memory requests are retained; fixed replica bounds need separate attention under pressure.
-- Large Parquet approached 64 GiB. Xlarge and xxlarge Parquet showed substantial CPU activity; retain their 15-CPU requests. Some reported CPU maxima exceed configured limits, so these telemetry values must not be treated as precise quota or throughput measurements.
+- Large and xlarge Parquet approached 64 GiB, so their memory requests remain 64 GiB. Their 8-CPU and 12-CPU requests are compaction experiments; xlarge's 12 CPUs is a chosen contention margin, not a formula-derived safe minimum. Xxlarge retains 15 CPUs. Some reported CPU maxima exceed configured limits, so these telemetry values must not be treated as precise quota or throughput measurements.
+- Large/xlarge metadata-cache requests 8 CPUs / 32 GiB experimentally, retaining 15-CPU / 64-GiB limits. Coverage is zero and one matching customer respectively. Five matching xxlarge customers peaked at 21.08 GiB; that supports investigating a 32-GiB reservation, not extrapolating safety across tiers. Medium remains at 8 CPUs / 64 GiB and xxlarge retains defaults pending testing. Memory/runtime limits and cache configuration remain unchanged; validate warm caches and contention.
+- Medium API memory at 12 GiB and large API CPU at 4 cores are explicit tuning choices. The observed medium API peak was 15.97 GiB; the reservation is below that peak while its 16-GiB limit remains unchanged. These API workloads have fixed replica bounds, so HPA percentages cannot provide additional replicas.
 - Xxlarge API, flat-run-fields-updater and Weave showed pressure. This profile does not solve their replica ceilings or increase limits.
 - History-updater, newer Weave workers, and several metadata-cache tiers have sparse coverage. Low activity is not sufficient evidence to lower their queue/cache capacity.
 - Frontend and filemeta have low sustained CPU and working sets across the observed tiers. Their lower requests are candidates for packing tests, with existing limits preserved.

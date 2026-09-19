@@ -6,26 +6,32 @@ CPU requests use quarter-core increments. Memory uses simple GiB sizes or 256/51
 
 ## Effective requests
 
-Each cell is **CPU cores / GiB memory**, including unchanged defaults. Unlisted services retain their defaults. The profile keeps larger tiers at least as large as the preceding tier; a tier without enough evidence retains its default and can therefore limit reductions in later tiers.
+Each cell is **CPU cores / GiB memory**, including unchanged defaults. Unlisted services retain their defaults. Ordinary service candidates keep larger tiers at least as large as the preceding tier; gaps can retain defaults. The explicit large/xlarge metadata-cache experiment is an exception: it tests 32 GiB while the existing medium experiment retains 64 GiB.
 
 | Service | Small | Medium | Large | Xlarge | Xxlarge |
 | --- | --- | --- | --- | --- | --- |
-| api | 1 / 2 | 4 / 16 | 4.5 / 16 | 6 / 16 | 6 / 16 |
+| api | 1 / 2 | 4 / 12 | 4 / 16 | 6 / 16 | 6 / 16 |
 | app | 0.5 / 2 | 0.5 / 2 | 0.5 / 2 | 4 / 8 | 4 / 8 |
 | frontend | 0.25 / 0.25 | 0.5 / 0.25 | 0.5 / 0.25 | 0.5 / 0.25 | 0.75 / 0.25 |
 | filemeta | 0.25 / 0.25 | 0.5 / 0.25 | 0.5 / 0.25 | 0.5 / 0.25 | 0.75 / 0.25 |
 | glue | 0.5 / 2 | 1 / 4 | 1.25 / 4 | 1.25 / 4 | 2.25 / 6 |
 | metric-observer | 0.5 / 0.5 | 0.75 / 1 | 0.75 / 1 | 0.75 / 1 | 1 / 4 |
 | weave-trace | 1 / 4 | 1 / 4 | 1 / 4 | 1 / 6 | 1 / 6 |
-| parquet | 1 / 8 | 8 / 64 | 15 / 64 | 15 / 64 | 15 / 64 |
-| parquet-metadata-cache | 4 / 16 | 8 / 64 | 15 / 64 | 15 / 64 | 15 / 64 |
+| parquet | 1 / 8 | 8 / 64 | 8 / 64 | 12 / 64 | 15 / 64 |
+| parquet-metadata-cache | 4 / 16 | 8 / 64 | 8 / 32 | 8 / 32 | 15 / 64 |
 | weave | 1 / 8 | 2 / 24 | 3 / 24 | 3 / 24 | 3 / 48 |
 | flat-run-fields-updater | 1 / 2 | 1 / 2 | 1 / 3 | 1 / 6 | 1 / 6 |
 | history-updater | 1 / 1 | 1 / 1 | 1 / 1.5 | 1 / 3 | 1 / 3 |
 | weave-trace-worker | 1 / 4 | 1 / 4 | 1 / 4 | 1 / 4 | 1 / 4 |
 | weave-trace-agent-scoring-worker | 1 / 3 | 1 / 3 | 1 / 3 | 1 / 3 | 1 / 3 |
 
-The two medium Parquet replicas and one metadata-cache replica request **8 CPUs each**, retaining 15-CPU limits and 64-GiB memory requests/limits. This is the agreed QA experiment. Metadata-cache has insufficient representative medium fleet coverage; its 8-CPU request is an explicit experiment, not a telemetry-derived recommendation. Other Parquet/cache sizes retain defaults. Earlier QA runs used 15-CPU requests and do not validate these new settings.
+The two medium Parquet replicas and one metadata-cache replica request **8 CPUs each**, retaining 15-CPU limits and 64-GiB memory requests/limits. This is the agreed QA experiment. Metadata-cache has insufficient representative medium fleet coverage; its 8-CPU request is an explicit experiment, not a telemetry-derived recommendation. Large Parquet requests 8 CPUs / 64 GiB; xlarge requests 12 CPUs / 64 GiB. Metadata-cache requests 8 CPUs / 32 GiB at both sizes. Small and xxlarge retain defaults. Earlier QA runs used 15-CPU requests and do not validate these new settings.
+
+The large/xlarge settings are explicit compaction experiments. Parquet retains its memory reservation because observed working sets approached 64 GiB. The xlarge 12-CPU request is a chosen contention margin, not a measured safe minimum. Large metadata-cache has no matching customer cohort and xlarge has only one; the observed 21-GiB peak across five matching xxlarge customers motivates testing 32 GiB but does not validate other tiers. Limits remain 15 CPUs / 64 GiB, and `GOMEMLIMIT`/`GOMAXPROCS` still derive from those limits. A lower memory request does not shrink the cache or runtime budget.
+
+At two Parquet replicas and one cache replica, these changes alone release **21 requested CPUs and 32 GiB for large**, and **13 requested CPUs and 32 GiB for xlarge**, versus their defaults. Those reservations can accommodate other workloads; realized node and cost reductions depend on placement, HPA growth, supporting services and rollout headroom. Six nodes is a QA test target, not a fleet-wide size guarantee.
+
+Medium API memory (12 GiB) and large API CPU (4 cores) are also explicit tuning choices rather than outputs of the headroom formula. Medium API observed memory approached 16 GiB; its limit remains 16 GiB and its fixed replica bounds do not provide additional scale-out capacity.
 
 ## Percentage autoscaling
 
@@ -37,8 +43,8 @@ Queue workers and cache-heavy services retain their existing resource targets ra
 
 ## Placement and validation
 
-Required hostname anti-affinity separates Parquet and metadata-cache from each other and from Parquet replicas at every size. It selects both service names within the namespace, including other releases. At least one eligible node per combined replica is required; a rolling surge can need another node. Preserve the selector if changing service name labels or affinity. On current QA workers, two 8-CPU requests also exceed the 15.82 allocatable CPUs; the affinity keeps separation on larger workers. This profile does not set a PriorityClass.
+Required hostname anti-affinity separates Parquet and metadata-cache from each other and from Parquet replicas at every size. It selects both service names within the namespace, including other releases. At least one eligible node per combined replica is required; a rolling surge can need another node. Preserve the selector if changing service name labels or affinity. On current QA workers, two 8-CPU requests also exceed the 15.82 allocatable CPUs; the affinity keeps separation on larger workers. This profile does not set a PriorityClass. Priority preemption can make room for pending pods; it does not evict neighbors when a running Parquet pod needs more CPU. Required separation does not eliminate contention with other services.
 
 Frontend, filemeta and metric-observer retain preferred hostname anti-affinity for replicas of the same release. Explicit affinity takes precedence; jobs must opt in independently.
 
-After building dependencies, run `python scripts/validate_resource_requests_profile.py` with Helm and PyYAML installed. It lints and renders all five sizes with normal and synthetic KEDA controllers, checks the rounded requests and percentage targets, and rejects unexpected changes to limits, replica bounds, queues and unrelated objects. Render tests do not establish performance. Test the revised profile under representative concurrent load, sustained pressure, bursts, and worker loss before rollout; watch latency, backlog, throttling, OOMs and HPA ceilings.
+After building dependencies, run `python scripts/validate_resource_requests_profile.py` with Helm and PyYAML installed. It lints and renders all five sizes with normal and synthetic KEDA controllers, checks the rounded requests and percentage targets, and rejects unexpected changes to limits, replica bounds, queues and unrelated objects. Render tests do not establish performance. Test the revised profile under representative concurrent load, sustained pressure, bursts, and worker loss before rollout; watch latency, backlog, throttling, OOMs and HPA ceilings. Include warm-cache steady state and competing workloads when validating the lower memory reservations. Xlarge Parquet at 80% CPU now targets 9.6 cores per pod rather than 12; reaching its three-replica ceiling can offset packing savings. Large remains fixed at two replicas.
