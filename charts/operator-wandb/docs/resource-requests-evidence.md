@@ -98,6 +98,7 @@ N is matching customers with at least 14 days of data. CPU and memory observatio
 - Large/xlarge metadata-cache requests 8 CPUs / 32 GiB experimentally, retaining 15-CPU / 64-GiB limits. Coverage is zero and one matching customer respectively. Five matching xxlarge customers peaked at 21.08 GiB; that supports investigating a 32-GiB reservation, not extrapolating safety across tiers. Medium remains at 8 CPUs / 64 GiB and xxlarge retains defaults pending testing. Memory/runtime limits and cache configuration remain unchanged; validate warm caches and contention.
 - Medium API memory at 12 GiB and large API CPU at 4 cores are explicit tuning choices. The observed medium API peak was 15.97 GiB; the reservation is below that peak while its 16-GiB limit remains unchanged. These API workloads have fixed replica bounds, so HPA percentages cannot provide additional replicas.
 - Xxlarge API, flat-run-fields-updater and Weave showed pressure. This profile does not solve their replica ceilings or increase limits.
+- Weave Trace xlarge has no matching telemetry cohort. Its explicit profile entry retains the chart's 1-CPU / 6-GiB requests and 80/80 HPA targets; it does not claim a measured reduction for that tier.
 - History-updater, newer Weave workers, and several metadata-cache tiers have sparse coverage. Low activity is not sufficient evidence to lower their queue/cache capacity.
 - Frontend and filemeta have low sustained CPU and working sets across the observed tiers. Their lower requests are candidates for packing tests, with existing limits preserved.
 
