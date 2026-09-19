@@ -64,7 +64,12 @@ def check_resources(value: dict, location: str) -> None:
 def check_profile(profile: dict) -> None:
     require(bool(profile), "Profile must contain services")
     for service, settings in profile.items():
-        require(set(settings) <= {"sizing", "resources", "containers", "preferredPodAntiAffinity", "affinity"}, f"{service}: unexpected profile setting")
+        require(set(settings) <= {"sizing", "resources", "containers", "preferredPodAntiAffinity", "affinity", "podAnnotations", "podDisruptionBudget"}, f"{service}: unexpected profile setting")
+        if "podAnnotations" in settings:
+            volumes = "wandb-ca-certs-root,datadog-socket" + (",temp-dir" if service == "weave-trace" else "")
+            require(service in {"app", "weave-trace"} and settings["podAnnotations"] == {"cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes": volumes}, f"{service}: unexpected eviction exemption")
+        if "podDisruptionBudget" in settings:
+            require(service in {"app", "parquet-metadata-cache"} and settings["podDisruptionBudget"] == {"maxUnavailable": "0%"}, f"{service}: preserve a serving replica")
         if "affinity" in settings:
             require(service in PARQUET_SERVICES and settings["affinity"] == PARQUET_AFFINITY, f"{service}: unexpected required anti-affinity")
         if "resources" in settings:
@@ -176,6 +181,17 @@ def check_workload(old: dict, new: dict, settings: dict, defaults: dict, size: s
         expected_affinity = {"podAntiAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{"weight": 100, "podAffinityTerm": {"topologyKey": "kubernetes.io/hostname", "labelSelector": {"matchLabels": old["spec"]["selector"]["matchLabels"]}}}]}}
         require(after.get("affinity") == expected_affinity, f"{size}: incorrect preferred anti-affinity")
         after.pop("affinity", None)
+    if "podAnnotations" in settings:
+        old_annotations = old["spec"]["template"]["metadata"].get("annotations", {})
+        new_annotations = new["spec"]["template"]["metadata"]["annotations"]
+        for key, value in settings["podAnnotations"].items():
+            require(new_annotations.get(key) == value, f"{size}/{service}: missing durable eviction annotation")
+            if key in old_annotations:
+                new_annotations[key] = old_annotations[key]
+            else:
+                new_annotations.pop(key)
+        if not new_annotations and "annotations" not in old["spec"]["template"]["metadata"]:
+            new["spec"]["template"]["metadata"].pop("annotations")
     require(old == new, f"{size}/{old['metadata']['name']}: unexpected workload change")
     return changed
 
@@ -235,6 +251,10 @@ def validate_render(baseline: dict, updated: dict, profile: dict, defaults: dict
             seen.add(service)
             if check_workload(deepcopy(original), deepcopy(replacement), profile[service], defaults[service], size):
                 changes[service].add(size)
+        elif original["kind"] == "PodDisruptionBudget" and profile.get(service, {}).get("podDisruptionBudget"):
+            expected = deepcopy(original)
+            expected["spec"]["maxUnavailable"] = "0%"
+            require(replacement == expected, f"{size}/{service}: incorrect singleton protection")
         elif original["kind"] == "HorizontalPodAutoscaler" and service in profile:
             autoscalers_seen.add(service)
             check_hpa(deepcopy(original), deepcopy(replacement), profile[service], size)

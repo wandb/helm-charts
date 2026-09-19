@@ -54,3 +54,26 @@ Before enrollment, inspect effective HPA/KEDA maxima or fixed replica counts for
 The profile enables preferred hostname anti-affinity for frontend, filemeta and metric-observer replicas of the same release. The base chart's `preferredPodAntiAffinity` defaults to `false` when omitted, so it adds no preferred anti-affinity unless enabled. Explicit `affinity` takes precedence. Jobs and CronJobs do not inherit the service flag; enable it separately with `jobs.<name>.preferredPodAntiAffinity: true` or `cronJobs.<name>.preferredPodAntiAffinity: true`. Parquet and metadata-cache use explicit required anti-affinity, independently of this flag.
 
 After building dependencies, run `python scripts/validate_resource_requests_profile.py` with Helm and PyYAML installed. It lints and renders all five sizes with normal and synthetic KEDA controllers, checks the rounded requests and percentage targets, and rejects unexpected changes to limits, replica bounds, queues and unrelated objects. Render tests do not establish performance. Test the revised profile under representative concurrent load, sustained pressure, bursts, and worker loss before rollout; watch latency, backlog, throttling, OOMs and HPA ceilings. Include warm-cache steady state and competing workloads when validating the lower CPU reservations. Xlarge Parquet at 80% CPU now targets 9.6 cores per pod rather than 12; reaching its default three-replica ceiling can offset packing savings. Large defaults to two fixed replicas; customer overrides can differ.
+
+## Graceful consolidation
+
+The opt-in profile annotates app and Weave Trace pod templates with an explicit
+`safe-to-evict-local-volumes` list: generated CA certificates and the Datadog
+socket, plus Weave Trace's request-scoped `/tmp` scratch volume. Replacement
+pods retain these annotations. Additional customer local volumes are not
+exempted; do not replace this list with blanket `safe-to-evict: true`. Persistent
+volumes, other services and shutdown grace periods are unchanged.
+
+App and metadata-cache use `maxUnavailable: "0%"`. This blocks autoscaler
+eviction, including installations running a singleton. After confirming
+redundancy, a customer can override the budget to permit an eviction. It does not add
+replicas or make a singleton highly available. Deployment rollouts retain
+`maxSurge: 1` and `maxUnavailable: 0`; PDBs do not govern Deployment rollouts.
+Customer disruption budgets take precedence in managed spec. As with chart
+defaults, a custom `minAvailable` budget must clear `maxUnavailable`.
+
+Allow temporary surge nodes during rollouts. Validate continuous writes and
+reads, completed-run readback, readiness, termination and automatic scale-down
+before treating a smaller node count as steady state. Match Cluster Autoscaler
+to the cluster's Kubernetes minor version. A manual drain is not evidence that
+autoscaler consolidation works.

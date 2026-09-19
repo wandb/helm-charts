@@ -4,6 +4,12 @@
 # Candidates require load validation. See docs/resource-requests.md and
 # docs/resource-requests-evidence.md for coverage, pressure and retained defaults.
 app:
+  podAnnotations:
+    # Generated CA certificates and telemetry sockets contain no application data.
+    cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "wandb-ca-certs-root,datadog-socket"
+  podDisruptionBudget:
+    # These services can be singletons. Opt into eviction only after ensuring redundancy.
+    maxUnavailable: "0%"
   sizing:
     small:
       resources:
@@ -251,6 +257,9 @@ metric-observer:
           targetCPUUtilizationPercentage: 70
           targetMemoryUtilizationPercentage: 80
 weave-trace:
+  podAnnotations:
+    # Allow only generated certificates, telemetry sockets and request-scoped scratch space.
+    cluster-autoscaler.kubernetes.io/safe-to-evict-local-volumes: "wandb-ca-certs-root,datadog-socket,temp-dir"
   sizing:
     small:
       resources:
@@ -359,6 +368,9 @@ parquet:
           targetCPUUtilizationPercentage: 80
           targetMemoryUtilizationPercentage: 80
 parquet-metadata-cache:
+  podDisruptionBudget:
+    # These services can be singletons. Opt into eviction only after ensuring redundancy.
+    maxUnavailable: "0%"
   affinity:
     podAntiAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
