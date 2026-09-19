@@ -181,7 +181,20 @@ type: OnDelete
 
 {{- define "wandb-base.sizingInfoHorizontal" }}
   {{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
-  {{- $hpaSizing := mergeOverwrite $sizingInfo.autoscaling.horizontal .Values.autoscaling.horizontal }}
+  {{- $overrides := default dict .Values.autoscaling.horizontal }}
+  {{- $hpaSizing := mergeOverwrite $sizingInfo.autoscaling.horizontal $overrides }}
+  {{- /* Keep existing request-based scaling when direct overrides are present. */}}
+  {{- range $resource := list "CPU" "Memory" }}
+    {{- $percentageKey := printf "target%sUtilizationPercentage" $resource }}
+    {{- $absoluteKey := printf "target%sAverageValue" $resource }}
+    {{- $requestKey := lower $resource }}
+    {{- $hasRequestOverride := eq (include "wandb-base.hasDirectRequestOverride" (dict "root" $ "resource" $requestKey)) "true" }}
+    {{- $preserveRequestScaling := and $hasRequestOverride (not $hpaSizing.preserveAbsoluteTargetsWithRequestOverrides) }}
+    {{- $preserveUtilization := and (or (hasKey $overrides $percentageKey) $preserveRequestScaling) (empty (get $overrides $absoluteKey)) }}
+    {{- if $preserveUtilization }}
+      {{- $_ := set $hpaSizing $absoluteKey "" }}
+    {{- end }}
+  {{- end }}
 
 {{- toYaml $hpaSizing }}
 {{- end }}
@@ -189,6 +202,9 @@ type: OnDelete
 {{- define "wandb-base.sizingInfoKeda" }}
   {{- $sizingInfo := fromYaml (include "wandb-base.sizingInfo" .) }}
   {{- $kedaSizing := mergeOverwrite $sizingInfo.autoscaling.keda .Values.autoscaling.keda }}
+  {{- if and $kedaSizing.enabled $kedaSizing.resourceRequestBaseline $kedaSizing.triggers }}
+    {{- $_ := set $kedaSizing "triggers" (include "wandb-base.kedaResourceTriggers" (dict "root" . "keda" $kedaSizing) | fromYamlArray) }}
+  {{- end }}
 
 {{- toYaml $kedaSizing }}
 {{- end }}

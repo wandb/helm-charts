@@ -20,20 +20,30 @@ spec:
   minReplicas: {{ $hpaSizing.minReplicas }}
   maxReplicas: {{ $hpaSizing.maxReplicas }}
   metrics:
-  {{- if $hpaSizing.targetCPUUtilizationPercentage }}
+  {{- if or $hpaSizing.targetCPUAverageValue $hpaSizing.targetCPUUtilizationPercentage }}
     - type: Resource
       resource:
         name: cpu
         target:
+    {{- if $hpaSizing.targetCPUAverageValue }}
+          type: AverageValue
+          averageValue: {{ $hpaSizing.targetCPUAverageValue | quote }}
+    {{- else }}
           type: Utilization
           averageUtilization: {{ $hpaSizing.targetCPUUtilizationPercentage }}
+    {{- end }}
   {{- end }}
-  {{- if $hpaSizing.targetMemoryUtilizationPercentage }}
+  {{- if or $hpaSizing.targetMemoryAverageValue $hpaSizing.targetMemoryUtilizationPercentage }}
     - type: Resource
       resource:
         name: memory
         target:
+    {{- if $hpaSizing.targetMemoryAverageValue }}
+          type: AverageValue
+          averageValue: {{ $hpaSizing.targetMemoryAverageValue | quote }}
+    {{- else }}
           type: Utilization
           averageUtilization: {{ $hpaSizing.targetMemoryUtilizationPercentage }}
+    {{- end }}
   {{- end }}
 {{- end }}
