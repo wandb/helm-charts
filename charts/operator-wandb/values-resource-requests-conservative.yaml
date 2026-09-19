@@ -112,13 +112,58 @@ weave-trace-agent-scoring-worker:
         horizontal:
           targetCPUAverageValue: 800m
           targetMemoryAverageValue: 2457.6Mi
+parquet:
+  # Separate both Parquet services across hostnames within the namespace.
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [parquet, parquet-metadata-cache]
+  sizing:
+    medium:
+      resources:
+        requests:
+          cpu: "8"
+      autoscaling:
+        horizontal:
+          targetCPUAverageValue: "12"
+        keda:
+          resourceRequestBaseline:
+            cpuMillicores: 15000
 parquet-metadata-cache:
+  # Separate both Parquet services across hostnames within the namespace.
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [parquet, parquet-metadata-cache]
   sizing:
     small:
       resources:
         requests:
           cpu: 3000m
           memory: 12288Mi
+      autoscaling:
+        keda:
+          resourceRequestBaseline:
+            cpuMillicores: 4000
+            memoryBytes: 17179869184
+    medium:
+      resources:
+        requests:
+          cpu: "8"
+      autoscaling:
+        keda:
+          resourceRequestBaseline:
+            cpuMillicores: 15000
 history-updater:
   sizing:
     small:

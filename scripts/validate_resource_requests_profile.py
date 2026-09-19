@@ -20,6 +20,21 @@ ROOT = Path(__file__).resolve().parents[1]
 CHART = ROOT / "charts" / "operator-wandb"
 PROFILE = CHART / "values-resource-requests-conservative.yaml"
 SIZES = ("small", "medium", "large", "xlarge", "xxlarge")
+PARQUET_SERVICES = {"parquet", "parquet-metadata-cache"}
+PARQUET_AFFINITY = {
+    "podAntiAffinity": {
+        "requiredDuringSchedulingIgnoredDuringExecution": [{
+            "topologyKey": "kubernetes.io/hostname",
+            "labelSelector": {
+                "matchExpressions": [{
+                    "key": "app.kubernetes.io/name",
+                    "operator": "In",
+                    "values": ["parquet", "parquet-metadata-cache"],
+                }],
+            },
+        }],
+    },
+}
 RESOURCE_KEYS = {"cpu", "memory"}
 ABSOLUTE_KEYS = {"targetCPUAverageValue", "targetMemoryAverageValue"}
 BASELINE_KEYS = {"cpuMillicores", "memoryBytes"}
@@ -50,7 +65,9 @@ def check_resources(value: dict, location: str) -> None:
 def check_profile(profile: dict) -> None:
     require(bool(profile), "Profile must contain services")
     for service, settings in profile.items():
-        require(set(settings) <= {"sizing", "resources", "containers", "preferredPodAntiAffinity"}, f"{service}: unexpected profile setting")
+        require(set(settings) <= {"sizing", "resources", "containers", "preferredPodAntiAffinity", "affinity"}, f"{service}: unexpected profile setting")
+        if "affinity" in settings:
+            require(service in PARQUET_SERVICES and settings["affinity"] == PARQUET_AFFINITY, f"{service}: unexpected required anti-affinity")
         if "resources" in settings:
             check_resources(settings["resources"], service)
         for name, container in settings.get("containers", {}).items():
@@ -131,7 +148,12 @@ def expected_requests(settings: dict, defaults: dict, size: str, container: str)
 
 def check_workload(old: dict, new: dict, settings: dict, defaults: dict, size: str) -> bool:
     before, after = old["spec"]["template"]["spec"], new["spec"]["template"]["spec"]
-    require(qos(before) == qos(after), f"{size}/{old['metadata']['name']}: QoS class changed")
+    service = old["metadata"]["labels"]["app.kubernetes.io/name"]
+    parquet_reduction = service in PARQUET_SERVICES and size == "medium"
+    if parquet_reduction:
+        require(qos(before) == "Guaranteed" and qos(after) == "Burstable", f"{size}/{service}: unexpected Parquet QoS transition")
+    else:
+        require(qos(before) == qos(after), f"{size}/{old['metadata']['name']}: QoS class changed")
     old_containers = {item["name"]: item for item in before["containers"]}
     new_containers = {item["name"]: item for item in after["containers"]}
     require(old_containers.keys() == new_containers.keys(), "Container set changed")
@@ -144,9 +166,18 @@ def check_workload(old: dict, new: dict, settings: dict, defaults: dict, size: s
             previous = original.get("resources", {}).get("requests", {}).get(resource)
             require(actual is not None and previous is not None, f"{name}: request missing")
             require(quantity(actual) == quantity(target), f"{size}/{name}/{resource}: profile request was not applied")
-            require(Decimal(".75") * quantity(previous) <= quantity(actual) <= quantity(previous), f"{size}/{name}/{resource}: request change exceeds profile bounds")
+            if parquet_reduction and resource == "cpu":
+                require(quantity(previous) == 15 and quantity(actual) == 8, f"{size}/{name}: Parquet CPU must change from 15 to 8")
+            else:
+                require(Decimal(".75") * quantity(previous) <= quantity(actual) <= quantity(previous), f"{size}/{name}/{resource}: request change exceeds profile bounds")
             changed |= quantity(actual) != quantity(previous)
             replacement["resources"]["requests"][resource] = previous
+    if "affinity" in settings:
+        require(after.get("affinity") == PARQUET_AFFINITY, f"{size}/{service}: required Parquet separation missing")
+        if "affinity" in before:
+            after["affinity"] = deepcopy(before["affinity"])
+        else:
+            after.pop("affinity", None)
     if settings.get("preferredPodAntiAffinity") and not before.get("affinity"):
         expected_affinity = {"podAntiAffinity": {"preferredDuringSchedulingIgnoredDuringExecution": [{"weight": 100, "podAffinityTerm": {"topologyKey": "kubernetes.io/hostname", "labelSelector": {"matchLabels": old["spec"]["selector"]["matchLabels"]}}}]}}
         require(after.get("affinity") == expected_affinity, f"{size}: incorrect preferred anti-affinity")
