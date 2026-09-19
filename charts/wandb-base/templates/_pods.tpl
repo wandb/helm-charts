@@ -15,9 +15,19 @@ metadata:
     {{- tpl (include "wandb-base.labels" $.root | nindent 4) $.root }}
     {{- tpl (include "wandb-base.podLabels" $.root | nindent 4) $.root }}
 spec:
-  {{- with .podData.affinity }}
+  {{- if .podData.affinity }}
   affinity:
-    {{- toYaml . | nindent 4 }}
+    {{- toYaml .podData.affinity | nindent 4 }}
+  {{- else if .podData.preferredPodAntiAffinity }}
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                {{- include "wandb-base.selectorLabels" $.root | nindent 16 }}
   {{- end }}
   containers:
     {{- include "wandb-base.containers" (dict "containers" .podData.containers "root" $.root "source" "containers") | nindent 4 }}
