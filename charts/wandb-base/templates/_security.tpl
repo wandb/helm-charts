@@ -15,9 +15,9 @@
     {{- end -}}
   {{- end -}}
   {{- if $profile.enabled -}}
-    {{- $defaults := dict "allowPrivilegeEscalation" false "privileged" false "capabilities" (dict "drop" (list "ALL") "add" list) "seccompProfile" (dict "type" "RuntimeDefault") -}}
+    {{- $defaults := dict "automountServiceAccountToken" false "allowPrivilegeEscalation" false "privileged" false "capabilities" (dict "drop" (list "ALL") "add" list) "seccompProfile" (dict "type" "RuntimeDefault") -}}
     {{- $profile = mergeOverwrite $defaults $profile -}}
-    {{- range $field := list "allowPrivilegeEscalation" "privileged" -}}
+    {{- range $field := list "automountServiceAccountToken" "allowPrivilegeEscalation" "privileged" -}}
       {{- if not (kindIs "bool" (get $profile $field)) -}}
         {{- fail (printf "workloadSecurityProfile.%s must be a boolean" $field) -}}
       {{- end -}}

@@ -875,3 +875,12 @@ containers:
 
 The profile adds no numeric UID/GID. Existing chart identity settings remain in
 place. Use an image compatible with the configured user and group settings.
+
+Enabled profiles also set `automountServiceAccountToken: false` on Pods and
+chart-created service accounts. Pod-level control applies even to external,
+shared or default service accounts; it does not remove explicit projected
+workload-identity volumes. Kubernetes API consumers must explicitly set
+`workloadSecurityProfile.automountServiceAccountToken: true` at the component
+or Job level. An enabled profile takes precedence over the direct Pod
+`automountServiceAccountToken` setting. The renderer does not infer API
+requirements from RBAC creation.

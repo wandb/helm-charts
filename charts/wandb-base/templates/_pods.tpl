@@ -15,7 +15,10 @@ metadata:
     {{- tpl (include "wandb-base.labels" $.root | nindent 4) $.root }}
     {{- tpl (include "wandb-base.podLabels" $.root | nindent 4) $.root }}
 spec:
-  {{- if ne .podData.automountServiceAccountToken nil }}
+  {{- $profile := include "wandb-base.securityProfile" (dict "root" $.root "podData" .podData "container" dict) | fromYaml }}
+  {{- if $profile.enabled }}
+  automountServiceAccountToken: {{ $profile.automountServiceAccountToken }}
+  {{- else if ne .podData.automountServiceAccountToken nil }}
     {{- if not (kindIs "bool" .podData.automountServiceAccountToken) }}
       {{- fail "automountServiceAccountToken must be a boolean or null" }}
     {{- end }}
@@ -62,7 +65,6 @@ spec:
   priorityClassName: {{ tpl $priorityClassName $.root }}
   {{- end }}
   serviceAccountName: {{ include "wandb-base.serviceAccountName" $.root }}
-  {{- $profile := include "wandb-base.securityProfile" (dict "root" $.root "podData" .podData "container" dict) | fromYaml }}
   {{- $podContext := merge (deepCopy (default dict .podData.podSecurityContext)) (deepCopy $.root.Values.podSecurityContext) }}
   {{- if $profile.enabled }}
     {{- $podContext = include "wandb-base.podSecurityProfile" (dict "context" $podContext "profile" $profile) | fromYaml }}
