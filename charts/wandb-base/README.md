@@ -885,6 +885,12 @@ or Job level. An enabled profile takes precedence over the direct Pod
 `automountServiceAccountToken` setting. The renderer does not infer API
 requirements from RBAC creation.
 
+When a Job or CronJob disables an inherited profile but uses a chart-created
+ServiceAccount with the profile enabled, its Pod explicitly restores the legacy
+`serviceAccount.automount` setting. An explicit Job/CronJob
+`automountServiceAccountToken` still takes precedence. External or shared identity
+accounts retain their own policy when the Pod does not specify an override.
+
 ### Image compatibility and writable paths
 
 `runAsNonRoot` and `readOnlyRootFilesystem` are optional profile booleans.

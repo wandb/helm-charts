@@ -23,6 +23,16 @@ spec:
       {{- fail "automountServiceAccountToken must be a boolean or null" }}
     {{- end }}
   automountServiceAccountToken: {{ .podData.automountServiceAccountToken }}
+  {{- else if include "wandb-base.createsServiceAccount" $.root | trim | eq "true" }}
+    {{- $accountProfile := include "wandb-base.securityProfile" (dict "root" $.root "podData" dict "container" dict) | fromYaml }}
+    {{- if $accountProfile.enabled }}
+      {{/* A Job opt-out must not inherit the shared account's enabled profile. */}}
+      {{- $legacyAutomount := $.root.Values.serviceAccount.automount }}
+      {{- if eq $legacyAutomount nil }}
+        {{- $legacyAutomount = true }}
+      {{- end }}
+  automountServiceAccountToken: {{ $legacyAutomount }}
+    {{- end }}
   {{- end }}
   {{- with .podData.affinity }}
   affinity:
