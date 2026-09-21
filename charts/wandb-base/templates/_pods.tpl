@@ -26,7 +26,7 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   containers:
-    {{- include "wandb-base.containers" (dict "containers" .podData.containers "root" $.root "source" "containers") | nindent 4 }}
+    {{- include "wandb-base.containers" (dict "containers" .podData.containers "root" $.root "source" "containers" "podData" .podData) | nindent 4 }}
   {{- $combinedSecrets := concat (default list $.root.Values.imagePullSecrets) (default list $.root.Values.global.imagePullSecrets) }}
   {{- $secretNames := list }}
   {{- range $secret := $combinedSecrets }}
@@ -47,7 +47,7 @@ spec:
   {{- end }}
   {{- if .podData.initContainers }}
   initContainers:
-    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers") | nindent 4 }}
+    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers" "podData" .podData) | nindent 4 }}
   {{- end }}
   {{- $nodeSelector := coalesce .podData.nodeSelector $.root.Values.nodeSelector $.root.Values.global.nodeSelector -}}
   {{- if $nodeSelector }}
@@ -62,8 +62,13 @@ spec:
   priorityClassName: {{ tpl $priorityClassName $.root }}
   {{- end }}
   serviceAccountName: {{ include "wandb-base.serviceAccountName" $.root }}
+  {{- $profile := include "wandb-base.securityProfile" (dict "root" $.root "podData" .podData "container" dict) | fromYaml }}
+  {{- $podContext := merge (deepCopy (default dict .podData.podSecurityContext)) (deepCopy $.root.Values.podSecurityContext) }}
+  {{- if $profile.enabled }}
+    {{- $podContext = include "wandb-base.podSecurityProfile" (dict "context" $podContext "profile" $profile) | fromYaml }}
+  {{- end }}
   securityContext:
-   {{- tpl (toYaml (merge (default dict .podData.podSecurityContext) $.root.Values.podSecurityContext) | nindent 4) $.root }}
+    {{- tpl (toYaml $podContext | nindent 4) $.root }}
   {{- with .podData.terminationGracePeriodSeconds }}
   terminationGracePeriodSeconds: {{ . }}
   {{- end }}

@@ -841,3 +841,37 @@ For more information on Kubernetes concepts used in this chart:
 - [Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
 - [Vertical Pod Autoscaling](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)
 - [KEDA (Kubernetes Event Driven Autoscaling)](https://keda.sh/)
+
+## Opt-in workload security profile
+
+`global.workloadSecurityProfile.enabled: true` enables dropped Linux capabilities
+(`ALL`), `allowPrivilegeEscalation: false`, `privileged: false`, and
+`seccompProfile.type: RuntimeDefault` for this chart's containers and init
+containers, including Jobs, CronJobs and StatefulSets. Omitted/disabled profiles
+preserve existing rendering.
+
+Settings merge in this order, with the last supplied value winning:
+`global.workloadSecurityProfile`, chart `workloadSecurityProfile`,
+`jobs.<name>.workloadSecurityProfile` or `cronJobs.<name>.workloadSecurityProfile`,
+and container `workloadSecurityProfile`. A component can set `enabled: false`.
+Container overrides affect container fields only. False values and empty
+capability lists are intentional overrides, not missing values.
+
+When enabled, profile-controlled fields override existing security contexts;
+other existing fields remain intact. Use named profile exceptions rather than
+expecting a legacy `securityContext` to override the profile. For example:
+
+```yaml
+global:
+  workloadSecurityProfile:
+    enabled: true
+containers:
+  listener:
+    workloadSecurityProfile:
+      capabilities:
+        drop: [ALL]
+        add: [NET_BIND_SERVICE]
+```
+
+The profile adds no numeric UID/GID. Existing chart identity settings remain in
+place. Use an image compatible with the configured user and group settings.

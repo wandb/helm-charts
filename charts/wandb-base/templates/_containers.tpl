@@ -41,6 +41,10 @@
       {{- $_ = set $container "globalVolumeMounts" $globalVolumeMounts -}}
       {{- $_ = set $container "globalVolumeMountsTpls" $globalVolumeMountTpls -}}
       {{- $_ = set $container "securityContext" (coalesce $container.securityContext (merge $.root.Values.securityContext $.root.Values.container.securityContext)) -}}
+      {{- $profile := include "wandb-base.securityProfile" (dict "root" $.root "podData" $.podData "container" $containerSource) | fromYaml -}}
+      {{- if $profile.enabled -}}
+        {{- $_ = set $container "securityContext" (include "wandb-base.containerSecurityProfile" (dict "context" $container.securityContext "profile" $profile) | fromYaml) -}}
+      {{- end -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
       {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) -}}
       {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $globalEnv $globalExtraEnv) -}}
