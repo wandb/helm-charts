@@ -17,8 +17,8 @@
   {{- if $profile.enabled -}}
     {{- $defaults := dict "automountServiceAccountToken" false "allowPrivilegeEscalation" false "privileged" false "capabilities" (dict "drop" (list "ALL") "add" list) "seccompProfile" (dict "type" "RuntimeDefault") -}}
     {{- $profile = mergeOverwrite $defaults $profile -}}
-    {{- range $field := list "automountServiceAccountToken" "allowPrivilegeEscalation" "privileged" -}}
-      {{- if not (kindIs "bool" (get $profile $field)) -}}
+    {{- range $field := list "automountServiceAccountToken" "allowPrivilegeEscalation" "privileged" "runAsNonRoot" "readOnlyRootFilesystem" -}}
+      {{- if and (hasKey $profile $field) (not (kindIs "bool" (get $profile $field))) -}}
         {{- fail (printf "workloadSecurityProfile.%s must be a boolean" $field) -}}
       {{- end -}}
     {{- end -}}
@@ -32,6 +32,11 @@
   {{- if .profile.enabled -}}
     {{- range $field := list "allowPrivilegeEscalation" "privileged" "capabilities" "seccompProfile" -}}
       {{- $_ := set $context $field (deepCopy (get $.profile $field)) -}}
+    {{- end -}}
+    {{- range $field := list "runAsNonRoot" "readOnlyRootFilesystem" -}}
+      {{- if hasKey $.profile $field -}}
+        {{- $_ := set $context $field (get $.profile $field) -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
   {{- toYaml $context -}}

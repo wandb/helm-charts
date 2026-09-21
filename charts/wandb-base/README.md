@@ -884,3 +884,38 @@ workload-identity volumes. Kubernetes API consumers must explicitly set
 or Job level. An enabled profile takes precedence over the direct Pod
 `automountServiceAccountToken` setting. The renderer does not infer API
 requirements from RBAC creation.
+
+### Image compatibility and writable paths
+
+`runAsNonRoot` and `readOnlyRootFilesystem` are optional profile booleans.
+They are applied only when explicitly supplied on an enabled profile. A child
+container can override either with `false`. These settings do not depend on the server version.
+Neither flag provisions writable paths or changes existing volumes.
+
+Use the existing per-workload/Job `volumes` and per-container `volumeMounts`
+controls for required writable paths, including init containers. For example,
+a component with a compatible image can use:
+
+```yaml
+workloadSecurityProfile:
+  enabled: true
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+# Use the image USER or a platform-assigned UID instead of chart defaults.
+podSecurityContext:
+  runAsUser: null
+  runAsGroup: null
+  fsGroup: null
+volumes:
+  - name: temporary
+    emptyDir: {}
+containers:
+  app:
+    volumeMounts:
+      - name: temporary
+        mountPath: /tmp
+```
+
+Configure writable mounts for the paths your image uses, and preserve any
+required persistent volumes. A non-root image USER or platform-assigned UID is
+required when removing the chart's numeric identity settings.
