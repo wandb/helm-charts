@@ -1,0 +1,95 @@
+suite: Workload token policy
+templates:
+  - deployment.yaml
+  - job.yaml
+  - serviceaccount.yaml
+set:
+  containers:
+    app: {}
+tests:
+  - it: leaves legacy pod policy unset
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.automountServiceAccountToken
+  - it: preserves legacy service account policy
+    template: serviceaccount.yaml
+    asserts:
+      - equal:
+          path: automountServiceAccountToken
+          value: true
+  - it: disables tokens at pod level even when using an external service account
+    template: deployment.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+      serviceAccount.create: false
+      serviceAccount.name: external
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: external
+  - it: disables tokens on generated service accounts
+    template: serviceaccount.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+    asserts:
+      - equal:
+          path: automountServiceAccountToken
+          value: false
+  - it: retains explicit API-consumer access
+    template: deployment.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+      workloadSecurityProfile.automountServiceAccountToken: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+  - it: allows a job to disable an inherited token exception
+    template: job.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+      workloadSecurityProfile.automountServiceAccountToken: true
+      jobs:
+        migration:
+          workloadSecurityProfile:
+            automountServiceAccountToken: false
+          containers:
+            migration: {}
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+  - it: rejects a string token policy
+    template: deployment.yaml
+    set:
+      serviceAccount.create: false
+      workloadSecurityProfile:
+        enabled: true
+        automountServiceAccountToken: 'false'
+    asserts:
+      - failedTemplate:
+          errorMessage: workloadSecurityProfile.automountServiceAccountToken must be a boolean
+  - it: uses the enabled profile instead of a direct pod token opt-in
+    template: deployment.yaml
+    set:
+      automountServiceAccountToken: true
+      workloadSecurityProfile.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+  - it: preserves an API-consumer profile exception over a direct pod opt-out
+    template: deployment.yaml
+    set:
+      automountServiceAccountToken: false
+      workloadSecurityProfile:
+        enabled: true
+        automountServiceAccountToken: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true

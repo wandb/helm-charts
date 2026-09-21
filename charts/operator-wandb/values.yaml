@@ -10,6 +10,10 @@
 
 # The global properties are used to configure multiple charts at once.
 global:
+  # Optional security settings for wandb-base workloads and W&B Helm test Pods.
+  # Dependency charts use their own security settings.
+  workloadSecurityProfile:
+    enabled: false
   # This should be the fqdn of where your users will be accessing the instance.
   host: "http://localhost:8080"
 
@@ -685,6 +689,9 @@ artifactsGc:
   DeleteFilesNumWorkers: 0
 
 api:
+  # Reads/writes application secrets and reads its namespace.
+  workloadSecurityProfile:
+    automountServiceAccountToken: true
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   service:
@@ -884,6 +891,9 @@ api:
           minReplicas: 2
 
 app:
+  # Reads/writes application secrets and reads its namespace.
+  workloadSecurityProfile:
+    automountServiceAccountToken: true
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: true
@@ -1052,6 +1062,9 @@ app:
           memory: 8Gi
 
 appRenamePreHook:
+  # Uses kubectl to annotate Deployments before upgrade.
+  workloadSecurityProfile:
+    automountServiceAccountToken: true
   install: true
   kind: Job
   globalOptOut:
@@ -1088,6 +1101,9 @@ appRenamePreHook:
         verbs: ["get", "patch"]
 
 appRenamePostHook:
+  # Uses kubectl to watch and delete old Deployments after upgrade.
+  workloadSecurityProfile:
+    automountServiceAccountToken: true
   install: true
   kind: Job
   globalOptOut:
@@ -1124,6 +1140,9 @@ appRenamePostHook:
         verbs: ["get", "delete", "list", "watch"]
 
 console:
+  # Reads cluster diagnostics and manages configuration secrets.
+  workloadSecurityProfile:
+    automountServiceAccountToken: true
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: true
@@ -2774,6 +2793,9 @@ frontend:
           minReplicas: 2
 
 glue:
+  # Reads application secrets and uses Lease/Event APIs for leader election.
+  workloadSecurityProfile:
+    automountServiceAccountToken: true
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   envFrom:
@@ -2929,6 +2951,9 @@ glue:
           memory: 6Gi
 
 internalSignerPreHook:
+  # Creates and updates the internal signer Secret.
+  workloadSecurityProfile:
+    automountServiceAccountToken: true
   install: true
   kind: Job
   globalOptOut:
@@ -2958,6 +2983,9 @@ internalSignerPreHook:
         verbs: ["get", "patch", "create", "update"]
 
 metric-observer:
+  # Reads application secrets and namespace metadata.
+  workloadSecurityProfile:
+    automountServiceAccountToken: true
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
@@ -3432,6 +3460,9 @@ parquet-metadata-cache:
           minReplicas: 1
 
 settingsMigrationJob:
+  # Reads and updates specification Secrets.
+  workloadSecurityProfile:
+    automountServiceAccountToken: true
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
@@ -4597,6 +4628,9 @@ bufstream:
           memory: 4Gi
 
 lumen-agent:
+  # Discovers Kubernetes resources for diagnostic collection.
+  workloadSecurityProfile:
+    automountServiceAccountToken: true
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   install: false
@@ -4792,3 +4826,16 @@ clickhouse:
       size: 8Gi
       storageClass: ""
       mountPath: /var/lib/clickhouse-keeper
+
+# Per-hook overrides inherit global.workloadSecurityProfile. Image runtime flags
+# must be validated separately: Python verification hooks install packages.
+testHooks:
+  workloadSecurityProfile: {}
+  connection:
+    workloadSecurityProfile: {}
+  weave:
+    workloadSecurityProfile: {}
+  mcp:
+    workloadSecurityProfile: {}
+  olap:
+    workloadSecurityProfile: {}

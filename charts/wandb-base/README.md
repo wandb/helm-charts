@@ -841,3 +841,81 @@ For more information on Kubernetes concepts used in this chart:
 - [Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
 - [Vertical Pod Autoscaling](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)
 - [KEDA (Kubernetes Event Driven Autoscaling)](https://keda.sh/)
+
+## Opt-in workload security profile
+
+`global.workloadSecurityProfile.enabled: true` enables dropped Linux capabilities
+(`ALL`), `allowPrivilegeEscalation: false`, `privileged: false`, and
+`seccompProfile.type: RuntimeDefault` for this chart's containers and init
+containers, including Jobs, CronJobs and StatefulSets. Omitted/disabled profiles
+preserve existing rendering.
+
+Settings merge in this order, with the last supplied value winning:
+`global.workloadSecurityProfile`, chart `workloadSecurityProfile`,
+`jobs.<name>.workloadSecurityProfile` or `cronJobs.<name>.workloadSecurityProfile`,
+and container `workloadSecurityProfile`. A component can set `enabled: false`.
+Container overrides affect container fields only. False values and empty
+capability lists are intentional overrides, not missing values.
+
+When enabled, profile-controlled fields override existing security contexts;
+other existing fields remain intact. Use named profile exceptions rather than
+expecting a legacy `securityContext` to override the profile. For example:
+
+```yaml
+global:
+  workloadSecurityProfile:
+    enabled: true
+containers:
+  listener:
+    workloadSecurityProfile:
+      capabilities:
+        drop: [ALL]
+        add: [NET_BIND_SERVICE]
+```
+
+The profile adds no numeric UID/GID. Existing chart identity settings remain in
+place. Use an image compatible with the configured user and group settings.
+
+Enabled profiles also set `automountServiceAccountToken: false` on Pods and
+chart-created service accounts. Pod-level control applies even to external,
+shared or default service accounts; it does not remove explicit projected
+workload-identity volumes. Kubernetes API consumers must explicitly set
+`workloadSecurityProfile.automountServiceAccountToken: true` at the component
+or Job level. An enabled profile takes precedence over the direct Pod
+`automountServiceAccountToken` setting. The renderer does not infer API
+requirements from RBAC creation.
+
+### Image compatibility and writable paths
+
+`runAsNonRoot` and `readOnlyRootFilesystem` are optional profile booleans.
+They are applied only when explicitly supplied on an enabled profile. A child
+container can override either with `false`. These settings do not depend on the server version.
+Neither flag provisions writable paths or changes existing volumes.
+
+Use the existing per-workload/Job `volumes` and per-container `volumeMounts`
+controls for required writable paths, including init containers. For example,
+a component with a compatible image can use:
+
+```yaml
+workloadSecurityProfile:
+  enabled: true
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+# Use the image USER or a platform-assigned UID instead of chart defaults.
+podSecurityContext:
+  runAsUser: null
+  runAsGroup: null
+  fsGroup: null
+volumes:
+  - name: temporary
+    emptyDir: {}
+containers:
+  app:
+    volumeMounts:
+      - name: temporary
+        mountPath: /tmp
+```
+
+Configure writable mounts for the paths your image uses, and preserve any
+required persistent volumes. A non-root image USER or platform-assigned UID is
+required when removing the chart's numeric identity settings.
