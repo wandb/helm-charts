@@ -134,3 +134,73 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: workloadSecurityProfile.enabled must be a boolean
+  - it: hardens partial legacy container contexts instead of replacing the baseline
+    template: deployment.yaml
+    set:
+      workloadSecurityProfile.enabled: true
+      containers.app.securityContext:
+        privileged: true
+        allowPrivilegeEscalation: true
+        runAsNonRoot: false
+        capabilities:
+          add: [NET_ADMIN]
+        seccompProfile:
+          type: Unconfined
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities
+          value:
+            add: []
+            drop: [ALL]
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.seccompProfile.type
+          value: RuntimeDefault
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
+          value: false
+  - it: treats an empty profile as inheritance
+    template: deployment.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+      workloadSecurityProfile: {}
+      containers.app.workloadSecurityProfile: {}
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: permits an init-container exception without weakening its siblings
+    template: deployment.yaml
+    set:
+      workloadSecurityProfile.enabled: true
+      initContainers.migrate.workloadSecurityProfile.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.capabilities.drop
+          value: []
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: preserves global environment opt-out when the profile is enabled
+    template: deployment.yaml
+    set:
+      workloadSecurityProfile.enabled: true
+      globalOptOut.env: true
+      global.env.GLOBAL_ONLY: global-value
+      containers.app.env.LOCAL_ONLY: local-value
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOCAL_ONLY
+            value: local-value
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GLOBAL_ONLY
+            value: global-value
