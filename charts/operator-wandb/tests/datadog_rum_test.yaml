@@ -1,0 +1,90 @@
+suite: Datadog RUM frontend configuration
+templates:
+  - templates/frontend.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: leaves Dedicated RUM disabled by default
+    template: templates/frontend.yaml
+    documentIndex: 0
+    asserts:
+      - notExists:
+          path: data.REACT_APP_DATADOG_RUM_ENABLED
+      - notExists:
+          path: data.REACT_APP_DATADOG_RUM_SESSION_SAMPLE_RATE
+
+  - it: renders the Dedicated RUM runtime settings
+    template: templates/frontend.yaml
+    documentIndex: 0
+    set:
+      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
+      global.datadog.rum.enabled: true
+      global.datadog.rum.profilingSampleRate: 10
+      global.datadog.rum.sessionSampleRate: 90
+      global.datadog.rum.sessionReplaySampleRate: 25
+      global.datadog.rum.traceSampleRate: 75
+    asserts:
+      - equal:
+          path: data.REACT_APP_DATADOG_RUM_ENABLED
+          value: "true"
+      - equal:
+          path: data.REACT_APP_DATADOG_RUM_PROFILING_SAMPLE_RATE
+          value: "10"
+      - equal:
+          path: data.REACT_APP_DATADOG_RUM_SESSION_SAMPLE_RATE
+          value: "90"
+      - equal:
+          path: data.REACT_APP_DATADOG_RUM_SESSION_REPLAY_SAMPLE_RATE
+          value: "25"
+      - equal:
+          path: data.REACT_APP_DATADOG_RUM_TRACE_SAMPLE_RATE
+          value: "75"
+      - notExists:
+          path: data.REACT_APP_CUSTOMER_NS
+
+  - it: requires the canonical customer namespace when Dedicated RUM is enabled
+    template: templates/frontend.yaml
+    set:
+      global.datadog.rum.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: global.extraEnv.TAG_CUSTOMER_NS must be a lowercase customer namespace when Dedicated RUM is enabled
+
+  - it: rejects a non-boolean enable value
+    template: templates/frontend.yaml
+    set:
+      global.datadog.rum.enabled: enabled
+    asserts:
+      - failedTemplate:
+          errorMessage: global.datadog.rum.enabled must be a boolean
+
+  - it: rejects a malformed customer namespace
+    template: templates/frontend.yaml
+    set:
+      global.extraEnv.TAG_CUSTOMER_NS: WandB_Customer
+      global.datadog.rum.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: global.extraEnv.TAG_CUSTOMER_NS must be a lowercase customer namespace when Dedicated RUM is enabled
+
+  - it: rejects a non-numeric sample rate
+    template: templates/frontend.yaml
+    set:
+      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
+      global.datadog.rum.enabled: true
+      global.datadog.rum.sessionSampleRate: invalid
+    asserts:
+      - failedTemplate:
+          errorMessage: global.datadog.rum.sessionSampleRate must be a number between 0 and 100
+
+  - it: rejects an out-of-range sample rate
+    template: templates/frontend.yaml
+    set:
+      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
+      global.datadog.rum.enabled: true
+      global.datadog.rum.sessionReplaySampleRate: 101
+    asserts:
+      - failedTemplate:
+          errorMessage: global.datadog.rum.sessionReplaySampleRate must be a number between 0 and 100
