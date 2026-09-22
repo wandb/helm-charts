@@ -171,6 +171,10 @@ resources:
 
 ### Security Contexts
 
+The default container security context drops all Linux capabilities (`capabilities.drop: [ALL]`) for application containers, init containers, and hooks that inherit it. This supports CIS Kubernetes hardening and the capabilities requirement of the Kubernetes Restricted Pod Security Standard. Upgrading to this default rolls affected workloads; validate custom images and startup scripts before production rollout.
+
+A non-empty container-specific `securityContext` replaces the default context rather than merging with it. Include `capabilities.drop: [ALL]` in such overrides to retain this protection.
+
 Security contexts can be defined at multiple levels:
 
 1. **Pod Security Context**: Applied to all containers in the pod
@@ -191,6 +195,8 @@ podSecurityContext:
 
 # Default container security context
 securityContext:
+  capabilities:
+    drop: [ALL]
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
 
@@ -198,6 +204,9 @@ securityContext:
 containers:
   app:
     securityContext:
+      capabilities:
+        drop: [ALL]
+      allowPrivilegeEscalation: false
       readOnlyRootFilesystem: false
 ```
 
