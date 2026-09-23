@@ -316,8 +316,200 @@ tests:
           content:
             name: OIDC_AUTH_METHOD
           any: true
-      - notContains:
+      - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_CORS_ORIGINS
-          any: true
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: GORILLA_CORS_ORIGINS
+                optional: true
+
+  - it: references the chart-managed ConfigMap from app
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: ""
+      global.auth.oidc.clientId: legacy-client
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_CLIENT_ID
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_CLIENT_ID
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_CLIENT_ID
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_CLIENT_ID
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_ISSUER
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_ISSUER
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_ISSUER
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_ISSUER
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_AUTH_METHOD
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_AUTH_METHOD
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_AUTH_METHOD
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_AUTH_METHOD
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_CORS_ORIGINS
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: GORILLA_CORS_ORIGINS
+
+  - it: references the chart-managed ConfigMap from api
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: ""
+      global.auth.oidc.clientId: legacy-client
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_CLIENT_ID
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_CLIENT_ID
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_CLIENT_ID
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_CLIENT_ID
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_ISSUER
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_ISSUER
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_ISSUER
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_ISSUER
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_AUTH_METHOD
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_AUTH_METHOD
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_AUTH_METHOD
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: OIDC_AUTH_METHOD
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_CORS_ORIGINS
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-oidc-configmap
+                key: GORILLA_CORS_ORIGINS
+
+  - it: preserves explicit environment override precedence in inline mode
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: ""
+      global.auth.oidc.clientId: legacy-client
+      global.env.GORILLA_OIDC_CLIENT_ID: global-client
+      global.extraEnv.GORILLA_OIDC_ISSUER: https://override.example.com
+      app.env.OIDC_AUTH_METHOD: implicit
+      app.extraEnv.GORILLA_CORS_ORIGINS: https://override-cors.example.com
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_CLIENT_ID
+            value: global-client
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_ISSUER
+            value: https://override.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_AUTH_METHOD
+            value: implicit
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_CORS_ORIGINS
+            value: https://override-cors.example.com
+
+  - it: preserves explicit environment override precedence in external mode
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+      global.auth.oidc.clientId: legacy-client
+      global.env.GORILLA_OIDC_CLIENT_ID: global-client
+      global.extraEnv.GORILLA_OIDC_ISSUER: https://override.example.com
+      app.env.OIDC_AUTH_METHOD: implicit
+      app.extraEnv.GORILLA_CORS_ORIGINS: https://override-cors.example.com
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_CLIENT_ID
+            value: global-client
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_ISSUER
+            value: https://override.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_AUTH_METHOD
+            value: implicit
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_CORS_ORIGINS
+            value: https://override-cors.example.com

@@ -553,22 +553,6 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.runUpdateShadowTopicProducer" . | quote }}
 {{- end -}}
 
-{{- define "wandb.oidcEnvs" -}}
-  {{- include "wandb.oidc.configEnvs" . }}
-  {{- if or .Values.global.auth.oidc.secret "" .Values.global.auth.oidc.oidcSecret.name }}
-- name: GORILLA_OIDC_SECRET
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "wandb.oidc.secretSecret" . | quote }}
-      key: "{{ .Values.global.auth.oidc.oidcSecret.secretKey }}"
-- name: OIDC_SECRET
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "wandb.oidc.secretSecret" . | quote }}
-      key: "{{ .Values.global.auth.oidc.oidcSecret.secretKey }}"
-  {{- end }}
-{{- end -}}
-
 {{- define "wandb.smtpEnvs" -}}
   {{- /*
     ATTENTION!

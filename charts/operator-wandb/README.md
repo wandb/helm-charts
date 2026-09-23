@@ -322,9 +322,14 @@ For production-grade implementation, the appropriate chart parameters should be 
 
 ## Customer-owned OIDC configuration
 
-By default, the chart continues to render OIDC settings from
-`global.auth.oidc.clientId`, `issuer`, and `authMethod`. To manage these settings
-outside Helm, set `global.auth.oidc.oidcConfigMap.name`:
+OIDC follows the same resource/reference pattern as the license. By default,
+Helm creates `<release>-oidc-configmap` from `global.auth.oidc.clientId`, `issuer`,
+`authMethod`, and the existing CORS inputs. App and API consume it through a
+shared reference helper; the API and local ConfigMaps contain no OIDC settings.
+
+To select an external ConfigMap instead, set `global.auth.oidc.oidcConfigMap.name`.
+The same helper selects its name and keys, and Helm stops creating the
+chart-managed OIDC ConfigMap:
 
 ```yaml
 global:
@@ -340,6 +345,10 @@ global:
 Provision the ConfigMap and, if needed, the client Secret in the release
 namespace **before** enabling this mode. The chart references these resources
 from the app and standalone API; it does not create or update their data.
+
+The chart-generated ConfigMap has the same Helm `keep` policy as the license,
+allowing a Helm upgrade to retain it when its name becomes an external
+reference. This retention policy does not configure Argo ownership or pruning.
 
 The ConfigMap must contain all four keys below. Key names can be customized
 through `clientIdKey`, `issuerKey`, `authMethodKey`, and `corsOriginsKey`.
@@ -359,8 +368,12 @@ data:
 `GORILLA_CORS_ORIGINS` is the complete comma-separated list. Preserve existing
 `app.extraCors` entries and, while OIDC is enabled, append `global.host` and
 the literal `null` origin to match the inline chart behavior. In external mode,
-Helm no longer computes this list or renders inline OIDC settings. Leftover
-inline values are ignored; migrate any explicit app/API environment overrides
+Helm no longer computes this list or renders inline OIDC settings. In inline
+mode, extra CORS origins still work with OIDC disabled; when neither is set,
+the CORS key is absent and its reference is optional, preserving application
+defaults. External references are always required.
+
+Leftover inline values are ignored in external mode; migrate explicit app/API environment overrides
 for these variables as well, since explicit environment overrides still win.
 
 Use the existing `oidcSecret` reference for credentials. If the provider does
