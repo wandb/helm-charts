@@ -1,3 +1,39 @@
+{{- $oidc := .Values.global.auth.oidc -}}
+{{- $config := include "wandb.oidc.configMap" . | fromJson -}}
+{{- if $config.external -}}
+  {{- $wouldCreateInlineSecret := and $oidc.secret (not $oidc.oidcSecret.name) -}}
+  {{- if $wouldCreateInlineSecret -}}
+    {{- fail "global.auth.oidc.oidcSecret.name is required when oidcConfigMap.name and an inline OIDC secret are set" -}}
+  {{- end -}}
+{{- else -}}
+  {{- $data := dict -}}
+  {{- $corsOrigins := list -}}
+  {{- if $config.enabled -}}
+    {{- $_ := set $data $config.clientIdKey ($oidc.clientId | toString) -}}
+    {{- $_ := set $data $config.issuerKey ($oidc.issuer | toString) -}}
+    {{- $_ := set $data $config.authMethodKey ($oidc.authMethod | toString) -}}
+    {{- $corsOrigins = list .Values.global.host "null" | compact -}}
+  {{- end -}}
+  {{- if .Values.app.extraCors -}}
+    {{- $corsOrigins = concat .Values.app.extraCors $corsOrigins | compact -}}
+  {{- end -}}
+  {{- if gt (len $corsOrigins) 0 -}}
+    {{- $_ := set $data $config.corsOriginsKey (join "," $corsOrigins) -}}
+  {{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $config.name }}
+  annotations:
+    # Retain the resource when switching to an external reference with the same name.
+    "helm.sh/resource-policy": "keep"
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  {{- $data | toYaml | nindent 2 }}
+---
+{{- end }}
+
 {{- if and .Values.global.auth.oidc.secret (not .Values.global.auth.oidc.oidcSecret.name) }}
 apiVersion: v1
 kind: Secret
