@@ -1,0 +1,52 @@
+suite: Datadog RUM container environment
+templates:
+  - charts/frontend/templates/deployment.yaml
+  - charts/app/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: supplies the namespace and RUM ConfigMap to the frontend container
+    template: charts/frontend/templates/deployment.yaml
+    set:
+      app.install: false
+      frontend.install: true
+      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
+      global.datadog.rum.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: frontend
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TAG_CUSTOMER_NS
+            value: wandb-s-perf-int
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-frontend-configmap
+
+  - it: supplies the namespace and RUM ConfigMap to the app container
+    template: charts/app/templates/deployment.yaml
+    set:
+      app.install: true
+      frontend.install: false
+      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
+      global.datadog.rum.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: app
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: TAG_CUSTOMER_NS
+            value: wandb-s-perf-int
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-frontend-configmap
