@@ -20,6 +20,21 @@ tests:
           path: data.REACT_APP_DATADOG_RUM_SESSION_REPLAY_SAMPLE_RATE
       - notExists:
           path: data.REACT_APP_DATADOG_RUM_TRACE_SAMPLE_RATE
+      - equal:
+          path: data.REACT_APP_CUSTOMER_NS
+          value: ""
+
+  - it: renders the customer namespace independently of Dedicated RUM
+    template: templates/frontend.yaml
+    documentIndex: 0
+    set:
+      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
+    asserts:
+      - equal:
+          path: data.REACT_APP_CUSTOMER_NS
+          value: wandb-s-perf-int
+      - notExists:
+          path: data.REACT_APP_DATADOG_RUM_ENABLED
 
   - it: renders the Dedicated RUM runtime settings
     template: templates/frontend.yaml
@@ -47,16 +62,9 @@ tests:
       - equal:
           path: data.REACT_APP_DATADOG_RUM_TRACE_SAMPLE_RATE
           value: "75"
-      - notExists:
+      - equal:
           path: data.REACT_APP_CUSTOMER_NS
-
-  - it: requires the canonical customer namespace when Dedicated RUM is enabled
-    template: templates/frontend.yaml
-    set:
-      global.datadog.rum.enabled: true
-    asserts:
-      - failedTemplate:
-          errorMessage: global.extraEnv.TAG_CUSTOMER_NS must be a lowercase customer namespace when Dedicated RUM is enabled
+          value: wandb-s-perf-int
 
   - it: rejects a non-boolean enable value
     template: templates/frontend.yaml
@@ -66,20 +74,10 @@ tests:
       - failedTemplate:
           errorMessage: global.datadog.rum.enabled must be a boolean
 
-  - it: rejects a malformed customer namespace
-    template: templates/frontend.yaml
-    set:
-      global.extraEnv.TAG_CUSTOMER_NS: WandB_Customer
-      global.datadog.rum.enabled: true
-    asserts:
-      - failedTemplate:
-          errorMessage: global.extraEnv.TAG_CUSTOMER_NS must be a lowercase customer namespace when Dedicated RUM is enabled
-
   - it: omits all RUM settings when explicitly disabled with retained configuration
     template: templates/frontend.yaml
     documentIndex: 0
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: false
       global.datadog.rum.profilingSampleRate: 10
       global.datadog.rum.sessionSampleRate: 90
@@ -96,12 +94,10 @@ tests:
           path: data.REACT_APP_DATADOG_RUM_SESSION_REPLAY_SAMPLE_RATE
       - notExists:
           path: data.REACT_APP_DATADOG_RUM_TRACE_SAMPLE_RATE
-
   - it: renders enabled defaults
     template: templates/frontend.yaml
     documentIndex: 0
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
     asserts:
       - equal:
@@ -124,7 +120,6 @@ tests:
     template: templates/frontend.yaml
     documentIndex: 0
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.profilingSampleRate: 0
       global.datadog.rum.sessionSampleRate: 0
@@ -151,7 +146,6 @@ tests:
     template: templates/frontend.yaml
     documentIndex: 0
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.profilingSampleRate: 100
       global.datadog.rum.sessionSampleRate: 100
@@ -174,149 +168,146 @@ tests:
           path: data.REACT_APP_DATADOG_RUM_TRACE_SAMPLE_RATE
           value: "100"
 
-  - it: preserves fractional sample rates
+  - it: rejects a fractional profilingSampleRate
     template: templates/frontend.yaml
-    documentIndex: 0
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.profilingSampleRate: 0.5
+    asserts:
+      - failedTemplate:
+          errorMessage: global.datadog.rum.profilingSampleRate must be a whole number between 0 and 100
+
+  - it: rejects a fractional sessionSampleRate
+    template: templates/frontend.yaml
+    set:
+      global.datadog.rum.enabled: true
       global.datadog.rum.sessionSampleRate: 25.5
+    asserts:
+      - failedTemplate:
+          errorMessage: global.datadog.rum.sessionSampleRate must be a whole number between 0 and 100
+
+  - it: rejects a fractional sessionReplaySampleRate
+    template: templates/frontend.yaml
+    set:
+      global.datadog.rum.enabled: true
       global.datadog.rum.sessionReplaySampleRate: 50.5
+    asserts:
+      - failedTemplate:
+          errorMessage: global.datadog.rum.sessionReplaySampleRate must be a whole number between 0 and 100
+
+  - it: rejects a fractional traceSampleRate
+    template: templates/frontend.yaml
+    set:
+      global.datadog.rum.enabled: true
       global.datadog.rum.traceSampleRate: 99.5
     asserts:
-      - equal:
-          path: data.REACT_APP_DATADOG_RUM_ENABLED
-          value: "true"
-      - equal:
-          path: data.REACT_APP_DATADOG_RUM_PROFILING_SAMPLE_RATE
-          value: "0.5"
-      - equal:
-          path: data.REACT_APP_DATADOG_RUM_SESSION_SAMPLE_RATE
-          value: "25.5"
-      - equal:
-          path: data.REACT_APP_DATADOG_RUM_SESSION_REPLAY_SAMPLE_RATE
-          value: "50.5"
-      - equal:
-          path: data.REACT_APP_DATADOG_RUM_TRACE_SAMPLE_RATE
-          value: "99.5"
+      - failedTemplate:
+          errorMessage: global.datadog.rum.traceSampleRate must be a whole number between 0 and 100
 
   - it: rejects a negative profilingSampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.profilingSampleRate: -1
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.profilingSampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.profilingSampleRate must be a whole number between 0 and 100
 
   - it: rejects an above-100 profilingSampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.profilingSampleRate: 101
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.profilingSampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.profilingSampleRate must be a whole number between 0 and 100
 
   - it: rejects a non-numeric profilingSampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.profilingSampleRate: invalid
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.profilingSampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.profilingSampleRate must be a whole number between 0 and 100
 
   - it: rejects a negative sessionSampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.sessionSampleRate: -1
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.sessionSampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.sessionSampleRate must be a whole number between 0 and 100
 
   - it: rejects an above-100 sessionSampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.sessionSampleRate: 101
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.sessionSampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.sessionSampleRate must be a whole number between 0 and 100
 
   - it: rejects a non-numeric sessionSampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.sessionSampleRate: invalid
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.sessionSampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.sessionSampleRate must be a whole number between 0 and 100
 
   - it: rejects a negative sessionReplaySampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.sessionReplaySampleRate: -1
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.sessionReplaySampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.sessionReplaySampleRate must be a whole number between 0 and 100
 
   - it: rejects an above-100 sessionReplaySampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.sessionReplaySampleRate: 101
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.sessionReplaySampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.sessionReplaySampleRate must be a whole number between 0 and 100
 
   - it: rejects a non-numeric sessionReplaySampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.sessionReplaySampleRate: invalid
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.sessionReplaySampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.sessionReplaySampleRate must be a whole number between 0 and 100
 
   - it: rejects a negative traceSampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.traceSampleRate: -1
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.traceSampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.traceSampleRate must be a whole number between 0 and 100
 
   - it: rejects an above-100 traceSampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.traceSampleRate: 101
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.traceSampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.traceSampleRate must be a whole number between 0 and 100
 
   - it: rejects a non-numeric traceSampleRate
     template: templates/frontend.yaml
     set:
-      global.extraEnv.TAG_CUSTOMER_NS: wandb-s-perf-int
       global.datadog.rum.enabled: true
       global.datadog.rum.traceSampleRate: invalid
     asserts:
       - failedTemplate:
-          errorMessage: global.datadog.rum.traceSampleRate must be a number between 0 and 100
+          errorMessage: global.datadog.rum.traceSampleRate must be a whole number between 0 and 100

@@ -1,22 +1,5 @@
+{{- include "wandb.rum.validate" . -}}
 {{- $rum := .Values.global.datadog.rum -}}
-{{- $customerNs := index .Values.global.extraEnv "TAG_CUSTOMER_NS" | default "" -}}
-{{- if not (kindIs "bool" $rum.enabled) -}}
-  {{- fail "global.datadog.rum.enabled must be a boolean" -}}
-{{- end -}}
-{{- if $rum.enabled -}}
-  {{- if not (regexMatch "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$" $customerNs) -}}
-    {{- fail "global.extraEnv.TAG_CUSTOMER_NS must be a lowercase customer namespace when Dedicated RUM is enabled" -}}
-  {{- end -}}
-  {{- range $name, $rate := dict "profilingSampleRate" $rum.profilingSampleRate "sessionReplaySampleRate" $rum.sessionReplaySampleRate "sessionSampleRate" $rum.sessionSampleRate "traceSampleRate" $rum.traceSampleRate -}}
-    {{- if not (or (kindIs "int" $rate) (kindIs "int64" $rate) (kindIs "float64" $rate)) -}}
-      {{- fail (printf "global.datadog.rum.%s must be a number between 0 and 100" $name) -}}
-    {{- end -}}
-    {{- $numericRate := float64 $rate -}}
-    {{- if or (lt $numericRate 0.0) (gt $numericRate 100.0) -}}
-      {{- fail (printf "global.datadog.rum.%s must be a number between 0 and 100" $name) -}}
-    {{- end -}}
-  {{- end -}}
-{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -45,6 +28,7 @@ data:
   SERVER_FLAG_WEAVE_1_PERCENTAGE: "100"
   WEAVE_ENABLED: "true"
   OPERATOR_ENABLED: "true"
+  REACT_APP_CUSTOMER_NS: {{ .Values.global.extraEnv.TAG_CUSTOMER_NS | default "" | quote }}
 {{- if $rum.enabled }}
   REACT_APP_DATADOG_RUM_ENABLED: "true"
   REACT_APP_DATADOG_RUM_PROFILING_SAMPLE_RATE: {{ $rum.profilingSampleRate | quote }}
