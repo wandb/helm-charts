@@ -1,0 +1,51 @@
+suite: selected environment omission
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: removes selected map environment values without affecting generated or benign values
+    set:
+      containers.app.enabled: true
+      env.RETIRED_FLAG: "true"
+      env.BENIGN_FLAG: retained
+      envOmit:
+        - RETIRED_FLAG
+      envTpls:
+        - |-
+          - name: CANONICAL_FLAG
+            value: "true"
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: RETIRED_FLAG}
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: BENIGN_FLAG, value: retained}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: CANONICAL_FLAG, value: "true"}
+
+  - it: rejects a string omission list
+    set:
+      containers.app.enabled: true
+      envOmit: RETIRED_FLAG
+    asserts:
+      - failedTemplate:
+          errorMessage: envOmit must be a list of literal environment names
+
+  - it: rejects false instead of treating it as an empty omission list
+    set:
+      containers.app.enabled: true
+      envOmit: false
+    asserts:
+      - failedTemplate:
+          errorMessage: envOmit must be a list of literal environment names
+
+  - it: rejects a map instead of treating it as an empty omission list
+    set:
+      containers.app.enabled: true
+      envOmit:
+        RETIRED_FLAG: true
+    asserts:
+      - failedTemplate:
+          errorMessage: envOmit must be a list of literal environment names
