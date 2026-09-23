@@ -221,6 +221,224 @@ the port through JSON to preserve its Helm type.
   {{- end -}}
 {{- end -}}
 
+{{/* Parse a retired boolean input without Helm truthiness or type coercion. */}}
+{{- define "wandb.mcpLegacyBool" -}}
+  {{- $normalized := "" -}}
+  {{- if kindIs "bool" .value -}}
+    {{- $normalized = ternary "true" "false" .value -}}
+  {{- else if kindIs "string" .value -}}
+    {{- $normalized = .value | trim | lower -}}
+  {{- else if has (toJson .value) (list "0" "1") -}}
+    {{- $normalized = toJson .value -}}
+  {{- else -}}
+    {{- fail (printf "%s must be true or false" .name) -}}
+  {{- end -}}
+  {{- $trueValues := list "1" "true" "yes" "on" -}}
+  {{- $falseValues := list "0" "false" "no" "off" -}}
+  {{- if not (or (has $normalized $trueValues) (has $normalized $falseValues)) -}}
+    {{- fail (printf "%s must be true or false" .name) -}}
+  {{- end -}}
+{{- dict "value" (has $normalized $trueValues) | toJson -}}
+{{- end -}}
+
+{{/*
+Resolve the narrow v0.3 -> v0.4 compatibility surface. Retired environment
+inputs are consumed here and removed by envOmit before the pod is rendered.
+The result contains only the typed selectors understood by v0.4.
+
+SCOPE NOTE: .Values is the mcp-server subchart scope.
+*/}}
+{{- define "wandb.resolveMcpCompatibility" -}}
+  {{- $env := index .Values "env" | default dict -}}
+  {{- $tools := index .Values "tools" | default dict -}}
+
+  {{- $typedProfilePresent := and (hasKey $tools "profile") (ne (toJson (index $tools "profile")) "null") -}}
+  {{- $profile := "auto" -}}
+  {{- if $typedProfilePresent -}}
+    {{- $rawProfile := index $tools "profile" -}}
+    {{- if not (kindIs "string" $rawProfile) -}}
+      {{- fail "mcp-server.tools.profile must be one of: auto, models-only, models-weave" -}}
+    {{- end -}}
+    {{- $profile = $rawProfile | trim -}}
+    {{- if not (has $profile (list "auto" "models-only" "models-weave")) -}}
+      {{- fail "mcp-server.tools.profile must be one of: auto, models-only, models-weave" -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $legacyProfile := "" -}}
+  {{- if hasKey .Values "weave" -}}
+    {{- $legacyWeave := index .Values "weave" -}}
+    {{- if eq (toJson $legacyWeave) "null" -}}
+      {{- $legacyWeave = dict -}}
+    {{- else if not (kindIs "map" $legacyWeave) -}}
+      {{- fail "mcp-server.weave must contain only the legacy tools selector" -}}
+    {{- end -}}
+    {{- range $legacyKey := keys $legacyWeave -}}
+      {{- if ne $legacyKey "tools" -}}
+        {{- fail (printf "mcp-server.weave.%s is not supported by the v0.4 compatibility bridge" $legacyKey) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if hasKey $legacyWeave "tools" -}}
+      {{- $rawLegacyTools := index $legacyWeave "tools" -}}
+      {{- $legacyModeIsAuto := and (kindIs "string" $rawLegacyTools) (eq ($rawLegacyTools | trim | lower) "auto") -}}
+      {{- if not $legacyModeIsAuto -}}
+        {{- $legacyWeaveTools := include "wandb.mcpLegacyBool" (dict "name" "mcp-server.weave.tools" "value" $rawLegacyTools) | fromJson -}}
+        {{- $legacyProfile = ternary "models-weave" "models-only" (index $legacyWeaveTools "value") -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if hasKey $env "WANDB_MCP_ENABLE_WEAVE_TOOLS" -}}
+    {{- $legacyWeaveEnv := include "wandb.mcpLegacyBool" (dict "name" "mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS" "value" (index $env "WANDB_MCP_ENABLE_WEAVE_TOOLS")) | fromJson -}}
+    {{- $envProfile := ternary "models-weave" "models-only" (index $legacyWeaveEnv "value") -}}
+    {{- if and $legacyProfile (ne $legacyProfile $envProfile) -}}
+      {{- fail "mcp-server.weave.tools conflicts with mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS" -}}
+    {{- end -}}
+    {{- $legacyProfile = $envProfile -}}
+  {{- end -}}
+  {{- if $legacyProfile -}}
+    {{- if and $typedProfilePresent (ne $profile $legacyProfile) -}}
+      {{- fail "legacy MCP Weave selection conflicts with mcp-server.tools.profile" -}}
+    {{- else if not $typedProfilePresent -}}
+      {{- $profile = $legacyProfile -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $typedAccessPresent := and (hasKey .Values "accessMode") (ne (toJson (index .Values "accessMode")) "null") -}}
+  {{- $accessMode := "read-write" -}}
+  {{- if $typedAccessPresent -}}
+    {{- $rawAccessMode := index .Values "accessMode" -}}
+    {{- if not (kindIs "string" $rawAccessMode) -}}
+      {{- fail "mcp-server.accessMode must be one of: read-write, read-only" -}}
+    {{- end -}}
+    {{- $accessMode = $rawAccessMode | trim -}}
+    {{- if not (has $accessMode (list "read-write" "read-only")) -}}
+      {{- fail "mcp-server.accessMode must be one of: read-write, read-only" -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if hasKey $env "WANDB_MCP_READ_ONLY" -}}
+    {{- $legacyReadOnly := include "wandb.mcpLegacyBool" (dict "name" "mcp-server.env.WANDB_MCP_READ_ONLY" "value" (index $env "WANDB_MCP_READ_ONLY")) | fromJson -}}
+    {{- $legacyAccessMode := ternary "read-only" "read-write" (index $legacyReadOnly "value") -}}
+    {{- if and $typedAccessPresent (ne $accessMode $legacyAccessMode) -}}
+      {{- fail "mcp-server.env.WANDB_MCP_READ_ONLY conflicts with mcp-server.accessMode" -}}
+    {{- else if not $typedAccessPresent -}}
+      {{- $accessMode = $legacyAccessMode -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- range $unsupportedName := list "WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS" "WANDB_MCP_ENABLE_ARIA_TOOLS" "WANDB_MCP_ENABLE_RAW_GRAPHQL" -}}
+    {{- if hasKey $env $unsupportedName -}}
+      {{- $unsupported := include "wandb.mcpLegacyBool" (dict "name" (printf "mcp-server.env.%s" $unsupportedName) "value" (index $env $unsupportedName)) | fromJson -}}
+      {{- if index $unsupported "value" -}}
+        {{- fail (printf "mcp-server.env.%s=true is unsupported in the Dedicated v0.4 profile" $unsupportedName) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $legacyTraceURL := "" -}}
+  {{- $legacyTraceName := "" -}}
+  {{- range $traceName := list "WF_TRACE_SERVER_URL" "WEAVE_TRACE_SERVER_URL" -}}
+    {{- if hasKey $env $traceName -}}
+      {{- $rawLegacyTraceURL := index $env $traceName -}}
+      {{- if not (kindIs "string" $rawLegacyTraceURL) -}}
+        {{- fail (printf "mcp-server.env.%s must be a string URL" $traceName) -}}
+      {{- end -}}
+      {{- $renderedLegacyTraceURL := tpl $rawLegacyTraceURL . | trim -}}
+      {{- if not $renderedLegacyTraceURL -}}
+        {{- fail (printf "mcp-server.env.%s must not be empty; omit it when no legacy trace backend is configured" $traceName) -}}
+      {{- end -}}
+      {{- if and $legacyTraceURL (ne $legacyTraceURL $renderedLegacyTraceURL) -}}
+        {{- fail (printf "mcp-server.env.%s conflicts with mcp-server.env.%s" $traceName $legacyTraceName) -}}
+      {{- end -}}
+      {{- $legacyTraceURL = $renderedLegacyTraceURL -}}
+      {{- $legacyTraceName = $traceName -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $traceBackend := index .Values "traceBackend" | default dict -}}
+  {{- $rawTypedTraceURL := "" -}}
+  {{- if hasKey $traceBackend "url" -}}
+    {{- $rawTypedTraceURL = index $traceBackend "url" -}}
+  {{- end -}}
+  {{- if not (kindIs "string" $rawTypedTraceURL) -}}
+    {{- fail "mcp-server.traceBackend.url must be an absolute HTTP(S) origin or /traces URL without credentials, query, or fragment" -}}
+  {{- end -}}
+  {{- $typedTraceURL := tpl $rawTypedTraceURL . | trim -}}
+  {{- if and $typedTraceURL $legacyTraceURL (ne $typedTraceURL $legacyTraceURL) -}}
+    {{- fail "legacy MCP trace URL conflicts with mcp-server.traceBackend.url" -}}
+  {{- end -}}
+  {{- $traceURL := $typedTraceURL -}}
+  {{- if and (not $traceURL) $legacyTraceURL -}}
+    {{- $traceURL = $legacyTraceURL -}}
+  {{- end -}}
+
+  {{- if hasKey .Values "otel" -}}
+    {{- $legacyOtel := index .Values "otel" -}}
+    {{- if eq (toJson $legacyOtel) "null" -}}
+      {{- $legacyOtel = dict -}}
+    {{- else if not (kindIs "map" $legacyOtel) -}}
+      {{- fail "mcp-server.otel is retired; only enabled=false is accepted during the v0.4 transition" -}}
+    {{- end -}}
+    {{- range $legacyKey := keys $legacyOtel -}}
+      {{- if ne $legacyKey "enabled" -}}
+        {{- fail (printf "mcp-server.otel.%s is not supported by the v0.4 compatibility bridge" $legacyKey) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if hasKey $legacyOtel "enabled" -}}
+      {{- $legacyOtelEnabled := include "wandb.mcpLegacyBool" (dict "name" "mcp-server.otel.enabled" "value" (index $legacyOtel "enabled")) | fromJson -}}
+      {{- if index $legacyOtelEnabled "value" -}}
+        {{- fail "mcp-server.otel.enabled=true is unsupported; use mcp-server.observability.provider=otel" -}}
+      {{- end -}}
+      {{- $observability := index .Values "observability" | default dict -}}
+      {{- if eq (index $observability "provider" | default "none" | toString | trim) "otel" -}}
+        {{- fail "mcp-server.otel.enabled=false conflicts with mcp-server.observability.provider=otel" -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if hasKey .Values "analytics" -}}
+    {{- $legacyAnalytics := index .Values "analytics" -}}
+    {{- if eq (toJson $legacyAnalytics) "null" -}}
+      {{- $legacyAnalytics = dict -}}
+    {{- else if not (kindIs "map" $legacyAnalytics) -}}
+      {{- fail "mcp-server.analytics is retired; only an inert compatibility block is accepted" -}}
+    {{- end -}}
+    {{- range $legacyKey := keys $legacyAnalytics -}}
+      {{- if ne $legacyKey "datadogApiKeySecret" -}}
+        {{- fail (printf "mcp-server.analytics.%s is not supported by the v0.4 compatibility bridge" $legacyKey) -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if hasKey $legacyAnalytics "datadogApiKeySecret" -}}
+      {{- $legacySecret := index $legacyAnalytics "datadogApiKeySecret" -}}
+      {{- if not (kindIs "map" $legacySecret) -}}
+        {{- fail "mcp-server.analytics is retired; only an inert compatibility block is accepted" -}}
+      {{- end -}}
+      {{- range $legacyKey := keys $legacySecret -}}
+        {{- if not (has $legacyKey (list "name" "key")) -}}
+          {{- fail (printf "mcp-server.analytics.datadogApiKeySecret.%s is not supported by the v0.4 compatibility bridge" $legacyKey) -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $legacySecretName := "" -}}
+      {{- if hasKey $legacySecret "name" -}}
+        {{- if not (kindIs "string" (index $legacySecret "name")) -}}
+          {{- fail "mcp-server.analytics is retired; only an inert compatibility block is accepted" -}}
+        {{- end -}}
+        {{- $legacySecretName = index $legacySecret "name" -}}
+      {{- end -}}
+      {{- $legacySecretKey := "api-key" -}}
+      {{- if hasKey $legacySecret "key" -}}
+        {{- if not (kindIs "string" (index $legacySecret "key")) -}}
+          {{- fail "mcp-server.analytics is retired; only an inert compatibility block is accepted" -}}
+        {{- end -}}
+        {{- $legacySecretKey = index $legacySecret "key" -}}
+      {{- end -}}
+      {{- if or (ne $legacySecretName "") (ne $legacySecretKey "api-key") -}}
+        {{- fail "mcp-server.analytics is retired; only an inert compatibility block is accepted" -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+
+{{- dict "profile" $profile "accessMode" $accessMode "traceUrl" $traceURL | toJson -}}
+{{- end -}}
+
 {{/* Map chart t-shirt sizes to the three server-owned capacity classes. */}}
 {{- define "wandb.resolveMcpCapacityClass" -}}
   {{- $size := .Values.global.size | default "default" | toString | trim | lower -}}
@@ -350,12 +568,12 @@ Resolves:
   split API / monolith Service used by backend calls.
 */}}
 {{- define "wandb.mcpEnvs" -}}
-  {{- $tools := index .Values "tools" | default dict -}}
-  {{- $profile := index $tools "profile" | default "auto" | toString | trim | lower -}}
-  {{- $accessMode := index .Values "accessMode" | default "read-write" | toString | trim | lower -}}
+  {{- $compatibility := include "wandb.resolveMcpCompatibility" . | fromJson -}}
+  {{- $profile := index $compatibility "profile" -}}
+  {{- $accessMode := index $compatibility "accessMode" -}}
   {{- $traceBackend := index .Values "traceBackend" | default dict -}}
   {{- $traceMode := index $traceBackend "mode" | default "auto" | toString | trim | lower -}}
-  {{- $explicitTraceURL := tpl (index $traceBackend "url" | default "" | toString) . | trim -}}
+  {{- $explicitTraceURL := index $compatibility "traceUrl" -}}
   {{- $hasExplicitTraceURL := ne $explicitTraceURL "" -}}
   {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
   {{- $hasTraceBackend := and (eq $traceMode "auto") (or $hasExplicitTraceURL (index $globalWeaveTrace "enabled")) -}}

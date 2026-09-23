@@ -271,6 +271,87 @@ tests:
           path: spec.template.spec.containers[0].env
           content: {name: WF_TRACE_SERVER_URL, value: https://trace.example.com/traces}
 
+  - it: translates legacy Weave and alternate trace inputs to canonical v0.4 environment
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.weave-trace.enabled: false
+      mcp-server.install: true
+      mcp-server.weave.tools: "on"
+      mcp-server.env.WEAVE_TRACE_SERVER_URL: https://legacy-trace.example.com/traces
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_TOOL_PROFILE, value: models-weave}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL, value: https://legacy-trace.example.com/traces}
+          count: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WEAVE_TRACE_SERVER_URL}
+          any: true
+
+  - it: translates legacy feature and access flags without leaking retired names
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.weave-trace.enabled: true
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS: "1"
+      mcp-server.env.WANDB_MCP_READ_ONLY: "YES"
+      mcp-server.env.WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS: "off"
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: false
+      mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL: "0"
+      mcp-server.env.CUSTOM_LOCAL_MARKER: retained
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_TOOL_PROFILE, value: models-weave}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ACCESS_MODE, value: read-only}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: CUSTOM_LOCAL_MARKER, value: retained}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_TOOLS}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_READ_ONLY}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_ARIA_TOOLS}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ENABLE_RAW_GRAPHQL}
+          any: true
+
+  - it: translates false legacy selectors to models-only read-write
+    template: charts/mcp-server/templates/deployment.yaml
+    set:
+      global.weave-trace.enabled: true
+      mcp-server.install: true
+      mcp-server.weave.tools: "no"
+      mcp-server.env.WANDB_MCP_READ_ONLY: "false"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_TOOL_PROFILE, value: models-only}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WANDB_MCP_ACCESS_MODE, value: read-write}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: WF_TRACE_SERVER_URL}
+          any: true
+
   - it: renders a templated external trace URL before emitting runtime evidence
     template: charts/mcp-server/templates/deployment.yaml
     set:

@@ -279,6 +279,20 @@ remain as a narrow, validated compatibility bridge. They cannot enable direct
 forwarding, inject credentials, or override a conflicting non-default typed
 provider. New configurations should use `observability` only.
 
+Chart 0.44.22 also consumes the retired `weave.tools`,
+`WANDB_MCP_ENABLE_WEAVE_TOOLS`, `WANDB_MCP_READ_ONLY`, `WF_TRACE_SERVER_URL`,
+and `WEAVE_TRACE_SERVER_URL` inputs when the corresponding typed selector is
+omitted. It renders only the canonical v0.4 environment. Matching old and new
+values may coexist during migration; conflicts fail the render. Retired Agent,
+ARIA, and raw GraphQL flags are accepted only when false because those profiles
+are not supported on Dedicated. The old `otel.enabled: false` and inert
+`analytics` defaults are treated as no-ops; enabled or credential-bearing forms
+must be migrated explicitly.
+
+This bridge does not select the chart. A higher-precedence User Spec or managed
+deployment pin must choose chart 0.44.22 or newer together with the compatible
+MCP image; an older chart cannot translate these inputs.
+
 The server-owned `dedicated` workload profile controls limits, admission,
 deadlines, sessions, and worker policy. Low-level environment overrides and
 opaque `envFrom` sources are rejected. MCP uses the internal ClusterIP for W&B

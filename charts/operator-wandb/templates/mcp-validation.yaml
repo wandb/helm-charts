@@ -16,6 +16,7 @@
   {{- $reservedEnvNames := include "wandb.mcpReservedEnvNames" . | fromJsonArray -}}
   {{- $reservedEnvPrefixes := list "WANDB_" "WEAVE_TRACE_" "WF_TRACE_" "WB_AGENT_" "MCP_" "MAX_" "SESSION_" "UVICORN_" "DD_" "OTEL_" -}}
   {{- $ownedBenignEnvNames := list "WANDB_SILENT" "WEAVE_SILENT" "WEAVE_DISABLED" "ENVIRONMENT" -}}
+  {{- $compatibilityEnvNames := list "WANDB_MCP_ENABLE_WEAVE_TOOLS" "WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS" "WANDB_MCP_ENABLE_ARIA_TOOLS" "WANDB_MCP_ENABLE_RAW_GRAPHQL" "WANDB_MCP_READ_ONLY" "WF_TRACE_SERVER_URL" "WEAVE_TRACE_SERVER_URL" -}}
   {{- $reservedEnvNames = concat $reservedEnvNames $ownedBenignEnvNames -}}
   {{- range $channel := list $mcpEnv $mcpExtraEnv $mcpContainerEnv -}}
     {{- range $name, $_ := $channel -}}
@@ -42,17 +43,27 @@
     {{- fail "mcp-server.image.repository must be relative when global.repositoryPrefix is configured" -}}
   {{- end -}}
 
-  {{/* Removed typed blocks fail closed instead of being silently ignored. */}}
-  {{- range $legacyKey := list "weave" "otel" "analytics" -}}
-    {{- if hasKey $mcp $legacyKey -}}
-      {{- fail (printf "mcp-server.%s is no longer supported; migrate to the typed v0.4 MCP profile interface" $legacyKey) -}}
+  {{/* Retired v0.3 inputs are translated only through the narrow helper. */}}
+  {{- $compatibility := include "wandb.resolveMcpCompatibility" (deepCopy $mcpTplContext) | fromJson -}}
+  {{- $envOmit := list -}}
+  {{- if hasKey $mcp "envOmit" -}}
+    {{- $envOmit = index $mcp "envOmit" -}}
+  {{- end -}}
+  {{- if or (not (kindIs "slice" $envOmit)) (ne (len $envOmit) (len $compatibilityEnvNames)) -}}
+    {{- fail "mcp-server.envOmit is chart-owned and must contain the exact v0.3 compatibility inputs" -}}
+  {{- end -}}
+  {{- $seenEnvOmit := dict -}}
+  {{- range $envName := $envOmit -}}
+    {{- if or (not (kindIs "string" $envName)) (not (has $envName $compatibilityEnvNames)) (hasKey $seenEnvOmit $envName) -}}
+      {{- fail "mcp-server.envOmit is chart-owned and must contain the exact v0.3 compatibility inputs" -}}
     {{- end -}}
+    {{- $_ := set $seenEnvOmit $envName true -}}
   {{- end -}}
 
   {{/* Generic environment channels cannot shadow the typed release contract. */}}
   {{- range $envName, $_ := $mcpEnv -}}
     {{- $reserved := include "wandb.isMcpReservedEnvName" (dict "name" $envName "reservedNames" $reservedEnvNames "reservedPrefixes" $reservedEnvPrefixes) -}}
-    {{- if and (eq $reserved "true") (not (has $envName $ownedBenignEnvNames)) -}}
+    {{- if and (eq $reserved "true") (not (has $envName $ownedBenignEnvNames)) (not (has $envName $compatibilityEnvNames)) -}}
       {{- fail (printf "mcp-server.env.%s is release-controlled; use the typed MCP values" $envName) -}}
     {{- end -}}
   {{- end -}}
@@ -131,27 +142,15 @@
   {{- end -}}
 
   {{/* Tool profile and access mode are the complete Dedicated product surface. */}}
-  {{- $tools := index $mcp "tools" | default dict -}}
-  {{- $rawToolProfile := index $tools "profile" | default "auto" -}}
-  {{- if not (kindIs "string" $rawToolProfile) -}}
-    {{- fail "mcp-server.tools.profile must be one of: auto, models-only, models-weave" -}}
-  {{- end -}}
-  {{- $toolProfile := $rawToolProfile | trim -}}
-  {{- if not (has $toolProfile (list "auto" "models-only" "models-weave")) -}}
-    {{- fail "mcp-server.tools.profile must be one of: auto, models-only, models-weave" -}}
-  {{- end -}}
-  {{- $rawAccessMode := index $mcp "accessMode" | default "read-write" -}}
-  {{- if not (kindIs "string" $rawAccessMode) -}}
-    {{- fail "mcp-server.accessMode must be one of: read-write, read-only" -}}
-  {{- end -}}
-  {{- $accessMode := $rawAccessMode | trim -}}
-  {{- if not (has $accessMode (list "read-write" "read-only")) -}}
-    {{- fail "mcp-server.accessMode must be one of: read-write, read-only" -}}
-  {{- end -}}
+  {{- $toolProfile := index $compatibility "profile" -}}
+  {{- $accessMode := index $compatibility "accessMode" -}}
 
   {{/* Trace availability resolves `auto`; the runtime receives an exact profile. */}}
   {{- $traceBackend := index $mcp "traceBackend" | default dict -}}
-  {{- $rawTraceMode := index $traceBackend "mode" | default "auto" -}}
+  {{- $rawTraceMode := "auto" -}}
+  {{- if hasKey $traceBackend "mode" -}}
+    {{- $rawTraceMode = index $traceBackend "mode" -}}
+  {{- end -}}
   {{- if not (kindIs "string" $rawTraceMode) -}}
     {{- fail "mcp-server.traceBackend.mode must be one of: auto, disabled" -}}
   {{- end -}}
@@ -159,12 +158,12 @@
   {{- if not (has $traceMode (list "auto" "disabled")) -}}
     {{- fail "mcp-server.traceBackend.mode must be one of: auto, disabled" -}}
   {{- end -}}
-  {{- $rawTraceURL := index $traceBackend "url" | default "" -}}
+  {{- $rawTraceURL := index $compatibility "traceUrl" -}}
   {{- $traceError := "mcp-server.traceBackend.url must be an absolute HTTP(S) origin or /traces URL without credentials, query, or fragment" -}}
   {{- if not (kindIs "string" $rawTraceURL) -}}
     {{- fail $traceError -}}
   {{- end -}}
-  {{- $traceURL := tpl $rawTraceURL (deepCopy $mcpTplContext) | trim -}}
+  {{- $traceURL := $rawTraceURL | trim -}}
   {{- $hasTraceURL := ne $traceURL "" -}}
   {{- if and (eq $traceMode "disabled") $hasTraceURL -}}
     {{- fail "mcp-server.traceBackend.url must be empty when traceBackend.mode=disabled" -}}

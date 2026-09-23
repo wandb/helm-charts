@@ -52,13 +52,13 @@ tests:
       - failedTemplate:
           errorMessage: mcp-server.envTpls entries must render a YAML array of environment maps
 
-  - it: rejects a legacy feature flag in env
+  - it: accepts the legacy Weave feature flag when its backend is available
     set:
+      global.weave-trace.enabled: true
       mcp-server.install: true
       mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS: "true"
     asserts:
-      - failedTemplate:
-          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS is release-controlled; use the typed MCP values
+      - notFailedTemplate: {}
 
   - it: rejects ARIA enablement in the Dedicated profile
     set:
@@ -66,7 +66,15 @@ tests:
       mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: "true"
     asserts:
       - failedTemplate:
-          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS is release-controlled; use the typed MCP values
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS=true is unsupported in the Dedicated v0.4 profile
+
+  - it: rejects Weave Agent enablement in the Dedicated profile
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS: "on"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS=true is unsupported in the Dedicated v0.4 profile
 
   - it: rejects raw GraphQL enablement in the Dedicated profile
     set:
@@ -74,7 +82,24 @@ tests:
       mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL: "true"
     asserts:
       - failedTemplate:
-          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL is release-controlled; use the typed MCP values
+          errorMessage: mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL=true is unsupported in the Dedicated v0.4 profile
+
+  - it: consumes disabled legacy Agent ARIA and raw GraphQL flags
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS: "OFF"
+      mcp-server.env.WANDB_MCP_ENABLE_ARIA_TOOLS: 0
+      mcp-server.env.WANDB_MCP_ENABLE_RAW_GRAPHQL: "no"
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an unknown legacy boolean token
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_READ_ONLY: sometimes
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_READ_ONLY must be true or false
 
   - it: rejects the new selector in generic env
     set:
@@ -107,6 +132,14 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: mcp-server.extraEnv cannot set release-controlled MCP variable WANDB_INTERNAL_BASE_URL
+
+  - it: accepts compatibility inputs only from the root MCP environment
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.WANDB_MCP_READ_ONLY: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.extraEnv cannot set release-controlled MCP variable WANDB_MCP_READ_ONLY
 
   - it: rejects generated profile values in the container environment
     set:
@@ -219,13 +252,53 @@ tests:
       - failedTemplate:
           errorMessage: mcp-server.sizing.medium.env is unsupported; the server-owned capacity class controls runtime policy
 
-  - it: rejects the removed Weave feature interface
+  - it: translates the legacy Weave feature interface
     set:
+      global.weave-trace.enabled: true
       mcp-server.install: true
-      mcp-server.weave.tools: "true"
+      mcp-server.weave.tools: "YES"
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects conflicting legacy Weave selectors
+    set:
+      global.weave-trace.enabled: true
+      mcp-server.install: true
+      mcp-server.weave.tools: true
+      mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS: "false"
     asserts:
       - failedTemplate:
-          errorMessage: mcp-server.weave is no longer supported; migrate to the typed v0.4 MCP profile interface
+          errorMessage: mcp-server.weave.tools conflicts with mcp-server.env.WANDB_MCP_ENABLE_WEAVE_TOOLS
+
+  - it: rejects a typed profile that conflicts with a legacy selector
+    set:
+      global.weave-trace.enabled: true
+      mcp-server.install: true
+      mcp-server.tools.profile: auto
+      mcp-server.weave.tools: true
+    asserts:
+      - failedTemplate:
+          errorMessage: legacy MCP Weave selection conflicts with mcp-server.tools.profile
+
+  - it: accepts matching typed and legacy selectors during migration
+    set:
+      global.weave-trace.enabled: true
+      mcp-server.install: true
+      mcp-server.tools.profile: models-weave
+      mcp-server.weave.tools: "on"
+      mcp-server.accessMode: read-only
+      mcp-server.env.WANDB_MCP_READ_ONLY: "1"
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects conflicting typed and legacy access modes
+    set:
+      mcp-server.install: true
+      mcp-server.accessMode: read-write
+      mcp-server.env.WANDB_MCP_READ_ONLY: true
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_READ_ONLY conflicts with mcp-server.accessMode
 
   - it: preserves the current Managed Spec Datadog compatibility input
     set:
@@ -269,6 +342,50 @@ tests:
       mcp-server.privacy.logLevel: standard
     asserts:
       - notFailedTemplate: {}
+
+  - it: accepts the inert legacy OTEL and analytics defaults
+    set:
+      mcp-server.install: true
+      mcp-server.otel.enabled: false
+      mcp-server.analytics.datadogApiKeySecret.name: ""
+      mcp-server.analytics.datadogApiKeySecret.key: api-key
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects active legacy OTEL configuration
+    set:
+      mcp-server.install: true
+      mcp-server.otel.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.otel.enabled=true is unsupported; use mcp-server.observability.provider=otel
+
+  - it: rejects an explicit legacy OTEL disable with the typed provider
+    set:
+      mcp-server.install: true
+      mcp-server.otel.enabled: false
+      mcp-server.observability.provider: otel
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.otel.enabled=false conflicts with mcp-server.observability.provider=otel
+
+  - it: rejects credential-bearing legacy analytics configuration
+    set:
+      mcp-server.install: true
+      mcp-server.analytics.datadogApiKeySecret.name: legacy-datadog-key
+      mcp-server.analytics.datadogApiKeySecret.key: api-key
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.analytics is retired; only an inert compatibility block is accepted
+
+  - it: rejects changes to the chart-owned compatibility omission list
+    set:
+      mcp-server.install: true
+      mcp-server.envOmit:
+        - WANDB_MCP_ENABLE_WEAVE_TOOLS
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.envOmit is chart-owned and must contain the exact v0.3 compatibility inputs
 
   - it: accepts the three Dedicated tool selectors
     set:
@@ -334,13 +451,52 @@ tests:
       mcp-server.traceBackend.url: https://user:secret@trace.example.com
     asserts: *unsafe_trace_url
 
-  - it: rejects the legacy trace URL environment path
+  - it: translates the legacy trace URL environment path
     set:
       mcp-server.install: true
       mcp-server.env.WF_TRACE_SERVER_URL: https://trace.example.com
     asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts equal legacy trace URL aliases
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: https://trace.example.com/traces
+      mcp-server.env.WEAVE_TRACE_SERVER_URL: https://trace.example.com/traces
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects conflicting legacy trace URL aliases
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: https://trace-a.example.com
+      mcp-server.env.WEAVE_TRACE_SERVER_URL: https://trace-b.example.com
+    asserts:
       - failedTemplate:
-          errorMessage: mcp-server.env.WF_TRACE_SERVER_URL is release-controlled; use the typed MCP values
+          errorMessage: mcp-server.env.WEAVE_TRACE_SERVER_URL conflicts with mcp-server.env.WF_TRACE_SERVER_URL
+
+  - it: rejects a legacy trace URL conflicting with the typed URL
+    set:
+      mcp-server.install: true
+      mcp-server.traceBackend.url: https://typed.example.com
+      mcp-server.env.WF_TRACE_SERVER_URL: https://legacy.example.com
+    asserts:
+      - failedTemplate:
+          errorMessage: legacy MCP trace URL conflicts with mcp-server.traceBackend.url
+
+  - it: rejects an empty legacy trace URL instead of guessing
+    set:
+      mcp-server.install: true
+      mcp-server.env.WF_TRACE_SERVER_URL: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WF_TRACE_SERVER_URL must not be empty; omit it when no legacy trace backend is configured
+
+  - it: validates a translated legacy trace URL
+    set:
+      mcp-server.install: true
+      mcp-server.env.WEAVE_TRACE_SERVER_URL: ftp://trace.example.com
+    asserts: *unsafe_trace_url
 
   - it: accepts a templated external trace URL in MCP subchart scope
     set:

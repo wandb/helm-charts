@@ -16,14 +16,19 @@ class OperatorMcpSchemaTest(unittest.TestCase):
     def test_dedicated_tool_profiles_are_exact(self) -> None:
         self.assertEqual(
             self.mcp["tools"]["properties"]["profile"]["enum"],
-            ["auto", "models-only", "models-weave"],
+            [None, "auto", "models-only", "models-weave"],
+        )
+        self.assertEqual(
+            self.mcp["tools"]["properties"]["profile"]["type"],
+            ["string", "null"],
         )
 
     def test_access_and_observability_are_typed(self) -> None:
         self.assertEqual(
             self.mcp["accessMode"]["enum"],
-            ["read-write", "read-only"],
+            [None, "read-write", "read-only"],
         )
+        self.assertEqual(self.mcp["accessMode"]["type"], ["string", "null"])
         self.assertEqual(
             self.mcp["observability"]["properties"]["provider"]["enum"],
             ["none", "datadog-agent", "otel"],

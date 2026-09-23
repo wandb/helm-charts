@@ -3728,6 +3728,9 @@ weave:
 ## runtime evidence. Dedicated v0.4 supports Models-only (17 read-write tools)
 ## and classic Weave (22 read-write tools). Weave Agent, ARIA, and raw GraphQL
 ## profiles are intentionally unavailable from this chart.
+## Chart 0.44.22 temporarily translates the unambiguous v0.3 `weave.tools`,
+## feature/read-only environment flags, and trace URL environment inputs when
+## the matching typed value is omitted. Conflicts fail instead of guessing.
 ## Disabled by default. Enable with: mcp-server.install: true
 ## Docs: https://github.com/wandb/wandb-mcp-server
 mcp-server:
@@ -3744,9 +3747,14 @@ mcp-server:
     ## - models-only: 17 read-write / 15 read-only tools.
     ## - models-weave: 22 read-write / 20 read-only tools; requires a trace
     ##   backend selected below.
-    profile: auto
+    ## Null means the typed selector was not supplied, allowing the temporary
+    ## v0.3 compatibility bridge to translate an unambiguous legacy selector.
+    ## It otherwise resolves exactly like auto.
+    profile: null
   ## Controls write-capable tool registration without changing the tool profile.
-  accessMode: read-write
+  ## Null defaults to read-write and lets the transition bridge distinguish an
+  ## omitted selector from an explicit typed value.
+  accessMode: null
   traceBackend:
     ## `auto` uses either url or the topology flag global.weave-trace.enabled.
     ## `disabled` forbids the trace URL and models-weave profile.
@@ -3863,6 +3871,16 @@ mcp-server:
   globalOptOut:
     env: true
   envFrom: {}
+  ## Chart-owned list of retired v0.3 inputs consumed by the compatibility
+  ## bridge. They are removed before canonical v0.4 environment is rendered.
+  envOmit:
+    - WANDB_MCP_ENABLE_WEAVE_TOOLS
+    - WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS
+    - WANDB_MCP_ENABLE_ARIA_TOOLS
+    - WANDB_MCP_ENABLE_RAW_GRAPHQL
+    - WANDB_MCP_READ_ONLY
+    - WF_TRACE_SERVER_URL
+    - WEAVE_TRACE_SERVER_URL
   envTpls:
     - '{{ include "wandb.mcpEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
