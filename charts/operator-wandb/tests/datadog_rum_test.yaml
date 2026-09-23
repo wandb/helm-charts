@@ -36,6 +36,38 @@ tests:
       - notExists:
           path: data.REACT_APP_DATADOG_RUM_ENABLED
 
+  - it: renders the customer namespace from global.env
+    template: templates/frontend.yaml
+    documentIndex: 0
+    set:
+      global.env.TAG_CUSTOMER_NS: env-customer
+    asserts:
+      - equal:
+          path: data.REACT_APP_CUSTOMER_NS
+          value: env-customer
+
+  - it: prefers global.env over global.extraEnv for the customer namespace
+    template: templates/frontend.yaml
+    documentIndex: 0
+    set:
+      global.extraEnv.TAG_CUSTOMER_NS: extra-env-customer
+      global.env.TAG_CUSTOMER_NS: env-customer
+    asserts:
+      - equal:
+          path: data.REACT_APP_CUSTOMER_NS
+          value: env-customer
+
+  - it: allows global.env to explicitly clear the customer namespace
+    template: templates/frontend.yaml
+    documentIndex: 0
+    set:
+      global.extraEnv.TAG_CUSTOMER_NS: extra-env-customer
+      global.env.TAG_CUSTOMER_NS: ""
+    asserts:
+      - equal:
+          path: data.REACT_APP_CUSTOMER_NS
+          value: ""
+
   - it: renders the Dedicated RUM runtime settings
     template: templates/frontend.yaml
     documentIndex: 0

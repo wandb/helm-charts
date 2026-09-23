@@ -1,3 +1,14 @@
+{{/* An explicitly configured global.env namespace takes precedence, including an empty string. */}}
+{{- define "wandb.rum.customerNamespace" -}}
+  {{- $extraEnv := .Values.global.extraEnv | default dict -}}
+  {{- $env := .Values.global.env | default dict -}}
+  {{- if hasKey $env "TAG_CUSTOMER_NS" -}}
+    {{- index $env "TAG_CUSTOMER_NS" | default "" -}}
+  {{- else -}}
+    {{- index $extraEnv "TAG_CUSTOMER_NS" | default "" -}}
+  {{- end -}}
+{{- end -}}
+
 {{- define "wandb.rum.validate" -}}
   {{- $rum := .Values.global.datadog.rum -}}
   {{- if not (kindIs "bool" $rum.enabled) -}}
