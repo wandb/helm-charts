@@ -59,6 +59,23 @@
         {{- end -}}
       {{- end -}}
 
+      {{- /* Remove explicitly named compatibility inputs after every map-based
+             environment channel has been merged. The caller owns this list;
+             generated envTpls remain available to emit canonical replacements. */ -}}
+      {{- $envOmit := list -}}
+      {{- if hasKey $.root.Values "envOmit" -}}
+        {{- $envOmit = index $.root.Values "envOmit" -}}
+      {{- end -}}
+      {{- if not (kindIs "slice" $envOmit) -}}
+        {{- fail "envOmit must be a list of literal environment names" -}}
+      {{- end -}}
+      {{- range $envName := $envOmit -}}
+        {{- if or (not (kindIs "string" $envName)) (not (regexMatch `^[A-Za-z_][A-Za-z0-9_]*$` $envName)) -}}
+          {{- fail "envOmit must be a list of literal environment names" -}}
+        {{- end -}}
+        {{- $_ = unset $container.env $envName -}}
+      {{- end -}}
+
       {{- /* Render shared and container-specific env templates. */ -}}
       {{- $envTpls := list }}
       {{- if $.root.Values.envTpls -}}
