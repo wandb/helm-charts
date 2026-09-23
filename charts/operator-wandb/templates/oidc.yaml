@@ -1,3 +1,15 @@
+{{- $oidc := .Values.global.auth.oidc -}}
+{{- $config := $oidc.oidcConfigMap | default dict -}}
+{{- if $config.name -}}
+  {{- range $key := list "clientIdKey" "issuerKey" "authMethodKey" "corsOriginsKey" -}}
+    {{- $_ := required (printf "global.auth.oidc.oidcConfigMap.%s is required when oidcConfigMap.name is set" $key) (index $config $key) -}}
+  {{- end -}}
+  {{- $wouldCreateInlineSecret := and $oidc.secret (not $oidc.oidcSecret.name) -}}
+  {{- if $wouldCreateInlineSecret -}}
+    {{- fail "global.auth.oidc.oidcSecret.name is required when oidcConfigMap.name and an inline OIDC secret are set" -}}
+  {{- end -}}
+{{- end -}}
+
 {{- if and .Values.global.auth.oidc.secret (not .Values.global.auth.oidc.oidcSecret.name) }}
 apiVersion: v1
 kind: Secret
