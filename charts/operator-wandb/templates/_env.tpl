@@ -554,6 +554,7 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.oidcEnvs" -}}
+  {{- include "wandb.oidc.configEnvs" . }}
   {{- if or .Values.global.auth.oidc.secret "" .Values.global.auth.oidc.oidcSecret.name }}
 - name: GORILLA_OIDC_SECRET
   valueFrom:

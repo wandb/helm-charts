@@ -1,0 +1,148 @@
+suite: OIDC configuration ownership
+templates:
+  - api.yaml
+  - local.yaml
+  - oidc.yaml
+release:
+  name: wandb
+set:
+  app.internalJWTMap: null
+  global.host: https://wandb.example.com
+  global.auth.oidc.clientId: legacy-client
+  global.auth.oidc.issuer: https://idp.example.com
+  global.auth.oidc.authMethod: pkce
+  app.extraCors:
+    - https://extra.example.com
+tests:
+  - it: preserves inline API configuration and CORS
+    template: api.yaml
+    asserts:
+      - equal:
+          path: data.GORILLA_OIDC_CLIENT_ID
+          value: legacy-client
+      - equal:
+          path: data.GORILLA_OIDC_ISSUER
+          value: https://idp.example.com
+      - equal:
+          path: data.GORILLA_AUTH_METHOD
+          value: pkce
+      - equal:
+          path: data.GORILLA_CORS_ORIGINS
+          value: https://extra.example.com,https://wandb.example.com,null
+
+  - it: preserves inline local configuration
+    template: local.yaml
+    asserts:
+      - equal:
+          path: data.OIDC_CLIENT_ID
+          value: legacy-client
+      - equal:
+          path: data.OIDC_ISSUER
+          value: https://idp.example.com
+      - equal:
+          path: data.OIDC_AUTH_METHOD
+          value: pkce
+
+  - it: preserves extra CORS origins without inline OIDC
+    template: api.yaml
+    set:
+      global.auth.oidc.clientId: ""
+    asserts:
+      - equal:
+          path: data.GORILLA_CORS_ORIGINS
+          value: https://extra.example.com
+      - notExists:
+          path: data.GORILLA_OIDC_CLIENT_ID
+
+  - it: omits inline API OIDC and CORS when external configuration is selected
+    template: api.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+    asserts:
+      - notExists:
+          path: data.GORILLA_OIDC_CLIENT_ID
+      - notExists:
+          path: data.GORILLA_OIDC_ISSUER
+      - notExists:
+          path: data.GORILLA_AUTH_METHOD
+      - notExists:
+          path: data.GORILLA_CORS_ORIGINS
+
+  - it: omits inline local OIDC when external configuration is selected
+    template: local.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+    asserts:
+      - notExists:
+          path: data.OIDC_CLIENT_ID
+      - notExists:
+          path: data.OIDC_ISSUER
+      - notExists:
+          path: data.OIDC_AUTH_METHOD
+
+  - it: preserves the legacy chart-managed client secret
+    template: oidc.yaml
+    set:
+      global.auth.oidc.secret: legacy-secret
+    asserts:
+      - equal:
+          path: metadata.name
+          value: wandb-oidc-secret
+      - equal:
+          path: data.OIDC_SECRET
+          value: bGVnYWN5LXNlY3JldA==
+
+  - it: renders no OIDC resource when the customer owns configuration and credentials
+    template: oidc.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+      global.auth.oidc.oidcSecret.name: customer-oidc-secret
+      global.auth.oidc.secret: ignored-legacy-secret
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: refuses a chart-managed client secret in external configuration mode
+    template: oidc.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+      global.auth.oidc.secret: legacy-secret
+    asserts:
+      - failedTemplate:
+          errorMessage: global.auth.oidc.oidcSecret.name is required when oidcConfigMap.name and an inline OIDC secret are set
+
+  - it: requires a nonempty external clientIdKey
+    template: oidc.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+      global.auth.oidc.oidcConfigMap.clientIdKey: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: global.auth.oidc.oidcConfigMap.clientIdKey is required when oidcConfigMap.name is set
+
+  - it: requires a nonempty external issuerKey
+    template: oidc.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+      global.auth.oidc.oidcConfigMap.issuerKey: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: global.auth.oidc.oidcConfigMap.issuerKey is required when oidcConfigMap.name is set
+
+  - it: requires a nonempty external authMethodKey
+    template: oidc.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+      global.auth.oidc.oidcConfigMap.authMethodKey: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: global.auth.oidc.oidcConfigMap.authMethodKey is required when oidcConfigMap.name is set
+
+  - it: requires a nonempty external corsOriginsKey
+    template: oidc.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+      global.auth.oidc.oidcConfigMap.corsOriginsKey: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: global.auth.oidc.oidcConfigMap.corsOriginsKey is required when oidcConfigMap.name is set
