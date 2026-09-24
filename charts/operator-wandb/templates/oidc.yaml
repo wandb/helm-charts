@@ -1,14 +1,12 @@
 {{- $oidc := .Values.global.auth.oidc -}}
-{{- $config := include "wandb.oidc.configMap" . | fromJson -}}
-{{- if $config.external -}}
-  {{- $wouldCreateInlineSecret := and $oidc.secret (not $oidc.oidcSecret.name) -}}
-  {{- if $wouldCreateInlineSecret -}}
-    {{- fail "global.auth.oidc.oidcSecret.name is required when oidcConfigMap.name and an inline OIDC secret are set" -}}
-  {{- end -}}
-{{- else -}}
+{{- if not $oidc.oidcConfigMap.name -}}
   {{- $data := dict -}}
   {{- $corsOrigins := list -}}
-  {{- if $config.enabled -}}
+  {{- if $oidc.clientId -}}
+    {{- $_ := set $data "GORILLA_OIDC_CLIENT_ID" ($oidc.clientId | toString) -}}
+    {{- $_ := set $data "GORILLA_OIDC_ISSUER" ($oidc.issuer | toString) -}}
+    {{- $_ := set $data "GORILLA_AUTH_METHOD" ($oidc.authMethod | toString) -}}
+    {{- /* Retain the environment names used by existing app versions. */ -}}
     {{- $_ := set $data "OIDC_CLIENT_ID" ($oidc.clientId | toString) -}}
     {{- $_ := set $data "OIDC_ISSUER" ($oidc.issuer | toString) -}}
     {{- $_ := set $data "OIDC_AUTH_METHOD" ($oidc.authMethod | toString) -}}
@@ -23,7 +21,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $config.name }}
+  name: {{ include "wandb.oidc.configMapName" . }}
   annotations:
     # Retain the resource when switching to an external reference with the same name.
     "helm.sh/resource-policy": "keep"
