@@ -1,5 +1,5 @@
 {{/*
-Select the OIDC ConfigMap and keys, matching the license resource/reference pattern.
+Select the OIDC ConfigMap, matching the license resource/reference pattern.
 The external resource is never read or rendered by Helm.
 */}}
 {{- define "wandb.oidc.configMap" -}}
@@ -10,18 +10,6 @@ The external resource is never read or rendered by Helm.
   "name" (default (printf "%s-oidc-configmap" .Release.Name) $config.name)
   "external" $external
   "enabled" (or $external (ne $oidc.clientId "")) -}}
-  {{- $defaults := dict
-  "clientIdKey" "OIDC_CLIENT_ID"
-  "issuerKey" "OIDC_ISSUER"
-  "authMethodKey" "OIDC_AUTH_METHOD"
-  "corsOriginsKey" "GORILLA_CORS_ORIGINS" -}}
-  {{- range $field, $default := $defaults -}}
-    {{- $key := default $default (index $config $field) -}}
-    {{- if $external -}}
-      {{- $key = required (printf "global.auth.oidc.oidcConfigMap.%s is required when oidcConfigMap.name is set" $field) (index $config $field) -}}
-    {{- end -}}
-    {{- $_ := set $source $field $key -}}
-  {{- end -}}
   {{- $source | toJson -}}
 {{- end -}}
 
@@ -36,15 +24,15 @@ that key, but an absent key must preserve the application's default origins.
 */}}
 {{- define "wandb.oidcEnvs" -}}
   {{- $config := include "wandb.oidc.configMap" . | fromJson -}}
-  {{- $keys := dict "GORILLA_CORS_ORIGINS" $config.corsOriginsKey -}}
+  {{- $keys := dict "GORILLA_CORS_ORIGINS" "GORILLA_CORS_ORIGINS" -}}
   {{- if $config.enabled -}}
     {{- $keys = merge $keys (dict
-    "GORILLA_OIDC_CLIENT_ID" $config.clientIdKey
-    "OIDC_CLIENT_ID" $config.clientIdKey
-    "GORILLA_OIDC_ISSUER" $config.issuerKey
-    "OIDC_ISSUER" $config.issuerKey
-    "GORILLA_AUTH_METHOD" $config.authMethodKey
-    "OIDC_AUTH_METHOD" $config.authMethodKey) -}}
+    "GORILLA_OIDC_CLIENT_ID" "OIDC_CLIENT_ID"
+    "OIDC_CLIENT_ID" "OIDC_CLIENT_ID"
+    "GORILLA_OIDC_ISSUER" "OIDC_ISSUER"
+    "OIDC_ISSUER" "OIDC_ISSUER"
+    "GORILLA_AUTH_METHOD" "OIDC_AUTH_METHOD"
+    "OIDC_AUTH_METHOD" "OIDC_AUTH_METHOD") -}}
   {{- end -}}
   {{- range $name, $key := $keys }}
 - name: {{ $name }}

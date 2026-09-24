@@ -57,22 +57,6 @@ tests:
           path: data
           value: {}
 
-  - it: honors custom keys in the chart-managed ConfigMap
-    template: oidc.yaml
-    set:
-      global.auth.oidc.oidcConfigMap.clientIdKey: client-id
-      global.auth.oidc.oidcConfigMap.issuerKey: issuer
-      global.auth.oidc.oidcConfigMap.authMethodKey: method
-      global.auth.oidc.oidcConfigMap.corsOriginsKey: cors
-    asserts:
-      - equal:
-          path: data
-          value:
-            client-id: legacy-client
-            issuer: https://idp.example.com
-            method: pkce
-            cors: https://extra.example.com,https://wandb.example.com,null
-
   - it: omits OIDC and CORS from the API ConfigMap in inline mode
     template: api.yaml
     asserts:
@@ -154,39 +138,3 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: global.auth.oidc.oidcSecret.name is required when oidcConfigMap.name and an inline OIDC secret are set
-
-  - it: requires a nonempty external clientIdKey
-    template: oidc.yaml
-    set:
-      global.auth.oidc.oidcConfigMap.name: customer-oidc
-      global.auth.oidc.oidcConfigMap.clientIdKey: ""
-    asserts:
-      - failedTemplate:
-          errorMessage: global.auth.oidc.oidcConfigMap.clientIdKey is required when oidcConfigMap.name is set
-
-  - it: requires a nonempty external issuerKey
-    template: oidc.yaml
-    set:
-      global.auth.oidc.oidcConfigMap.name: customer-oidc
-      global.auth.oidc.oidcConfigMap.issuerKey: ""
-    asserts:
-      - failedTemplate:
-          errorMessage: global.auth.oidc.oidcConfigMap.issuerKey is required when oidcConfigMap.name is set
-
-  - it: requires a nonempty external authMethodKey
-    template: oidc.yaml
-    set:
-      global.auth.oidc.oidcConfigMap.name: customer-oidc
-      global.auth.oidc.oidcConfigMap.authMethodKey: ""
-    asserts:
-      - failedTemplate:
-          errorMessage: global.auth.oidc.oidcConfigMap.authMethodKey is required when oidcConfigMap.name is set
-
-  - it: requires a nonempty external corsOriginsKey
-    template: oidc.yaml
-    set:
-      global.auth.oidc.oidcConfigMap.name: customer-oidc
-      global.auth.oidc.oidcConfigMap.corsOriginsKey: ""
-    asserts:
-      - failedTemplate:
-          errorMessage: global.auth.oidc.oidcConfigMap.corsOriginsKey is required when oidcConfigMap.name is set
