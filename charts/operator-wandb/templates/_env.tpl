@@ -162,15 +162,17 @@ Global values will override any chart-specific values.
           ...
   */ -}}
 
-  {{- if kindIs "map" .Values.global.mysql.password }}
+  {{- if not .Values.global.mysql.rdsIamAuth }}
+    {{- if kindIs "map" .Values.global.mysql.password }}
 - name: MYSQL_PASSWORD
 {{- toYaml .Values.global.mysql.password | nindent 2 }}
-  {{- else }}
+    {{- else }}
 - name: MYSQL_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.mysql.passwordSecret" . | quote}}
       key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+    {{- end }}
   {{- end }}
 
   {{- if kindIs "map" .Values.global.mysql.port }}
