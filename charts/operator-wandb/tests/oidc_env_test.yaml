@@ -1,0 +1,343 @@
+suite: OIDC ConfigMap selection and compatible Secret references
+templates:
+  - charts/app/templates/deployment.yaml
+  - charts/api/templates/deployment.yaml
+release:
+  name: wandb
+set:
+  global.api.enabled: true
+  global.auth.oidc.oidcConfigMap.name: customer-oidc
+  global.auth.oidc.oidcSecret.name: customer-oidc-secret
+tests:
+  - it: imports the external ConfigMap and preserves Secret references in api
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: customer-oidc
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_CLIENT_ID
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_ISSUER
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_AUTH_METHOD
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_CORS_ORIGINS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_CLIENT_ID
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_ISSUER
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_AUTH_METHOD
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: OIDC_SECRET
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: OIDC_SECRET
+
+  - it: imports the external ConfigMap and preserves Secret references in app
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: customer-oidc
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_CLIENT_ID
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_ISSUER
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_AUTH_METHOD
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_CORS_ORIGINS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_CLIENT_ID
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_ISSUER
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_AUTH_METHOD
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: OIDC_SECRET
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: OIDC_SECRET
+
+  - it: uses inline settings when no external ConfigMap is selected
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: ""
+      global.auth.oidc.oidcSecret.name: ""
+      global.auth.oidc.clientId: legacy-client
+      global.auth.oidc.secret: legacy-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-oidc-configmap
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+
+  - it: references the empty generated ConfigMap when OIDC is unset
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: ""
+      global.auth.oidc.oidcSecret.name: ""
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-oidc-configmap
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+          any: true
+
+  - it: supports external OIDC without a client secret
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcSecret.name: ""
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: customer-oidc
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+          any: true
+
+  - it: supports external credentials with chart-managed configuration
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: ""
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-oidc-configmap
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: OIDC_SECRET
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: OIDC_SECRET
+
+  - it: imports OIDC resources with the legacy app disabled
+    template: charts/api/templates/deployment.yaml
+    set:
+      app.install: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: customer-oidc
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: OIDC_SECRET
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: OIDC_SECRET
+
+  - it: preserves explicit environment overrides alongside imported OIDC settings
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.env.GORILLA_OIDC_CLIENT_ID: global-client
+      api.env.GORILLA_OIDC_ISSUER: https://override.example.com
+      api.extraEnv.GORILLA_AUTH_METHOD: implicit
+      api.env.GORILLA_OIDC_SECRET: explicit-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: customer-oidc
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_CLIENT_ID
+            value: global-client
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_ISSUER
+            value: https://override.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_AUTH_METHOD
+            value: implicit
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            value: explicit-secret
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: OIDC_SECRET
+
+  - it: preserves the existing external Secret key option in api
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcSecret.secretKey: client-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: client-secret
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: client-secret
+
+  - it: preserves the existing external Secret key option in app
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcSecret.secretKey: client-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: client-secret
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: customer-oidc-secret
+                key: client-secret
