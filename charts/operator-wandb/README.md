@@ -328,7 +328,7 @@ Helm creates `<release>-oidc-configmap` from `global.auth.oidc.clientId`, `issue
 shared reference helper; the API and local ConfigMaps contain no OIDC settings.
 
 To select an external ConfigMap instead, set `global.auth.oidc.oidcConfigMap.name`.
-The same helper selects its name and keys, and Helm stops creating the
+The same helper selects its name, and Helm stops creating the
 chart-managed OIDC ConfigMap:
 
 ```yaml
@@ -350,8 +350,8 @@ The chart-generated ConfigMap has the same Helm `keep` policy as the license,
 allowing a Helm upgrade to retain it when its name becomes an external
 reference. This retention policy does not configure Argo ownership or pruning.
 
-The ConfigMap must contain all four keys below. Key names can be customized
-through `clientIdKey`, `issuerKey`, `authMethodKey`, and `corsOriginsKey`.
+The ConfigMap must contain all four fixed keys below. Only their values vary
+between deployments.
 
 ```yaml
 apiVersion: v1
