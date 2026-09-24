@@ -1,0 +1,19 @@
+# One-time setup (e.g., install system tools, global CLIs).
+initialize: |
+  # Linuxbrew is pre-installed; install Helm, chart-testing (ct), yamllint, kind.
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+  brew install helm chart-testing yamllint kind
+  echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> $ENVRC
+# Install project dependencies (runs during builds, surfaced to agent at session start).
+maintenance: |
+  # Pull subchart dependencies (recursive `helm dep build`).
+  ./helm-dep-build.sh
+knowledge:
+  - name: lint
+    contents: |
+      ct lint --config ct.yaml --all
+  - name: notes
+    contents: |
+      # Helm dep build adds the stakater chart repo defined in ct.yaml.
+      # Snapshot/install tests need a local Kind cluster (see DEVELOPERS.md):
+      #   ./setup-dev-cluster.sh && ./snapshots.sh build && ./snapshots.sh run
