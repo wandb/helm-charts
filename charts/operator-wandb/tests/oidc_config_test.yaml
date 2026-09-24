@@ -1,0 +1,186 @@
+suite: OIDC configuration ownership
+templates:
+  - api.yaml
+  - local.yaml
+  - oidc.yaml
+release:
+  name: wandb
+set:
+  app.internalJWTMap: null
+  global.host: https://wandb.example.com
+  global.auth.oidc.clientId: legacy-client
+  global.auth.oidc.issuer: https://idp.example.com
+  global.auth.oidc.authMethod: pkce
+  app.extraCors:
+    - https://extra.example.com
+tests:
+  - it: renders inline settings and CORS in the dedicated OIDC ConfigMap
+    template: oidc.yaml
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: wandb-oidc-configmap
+      - equal:
+          path: data
+          value:
+            GORILLA_OIDC_CLIENT_ID: legacy-client
+            GORILLA_OIDC_ISSUER: https://idp.example.com
+            GORILLA_AUTH_METHOD: pkce
+            GORILLA_CORS_ORIGINS: https://extra.example.com,https://wandb.example.com,null
+            OIDC_CLIENT_ID: legacy-client
+            OIDC_ISSUER: https://idp.example.com
+            OIDC_AUTH_METHOD: pkce
+
+  - it: retains the generated ConfigMap when ownership moves outside Helm
+    template: oidc.yaml
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+
+  - it: preserves extra CORS origins without enabling inline OIDC
+    template: oidc.yaml
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    set:
+      global.auth.oidc.clientId: ""
+    asserts:
+      - equal:
+          path: data
+          value:
+            GORILLA_CORS_ORIGINS: https://extra.example.com
+
+  - it: leaves absent OIDC and CORS settings unset
+    template: oidc.yaml
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    set:
+      global.auth.oidc.clientId: ""
+      app.extraCors: []
+    asserts:
+      - equal:
+          path: data
+          value: {}
+
+  - it: omits OIDC and CORS from the API ConfigMap in inline mode
+    template: api.yaml
+    asserts:
+      - notExists:
+          path: data.GORILLA_OIDC_CLIENT_ID
+      - notExists:
+          path: data.GORILLA_OIDC_ISSUER
+      - notExists:
+          path: data.GORILLA_AUTH_METHOD
+      - notExists:
+          path: data.GORILLA_CORS_ORIGINS
+
+  - it: omits OIDC from the local ConfigMap in inline mode
+    template: local.yaml
+    asserts:
+      - notExists:
+          path: data.OIDC_CLIENT_ID
+      - notExists:
+          path: data.OIDC_ISSUER
+      - notExists:
+          path: data.OIDC_AUTH_METHOD
+
+  - it: omits inline API OIDC and CORS when external configuration is selected
+    template: api.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+    asserts:
+      - notExists:
+          path: data.GORILLA_OIDC_CLIENT_ID
+      - notExists:
+          path: data.GORILLA_OIDC_ISSUER
+      - notExists:
+          path: data.GORILLA_AUTH_METHOD
+      - notExists:
+          path: data.GORILLA_CORS_ORIGINS
+
+  - it: omits inline local OIDC when external configuration is selected
+    template: local.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+    asserts:
+      - notExists:
+          path: data.OIDC_CLIENT_ID
+      - notExists:
+          path: data.OIDC_ISSUER
+      - notExists:
+          path: data.OIDC_AUTH_METHOD
+
+  - it: preserves the existing inline client Secret format
+    template: oidc.yaml
+    documentSelector:
+      path: kind
+      value: Secret
+    set:
+      global.auth.oidc.secret: legacy-secret
+    asserts:
+      - equal:
+          path: metadata.name
+          value: wandb-oidc-secret
+      - equal:
+          path: data
+          value:
+            OIDC_SECRET: bGVnYWN5LXNlY3JldA==
+
+  - it: renders no OIDC resource when the customer owns configuration and credentials
+    template: oidc.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+      global.auth.oidc.oidcSecret.name: customer-oidc-secret
+      global.auth.oidc.secret: ignored-legacy-secret
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: creates only the ConfigMap when no client secret is configured
+    template: oidc.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: ConfigMap
+
+  - it: allows chart-managed credentials with an external ConfigMap
+    template: oidc.yaml
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc
+      global.auth.oidc.secret: legacy-secret
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: kind
+          value: Secret
+      - equal:
+          path: data
+          value:
+            OIDC_SECRET: bGVnYWN5LXNlY3JldA==
+
+  - it: preserves custom keys for chart-managed Secrets
+    template: oidc.yaml
+    documentSelector:
+      path: kind
+      value: Secret
+    set:
+      global.auth.oidc.secret: legacy-secret
+      global.auth.oidc.oidcSecret.secretKey: client-secret
+    asserts:
+      - equal:
+          path: data
+          value:
+            client-secret: bGVnYWN5LXNlY3JldA==
