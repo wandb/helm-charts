@@ -1144,10 +1144,6 @@ data:
   GORILLA_FRONTEND_HOST: "http://localhost:8080"
   GORILLA_LICENSE_CERT_PATH: "/jwks.json"
   GORILLA_FILE_METADATA_SOURCE_IS_INTERNAL: "true"
-  GORILLA_CORS_ORIGINS: "https://example.com,https://another.example.com,http://localhost:8080,null"
-  GORILLA_OIDC_CLIENT_ID: "myclientid"
-  GORILLA_AUTH_METHOD: "oidc"
-  GORILLA_OIDC_ISSUER: "myissuer"
   GORILLA_SESSION_LENGTH: "720h"
   GORILLA_SWEEP_PROVIDER: "http://chartsnap-app:8082"
   GORILLA_VIEW_SPEC_UPDATER_EXECUTABLE: "/view-spec-updater-linux"
@@ -1477,9 +1473,6 @@ data:
   GLUE_ENABLED: "true"
   GORILLA_GLUE_CONTAINER_PORT: "9173"
   HOST: "http://localhost:8080"
-  OIDC_CLIENT_ID: myclientid
-  OIDC_AUTH_METHOD: oidc
-  OIDC_ISSUER: myissuer
   LOCAL_K8S_SIGNER_SECRET_NAME: "chartsnap-internal-signer"
   LOCAL_K8S_SIGNER_NAMESPACE: "default"
 ---
@@ -1702,6 +1695,24 @@ data:
         }
       }
     }
+---
+# Source: operator-wandb/templates/oidc.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-oidc-configmap
+  annotations:
+    # Retain the resource when switching to an external reference with the same name.
+    "helm.sh/resource-policy": "keep"
+  labels:
+data:
+  GORILLA_AUTH_METHOD: oidc
+  GORILLA_CORS_ORIGINS: https://example.com,https://another.example.com,http://localhost:8080,null
+  GORILLA_OIDC_CLIENT_ID: myclientid
+  GORILLA_OIDC_ISSUER: myissuer
+  OIDC_AUTH_METHOD: oidc
+  OIDC_CLIENT_ID: myclientid
+  OIDC_ISSUER: myissuer
 ---
 # Source: operator-wandb/templates/parquet.yaml
 apiVersion: v1
@@ -2652,6 +2663,8 @@ spec:
             name: chartsnap-kafka-configmap
         - configMapRef:
             name: chartsnap-redis-configmap
+        - configMapRef:
+            name: chartsnap-oidc-configmap
         env:
         - name: G_HOST_IP
           valueFrom:
@@ -2782,16 +2795,6 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
-        - name: GORILLA_OIDC_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: OIDC_SECRET
-              name: chartsnap-oidc-secret
-        - name: OIDC_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: OIDC_SECRET
-              name: chartsnap-oidc-secret
         - name: SMTP_HOST
           value: ""
         - name: SMTP_PORT
@@ -2805,6 +2808,16 @@ spec:
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
           value: https://api.wandb.ai/email/dispatch
+        - name: GORILLA_OIDC_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: OIDC_SECRET
+              name: chartsnap-oidc-secret
+        - name: OIDC_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: OIDC_SECRET
+              name: chartsnap-oidc-secret
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -2918,6 +2931,8 @@ spec:
             name: chartsnap-kafka-configmap
         - configMapRef:
             name: chartsnap-redis-configmap
+        - configMapRef:
+            name: chartsnap-oidc-configmap
         env:
         - name: G_HOST_IP
           valueFrom:
@@ -3048,16 +3063,6 @@ spec:
               key: GORILLA_STATSIG_KEY
               name: gorilla-statsig
               optional: true
-        - name: GORILLA_OIDC_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: OIDC_SECRET
-              name: chartsnap-oidc-secret
-        - name: OIDC_SECRET
-          valueFrom:
-            secretKeyRef:
-              key: OIDC_SECRET
-              name: chartsnap-oidc-secret
         - name: SMTP_HOST
           value: ""
         - name: SMTP_PORT
@@ -3071,6 +3076,16 @@ spec:
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
           value: https://api.wandb.ai/email/dispatch
+        - name: GORILLA_OIDC_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: OIDC_SECRET
+              name: chartsnap-oidc-secret
+        - name: OIDC_SECRET
+          valueFrom:
+            secretKeyRef:
+              key: OIDC_SECRET
+              name: chartsnap-oidc-secret
         - name: LICENSE
           valueFrom:
             secretKeyRef:
@@ -3222,6 +3237,8 @@ spec:
             name: chartsnap-local-configmap
         - configMapRef:
             name: chartsnap-redis-configmap
+        - configMapRef:
+            name: chartsnap-oidc-configmap
         env:
         - name: G_HOST_IP
           valueFrom:
@@ -3365,16 +3382,6 @@ spec:
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
           value: https://api.wandb.ai/email/dispatch
-        - name: LICENSE
-          valueFrom:
-            secretKeyRef:
-              key: license
-              name: chartsnap-license
-        - name: GORILLA_LICENSE
-          valueFrom:
-            secretKeyRef:
-              key: license
-              name: chartsnap-license
         - name: GORILLA_OIDC_SECRET
           valueFrom:
             secretKeyRef:
@@ -3385,6 +3392,16 @@ spec:
             secretKeyRef:
               key: OIDC_SECRET
               name: chartsnap-oidc-secret
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: license
+              name: chartsnap-license
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: license
+              name: chartsnap-license
         - name: GORILLA_LIMITER
           value: noop://
         - name: SSL_CERT_FILE
@@ -3505,6 +3522,8 @@ spec:
             name: chartsnap-local-configmap
         - configMapRef:
             name: chartsnap-redis-configmap
+        - configMapRef:
+            name: chartsnap-oidc-configmap
         env:
         - name: G_HOST_IP
           valueFrom:
@@ -3648,16 +3667,6 @@ spec:
               name: chartsnap-smtp-secret
         - name: GORILLA_EMAIL_SINK
           value: https://api.wandb.ai/email/dispatch
-        - name: LICENSE
-          valueFrom:
-            secretKeyRef:
-              key: license
-              name: chartsnap-license
-        - name: GORILLA_LICENSE
-          valueFrom:
-            secretKeyRef:
-              key: license
-              name: chartsnap-license
         - name: GORILLA_OIDC_SECRET
           valueFrom:
             secretKeyRef:
@@ -3668,6 +3677,16 @@ spec:
             secretKeyRef:
               key: OIDC_SECRET
               name: chartsnap-oidc-secret
+        - name: LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: license
+              name: chartsnap-license
+        - name: GORILLA_LICENSE
+          valueFrom:
+            secretKeyRef:
+              key: license
+              name: chartsnap-license
         - name: GORILLA_LIMITER
           value: noop://
         - name: SSL_CERT_FILE
