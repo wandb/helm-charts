@@ -322,14 +322,14 @@ For production-grade implementation, the appropriate chart parameters should be 
 
 ## Customer-owned OIDC configuration
 
-OIDC follows the same resource/reference pattern as the license. By default,
-Helm creates `<release>-oidc-configmap` from `global.auth.oidc.clientId`, `issuer`,
-`authMethod`, and the existing CORS inputs. App and API consume it through a
-shared reference helper; the API and local ConfigMaps contain no OIDC settings.
+By default, Helm creates `<release>-oidc-configmap` from the existing inline
+`global.auth.oidc` settings and CORS inputs. It still creates the ConfigMap when
+OIDC is unset; the data is empty unless extra CORS origins are configured.
+The app and API always import the selected ConfigMap through `envFrom`.
 
-To select an external ConfigMap instead, set `global.auth.oidc.oidcConfigMap.name`.
-The same helper selects its name, and Helm stops creating the
-chart-managed OIDC ConfigMap:
+Set `global.auth.oidc.oidcConfigMap.name` to use an existing ConfigMap in the
+release namespace instead. Helm then references it without creating or reading
+it. Leaving the name empty selects the chart-created ConfigMap.
 
 ```yaml
 global:
@@ -337,21 +337,11 @@ global:
     oidc:
       oidcConfigMap:
         name: customer-oidc
-      oidcSecret:
-        name: customer-oidc-secret
-        secretKey: OIDC_SECRET
 ```
 
-Provision the ConfigMap and, if needed, the client Secret in the release
-namespace **before** enabling this mode. The chart references these resources
-from the app and standalone API; it does not create or update their data.
-
-The chart-generated ConfigMap has the same Helm `keep` policy as the license,
-allowing a Helm upgrade to retain it when its name becomes an external
-reference. This retention policy does not configure Argo ownership or pruning.
-
-The ConfigMap must contain all four fixed keys below. Only their values vary
-between deployments.
+The keys are the application's fixed environment-variable names. Existing app
+versions still consume the `OIDC_*` aliases, so the chart-created ConfigMap
+preserves them alongside the API's `GORILLA_*` names. Each pair has one value:
 
 ```yaml
 apiVersion: v1
@@ -359,48 +349,30 @@ kind: ConfigMap
 metadata:
   name: customer-oidc
 data:
+  GORILLA_OIDC_CLIENT_ID: "existing-client-id"
   OIDC_CLIENT_ID: "existing-client-id"
+  GORILLA_OIDC_ISSUER: "https://idp.example.com"
   OIDC_ISSUER: "https://idp.example.com"
+  GORILLA_AUTH_METHOD: "pkce"
   OIDC_AUTH_METHOD: "pkce"
   GORILLA_CORS_ORIGINS: "https://extra.example.com,https://wandb.example.com,null"
 ```
 
-`GORILLA_CORS_ORIGINS` is the complete comma-separated list. Preserve existing
-`app.extraCors` entries and, while OIDC is enabled, append `global.host` and
-the literal `null` origin to match the inline chart behavior. In external mode,
-Helm no longer computes this list or renders inline OIDC settings. In inline
-mode, extra CORS origins still work with OIDC disabled; when neither is set,
-the CORS key is absent and its reference is optional, preserving application
-defaults. External references are always required.
+An API-only external ConfigMap needs only the `GORILLA_*` keys. For CORS, preserve
+`app.extraCors` and, while OIDC is enabled, append `global.host` and the literal
+`null` origin. An empty ConfigMap supplies no OIDC variables. Explicit environment
+overrides retain precedence over `envFrom`.
 
-Leftover inline values are ignored in external mode; migrate explicit app/API environment overrides
-for these variables as well, since explicit environment overrides still win.
+Client secrets keep their existing behavior: inline `global.auth.oidc.secret`
+or an external `oidcSecret.name` with `oidcSecret.secretKey` (default `OIDC_SECRET`).
+The existing Secret references provide both `GORILLA_OIDC_SECRET` and `OIDC_SECRET`;
+no Secret format migration is required to adopt the ConfigMap option.
 
-Use the existing `oidcSecret` reference for credentials. If the provider does
-not require a client secret, leave both `oidcSecret.name` and `oidc.secret`
-empty. External configuration cannot be combined with a chart-generated inline
-client secret: supply an external Secret reference or remove the unused secret.
-
-For migration:
-
-1. Copy the current effective OIDC settings, CORS origins, and credentials into
-   the external resources. Resolve any Terraform or explicit environment
-   overrides before enabling customer editing.
-2. Enable the references and verify login before removing the migrated settings
-   from the user spec. Keep the original values available for rollback.
-3. The external owner (for example, Console) updates the ConfigMap/Secret and
-   restarts the consuming app/API workloads. Environment references are read
-   when a container starts; changing data alone does not restart it.
-
-To disable OIDC while keeping external ownership, retain every ConfigMap key
-and clear the client ID, issuer, and auth method. Set the CORS list to the
-remaining non-OIDC origins (or an empty string). If a Secret is referenced,
-retain it and its configured key, clearing its value when no longer needed.
-Missing referenced resources or keys prevent containers from starting.
-
-These external resources must remain outside Helm/Argo ownership of their
-mutable data. Switching this chart mode on does not migrate user specs,
-implement Console editing, or install restart automation.
+Provision a named external ConfigMap before selecting it. A missing named
+resource prevents container startup; an empty name uses the inline values.
+After changing external data, restart the consuming workloads to pick it up.
+Helm's `keep` annotation retains a chart-created ConfigMap during a same-name
+ownership transfer. Console editing and Argo ownership rules are separate work.
 
 ## Using External Secrets
 

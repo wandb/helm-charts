@@ -442,11 +442,9 @@ global:
       secret: ""
       authMethod: ""
       issuer: ""
-      # Empty name: Helm creates a dedicated OIDC ConfigMap from inline values.
-      # Nonempty name: reference an external ConfigMap without creating it.
-      # Provision external resources in the release namespace before enabling;
-      # all four keys, including the complete CORS list, are required.
-      # App/API consume either source through the same OIDC reference helper.
+      # Empty name: Helm creates an OIDC ConfigMap from the inline values above.
+      # Set a name to use an existing ConfigMap in the release namespace instead.
+      # App/API import the selected ConfigMap through envFrom; key names are fixed.
       oidcConfigMap:
         name: ""
       oidcSecret:
@@ -719,6 +717,7 @@ api:
           key: "GORILLA_COREWEAVE_OBSERVABILITY_API_KEY"
           optional: true
   envFrom:
+    '{{ include "wandb.oidc.configMapName" . }}': "configMapRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -737,8 +736,8 @@ api:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
-    - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
+    - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
@@ -924,6 +923,7 @@ app:
           key: "GORILLA_COREWEAVE_OBSERVABILITY_API_KEY"
           optional: true
   envFrom:
+    '{{ include "wandb.oidc.configMapName" . }}': "configMapRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -947,8 +947,8 @@ app:
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.smtpEnvs" . }}'
-    - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
+    - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
   service:
