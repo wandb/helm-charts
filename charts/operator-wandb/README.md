@@ -330,6 +330,60 @@ The following Terraform (IaC) options use this approach:
 
 For production-grade implementation, the appropriate chart parameters should be used to point to prebuilt, externalized state stores.
 
+## Customer-owned OIDC configuration
+
+By default, Helm creates `<release>-oidc-configmap` from the existing inline
+`global.auth.oidc` settings and CORS inputs. It still creates the ConfigMap when
+OIDC is unset; the data is empty unless extra CORS origins are configured.
+The app and API always import the selected ConfigMap through `envFrom`.
+
+Set `global.auth.oidc.oidcConfigMap.name` to use an existing ConfigMap in the
+release namespace instead. Helm then references it without creating or reading
+it. Leaving the name empty selects the chart-created ConfigMap.
+
+```yaml
+global:
+  auth:
+    oidc:
+      oidcConfigMap:
+        name: customer-oidc
+```
+
+The keys are the application's fixed environment-variable names. Existing app
+versions still consume the `OIDC_*` aliases, so the chart-created ConfigMap
+preserves them alongside the API's `GORILLA_*` names. Each pair has one value:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: customer-oidc
+data:
+  GORILLA_OIDC_CLIENT_ID: "existing-client-id"
+  OIDC_CLIENT_ID: "existing-client-id"
+  GORILLA_OIDC_ISSUER: "https://idp.example.com"
+  OIDC_ISSUER: "https://idp.example.com"
+  GORILLA_AUTH_METHOD: "pkce"
+  OIDC_AUTH_METHOD: "pkce"
+  GORILLA_CORS_ORIGINS: "https://extra.example.com,https://wandb.example.com,null"
+```
+
+An API-only external ConfigMap needs only the `GORILLA_*` keys. For CORS, preserve
+`app.extraCors` and, while OIDC is enabled, append `global.host` and the literal
+`null` origin. An empty ConfigMap supplies no OIDC variables. Explicit environment
+overrides retain precedence over `envFrom`.
+
+Client secrets keep their existing behavior: inline `global.auth.oidc.secret`
+or an external `oidcSecret.name` with `oidcSecret.secretKey` (default `OIDC_SECRET`).
+The existing Secret references provide both `GORILLA_OIDC_SECRET` and `OIDC_SECRET`;
+no Secret format migration is required to adopt the ConfigMap option.
+
+Provision a named external ConfigMap before selecting it. A missing named
+resource prevents container startup; an empty name uses the inline values.
+After changing external data, restart the consuming workloads to pick it up.
+Helm's `keep` annotation retains a chart-created ConfigMap during a same-name
+ownership transfer. Console editing and Argo ownership rules are separate work.
+
 ## Using External Secrets
 
 The chart supports referencing existing Kubernetes Secrets for sensitive credentials. This allows you to manage secrets externally using tools like External Secrets Operator, Sealed Secrets, or other secret management systems.
