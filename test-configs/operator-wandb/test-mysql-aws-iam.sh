@@ -134,8 +134,13 @@ if grep -Eq 'name: mysql-ca|secretName: "?wandb-mysql-ca-cert"?' "$migration_job
   exit 1
 fi
 
-if ! grep -q 'name: wandb-ca-certs-user' "$migration_job_rendered" ||
-  ! grep -q 'mountPath: /usr/local/share/ca-certificates/configmap' "$migration_job_rendered" ||
+if ! awk '
+  /volumeMounts:/ { in_mounts = 1; next }
+  in_mounts && /name:/ { custom_ca = ($0 ~ /name: wandb-ca-certs-user$/) }
+  in_mounts && custom_ca && /mountPath: \/usr\/local\/share\/ca-certificates\/configmap$/ { found = 1 }
+  /^[[:space:]]*volumes:/ { in_mounts = 0 }
+  END { exit found ? 0 : 1 }
+' "$migration_job_rendered" ||
   ! grep -q 'name: .custom-clickhouse-ca.' "$migration_job_rendered"; then
   echo "the ClickHouse migration Job must retain global custom CA certificate mounts" >&2
   exit 1
@@ -148,10 +153,16 @@ fi
 
 assert_iam_render_rejected() {
   local description="$1"
-  shift
+  local expected_error="$2"
+  local output
+  shift 2
 
-  if helm template wandb "$chart" --namespace default --values "$values" "$@" >/dev/null 2>&1; then
+  if output="$(helm template wandb "$chart" --namespace default --values "$values" "$@" 2>&1 >/dev/null)"; then
     echo "IAM authentication $description must fail validation" >&2
+    exit 1
+  fi
+  if ! grep -Fq "$expected_error" <<<"$output"; then
+    echo "IAM authentication $description failed for an unexpected reason: $output" >&2
     exit 1
   fi
 }
@@ -166,18 +177,18 @@ assert_iam_render_accepted() {
   fi
 }
 
-assert_iam_render_rejected "with rdsIamAuth as string false" --set-string global.mysql.rdsIamAuth=false
-assert_iam_render_rejected "with rdsIamAuth as string true" --set-string global.mysql.rdsIamAuth=true
-assert_iam_render_rejected "with rdsIamAuth as a number" --set global.mysql.rdsIamAuth=1
-assert_iam_render_rejected "without a database host" --set global.mysql.host=
-assert_iam_render_rejected "without a database user" --set global.mysql.user=
-assert_iam_render_rejected "without an AWS region" --set global.mysql.awsRegion=
-assert_iam_render_rejected "without a CA certificate" --set global.mysql.caCert=
-assert_iam_render_rejected "with a database password" --set global.mysql.password=must-be-empty
-assert_iam_render_rejected "with a password Secret" --set global.mysql.passwordSecret.name=existing-secret
-assert_iam_render_rejected "with local MySQL installed" --set mysql.install=true
-assert_iam_render_rejected "with password init-db enabled" --set app.initContainers.init-db.enabled=true
-assert_iam_render_rejected "with mysql-exporter enabled" --set prometheus.mysql-exporter.install=true
+assert_iam_render_rejected "with rdsIamAuth as string false" "global.mysql.rdsIamAuth must be a boolean" --set-string global.mysql.rdsIamAuth=false
+assert_iam_render_rejected "with rdsIamAuth as string true" "global.mysql.rdsIamAuth must be a boolean" --set-string global.mysql.rdsIamAuth=true
+assert_iam_render_rejected "with rdsIamAuth as a number" "global.mysql.rdsIamAuth must be a boolean" --set global.mysql.rdsIamAuth=1
+assert_iam_render_rejected "without a database host" "global.mysql.host is required" --set global.mysql.host=
+assert_iam_render_rejected "without a database user" "global.mysql.user is required" --set global.mysql.user=
+assert_iam_render_rejected "without an AWS region" "global.mysql.awsRegion is required" --set global.mysql.awsRegion=
+assert_iam_render_rejected "without a CA certificate" "global.mysql.caCert is required" --set global.mysql.caCert=
+assert_iam_render_rejected "with a database password" "global.mysql.password must be empty" --set global.mysql.password=must-be-empty
+assert_iam_render_rejected "with a password Secret" "global.mysql.passwordSecret.name must be empty" --set global.mysql.passwordSecret.name=existing-secret
+assert_iam_render_rejected "with local MySQL installed" "mysql.install must be false" --set mysql.install=true
+assert_iam_render_rejected "with password init-db enabled" "app.initContainers.init-db.enabled must be false" --set app.initContainers.init-db.enabled=true
+assert_iam_render_rejected "with mysql-exporter enabled" "prometheus.mysql-exporter.install must be false" --set prometheus.mysql-exporter.install=true
 
 assert_iam_render_accepted \
   "with app disabled and its unused init-db default enabled" \
