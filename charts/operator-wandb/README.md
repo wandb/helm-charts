@@ -51,6 +51,18 @@ By default, the W&B Server chart includes an in-cluster MySQL deployment that is
 
 For production deployments, you should use an external MySQL database. You can configure the chart to use an external MySQL database by setting the appropriate parameters in the `global.mysql` section.
 
+##### Aurora IAM authentication
+
+`global.mysql.rdsIamAuth` defaults to `false`. Enable it only with a server image containing the [Aurora IAM connector](https://github.com/wandb/core/pull/49035), an IAM-enabled Aurora cluster, and a dedicated database user configured for IAM authentication.
+
+Set `global.mysql.host` to the Aurora endpoint, `user` to the IAM database user, `awsRegion` to the cluster's region, and `caCert` to the regional RDS CA bundle. Leave `password` and `passwordSecret.name` empty. Disable `mysql.install`, `app.initContainers.init-db.enabled`, and `prometheus.mysql-exporter.install`. The chart rejects conflicting password configuration and renders a password-free DSN with certificate verification.
+
+The CA can be an inline PEM bundle or a `valueFrom.secretKeyRef` or `valueFrom.configMapKeyRef` mapping with `name` and `key`. References mount the existing object and use its key as the certificate filename; the chart does not create a CA Secret for them.
+
+Each database workload needs a service-account role authorized for that cluster resource ID and database user. Preserve its existing object-storage, queue, KMS, and Secrets Manager permissions when assigning the role. The [IAM render fixture](../../../test-configs/operator-wandb/mysql-aws-iam.yaml) shows the workload annotations; its CA and role ARN are test values. Weave and Weave Trace are excluded from these database-role annotations.
+
+The ClickHouse migration hook does not mount the MySQL CA Secret, which may not exist until the same upgrade creates it. Its global custom CA ConfigMap remains mounted. To return to password authentication, disable `rdsIamAuth`, restore the password configuration, and restore the initializer and exporter settings used before cutover.
+
 #### Redis
 
 By default, the W&B Server chart includes an in-cluster Redis deployment that is provided by bitnami/Redis. This deployment is for trial purposes only and not recommended for use in production.

@@ -1,0 +1,209 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+chart="$repo_root/charts/operator-wandb"
+values="$repo_root/test-configs/operator-wandb/mysql-aws-iam.yaml"
+rendered="$(mktemp)"
+password_rendered="$(mktemp)"
+migration_rendered="$(mktemp)"
+migration_job_rendered="$(mktemp)"
+trap 'rm -f "$rendered" "$password_rendered" "$migration_rendered" "$migration_job_rendered"' EXIT
+
+helm template wandb "$chart" --namespace default --values "$values" >"$rendered"
+
+if grep -q 'name: MYSQL_PASSWORD' "$rendered"; then
+  echo "IAM authentication must not render MYSQL_PASSWORD" >&2
+  exit 1
+fi
+
+if grep -q 'name: wandb-mysql$' "$rendered"; then
+  echo "IAM authentication must not render the application MySQL password Secret" >&2
+  exit 1
+fi
+
+# shellcheck disable=SC2016 # Helm intentionally renders these environment references literally.
+expected_dsn='mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&rds-iam-auth=true&aws-region=us-east-1'
+if ! grep -Fq "$expected_dsn" "$rendered"; then
+  echo "IAM authentication DSN was not rendered" >&2
+  exit 1
+fi
+
+database_role_annotation='eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/wandb-database'
+
+service_account_exists() {
+  local name="$1"
+
+  awk -v expected_name="$name" '
+    BEGIN { RS = "---" }
+    $0 ~ "\nkind: ServiceAccount\n" &&
+      $0 ~ "\n  name: " expected_name "\n" {
+      found = 1
+    }
+    END { exit found ? 0 : 1 }
+  ' "$rendered"
+}
+
+service_account_has_database_role() {
+  local name="$1"
+
+  awk -v expected_name="$name" -v expected_annotation="$database_role_annotation" '
+    BEGIN { RS = "---" }
+    $0 ~ "\nkind: ServiceAccount\n" &&
+      $0 ~ "\n  name: " expected_name "\n" &&
+      index($0, expected_annotation) {
+      found = 1
+    }
+    END { exit found ? 0 : 1 }
+  ' "$rendered"
+}
+
+database_service_accounts=(
+  wandb-api
+  wandb-app
+  wandb-executor
+  wandb-filemeta
+  wandb-filestream
+  wandb-flat-run-fields-updater
+  wandb-glue
+  wandb-history-updater
+  wandb-metric-observer
+  wandb-parquet
+  wandb-parquet-metadata-cache
+)
+for service_account in "${database_service_accounts[@]}"; do
+  if ! service_account_exists "$service_account"; then
+    echo "expected database workload ServiceAccount $service_account to be rendered" >&2
+    exit 1
+  fi
+  if ! service_account_has_database_role "$service_account"; then
+    echo "expected database role annotation on ServiceAccount $service_account" >&2
+    exit 1
+  fi
+done
+
+excluded_service_accounts=(
+  wandb-weave
+  wandb-weave-trace
+)
+for service_account in "${excluded_service_accounts[@]}"; do
+  if ! service_account_exists "$service_account"; then
+    echo "expected excluded ServiceAccount $service_account to be rendered" >&2
+    exit 1
+  fi
+  if service_account_has_database_role "$service_account"; then
+    echo "database role annotation must not be set on ServiceAccount $service_account" >&2
+    exit 1
+  fi
+done
+
+if grep -q 'name: init-db' "$rendered"; then
+  echo "password-based init-db must be disabled for IAM authentication" >&2
+  exit 1
+fi
+
+if grep -q 'prometheus-mysql-exporter' "$rendered"; then
+  echo "password-based mysql-exporter must be disabled for IAM authentication" >&2
+  exit 1
+fi
+
+helm template wandb "$chart" \
+  --namespace default \
+  --values "$values" \
+  --set clickhouseMigrationJob.install=true \
+  --set global.caCertsConfigMap=custom-clickhouse-ca \
+  --set global.olap.history.enabled=true \
+  --set global.olap.history.host=clickhouse.example.internal \
+  --set-string global.olap.history.port=9440 >"$migration_rendered"
+
+awk '
+  BEGIN { RS = "---" }
+  $0 ~ "\nkind: Job\n" &&
+    $0 ~ "\n  name: wandb-ch-migrate\n" {
+    print
+  }
+' "$migration_rendered" >"$migration_job_rendered"
+
+if [[ ! -s "$migration_job_rendered" ]]; then
+  echo "expected the ClickHouse migration Job to be rendered" >&2
+  exit 1
+fi
+
+if grep -Eq 'name: mysql-ca|secretName: "?wandb-mysql-ca-cert"?' "$migration_job_rendered"; then
+  echo "the pre-upgrade ClickHouse migration Job must not depend on the same-upgrade MySQL CA Secret" >&2
+  exit 1
+fi
+
+if ! awk '
+  /volumeMounts:/ { in_mounts = 1; next }
+  in_mounts && /name:/ { custom_ca = ($0 ~ /name: wandb-ca-certs-user$/) }
+  in_mounts && custom_ca && /mountPath: \/usr\/local\/share\/ca-certificates\/configmap$/ { found = 1 }
+  /^[[:space:]]*volumes:/ { in_mounts = 0 }
+  END { exit found ? 0 : 1 }
+' "$migration_job_rendered" ||
+  ! grep -q 'name: .custom-clickhouse-ca.' "$migration_job_rendered"; then
+  echo "the ClickHouse migration Job must retain global custom CA certificate mounts" >&2
+  exit 1
+fi
+
+if grep -Fq 'ad.datadoghq.com/yace.checks:' "$rendered"; then
+  echo "YACE is only for W&B Console and must not configure Datadog ingestion" >&2
+  exit 1
+fi
+
+assert_iam_render_rejected() {
+  local description="$1"
+  local expected_error="$2"
+  local output
+  shift 2
+
+  if output="$(helm template wandb "$chart" --namespace default --values "$values" "$@" 2>&1 >/dev/null)"; then
+    echo "IAM authentication $description must fail validation" >&2
+    exit 1
+  fi
+  if ! grep -Fq "$expected_error" <<<"$output"; then
+    echo "IAM authentication $description failed for an unexpected reason: $output" >&2
+    exit 1
+  fi
+}
+
+assert_iam_render_accepted() {
+  local description="$1"
+  shift
+
+  if ! helm template wandb "$chart" --namespace default --values "$values" "$@" >/dev/null; then
+    echo "IAM authentication $description must pass validation" >&2
+    exit 1
+  fi
+}
+
+assert_iam_render_rejected "with rdsIamAuth as string false" "global.mysql.rdsIamAuth must be a boolean" --set-string global.mysql.rdsIamAuth=false
+assert_iam_render_rejected "with rdsIamAuth as string true" "global.mysql.rdsIamAuth must be a boolean" --set-string global.mysql.rdsIamAuth=true
+assert_iam_render_rejected "with rdsIamAuth as a number" "global.mysql.rdsIamAuth must be a boolean" --set global.mysql.rdsIamAuth=1
+assert_iam_render_rejected "without a database host" "global.mysql.host is required" --set global.mysql.host=
+assert_iam_render_rejected "without a database user" "global.mysql.user is required" --set global.mysql.user=
+assert_iam_render_rejected "without an AWS region" "global.mysql.awsRegion is required" --set global.mysql.awsRegion=
+assert_iam_render_rejected "without a CA certificate" "global.mysql.caCert is required" --set global.mysql.caCert=
+assert_iam_render_rejected "with a database password" "global.mysql.password must be empty" --set global.mysql.password=must-be-empty
+assert_iam_render_rejected "with a password Secret" "global.mysql.passwordSecret.name must be empty" --set global.mysql.passwordSecret.name=existing-secret
+assert_iam_render_rejected "with local MySQL installed" "mysql.install must be false" --set mysql.install=true
+assert_iam_render_rejected "with password init-db enabled" "app.initContainers.init-db.enabled must be false" --set app.initContainers.init-db.enabled=true
+assert_iam_render_rejected "with mysql-exporter enabled" "prometheus.mysql-exporter.install must be false" --set prometheus.mysql-exporter.install=true
+
+assert_iam_render_accepted \
+  "with app disabled and its unused init-db default enabled" \
+  --set app.install=false \
+  --set app.initContainers.init-db.enabled=true
+assert_iam_render_accepted \
+  "with Prometheus disabled and its unused mysql-exporter default enabled" \
+  --set prometheus.install=false \
+  --set prometheus.mysql-exporter.install=true
+
+helm template wandb "$chart" --namespace default >"$password_rendered"
+# shellcheck disable=SC2016 # Helm intentionally renders these environment references literally.
+expected_password_dsn='mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred'
+if ! grep -Fq 'name: MYSQL_PASSWORD' "$password_rendered" ||
+  ! grep -Fq "$expected_password_dsn" "$password_rendered"; then
+  echo "default password authentication must remain unchanged" >&2
+  exit 1
+fi
