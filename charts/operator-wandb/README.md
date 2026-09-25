@@ -505,3 +505,46 @@ helm install wandb ./charts/operator-wandb \
 ## Additional Resources
 
 For more detailed information and advanced configuration options, please refer to the [W&B documentation](https://docs.wandb.ai/).
+
+## Workload security profile
+
+Enable the optional profile for W&B workloads and Helm test Pods:
+
+```yaml
+global:
+  workloadSecurityProfile:
+    enabled: true
+```
+
+The profile defaults to disabled. When enabled, it drops all Linux capabilities,
+disables privilege escalation and privileged mode, sets RuntimeDefault seccomp,
+and disables service-account token automount. Components that use the Kubernetes
+API explicitly retain tokens through their component values. Dependency charts
+use their own security settings.
+
+Settings merge from global to chart alias, then Job/CronJob, then container.
+Later values take precedence, including explicit `false` values and empty
+capability lists. Use `<alias>.workloadSecurityProfile.enabled: false` to opt a
+component out. Container overrides affect container fields only.
+Profile-controlled fields override existing security contexts; other fields
+remain unchanged.
+
+`runAsNonRoot` and `readOnlyRootFilesystem` are optional per-component or
+per-container settings. Enable them for compatible images and configure required
+writable paths with `volumes` and `volumeMounts`. The profile does not assign
+numeric UID/GID values or change existing identity settings.
+
+```yaml
+weave-trace:
+  workloadSecurityProfile:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+```
+
+See [image compatibility and writable paths](../wandb-base/README.md#image-compatibility-and-writable-paths)
+for volume configuration and image-user requirements.
+
+Direct Helm tests inherit the global profile. Override them with
+`testHooks.workloadSecurityProfile` or
+`testHooks.<connection|weave|mcp|olap>.workloadSecurityProfile`. Python verification
+hooks install packages and require writable installation paths.
