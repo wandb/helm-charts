@@ -162,15 +162,17 @@ Global values will override any chart-specific values.
           ...
   */ -}}
 
-  {{- if kindIs "map" .Values.global.mysql.password }}
+  {{- if not .Values.global.mysql.rdsIamAuth }}
+    {{- if kindIs "map" .Values.global.mysql.password }}
 - name: MYSQL_PASSWORD
 {{- toYaml .Values.global.mysql.password | nindent 2 }}
-  {{- else }}
+    {{- else }}
 - name: MYSQL_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.mysql.passwordSecret" . | quote}}
       key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+    {{- end }}
   {{- end }}
 
   {{- if kindIs "map" .Values.global.mysql.port }}
@@ -205,7 +207,7 @@ Global values will override any chart-specific values.
   value: "{{ include "wandb.mysql.user" . }}"
   {{- end -}}
 
-  {{- if and .Values.global.mysql.caCert (ne .Values.global.mysql.caCert "") }}
+  {{- if or (kindIs "map" .Values.global.mysql.caCert) (and (kindIs "string" .Values.global.mysql.caCert) (ne .Values.global.mysql.caCert "")) }}
 - name: MYSQL_CA_CERT_PATH
   value: "/etc/ssl/certs/{{ include "wandb.mysql.certFileName" . }}"
   {{- end }}
