@@ -1,0 +1,29 @@
+suite: Base Helm test Pod profile
+templates:
+  - tests/test-connection.yaml
+set:
+  test.enabled: true
+tests:
+  - it: preserves the default test Pod
+    asserts:
+      - notExists:
+          path: spec.automountServiceAccountToken
+      - notExists:
+          path: spec.containers[0].securityContext
+  - it: includes direct test Pods in the profile
+    set:
+      global.workloadSecurityProfile.enabled: true
+    asserts:
+      - equal:
+          path: spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: honors test-specific opt-out
+    set:
+      global.workloadSecurityProfile.enabled: true
+      test.workloadSecurityProfile.enabled: false
+    asserts:
+      - notExists:
+          path: spec.containers[0].securityContext

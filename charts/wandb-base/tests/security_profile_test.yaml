@@ -1,0 +1,206 @@
+suite: Explicit workload security profile
+templates:
+  - deployment.yaml
+  - job.yaml
+  - cronjob.yaml
+  - statefulset.yaml
+set:
+  containers:
+    app:
+      args: [serve]
+    sidecar:
+      args: [observe]
+  initContainers:
+    migrate:
+      args: [migrate]
+tests:
+  - it: preserves legacy contexts when omitted
+    template: deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: []
+      - notExists:
+          path: spec.template.spec.containers[0].securityContext.seccompProfile
+  - it: applies the baseline to every application and init container
+    template: deployment.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+      - equal:
+          path: spec.template.spec.containers[1].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.capabilities.drop
+          value: [ALL]
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.seccompProfile.type
+          value: RuntimeDefault
+  - it: preserves an explicit false component opt-out
+    template: deployment.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+      workloadSecurityProfile.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: []
+  - it: replaces capability lists and keeps exceptions local to one container
+    template: deployment.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+      workloadSecurityProfile.allowPrivilegeEscalation: true
+      containers.app.workloadSecurityProfile:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: []
+          add: [NET_BIND_SERVICE]
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: []
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.add
+          value: [NET_BIND_SERVICE]
+      - equal:
+          path: spec.template.spec.containers[1].securityContext.capabilities.drop
+          value: [ALL]
+      - equal:
+          path: spec.template.spec.containers[1].securityContext.allowPrivilegeEscalation
+          value: true
+  - it: applies job overrides without leaking into another job
+    template: job.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+      jobs:
+        a:
+          workloadSecurityProfile:
+            enabled: false
+          containers:
+            task: {}
+        b:
+          containers:
+            task: {}
+    asserts:
+      - documentIndex: 0
+        equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: []
+      - documentIndex: 1
+        equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: covers cronjobs including init containers
+    template: cronjob.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+      cronJobs:
+        task:
+          schedule: '0 * * * *'
+          concurrencyPolicy: Forbid
+          containers:
+            task: {}
+          initContainers:
+            setup: {}
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.initContainers[0].securityContext.allowPrivilegeEscalation
+          value: false
+  - it: covers statefulsets
+    template: statefulset.yaml
+    set:
+      kind: Statefulset
+      workloadSecurityProfile.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: rejects string opt-ins rather than treating false as truthy
+    template: deployment.yaml
+    set:
+      workloadSecurityProfile.enabled: 'false'
+    asserts:
+      - failedTemplate:
+          errorMessage: workloadSecurityProfile.enabled must be a boolean
+  - it: hardens partial legacy container contexts instead of replacing the baseline
+    template: deployment.yaml
+    set:
+      workloadSecurityProfile.enabled: true
+      containers.app.securityContext:
+        privileged: true
+        allowPrivilegeEscalation: true
+        runAsNonRoot: false
+        capabilities:
+          add: [NET_ADMIN]
+        seccompProfile:
+          type: Unconfined
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.privileged
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities
+          value:
+            add: []
+            drop: [ALL]
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.seccompProfile.type
+          value: RuntimeDefault
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
+          value: false
+  - it: treats an empty profile as inheritance
+    template: deployment.yaml
+    set:
+      global.workloadSecurityProfile.enabled: true
+      workloadSecurityProfile: {}
+      containers.app.workloadSecurityProfile: {}
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: permits an init-container exception without weakening its siblings
+    template: deployment.yaml
+    set:
+      workloadSecurityProfile.enabled: true
+      initContainers.migrate.workloadSecurityProfile.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.capabilities.drop
+          value: []
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: preserves global environment opt-out when the profile is enabled
+    template: deployment.yaml
+    set:
+      workloadSecurityProfile.enabled: true
+      globalOptOut.env: true
+      global.env.GLOBAL_ONLY: global-value
+      containers.app.env.LOCAL_ONLY: local-value
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: LOCAL_ONLY
+            value: local-value
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GLOBAL_ONLY
+            value: global-value
