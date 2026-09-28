@@ -5,5 +5,12 @@
 
 {{- define "wandb.lumenStagingVolume" }}
 - name: lumen-staging-dir
-  emptyDir: { }
+  ephemeral:
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.global.lumen.stagingDirectorySize | quote }}
 {{- end }}
