@@ -1,0 +1,159 @@
+suite: Workload security profile
+release:
+  name: security-test
+templates:
+  - charts/api/templates/deployment.yaml
+  - charts/console/templates/deployment.yaml
+  - charts/weave-trace/templates/deployment.yaml
+  - charts/appRenamePreHook/templates/job.yaml
+  - charts/appRenamePostHook/templates/job.yaml
+  - charts/internalSignerPreHook/templates/job.yaml
+  - charts/settingsMigrationJob/templates/job.yaml
+  - charts/clickhouseMigrationJob/templates/job.yaml
+  - charts/glue/templates/deployment.yaml
+  - charts/lumen-agent/templates/cronjob.yaml
+  - templates/tests/test-connection.yaml
+  - templates/tests/test-weave.yaml
+  - templates/tests/test-mcp.yaml
+  - templates/tests/test-olap.yaml
+set:
+  global.workloadSecurityProfile.enabled: true
+  global.api.enabled: true
+  global.glue.enabled: true
+  global.localService.bypass: true
+  global.olap.history.enabled: true
+  global.olap.default.host: clickhouse.example
+  global.olap.default.password: fixture-only
+  weave-trace.install: true
+  mcp-server.install: true
+  settingsMigrationJob.install: true
+  lumen-agent.install: true
+tests:
+  - it: drops capabilities on the API and retains API credentials
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+  - it: preserves console API access
+    template: charts/console/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+  - it: disables Kubernetes API tokens on shared trace identity pods
+    template: charts/weave-trace/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: retains rename pre-hook API access while hardening the container
+    template: charts/appRenamePreHook/templates/job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: retains rename post-hook API access
+    template: charts/appRenamePostHook/templates/job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+  - it: retains signer Secret creation access
+    template: charts/internalSignerPreHook/templates/job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+  - it: retains settings migration Secret access
+    template: charts/settingsMigrationJob/templates/job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+  - it: hardens migration and wait containers without API tokens
+    template: charts/clickhouseMigrationJob/templates/job.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.capabilities.drop
+          value: [ALL]
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: retains glue leader election access
+    template: charts/glue/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+  - it: covers the diagnostic cronjob and its API access
+    template: charts/lumen-agent/templates/cronjob.yaml
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.automountServiceAccountToken
+          value: true
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: hardens the direct connection test Pod
+    template: templates/tests/test-connection.yaml
+    asserts:
+      - equal:
+          path: spec.automountServiceAccountToken
+          value: false
+      - equal:
+          path: spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: hardens the direct weave test Pod
+    template: templates/tests/test-weave.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+  - it: hardens the direct MCP test Pod
+    template: templates/tests/test-mcp.yaml
+    asserts:
+      - equal:
+          path: spec.containers[0].securityContext.seccompProfile.type
+          value: RuntimeDefault
+  - it: hardens the direct OLAP test Pod
+    template: templates/tests/test-olap.yaml
+    asserts:
+      - equal:
+          path: spec.containers[0].securityContext.capabilities.drop
+          value: [ALL]
+  - it: permits a test-hook exception without changing application containers
+    template: templates/tests/test-connection.yaml
+    set:
+      testHooks.connection.workloadSecurityProfile.enabled: false
+    asserts:
+      - notExists:
+          path: spec.containers[0].securityContext
+      - notExists:
+          path: spec.automountServiceAccountToken
+  - it: leaves default rendering unchanged including token exceptions
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.workloadSecurityProfile.enabled: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.automountServiceAccountToken
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.capabilities.drop
+          value: []

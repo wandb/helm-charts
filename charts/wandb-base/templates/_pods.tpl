@@ -15,18 +15,31 @@ metadata:
     {{- tpl (include "wandb-base.labels" $.root | nindent 4) $.root }}
     {{- tpl (include "wandb-base.podLabels" $.root | nindent 4) $.root }}
 spec:
-  {{- if ne .podData.automountServiceAccountToken nil }}
+  {{- $profile := include "wandb-base.securityProfile" (dict "root" $.root "podData" .podData "container" dict) | fromYaml }}
+  {{- if $profile.enabled }}
+  automountServiceAccountToken: {{ $profile.automountServiceAccountToken }}
+  {{- else if ne .podData.automountServiceAccountToken nil }}
     {{- if not (kindIs "bool" .podData.automountServiceAccountToken) }}
       {{- fail "automountServiceAccountToken must be a boolean or null" }}
     {{- end }}
   automountServiceAccountToken: {{ .podData.automountServiceAccountToken }}
+  {{- else if include "wandb-base.createsServiceAccount" $.root | trim | eq "true" }}
+    {{- $accountProfile := include "wandb-base.securityProfile" (dict "root" $.root "podData" dict "container" dict) | fromYaml }}
+    {{- if $accountProfile.enabled }}
+      {{/* A Job opt-out must not inherit the shared account's enabled profile. */}}
+      {{- $legacyAutomount := $.root.Values.serviceAccount.automount }}
+      {{- if eq $legacyAutomount nil }}
+        {{- $legacyAutomount = true }}
+      {{- end }}
+  automountServiceAccountToken: {{ $legacyAutomount }}
+    {{- end }}
   {{- end }}
   {{- with .podData.affinity }}
   affinity:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   containers:
-    {{- include "wandb-base.containers" (dict "containers" .podData.containers "root" $.root "source" "containers") | nindent 4 }}
+    {{- include "wandb-base.containers" (dict "containers" .podData.containers "root" $.root "source" "containers" "podData" .podData) | nindent 4 }}
   {{- $combinedSecrets := concat (default list $.root.Values.imagePullSecrets) (default list $.root.Values.global.imagePullSecrets) }}
   {{- $secretNames := list }}
   {{- range $secret := $combinedSecrets }}
@@ -47,7 +60,7 @@ spec:
   {{- end }}
   {{- if .podData.initContainers }}
   initContainers:
-    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers") | nindent 4 }}
+    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers" "podData" .podData) | nindent 4 }}
   {{- end }}
   {{- $nodeSelector := coalesce .podData.nodeSelector $.root.Values.nodeSelector $.root.Values.global.nodeSelector -}}
   {{- if $nodeSelector }}
@@ -62,8 +75,12 @@ spec:
   priorityClassName: {{ tpl $priorityClassName $.root }}
   {{- end }}
   serviceAccountName: {{ include "wandb-base.serviceAccountName" $.root }}
+  {{- $podContext := merge (deepCopy (default dict .podData.podSecurityContext)) (deepCopy $.root.Values.podSecurityContext) }}
+  {{- if $profile.enabled }}
+    {{- $podContext = include "wandb-base.podSecurityProfile" (dict "context" $podContext "profile" $profile) | fromYaml }}
+  {{- end }}
   securityContext:
-   {{- tpl (toYaml (merge (default dict .podData.podSecurityContext) $.root.Values.podSecurityContext) | nindent 4) $.root }}
+    {{- tpl (toYaml $podContext | nindent 4) $.root }}
   {{- with .podData.terminationGracePeriodSeconds }}
   terminationGracePeriodSeconds: {{ . }}
   {{- end }}
