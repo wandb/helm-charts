@@ -1,8 +1,10 @@
-"""Check warning text with Helm because helm-unittest discards YAML comments."""
+"""Check raw Helm warning comments after building the chart dependencies.
+
+helm-unittest discards YAML comments, so these checks render the chart directly.
+"""
 
 import json
 from pathlib import Path
-import shutil
 import subprocess
 import tempfile
 import unittest
@@ -11,7 +13,6 @@ import unittest
 CHART = Path(__file__).resolve().parents[2] / "charts" / "operator-wandb"
 
 
-@unittest.skipUnless(shutil.which("helm"), "Helm is required for render checks")
 class IPAllowListWarningTests(unittest.TestCase):
     def test_disabled_policy_warning_in_rendered_yaml(self):
         cases = [
@@ -36,7 +37,10 @@ class IPAllowListWarningTests(unittest.TestCase):
                     ["helm", "template", "warning-test", str(CHART), "-f", str(values)],
                     capture_output=True,
                     text=True,
-                    check=True,
+                    check=False,
+                )
+                self.assertEqual(
+                    result.returncode, 0, f"helm template failed:\n{result.stderr}"
                 )
                 warning = (
                     "# WARNING: global.ipAllowList is disabled; configured systemCIDRs "
@@ -45,3 +49,7 @@ class IPAllowListWarningTests(unittest.TestCase):
                 )
                 self.assertEqual(result.stdout.count(warning), int(expect_warning))
                 self.assertNotIn("kind: Middleware", result.stdout)
+
+
+if __name__ == "__main__":
+    unittest.main()
