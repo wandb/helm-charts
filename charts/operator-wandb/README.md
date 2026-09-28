@@ -51,6 +51,18 @@ By default, the W&B Server chart includes an in-cluster MySQL deployment that is
 
 For production deployments, you should use an external MySQL database. You can configure the chart to use an external MySQL database by setting the appropriate parameters in the `global.mysql` section.
 
+##### Aurora IAM authentication
+
+`global.mysql.rdsIamAuth` defaults to `false`. Enable it only with a server image containing the [Aurora IAM connector](https://github.com/wandb/core/pull/49035), an IAM-enabled Aurora cluster, and a dedicated database user configured for IAM authentication.
+
+Set `global.mysql.host` to the Aurora endpoint, `user` to the IAM database user, `awsRegion` to the cluster's region, and `caCert` to the regional RDS CA bundle. Leave `password` and `passwordSecret.name` empty. Disable `mysql.install`, `app.initContainers.init-db.enabled`, and `prometheus.mysql-exporter.install`. The chart rejects conflicting password configuration and renders a password-free DSN with certificate verification.
+
+The CA can be an inline PEM bundle or a `valueFrom.secretKeyRef` or `valueFrom.configMapKeyRef` mapping with `name` and `key`. References mount the existing object and use its key as the certificate filename; the chart does not create a CA Secret for them.
+
+Each database workload needs a service-account role authorized for that cluster resource ID and database user. Preserve its existing object-storage, queue, KMS, and Secrets Manager permissions when assigning the role. The [IAM render fixture](../../../test-configs/operator-wandb/mysql-aws-iam.yaml) shows the workload annotations; its CA and role ARN are test values. Weave and Weave Trace are excluded from these database-role annotations.
+
+The ClickHouse migration hook does not mount the MySQL CA Secret, which may not exist until the same upgrade creates it. Its global custom CA ConfigMap remains mounted. To return to password authentication, disable `rdsIamAuth`, restore the password configuration, and restore the initializer and exporter settings used before cutover.
+
 #### Redis
 
 By default, the W&B Server chart includes an in-cluster Redis deployment that is provided by bitnami/Redis. This deployment is for trial purposes only and not recommended for use in production.
@@ -238,6 +250,76 @@ api:
       memory: 1Gi
 ```
 
+### MCP Server
+
+The MCP Server is disabled by default for direct Helm and Self-Managed installs.
+Its supported configuration is intentionally small: Helm selects a named server
+profile and keeps deployment concerns such as routing and resources separate.
+
+```yaml
+mcp-server:
+  install: true
+  image:
+    repository: wandb/mcp-server
+    tag: "0.4.0"
+    # For an immutable release, set this to sha256: followed by 64 lowercase
+    # hexadecimal characters.
+    digest: ""
+  tools:
+    profile: auto # auto | models-only | models-weave
+  accessMode: read-write # read-write | read-only
+  traceBackend:
+    mode: auto # auto | disabled
+    url: "" # optional external HTTP(S) origin or /traces URL
+  routing:
+    internalBaseUrl: "" # derived from the split API or monolith Service
+  observability:
+    provider: none # none | datadog-agent | otel
+    privacy: standard # off | standard | strict
+  resources: {}
+```
+
+`tools.profile=auto` resolves during chart rendering to `models-only` when no
+trace backend is available and `models-weave` otherwise. The pod always receives
+the resolved profile, never `auto`. In v0.4 these correspond to exact 17/22
+read-write tool manifests (15/20 in read-only mode). Agent, ARIA, and raw GraphQL
+profiles cannot be enabled through this chart.
+
+For the v0.4 transition, the existing Managed Spec
+`datadog.enabled/mode/env/service/deploymentType` and `privacy.logLevel` fields
+remain as a narrow, validated compatibility bridge. They cannot enable direct
+forwarding, inject credentials, or override a conflicting non-default typed
+provider. New configurations should use `observability` only.
+
+The server-owned `dedicated` workload profile controls limits, admission,
+deadlines, sessions, and worker policy. Low-level environment overrides and
+opaque `envFrom` sources are rejected. MCP uses the internal ClusterIP for W&B
+API calls while `global.host` remains the public URL for user-facing links. It
+runs as one steady-state pod without HPA/VPA/KEDA, Kubernetes RBAC, or a mounted
+service-account token. Rolling updates retain `maxSurge: 1` for availability,
+so two independent process budgets can briefly overlap. Liveness uses
+`/mcp/livez`; readiness and the Helm health hook use `/mcp/health` so saturation
+does not restart a healthy process. Component-specific `nodeSelector`, `tolerations`, `affinity`, and
+`topologySpreadConstraints` remain supported scheduling controls.
+
+Capacity follows `global.size`: `default`, `testing`, and `small` select `small`;
+`medium` selects `medium`; `large`, `xlarge`, and `xxlarge` select `large`.
+These select server concurrency budgets, not CPU or memory requests. Resource
+settings remain explicit deployment controls; changing capacity does not resize
+the pod. The numeric defaults stay unchanged pending the release benchmarks.
+
+MCP uses its own ServiceAccount and disables automatic token mounting on both
+the account and Pod. Shared Weave/Azure identity selectors are rejected. Generic
+environment extensions must have literal names and cannot override the typed
+contract or SDK privacy flags, including through container templates. Final
+rendered environment entries must be unique. The inherited CA certificate
+mounts remain available for private upstream certificates.
+
+Ingress and the health hook follow the actual MCP Service name, including
+component name overrides. `mcp-server.service.ports` must contain exactly one
+named `http` TCP port from 1 to 65535 with `targetPort: 8080`. For example, a
+Service port of 9090 is supported while application and probe ports remain 8080.
+
 ## Use External Stateful Data
 
 You can configure the W&B Server Helm chart to point to external stateful storage for items like MySQL, Redis, and Storage.
@@ -249,6 +331,60 @@ The following Terraform (IaC) options use this approach:
 - [Azure](https://github.com/wandb/terraform-azurerm-wandb)
 
 For production-grade implementation, the appropriate chart parameters should be used to point to prebuilt, externalized state stores.
+
+## Customer-owned OIDC configuration
+
+By default, Helm creates `<release>-oidc-configmap` from the existing inline
+`global.auth.oidc` settings and CORS inputs. It still creates the ConfigMap when
+OIDC is unset; the data is empty unless extra CORS origins are configured.
+The app and API always import the selected ConfigMap through `envFrom`.
+
+Set `global.auth.oidc.oidcConfigMap.name` to use an existing ConfigMap in the
+release namespace instead. Helm then references it without creating or reading
+it. Leaving the name empty selects the chart-created ConfigMap.
+
+```yaml
+global:
+  auth:
+    oidc:
+      oidcConfigMap:
+        name: customer-oidc
+```
+
+The keys are the application's fixed environment-variable names. Existing app
+versions still consume the `OIDC_*` aliases, so the chart-created ConfigMap
+preserves them alongside the API's `GORILLA_*` names. Each pair has one value:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: customer-oidc
+data:
+  GORILLA_OIDC_CLIENT_ID: "existing-client-id"
+  OIDC_CLIENT_ID: "existing-client-id"
+  GORILLA_OIDC_ISSUER: "https://idp.example.com"
+  OIDC_ISSUER: "https://idp.example.com"
+  GORILLA_AUTH_METHOD: "pkce"
+  OIDC_AUTH_METHOD: "pkce"
+  GORILLA_CORS_ORIGINS: "https://extra.example.com,https://wandb.example.com,null"
+```
+
+An API-only external ConfigMap needs only the `GORILLA_*` keys. For CORS, preserve
+`app.extraCors` and, while OIDC is enabled, append `global.host` and the literal
+`null` origin. An empty ConfigMap supplies no OIDC variables. Explicit environment
+overrides retain precedence over `envFrom`.
+
+Client secrets keep their existing behavior: inline `global.auth.oidc.secret`
+or an external `oidcSecret.name` with `oidcSecret.secretKey` (default `OIDC_SECRET`).
+The existing Secret references provide both `GORILLA_OIDC_SECRET` and `OIDC_SECRET`;
+no Secret format migration is required to adopt the ConfigMap option.
+
+Provision a named external ConfigMap before selecting it. A missing named
+resource prevents container startup; an empty name uses the inline values.
+After changing external data, restart the consuming workloads to pick it up.
+Helm's `keep` annotation retains a chart-created ConfigMap during a same-name
+ownership transfer. Console editing and Argo ownership rules are separate work.
 
 ## Using External Secrets
 

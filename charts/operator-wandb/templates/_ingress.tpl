@@ -183,9 +183,9 @@ It expects a dictionary with two entries:
   path: /mcp
   backend:
     service:
-      name: {{ $.Release.Name }}-mcp-server
+      name: {{ include "wandb.mcpServiceName" $ }}
       port:
-        number: 8080
+        number: {{ include "wandb.mcpServicePort" $ }}
   {{- end }}
 - pathType: Prefix
   path: /console

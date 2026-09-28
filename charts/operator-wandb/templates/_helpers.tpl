@@ -71,13 +71,27 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Return the explicitly configured OTEL traces port, or the protocol default.
+*/}}
+{{- define "wandb.otelTracesPort" -}}
+  {{- $traces := .Values.global.otel.traces | default dict -}}
+  {{- $port := index $traces "port" -}}
+  {{- if or (not (hasKey $traces "port")) (kindIs "invalid" $port) -}}
+    {{- $proto := index $traces "proto" | default "grpc" | toString | trim | lower -}}
+    {{- ternary 4318 4317 (eq $proto "http") -}}
+  {{- else -}}
+    {{- $port -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
 Return the endpoint to send otel traces to (only works when called within a subchart or traceRatio will not be present)
 */}}
 {{- define "wandb.otelTracesEndpoint" -}}
   {{- if .Values.global.otel.traces.host -}}
-otlp+{{ .Values.global.otel.traces.proto }}://{{ .Values.global.otel.traces.host }}:{{ .Values.global.otel.traces.port }}?trace_ratio={{ default 0.0 .Values.traceRatio }}
+otlp+{{ .Values.global.otel.traces.proto }}://{{ .Values.global.otel.traces.host }}:{{ include "wandb.otelTracesPort" . }}?trace_ratio={{ default 0.0 .Values.traceRatio }}
   {{- else -}}
-otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset:{{ .Values.global.otel.traces.port }}?trace_ratio={{ default 0.0 .Values.traceRatio }}
+otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset:{{ include "wandb.otelTracesPort" . }}?trace_ratio={{ default 0.0 .Values.traceRatio }}
   {{- end -}}
 {{- end -}}
 

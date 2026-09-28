@@ -1,3 +1,37 @@
+{{- $oidc := .Values.global.auth.oidc -}}
+{{- if not $oidc.oidcConfigMap.name -}}
+  {{- $data := dict -}}
+  {{- $corsOrigins := list -}}
+  {{- if $oidc.clientId -}}
+    {{- $_ := set $data "GORILLA_OIDC_CLIENT_ID" ($oidc.clientId | toString) -}}
+    {{- $_ := set $data "GORILLA_OIDC_ISSUER" ($oidc.issuer | toString) -}}
+    {{- $_ := set $data "GORILLA_AUTH_METHOD" ($oidc.authMethod | toString) -}}
+    {{- /* Retain the environment names used by existing app versions. */ -}}
+    {{- $_ := set $data "OIDC_CLIENT_ID" ($oidc.clientId | toString) -}}
+    {{- $_ := set $data "OIDC_ISSUER" ($oidc.issuer | toString) -}}
+    {{- $_ := set $data "OIDC_AUTH_METHOD" ($oidc.authMethod | toString) -}}
+    {{- $corsOrigins = list .Values.global.host "null" | compact -}}
+  {{- end -}}
+  {{- if .Values.app.extraCors -}}
+    {{- $corsOrigins = concat .Values.app.extraCors $corsOrigins | compact -}}
+  {{- end -}}
+  {{- if gt (len $corsOrigins) 0 -}}
+    {{- $_ := set $data "GORILLA_CORS_ORIGINS" (join "," $corsOrigins) -}}
+  {{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "wandb.oidc.configMapName" . }}
+  annotations:
+    # Retain the resource when switching to an external reference with the same name.
+    "helm.sh/resource-policy": "keep"
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  {{- $data | toYaml | nindent 2 }}
+---
+{{- end }}
+
 {{- if and .Values.global.auth.oidc.secret (not .Values.global.auth.oidc.oidcSecret.name) }}
 apiVersion: v1
 kind: Secret
