@@ -1,0 +1,33 @@
+---
+suite: Traefik named hosts
+templates:
+- templates/traefik-ingress.yaml
+set:
+  global.host: https://customer.example.com
+  global.traefikIngress: true
+  global.ipAllowList.enabled: true
+  global.ipAllowList.userCIDRs:
+  - 192.0.2.0/24
+  ingress.additionalHosts:
+  - ''
+  - alias.example.com
+  - customer.example.com
+  - alias.example.com
+tests:
+- it: deduplicates named hosts and omits the hostless PrivateLink alias
+  set: {}
+  asserts:
+  - equal:
+      path: spec.tls[0].hosts
+      value:
+      - customer.example.com
+      - alias.example.com
+  - lengthEqual:
+      path: spec.rules
+      count: 2
+  - equal:
+      path: spec.rules[0].host
+      value: customer.example.com
+  - equal:
+      path: spec.rules[1].host
+      value: alias.example.com
