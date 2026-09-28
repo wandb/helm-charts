@@ -1,0 +1,137 @@
+suite: additional primary Ingress rules
+templates:
+  - templates/ingress.yaml
+release:
+  name: wandb
+set:
+  global.host: https://app.wandb.example.com
+  ingress.class: alb
+  ingress.additionalHosts:
+    - api.wandb.example.com
+    - ""
+tests:
+  - it: preserves application hosts and the catch-all when extra rules are empty
+    asserts:
+      - hasDocuments:
+          count: 1
+      - lengthEqual:
+          path: spec.rules
+          count: 3
+      - equal:
+          path: spec.rules[0].host
+          value: app.wandb.example.com
+      - equal:
+          path: spec.rules[1].host
+          value: api.wandb.example.com
+      - equal:
+          path: spec.rules[2].host
+          value: null
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: wandb-app
+
+  - it: redirects the legacy host before application and PrivateLink rules
+    set:
+      global.api.enabled: true
+      weave-trace.install: true
+      ingress.annotations:
+        alb.ingress.kubernetes.io/actions.legacy-host-redirect: >-
+          {"type":"redirect","redirectConfig":{"protocol":"HTTPS","port":"443","host":"app.wandb.example.com","path":"/#{path}","query":"#{query}","statusCode":"HTTP_302"}}
+      ingress.extraRules:
+        - host: wandb.example.com
+          http:
+            paths:
+              - path: /
+                pathType: Prefix
+                backend:
+                  service:
+                    name: legacy-host-redirect
+                    port:
+                      name: use-annotation
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: wandb
+      - equal:
+          path: metadata.annotations["alb.ingress.kubernetes.io/actions.legacy-host-redirect"]
+          value: >-
+            {"type":"redirect","redirectConfig":{"protocol":"HTTPS","port":"443","host":"app.wandb.example.com","path":"/#{path}","query":"#{query}","statusCode":"HTTP_302"}}
+      - lengthEqual:
+          path: spec.rules
+          count: 4
+      - equal:
+          path: spec.rules[0]
+          value:
+            host: wandb.example.com
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: legacy-host-redirect
+                      port:
+                        name: use-annotation
+      - equal:
+          path: spec.rules[1].host
+          value: app.wandb.example.com
+      - equal:
+          path: spec.rules[2].host
+          value: api.wandb.example.com
+      - equal:
+          path: spec.rules[3].host
+          value: null
+      - contains:
+          path: spec.rules[2].http.paths
+          content:
+            path: /graphql
+            pathType: Prefix
+            backend:
+              service:
+                name: wandb-api
+                port:
+                  number: 8081
+      - contains:
+          path: spec.rules[1].http.paths
+          content:
+            path: /traces
+            pathType: Prefix
+            backend:
+              service:
+                name: wandb-weave-trace
+                port:
+                  number: 8722
+
+  - it: leaves secondary Ingress rules unchanged when the primary Ingress is disabled
+    set:
+      ingress.create: false
+      ingress.extraRules:
+        - host: wandb.example.com
+          http:
+            paths:
+              - path: /
+                pathType: Prefix
+                backend:
+                  service:
+                    name: legacy-host-redirect
+                    port:
+                      name: use-annotation
+      ingress.secondary.create: true
+      ingress.secondary.nameOverride: wandb-secondary
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: wandb-secondary
+      - lengthEqual:
+          path: spec.rules
+          count: 1
+      - equal:
+          path: spec.rules[0].host
+          value: app.wandb.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: wandb-app
