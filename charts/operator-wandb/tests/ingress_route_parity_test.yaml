@@ -1,0 +1,654 @@
+---
+suite: Primary and Traefik route parity
+templates:
+- templates/ingress.yaml
+- templates/traefik-ingress.yaml
+release:
+  name: customer
+  namespace: customer-ns
+set:
+  global.host: https://customer.example.com
+  global.traefikIngress: true
+  global.ipAllowList.enabled: true
+  global.ipAllowList.userCIDRs:
+  - 192.0.2.0/24
+  ingress.additionalHosts:
+  - alias.example.com
+tests:
+- it: shares monolith paths with the primary ingress
+  set: {}
+  asserts:
+  - equal:
+      path: spec.rules
+      value:
+      - host: customer.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-app
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+      - host: alias.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-app
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+- it: shares console default backend paths with the primary ingress
+  set:
+    ingress.defaultBackend: console
+  asserts:
+  - equal:
+      path: spec.rules
+      value:
+      - host: customer.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+      - host: alias.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+- it: shares frontend default backend paths with the primary ingress
+  set:
+    frontend.install: true
+  asserts:
+  - equal:
+      path: spec.rules
+      value:
+      - host: customer.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-frontend
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+      - host: alias.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-frontend
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+- it: shares trace route paths with the primary ingress
+  set:
+    weave-trace.install: true
+  asserts:
+  - equal:
+      path: spec.rules
+      value:
+      - host: customer.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-app
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+          - pathType: Prefix
+            path: "/traces"
+            backend:
+              service:
+                name: customer-weave-trace
+                port:
+                  number: 8722
+      - host: alias.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-app
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+          - pathType: Prefix
+            path: "/traces"
+            backend:
+              service:
+                name: customer-weave-trace
+                port:
+                  number: 8722
+- it: shares MCP custom Service paths with the primary ingress
+  set:
+    mcp-server.install: true
+    mcp-server.service.name: customer-mcp-custom
+    mcp-server.service.ports:
+    - name: http
+      port: 9090
+      targetPort: 8080
+  asserts:
+  - equal:
+      path: spec.rules
+      value:
+      - host: customer.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-app
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/mcp"
+            backend:
+              service:
+                name: customer-mcp-custom
+                port:
+                  number: 9090
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+      - host: alias.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-app
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/mcp"
+            backend:
+              service:
+                name: customer-mcp-custom
+                port:
+                  number: 9090
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+- it: shares split API with optional routes False paths with the primary ingress
+  set:
+    global.api.enabled: true
+    mcp-server.install: true
+    weave-trace.install: true
+    global.api.additionalPaths.analytics: false
+    global.api.additionalPaths.oidc: false
+    global.api.additionalPaths.proxy: false
+    global.api.additionalPaths.files: false
+    global.api.additionalPaths.debug: false
+    global.api.additionalPaths.service_redirect: false
+    global.api.additionalPaths.service_dangerzone: false
+    global.api.additionalPaths.scim: false
+    global.api.additionalPaths.admin: false
+    global.api.additionalPaths.artifacts: false
+  asserts:
+  - equal:
+      path: spec.rules
+      value:
+      - host: customer.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-app
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/api"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/graphql"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/graphql2"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/mcp"
+            backend:
+              service:
+                name: customer-mcp-server
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+          - pathType: Prefix
+            path: "/traces"
+            backend:
+              service:
+                name: customer-weave-trace
+                port:
+                  number: 8722
+      - host: alias.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-app
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/api"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/graphql"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/graphql2"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/mcp"
+            backend:
+              service:
+                name: customer-mcp-server
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+          - pathType: Prefix
+            path: "/traces"
+            backend:
+              service:
+                name: customer-weave-trace
+                port:
+                  number: 8722
+- it: shares split API with optional routes True paths with the primary ingress
+  set:
+    global.api.enabled: true
+    mcp-server.install: true
+    weave-trace.install: true
+    global.api.additionalPaths.analytics: true
+    global.api.additionalPaths.oidc: true
+    global.api.additionalPaths.proxy: true
+    global.api.additionalPaths.files: true
+    global.api.additionalPaths.debug: true
+    global.api.additionalPaths.service_redirect: true
+    global.api.additionalPaths.service_dangerzone: true
+    global.api.additionalPaths.scim: true
+    global.api.additionalPaths.admin: true
+    global.api.additionalPaths.artifacts: true
+  asserts:
+  - equal:
+      path: spec.rules
+      value:
+      - host: customer.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-app
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/api"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/graphql"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/graphql2"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/analytics"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/oidc"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/proxy"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/files"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/debug"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/service-redirect"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/service-dangerzone"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/scim"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/admin/audit_logs"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/artifacts"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/artifactsV2"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/mcp"
+            backend:
+              service:
+                name: customer-mcp-server
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+          - pathType: Prefix
+            path: "/traces"
+            backend:
+              service:
+                name: customer-weave-trace
+                port:
+                  number: 8722
+      - host: alias.example.com
+        http:
+          paths:
+          - pathType: Prefix
+            path: "/"
+            backend:
+              service:
+                name: customer-app
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/api"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/graphql"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/graphql2"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/analytics"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/oidc"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/proxy"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/files"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/debug"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/service-redirect"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/service-dangerzone"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/scim"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/admin/audit_logs"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/artifacts"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/artifactsV2"
+            backend:
+              service:
+                name: customer-api
+                port:
+                  number: 8081
+          - pathType: Prefix
+            path: "/mcp"
+            backend:
+              service:
+                name: customer-mcp-server
+                port:
+                  number: 8080
+          - pathType: Prefix
+            path: "/console"
+            backend:
+              service:
+                name: customer-console
+                port:
+                  number: 8082
+          - pathType: Prefix
+            path: "/traces"
+            backend:
+              service:
+                name: customer-weave-trace
+                port:
+                  number: 8722

@@ -195,3 +195,17 @@ It expects a dictionary with two entries:
       port:
         number: 8082
 {{- end }}
+
+{{/* Keep the legacy primary and Traefik application paths identical, including traces. */}}
+{{- define "wandb.primaryIngressPaths" -}}
+  {{- include "IngressPath" . }}
+  {{- if index .Values "weave-trace" "install" }}
+- pathType: Prefix
+  path: /traces
+  backend:
+    service:
+      name: {{ .Release.Name }}-weave-trace
+      port:
+        number: 8722
+  {{- end }}
+{{- end -}}

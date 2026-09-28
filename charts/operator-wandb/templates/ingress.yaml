@@ -34,7 +34,7 @@ spec:
             class: {{ .Values.ingress.class }}
   {{- end }}
 {{- end }}
-{{- if .Values.ingress.install }}
+{{- if and .Values.global.legacyIngress .Values.ingress.install }}
 ---
   {{- if .Values.ingress.create }}
 apiVersion: networking.k8s.io/v1
@@ -80,21 +80,12 @@ spec:
   - host: {{ . }}
     http:
       paths:
-      {{- include "IngressPath" $dot | nindent 6 }}
-      {{- if index $.Values "weave-trace" "install" }}
-      - pathType: Prefix
-        path: /traces
-        backend:
-          service:
-            name: {{ $.Release.Name }}-weave-trace
-            port:
-              number: 8722
-      {{- end }}
+      {{- include "wandb.primaryIngressPaths" $dot | nindent 6 }}
     {{- end }}
   {{- end }}
 {{- end }}
 ---
-{{- if and .Values.ingress.secondary .Values.ingress.secondary.create }}
+{{- if and .Values.global.legacyIngress .Values.ingress.secondary .Values.ingress.secondary.create }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
