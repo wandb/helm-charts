@@ -1,0 +1,195 @@
+suite: OIDC ConfigMap lookup
+templates:
+  - oidc.yaml
+release:
+  name: customer
+  namespace: dedicated
+set:
+  app.internalJWTMap: null
+  global.host: https://wandb.example.com
+  global.auth.oidc.clientId: inline-client
+  global.auth.oidc.issuer: https://inline.example.com
+  global.auth.oidc.authMethod: pkce
+kubernetesProvider:
+  scheme:
+    "v1/ConfigMap":
+      gvr:
+        version: v1
+        resource: configmaps
+      namespaced: true
+
+tests:
+  - it: seeds a missing ConfigMap from inline configuration
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: customer-oidc-configmap
+      - equal:
+          path: data.GORILLA_OIDC_CLIENT_ID
+          value: inline-client
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+
+  - it: continues applying inline changes before Console takes ownership
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-oidc-configmap
+            namespace: dedicated
+          data:
+            GORILLA_OIDC_CLIENT_ID: previous-client
+    asserts:
+      - equal:
+          path: data.GORILLA_OIDC_CLIENT_ID
+          value: inline-client
+      - equal:
+          path: data.OIDC_CLIENT_ID
+          value: inline-client
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+
+  - it: preserves Console configuration and its ownership marker on upgrade
+    release:
+      isUpgrade: true
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-oidc-configmap
+            namespace: dedicated
+            resourceVersion: "123"
+            annotations:
+              wandb.ai/console-managed: "true"
+          data:
+            GORILLA_OIDC_CLIENT_ID: console-client
+            OIDC_CLIENT_ID: console-client
+            GORILLA_OIDC_ISSUER: https://console.example.com
+            OIDC_ISSUER: https://console.example.com
+            GORILLA_AUTH_METHOD: implicit
+            OIDC_AUTH_METHOD: implicit
+            GORILLA_CORS_ORIGINS: https://console.example.com,null
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: data
+          value:
+            GORILLA_OIDC_CLIENT_ID: console-client
+            OIDC_CLIENT_ID: console-client
+            GORILLA_OIDC_ISSUER: https://console.example.com
+            OIDC_ISSUER: https://console.example.com
+            GORILLA_AUTH_METHOD: implicit
+            OIDC_AUTH_METHOD: implicit
+            GORILLA_CORS_ORIGINS: https://console.example.com,null
+      - equal:
+          path: metadata.annotations["wandb.ai/console-managed"]
+          value: "true"
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+      - notExists:
+          path: metadata.resourceVersion
+
+  - it: keeps OIDC disabled when Console clears the ConfigMap
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-oidc-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: "true"
+          data: {}
+    asserts:
+      - equal:
+          path: data
+          value: {}
+      - equal:
+          path: metadata.annotations["wandb.ai/console-managed"]
+          value: "true"
+
+  - it: treats absent data on a Console-managed ConfigMap as empty
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-oidc-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: "true"
+    asserts:
+      - equal:
+          path: data
+          value: {}
+
+  - it: returns to inline configuration when the ownership marker is false
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-oidc-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: "false"
+          data:
+            GORILLA_OIDC_CLIENT_ID: console-client
+    asserts:
+      - equal:
+          path: data.GORILLA_OIDC_CLIENT_ID
+          value: inline-client
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+
+  - it: does not reuse configuration from another release or namespace
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-oidc-configmap
+            namespace: another-namespace
+            annotations:
+              wandb.ai/console-managed: "true"
+          data:
+            GORILLA_OIDC_CLIENT_ID: other-namespace-client
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: another-release-oidc-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: "true"
+          data:
+            GORILLA_OIDC_CLIENT_ID: other-release-client
+    asserts:
+      - equal:
+          path: data.GORILLA_OIDC_CLIENT_ID
+          value: inline-client
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+
+  - it: does not render a ConfigMap when an external name is selected
+    set:
+      global.auth.oidc.oidcConfigMap.name: customer-oidc-configmap
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-oidc-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: "true"
+          data:
+            GORILLA_OIDC_CLIENT_ID: external-client
+    asserts:
+      - hasDocuments:
+          count: 0

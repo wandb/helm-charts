@@ -339,6 +339,22 @@ By default, Helm creates `<release>-oidc-configmap` from the existing inline
 OIDC is unset; the data is empty unless extra CORS origins are configured.
 The app and API always import the selected ConfigMap through `envFrom`.
 
+To hand the chart-created ConfigMap over to Console, Console must set
+`wandb.ai/console-managed: "true"` on the ConfigMap when it starts managing its
+data. During Helm install/upgrade, `lookup` reads that annotation and reuses the
+live data, including an intentionally empty map. The chart continues rendering
+the ConfigMap and the annotation; no external name or install hook is needed.
+Until the annotation is set, inline values (including operator user-spec and
+Terraform inputs) continue to update the ConfigMap as before. Leave
+Terraform-controlled configuration unmarked. Removing the annotation returns
+data ownership to inline values on the next Helm upgrade.
+
+This preservation requires Helm to render with cluster access, as operator v1
+does. Offline `helm template`, including Argo CD rendering, cannot read the live
+ConfigMap and renders inline values. Argo therefore needs separate data ownership
+rules when it takes over deployment. `helm.sh/resource-policy: keep` protects
+against deletion; it does not prevent data updates.
+
 Set `global.auth.oidc.oidcConfigMap.name` to use an existing ConfigMap in the
 release namespace instead. Helm then references it without creating or reading
 it. Leaving the name empty selects the chart-created ConfigMap.
