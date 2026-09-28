@@ -73,8 +73,10 @@ renewable certificate lifecycle independent of the old Ingress before disabling
 legacy ingress. This chart does not automatically adopt or patch live certificate
 ownership. Keep legacy ingress enabled until that migration is verified.
 
-Activation also requires the Traefik Middleware CRD, operator permissions to manage
-Ingress/Middleware resources, both Traefik Kubernetes providers watching the release
+Activation requires operator chart **1.4.10** or another release containing its
+Traefik middleware RBAC grant; upgrade the installed operator first. Custom
+`role.rules` replacements must include that grant. Activation also requires the
+Traefik Middleware CRD, both Traefik Kubernetes providers watching the release
 namespace, and a working trusted source-IP configuration. No forwarded-header
 `ipStrategy` is set. Rendering verifies resource references, not live enforcement,
 redirects, certificate issuance/renewal, or missing/rejected middleware behavior.
