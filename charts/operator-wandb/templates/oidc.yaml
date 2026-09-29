@@ -51,29 +51,27 @@ data:
   {{- $metadata := get $existing "metadata" | default dict -}}
   {{- $annotations := get $metadata "annotations" | default dict -}}
   {{- $consoleManaged := eq (get $annotations "wandb.ai/console-managed") "true" -}}
-  {{- if or $oidc.secret $consoleManaged -}}
-    {{- $data := dict -}}
-    {{- if $consoleManaged -}}
-      {{- /* Secret data is already base64 encoded; preserve empty data without restoring inline credentials. */ -}}
-      {{- $data = get $existing "data" | default dict -}}
-    {{- else -}}
-      {{- $_ := set $data $oidc.oidcSecret.secretKey ($oidc.secret | b64enc) -}}
-    {{- end }}
+  {{- $data := dict -}}
+  {{- if $consoleManaged -}}
+    {{- /* Secret data is already base64 encoded; preserve empty data without restoring inline credentials. */ -}}
+    {{- $data = get $existing "data" | default dict -}}
+  {{- else if $oidc.secret -}}
+    {{- $_ := set $data $oidc.oidcSecret.secretKey ($oidc.secret | b64enc) -}}
+  {{- end }}
 apiVersion: v1
 kind: Secret
 metadata:
   name: {{ $name }}
   annotations:
     "helm.sh/resource-policy": "keep"
-    {{- if $consoleManaged }}
+  {{- if $consoleManaged }}
     "wandb.ai/console-managed": "true"
-    {{- end }}
+  {{- end }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
-    {{- $data | toYaml | nindent 2 }}
+  {{- $data | toYaml | nindent 2 }}
 ---
-  {{- end }}
 {{- end }}
 
 {{- if and .Values.app.internalJWTMap (gt (len .Values.app.internalJWTMap) 0) }}
