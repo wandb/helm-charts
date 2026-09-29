@@ -1,5 +1,9 @@
-{{- $oidc := .Values.global.auth.oidc -}}
-{{- if not $oidc.oidcConfigMap.name -}}
+{{- /* Legacy user specs disable OIDC with null; treat it as empty configuration. */ -}}
+{{- $oidc := .Values.global.auth.oidc | default dict -}}
+{{- $configMap := $oidc.oidcConfigMap | default dict -}}
+{{- $secret := $oidc.oidcSecret | default dict -}}
+{{- $secretKey := $secret.secretKey | default "OIDC_SECRET" -}}
+{{- if not $configMap.name -}}
   {{- $name := include "wandb.oidc.configMapName" . -}}
   {{- $existing := lookup "v1" "ConfigMap" .Release.Namespace $name | default dict -}}
   {{- $metadata := get $existing "metadata" | default dict -}}
@@ -45,7 +49,7 @@ data:
 ---
 {{- end }}
 
-{{- if not $oidc.oidcSecret.name -}}
+{{- if not $secret.name -}}
   {{- $name := include "wandb.oidc.secretSecret" . -}}
   {{- $existing := lookup "v1" "Secret" .Release.Namespace $name | default dict -}}
   {{- $metadata := get $existing "metadata" | default dict -}}
@@ -56,7 +60,7 @@ data:
     {{- /* Secret data is already base64 encoded; preserve empty data without restoring inline credentials. */ -}}
     {{- $data = get $existing "data" | default dict -}}
   {{- else if $oidc.secret -}}
-    {{- $_ := set $data $oidc.oidcSecret.secretKey ($oidc.secret | b64enc) -}}
+    {{- $_ := set $data $secretKey ($oidc.secret | b64enc) -}}
   {{- end }}
 apiVersion: v1
 kind: Secret
