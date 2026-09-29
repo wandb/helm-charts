@@ -391,13 +391,16 @@ An API-only external ConfigMap needs only the `GORILLA_*` keys. For CORS, preser
 `null` origin. An empty ConfigMap supplies no OIDC variables. Explicit environment
 overrides retain precedence over `envFrom`.
 
-Inline `global.auth.oidc.secret` seeds `<release>-oidc-secret`. Console can take
-ownership by setting `wandb.ai/console-managed: "true"` on that Secret along with
-its data. Helm then preserves the live data, including empty data, and keeps
-rendering the Secret after the inline value is removed. The app/API use the
+By default, Helm always creates `<release>-oidc-secret`, using inline
+`global.auth.oidc.secret` when configured and `data: {}` otherwise. This gives
+Console an existing Secret to patch, including for customers without a client
+secret. Console can take ownership by setting `wandb.ai/console-managed: "true"`
+on that Secret along with its data. Helm then preserves the live data, including
+empty data, and keeps rendering the Secret after the inline value is removed.
+The app/API use the
 managed credential when present and omit the Secret references when Console
-clears it. Unmarked Secrets continue following inline values; no Secret is
-created when neither inline credentials nor a Console-managed Secret exists.
+clears it. Unmarked Secrets continue following inline values. An empty Secret
+does not add credential environment variables or enable OIDC.
 
 An external `oidcSecret.name` still references an existing Secret without
 rendering or looking it up. `oidcSecret.secretKey` remains supported (default
