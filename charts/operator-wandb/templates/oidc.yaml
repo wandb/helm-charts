@@ -45,16 +45,35 @@ data:
 ---
 {{- end }}
 
-{{- if and .Values.global.auth.oidc.secret (not .Values.global.auth.oidc.oidcSecret.name) }}
+{{- if not $oidc.oidcSecret.name -}}
+  {{- $name := include "wandb.oidc.secretSecret" . -}}
+  {{- $existing := lookup "v1" "Secret" .Release.Namespace $name | default dict -}}
+  {{- $metadata := get $existing "metadata" | default dict -}}
+  {{- $annotations := get $metadata "annotations" | default dict -}}
+  {{- $consoleManaged := eq (get $annotations "wandb.ai/console-managed") "true" -}}
+  {{- if or $oidc.secret $consoleManaged -}}
+    {{- $data := dict -}}
+    {{- if $consoleManaged -}}
+      {{- /* Secret data is already base64 encoded; preserve empty data without restoring inline credentials. */ -}}
+      {{- $data = get $existing "data" | default dict -}}
+    {{- else -}}
+      {{- $_ := set $data $oidc.oidcSecret.secretKey ($oidc.secret | b64enc) -}}
+    {{- end }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "wandb.oidc.secretSecret" . }}
+  name: {{ $name }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+    {{- if $consoleManaged }}
+    "wandb.ai/console-managed": "true"
+    {{- end }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
-  {{ .Values.global.auth.oidc.oidcSecret.secretKey }}: {{ .Values.global.auth.oidc.secret | b64enc }}
+    {{- $data | toYaml | nindent 2 }}
 ---
+  {{- end }}
 {{- end }}
 
 {{- if and .Values.app.internalJWTMap (gt (len .Values.app.internalJWTMap) 0) }}
