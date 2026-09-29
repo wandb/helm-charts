@@ -1,0 +1,123 @@
+suite: OIDC null value compatibility
+templates:
+  - oidc.yaml
+  - charts/api/templates/deployment.yaml
+release:
+  name: wandb
+set:
+  app.internalJWTMap: null
+  global.api.enabled: true
+tests:
+  - it: renders an empty ConfigMap when the legacy user spec disables OIDC with null
+    template: oidc.yaml
+    set:
+      global.auth.oidc: null
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    asserts:
+      - equal:
+          path: metadata.name
+          value: wandb-oidc-configmap
+      - equal:
+          path: data
+          value: {}
+  - it: renders an empty Secret when the legacy user spec disables OIDC with null
+    template: oidc.yaml
+    set:
+      global.auth.oidc: null
+    documentSelector:
+      path: kind
+      value: Secret
+    asserts:
+      - equal:
+          path: metadata.name
+          value: wandb-oidc-secret
+      - equal:
+          path: data
+          value: {}
+  - it: keeps API OIDC credentials disabled when OIDC is null
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.auth.oidc: null
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-oidc-configmap
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+          any: true
+  - it: uses the default ConfigMap with null reference settings
+    template: oidc.yaml
+    set:
+      global.auth.oidc.oidcConfigMap: null
+      global.auth.oidc.oidcSecret: null
+      global.auth.oidc.clientId: inline-client
+      global.auth.oidc.issuer: https://idp.example.com
+      global.auth.oidc.authMethod: pkce
+      global.auth.oidc.secret: inline-secret
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    asserts:
+      - equal:
+          path: metadata.name
+          value: wandb-oidc-configmap
+      - equal:
+          path: data.GORILLA_OIDC_CLIENT_ID
+          value: inline-client
+  - it: uses the default Secret name and key with null reference settings
+    template: oidc.yaml
+    set:
+      global.auth.oidc.oidcConfigMap: null
+      global.auth.oidc.oidcSecret: null
+      global.auth.oidc.clientId: inline-client
+      global.auth.oidc.issuer: https://idp.example.com
+      global.auth.oidc.authMethod: pkce
+      global.auth.oidc.secret: inline-secret
+    documentSelector:
+      path: kind
+      value: Secret
+    asserts:
+      - equal:
+          path: metadata.name
+          value: wandb-oidc-secret
+      - equal:
+          path: data
+          value:
+            OIDC_SECRET: aW5saW5lLXNlY3JldA==
+  - it: references the default Secret key in the API with null reference settings
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.auth.oidc.oidcConfigMap: null
+      global.auth.oidc.oidcSecret: null
+      global.auth.oidc.clientId: inline-client
+      global.auth.oidc.issuer: https://idp.example.com
+      global.auth.oidc.authMethod: pkce
+      global.auth.oidc.secret: inline-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: OIDC_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
