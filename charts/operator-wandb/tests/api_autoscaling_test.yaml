@@ -1,0 +1,41 @@
+suite: API autoscaling capacity
+templates:
+  - charts/api/templates/hpa.yaml
+release:
+  name: test-release
+  namespace: default
+tests:
+  - it: lets the xxlarge API scale above its minimum
+    set:
+      global.api.enabled: true
+      global.size: xxlarge
+    asserts:
+      - equal:
+          path: spec.minReplicas
+          value: 2
+      - equal:
+          path: spec.maxReplicas
+          value: 5
+      - equal:
+          path: spec.metrics[0].resource.target.averageUtilization
+          value: 80
+  - it: honors an explicit API maximum over the sizing default
+    set:
+      global.api.enabled: true
+      global.size: xxlarge
+      api.autoscaling.horizontal.maxReplicas: 2
+    asserts:
+      - equal:
+          path: spec.maxReplicas
+          value: 2
+  - it: retains the xlarge replica bounds
+    set:
+      global.api.enabled: true
+      global.size: xlarge
+    asserts:
+      - equal:
+          path: spec.minReplicas
+          value: 2
+      - equal:
+          path: spec.maxReplicas
+          value: 2
