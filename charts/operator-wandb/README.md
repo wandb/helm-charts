@@ -332,6 +332,30 @@ The following Terraform (IaC) options use this approach:
 
 For production-grade implementation, the appropriate chart parameters should be used to point to prebuilt, externalized state stores.
 
+## Customer-owned Slack configuration
+
+Helm always creates `<release>-slack-secret` from `global.slack.clientId` and
+`global.slack.secret`, with empty data when neither is configured. API and legacy
+app workloads import it through `envFrom`. The fixed keys are
+`GORILLA_SLACK_CLIENT_ID`, `GORILLA_SLACK_SECRET`, `SLACK_CLIENT_ID`, and
+`SLACK_SECRET`; the legacy aliases contain the same values. Slack keys are no
+longer rendered in the shared global Secret.
+
+Console patches the Secret and sets `wandb.ai/console-managed: "true"`. Helm
+preserves marked live data through `lookup`, including removed keys; unmarked
+Secrets continue following inline values. The `helm.sh/resource-policy: keep`
+annotation preserves the resource when switching to an external reference; it
+is not what protects data from reconciliation. Set
+`global.slack.slackSecret.name` to reference an existing Secret with the same
+fixed keys instead of rendering the default Secret. Argo CD requires separate
+sync ownership rules because offline templating does not resolve live `lookup`.
+
+Roll out this chart before the Console change. Dedicated Cloud Console patches
+the existing Secret and restarts the API deployment. The Secret reference is
+always present, so first credentials, replacements, and removals take effect on
+restart without another Helm update. Existing inline values remain supported;
+legacy/self-managed Console retains its user-spec path.
+
 ## Customer-owned OIDC configuration
 
 By default, Helm creates `<release>-oidc-configmap` from the existing inline
