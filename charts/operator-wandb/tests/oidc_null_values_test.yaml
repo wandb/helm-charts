@@ -36,7 +36,7 @@ tests:
       - equal:
           path: data
           value: {}
-  - it: keeps API OIDC credentials disabled when OIDC is null
+  - it: keeps optional API Secret references when OIDC is null
     template: charts/api/templates/deployment.yaml
     set:
       global.auth.oidc: null
@@ -46,16 +46,24 @@ tests:
           content:
             configMapRef:
               name: wandb-oidc-configmap
-      - notContains:
+      - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_OIDC_SECRET
-          any: true
-      - notContains:
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+                optional: true
+      - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: OIDC_SECRET
-          any: true
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+                optional: true
   - it: uses the default ConfigMap with null reference settings
     template: oidc.yaml
     set:
@@ -113,6 +121,7 @@ tests:
               secretKeyRef:
                 name: wandb-oidc-secret
                 key: OIDC_SECRET
+                optional: true
       - contains:
           path: spec.template.spec.containers[0].env
           content:
@@ -121,3 +130,4 @@ tests:
               secretKeyRef:
                 name: wandb-oidc-secret
                 key: OIDC_SECRET
+                optional: true

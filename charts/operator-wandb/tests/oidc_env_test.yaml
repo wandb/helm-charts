@@ -150,6 +150,7 @@ tests:
               secretKeyRef:
                 name: wandb-oidc-secret
                 key: OIDC_SECRET
+                optional: true
       - contains:
           path: spec.template.spec.containers[0].env
           content:
@@ -158,8 +159,9 @@ tests:
               secretKeyRef:
                 name: wandb-oidc-secret
                 key: OIDC_SECRET
+                optional: true
 
-  - it: references the empty generated ConfigMap when OIDC is unset
+  - it: references the empty generated ConfigMap and Secret before the first credential
     template: charts/api/templates/deployment.yaml
     set:
       global.auth.oidc.oidcConfigMap.name: ""
@@ -170,16 +172,24 @@ tests:
           content:
             configMapRef:
               name: wandb-oidc-configmap
-      - notContains:
+      - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: OIDC_SECRET
-          any: true
-      - notContains:
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+                optional: true
+      - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_OIDC_SECRET
-          any: true
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+                optional: true
 
   - it: supports external OIDC without a client secret
     template: charts/api/templates/deployment.yaml
@@ -191,16 +201,24 @@ tests:
           content:
             configMapRef:
               name: customer-oidc
-      - notContains:
+      - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: OIDC_SECRET
-          any: true
-      - notContains:
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+                optional: true
+      - contains:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_OIDC_SECRET
-          any: true
+            valueFrom:
+              secretKeyRef:
+                name: wandb-oidc-secret
+                key: OIDC_SECRET
+                optional: true
 
   - it: supports external credentials with chart-managed configuration
     template: charts/api/templates/deployment.yaml
