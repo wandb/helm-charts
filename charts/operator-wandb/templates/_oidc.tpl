@@ -16,28 +16,21 @@
   {{- $oidc := .Values.global.auth.oidc | default dict -}}
   {{- $secret := $oidc.oidcSecret | default dict -}}
   {{- $secretKey := $secret.secretKey | default "OIDC_SECRET" -}}
-  {{- $enabled := or $oidc.secret $secret.name -}}
-  {{- if not $secret.name -}}
-    {{- $name := include "wandb.oidc.secretSecret" . -}}
-    {{- $existing := lookup "v1" "Secret" .Release.Namespace $name | default dict -}}
-    {{- $metadata := get $existing "metadata" | default dict -}}
-    {{- $annotations := get $metadata "annotations" | default dict -}}
-    {{- if eq (get $annotations "wandb.ai/console-managed") "true" -}}
-      {{- /* Console-owned credentials remain usable after removing inline values; empty credentials disable the reference. */ -}}
-      {{- $data := get $existing "data" | default dict -}}
-      {{- $enabled = not (empty (get $data $secretKey)) -}}
-    {{- end -}}
-  {{- end -}}
-  {{- if $enabled }}
+  {{- /* Always reference the chart-created Secret, even when empty, so Console can add or clear credentials with only a restart. */ -}}
 - name: GORILLA_OIDC_SECRET
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.oidc.secretSecret" . | quote }}
       key: {{ $secretKey | quote }}
+  {{- if not $secret.name }}
+      optional: true
+  {{- end }}
 - name: OIDC_SECRET
   valueFrom:
     secretKeyRef:
       name: {{ include "wandb.oidc.secretSecret" . | quote }}
       key: {{ $secretKey | quote }}
+  {{- if not $secret.name }}
+      optional: true
   {{- end }}
 {{- end -}}

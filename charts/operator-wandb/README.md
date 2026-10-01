@@ -397,15 +397,20 @@ Console an existing Secret to patch, including for customers without a client
 secret. Console can take ownership by setting `wandb.ai/console-managed: "true"`
 on that Secret along with its data. Helm then preserves the live data, including
 empty data, and keeps rendering the Secret after the inline value is removed.
-The app/API use the
-managed credential when present and omit the Secret references when Console
-clears it. Unmarked Secrets continue following inline values. An empty Secret
-does not add credential environment variables or enable OIDC.
+The app/API always reference the chart-created Secret with `optional: true`.
+A missing credential key does not add an environment variable or prevent startup;
+it does not enable OIDC. Adding the first credential, changing it, or removing
+its key takes effect when the consuming workload restarts, without needing a
+Helm render to change the Deployment's Secret references. To clear a credential,
+Console should remove its key from the Secret. Unmarked Secrets continue
+following inline values.
 
 An external `oidcSecret.name` still references an existing Secret without
 rendering or looking it up. `oidcSecret.secretKey` remains supported (default
 `OIDC_SECRET`), and both `GORILLA_OIDC_SECRET` and `OIDC_SECRET` reference that
-same key. No Secret format migration is required. As with the ConfigMap,
+same key. Explicit external Secret references remain required, so a missing
+Secret or key prevents startup as before. No Secret format migration is required.
+As with the ConfigMap,
 preservation requires cluster access during Helm rendering; Argo needs separate
 ownership rules. Terraform-controlled Secrets must remain unmarked.
 
