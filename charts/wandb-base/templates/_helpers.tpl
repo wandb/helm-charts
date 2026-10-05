@@ -237,3 +237,10 @@ Common annotations - merges global and local common annotations
 {{- toYaml $commonAnnotations }}
   {{- end }}
 {{- end }}
+
+{{/* Whether this component renders and controls its own ServiceAccount. */}}
+{{- define "wandb-base.createsServiceAccount" -}}
+  {{- and .Values.serviceAccount.create
+  (not (include "wandb-base.azureStorageServiceAccountEnabled" . | trim | eq "true"))
+  (not .Values.serviceAccount.useWeaveTraceIdentity) -}}
+{{- end -}}
