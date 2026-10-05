@@ -9,18 +9,27 @@
 {{- if $consoleManaged -}}
   {{- $data = $existing.data | default dict -}}
 {{- else -}}
-  {{- $host := include "wandb.smtp.resolveValue" (dict "root" . "field" "host" "value" ($smtp.host)) -}}
-  {{- $port := include "wandb.smtp.resolveValue" (dict "root" . "field" "port" "value" ($smtp.port | default 587)) -}}
-  {{- $user := include "wandb.smtp.resolveValue" (dict "root" . "field" "user" "value" ($smtp.user)) -}}
-  {{- $password := include "wandb.smtp.resolveValue" (dict "root" . "field" "password" "value" ($smtp.password)) -}}
-  {{- $sink := "https://api.wandb.ai/email/dispatch" -}}
-  {{- if $host -}}
-    {{- $sink = printf "smtp://%s:%s@%s:%s" $user $password $host $port -}}
+  {{- $fields := dict "host" "SMTP_HOST" "port" "SMTP_PORT" "user" "SMTP_USER" "password" "SMTP_PASSWORD" "mailFrom" "GORILLA_EMAIL_FROM_ADDRESS" -}}
+  {{- range $field, $env := $fields -}}
+    {{- $value := get $smtp $field -}}
+    {{- if eq $field "port" -}}
+      {{- $value = $value | default 587 -}}
+    {{- end -}}
+    {{- $external := and (kindIs "map" $value) (hasKey $value "valueFrom") -}}
+    {{- if not $external -}}
+      {{- $inline := include "wandb.smtp.inlineValue" $value -}}
+      {{- if or (ne $field "mailFrom") $inline -}}
+        {{- $_ := set $data $env ($inline | b64enc) -}}
+      {{- end -}}
+    {{- end -}}
   {{- end -}}
-  {{- $data = dict "SMTP_HOST" ($host | b64enc) "SMTP_PORT" ($port | b64enc) "SMTP_USER" ($user | b64enc) "SMTP_PASSWORD" ($password | b64enc) "GORILLA_EMAIL_SINK" ($sink | b64enc) -}}
-  {{- $mailFrom := include "wandb.smtp.resolveValue" (dict "root" . "field" "mailFrom" "value" $smtp.mailFrom) -}}
-  {{- if $mailFrom -}}
-    {{- $_ := set $data "GORILLA_EMAIL_FROM_ADDRESS" ($mailFrom | b64enc) -}}
+  {{- if not (include "wandb.smtp.hasConnectionRefs" .) -}}
+    {{- $host := get $data "SMTP_HOST" | b64dec -}}
+    {{- $sink := "https://api.wandb.ai/email/dispatch" -}}
+    {{- if $host -}}
+      {{- $sink = printf "smtp://%s:%s@%s:%s" (get $data "SMTP_USER" | b64dec) (get $data "SMTP_PASSWORD" | b64dec) $host (get $data "SMTP_PORT" | b64dec) -}}
+    {{- end -}}
+    {{- $_ := set $data "GORILLA_EMAIL_SINK" ($sink | b64enc) -}}
   {{- end -}}
 {{- end }}
 apiVersion: v1

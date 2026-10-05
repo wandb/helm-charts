@@ -147,10 +147,7 @@ global:
   #
   # FOR ADVANCED USERS:
   # the following mysql config options can passed as maps/objects
-  # References are resolved with lookup into <release>-smtp-secret when Helm renders.
-  # Referenced resources must already exist in the release namespace.
-  # Source changes require Helm reconciliation before a pod restart can pick them up.
-  # After Console takes ownership, its saved settings are preserved instead.
+  # so that their values can be pulled by existing secrets populated by other systems
   #
   # mysql:
   #   host:
@@ -230,10 +227,7 @@ global:
   #
   # FOR ADVANCED USERS:
   # the following clickhouse config options can passed as maps/objects
-  # References are resolved with lookup into <release>-smtp-secret when Helm renders.
-  # Referenced resources must already exist in the release namespace.
-  # Source changes require Helm reconciliation before a pod restart can pick them up.
-  # After Console takes ownership, its saved settings are preserved instead.
+  # so that their values can be pulled by existing secrets populated by other systems
   #
   # clickhouse:
   #   host:
@@ -406,10 +400,10 @@ global:
   #
   # For Advanced Users:
   # the following email config options can passed as maps/objects
-  # References are resolved with lookup into <release>-smtp-secret when Helm renders.
-  # Referenced resources must already exist in the release namespace.
-  # Source changes require Helm reconciliation before a pod restart can pick them up.
-  # After Console takes ownership, its saved settings are preserved instead.
+  # Inline SMTP values seed <release>-smtp-secret for Console to manage.
+  # Secret/ConfigMap references are passed directly to pods; Helm does not read them.
+  # Restart pods after changing referenced values, as with the existing chart.
+  # Explicit references take precedence over the corresponding Console-managed values.
   #
   # email:
   #   smtp:
@@ -764,6 +758,7 @@ api:
     "{{ .Release.Name }}-api-configmap": "configMapRef"
     "{{ .Release.Name }}-gorilla-session-key": "secretRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.sessionKeyEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
@@ -975,6 +970,7 @@ app:
     "{{ .Release.Name }}-app-configmap": "configMapRef"
     "{{ .Release.Name }}-local-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.sessionKeyEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
@@ -1286,6 +1282,7 @@ executor:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-executor-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -1416,6 +1413,7 @@ filemeta:
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -1586,6 +1584,7 @@ filestream:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-filestream-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -1702,6 +1701,7 @@ flat-run-fields-updater:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-flat-run-fields-updater-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
@@ -2004,6 +2004,7 @@ history-updater:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-history-updater-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
@@ -2838,6 +2839,7 @@ glue:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-glue-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -3036,6 +3038,7 @@ metric-observer:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-flat-run-fields-updater-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -3192,6 +3195,7 @@ parquet:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-parquet-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'

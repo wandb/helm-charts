@@ -1,0 +1,243 @@
+suite: SMTP external references remain direct
+templates:
+- smtp.yaml
+- charts/api/templates/deployment.yaml
+release:
+  name: customer
+  namespace: dedicated
+set:
+  global.api.enabled: true
+  global.email.smtp.host: smtp.example.com
+  global.email.smtp.user: sender
+tests:
+- it: renders required external references without reading cluster resources
+  template: charts/api/templates/deployment.yaml
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: SMTP_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: customer-credentials
+            key: password
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: GORILLA_EMAIL_FROM_ADDRESS
+        valueFrom:
+          configMapKeyRef:
+            name: customer-email
+            key: from
+            optional: true
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: GORILLA_EMAIL_SINK
+        value: smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+  - contains:
+      path: spec.template.spec.containers[0].envFrom
+      content:
+        secretRef:
+          name: customer-smtp-secret
+  set:
+    global.email.smtp.password:
+      valueFrom:
+        secretKeyRef:
+          name: customer-credentials
+          key: password
+    global.email.smtp.mailFrom:
+      valueFrom:
+        configMapKeyRef:
+          name: customer-email
+          key: from
+          optional: true
+- it: stores inline fields without copying external fields into the shared Secret
+  template: smtp.yaml
+  asserts:
+  - equal:
+      path: data.SMTP_HOST
+      value: c210cC5leGFtcGxlLmNvbQ==
+  - equal:
+      path: data.SMTP_USER
+      value: c2VuZGVy
+  - notExists:
+      path: data.SMTP_PASSWORD
+  - notExists:
+      path: data.GORILLA_EMAIL_FROM_ADDRESS
+  - notExists:
+      path: data.GORILLA_EMAIL_SINK
+  set:
+    global.email.smtp.password:
+      valueFrom:
+        secretKeyRef:
+          name: customer-credentials
+          key: password
+    global.email.smtp.mailFrom:
+      valueFrom:
+        configMapKeyRef:
+          name: customer-email
+          key: from
+          optional: true
+- it: keeps inline-only settings in the shared Secret
+  template: smtp.yaml
+  set:
+    global.email.smtp.password:
+      value: password
+    global.email.smtp.mailFrom:
+      value: sender@example.com
+  asserts:
+  - equal:
+      path: data.SMTP_PASSWORD
+      value: cGFzc3dvcmQ=
+  - equal:
+      path: data.GORILLA_EMAIL_FROM_ADDRESS
+      value: c2VuZGVyQGV4YW1wbGUuY29t
+  - equal:
+      path: data.GORILLA_EMAIL_SINK
+      value: c210cDovL3NlbmRlcjpwYXNzd29yZEBzbXRwLmV4YW1wbGUuY29tOjU4Nw==
+- it: retains the default dispatch service when no SMTP host is configured
+  template: smtp.yaml
+  set:
+    global.email.smtp.host: ''
+    global.email.smtp.password:
+      valueFrom:
+        secretKeyRef:
+          name: customer-credentials
+          key: password
+  asserts:
+  - equal:
+      path: data.GORILLA_EMAIL_SINK
+      value: aHR0cHM6Ly9hcGkud2FuZGIuYWkvZW1haWwvZGlzcGF0Y2g=
+- it: preserves optional references and field-specific keys for all connection settings
+  template: charts/api/templates/deployment.yaml
+  set:
+    global.email.smtp.host:
+      valueFrom:
+        configMapKeyRef:
+          name: smtp-config
+          key: hostname
+    global.email.smtp.port:
+      valueFrom:
+        configMapKeyRef:
+          name: smtp-config
+          key: port
+    global.email.smtp.user:
+      valueFrom:
+        secretKeyRef:
+          name: smtp-user
+          key: username
+          optional: true
+    global.email.smtp.password:
+      valueFrom:
+        secretKeyRef:
+          name: smtp-password
+          key: credential
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: SMTP_HOST
+        valueFrom:
+          configMapKeyRef:
+            name: smtp-config
+            key: hostname
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: SMTP_PORT
+        valueFrom:
+          configMapKeyRef:
+            name: smtp-config
+            key: port
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: SMTP_USER
+        valueFrom:
+          secretKeyRef:
+            name: smtp-user
+            key: username
+            optional: true
+  - contains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: SMTP_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: smtp-password
+            key: credential
+- it: preserves Console-managed SMTP settings during an upgrade
+  template: smtp.yaml
+  release:
+    isUpgrade: true
+  kubernetesProvider:
+    objects:
+    - apiVersion: v1
+      kind: Secret
+      metadata:
+        name: customer-smtp-secret
+        namespace: dedicated
+        annotations:
+          wandb.ai/console-managed: 'true'
+      data:
+        SMTP_PASSWORD: Y29uc29sZS1wYXNzd29yZA==
+        GORILLA_EMAIL_SINK: Y29uc29sZS1zaW5r
+  asserts:
+  - equal:
+      path: data
+      value:
+        SMTP_PASSWORD: Y29uc29sZS1wYXNzd29yZA==
+        GORILLA_EMAIL_SINK: Y29uc29sZS1zaW5r
+  - equal:
+      path: metadata.annotations["wandb.ai/console-managed"]
+      value: 'true'
+- it: preserves intentionally empty Console-managed settings
+  template: smtp.yaml
+  release:
+    isUpgrade: true
+  kubernetesProvider:
+    objects:
+    - apiVersion: v1
+      kind: Secret
+      metadata:
+        name: customer-smtp-secret
+        namespace: dedicated
+        annotations:
+          wandb.ai/console-managed: 'true'
+      data: {}
+  asserts:
+  - equal:
+      path: data
+      value: {}
+  - equal:
+      path: metadata.annotations["wandb.ai/console-managed"]
+      value: 'true'
+- it: seeds scalar inline values without pod-level overrides
+  template: charts/api/templates/deployment.yaml
+  set:
+    global.email.smtp.password: inline-password
+    global.email.smtp.mailFrom: sender@example.com
+  asserts:
+  - contains:
+      path: spec.template.spec.containers[0].envFrom
+      content:
+        secretRef:
+          name: customer-smtp-secret
+  - notContains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: SMTP_PASSWORD
+      any: true
+  - notContains:
+      path: spec.template.spec.containers[0].env
+      content:
+        name: GORILLA_EMAIL_SINK
+      any: true
+kubernetesProvider:
+  scheme:
+    v1/Secret:
+      gvr:
+        version: v1
+        resource: secrets
+      namespaced: true
