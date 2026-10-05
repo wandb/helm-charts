@@ -1,53 +1,45 @@
-{{/*
-Return the SMTP host
-*/}}
-{{- define "wandb.smtp.host" -}}
-{{- print $.Values.global.email.smtp.host -}}
+{{- define "wandb.smtp.secretName" -}}
+  {{- printf "%s-smtp-secret" .Release.Name -}}
 {{- end -}}
 
-{{/*
-Return the SMTP port
-*/}}
-{{- define "wandb.smtp.port" -}}
-{{- print $.Values.global.email.smtp.port -}}
+{{/* External connection fields need pod-time expansion of the SMTP URL. */}}
+{{- define "wandb.smtp.hasConnectionRefs" -}}
+  {{- $email := .Values.global.email | default dict -}}
+  {{- $smtp := $email.smtp | default dict -}}
+  {{- if $smtp.host -}}
+    {{- range $field := list "host" "port" "user" "password" -}}
+      {{- $value := get $smtp $field -}}
+      {{- if and (kindIs "map" $value) (hasKey $value "valueFrom") -}}
+      true
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
 {{- end -}}
 
-{{/*
-Return the SMTP user
-*/}}
-{{- define "wandb.smtp.user" -}}
-{{- print $.Values.global.email.smtp.user -}}
-{{- end -}}
-
-{{/*
-Return the SMTP password
-*/}}
-{{- define "wandb.smtp.password" -}}
-{{- print $.Values.global.email.smtp.password -}}
-{{- end -}}
-
-{{/*
-Return the SMTP mailFrom address
-*/}}
-{{- define "wandb.smtp.mailFrom" -}}
-{{- print $.Values.global.email.smtp.mailFrom -}}
-{{- end -}}
-
-{{/*
-Const: Internals should not be tied back to the values.yaml in any way.
-*/}}
-{{- define "wandb.smtp.internalSecretName" -}}
-{{- print .Release.Name "-smtp-secret" -}}
-{{- end -}}
-
-{{- define "wandb.smtp.internalSecretKey" -}}
-{{- print "SMTP_PASSWORD" -}}
-{{- end -}}
-
-{{- define "wandb.emailSink" -}}
-  {{- if ne .Values.global.email.smtp.host "" -}}
-smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+{{/* Inline values seed the shared Secret; external references remain on pods. */}}
+{{- define "wandb.smtp.inlineValue" -}}
+  {{- if kindIs "map" . -}}
+    {{- if hasKey . "value" -}}
+      {{- .value | toString -}}
+    {{- end -}}
   {{- else -}}
-https://api.wandb.ai/email/dispatch
+    {{- . | default "" | toString -}}
+  {{- end -}}
+{{- end -}}
+
+{{- define "wandb.smtpEnvs" -}}
+  {{- $email := .Values.global.email | default dict -}}
+  {{- $smtp := $email.smtp | default dict -}}
+  {{- $fields := list (dict "field" "host" "env" "SMTP_HOST") (dict "field" "port" "env" "SMTP_PORT") (dict "field" "user" "env" "SMTP_USER") (dict "field" "password" "env" "SMTP_PASSWORD") (dict "field" "mailFrom" "env" "GORILLA_EMAIL_FROM_ADDRESS") -}}
+  {{- range $fields -}}
+    {{- $value := get $smtp .field -}}
+    {{- if and (kindIs "map" $value) (hasKey $value "valueFrom") }}
+- name: {{ .env }}
+  {{- toYaml $value | nindent 2 }}
+    {{- end -}}
+  {{- end -}}
+  {{- if include "wandb.smtp.hasConnectionRefs" . }}
+- name: GORILLA_EMAIL_SINK
+  value: "smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)"
   {{- end -}}
 {{- end -}}
