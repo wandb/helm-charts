@@ -1,0 +1,31 @@
+{{- if .Values.global.traefikIngress }}
+  {{/* Empty aliases are the AWS hostless PrivateLink rule, outside this public ingress. */}}
+  {{- $hosts := concat (list (include "defaultHost" .)) .Values.ingress.additionalHosts | compact | uniq }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-traefik
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+  annotations:
+    # HTTP redirects and geographic policy belong to the existing entrypoint configuration.
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-ip-allowlist@kubernetescrd" .Release.Namespace .Release.Name | quote }}
+    cert-manager.io/cluster-issuer: cert-issuer
+spec:
+  ingressClassName: traefik
+  tls:
+    - secretName: wandb-ssl-cert
+      hosts:
+        {{- toYaml $hosts | nindent 8 }}
+  rules:
+  {{- range $hosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          {{- include "wandb.primaryIngressPaths" $ | nindent 10 }}
+  {{- end }}
+{{- end }}

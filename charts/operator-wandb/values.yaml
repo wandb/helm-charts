@@ -14,6 +14,20 @@ global:
   # Dependency charts use their own security settings.
   workloadSecurityProfile:
     enabled: false
+  # Master gate for existing primary/secondary Ingress resources; retains certificates.
+  # For Internal Use Only
+  legacyIngress: true
+  # Creates a parallel HTTPS Traefik Ingress with the IP allowlist attached.
+  # For Internal Use Only
+  traefikIngress: false
+  # For Internal Use Only
+  ipAllowList:
+    enabled: false
+    # Platform-owned and customer-owned IPv4/IPv6 CIDRs; effective policy is their union.
+    # Disabled policy with CIDRs emits a warning. Enabled policy requires at least one CIDR.
+    systemCIDRs: []
+    userCIDRs: []
+
   # This should be the fqdn of where your users will be accessing the instance.
   host: "http://localhost:8080"
 
@@ -120,6 +134,10 @@ global:
     namespace: default
 
   mysql:
+    # Enable short-lived AWS RDS IAM tokens instead of password authentication.
+    rdsIamAuth: false
+    # Required when rdsIamAuth is true.
+    awsRegion: ""
     host: ""
     port: 3306
     database: "wandb_local"
@@ -172,6 +190,10 @@ global:
   slack:
     secret: ""
     clientId: ""
+    # Use an existing Secret with the fixed GORILLA_SLACK_* and SLACK_* keys.
+    # Empty name creates <release>-slack-secret, seeded from the inline values.
+    slackSecret:
+      name: ""
 
   otel:
     traces:
@@ -447,10 +469,15 @@ global:
       authMethod: ""
       issuer: ""
       # Empty name: Helm creates an OIDC ConfigMap from the inline values above.
+      # Once Console sets wandb.ai/console-managed: "true" on that ConfigMap,
+      # Helm lookup preserves its live data (including empty data) during upgrades.
       # Set a name to use an existing ConfigMap in the release namespace instead.
       # App/API import the selected ConfigMap through envFrom; key names are fixed.
       oidcConfigMap:
         name: ""
+      # Empty name: Helm always creates the Secret, empty if no inline secret is set.
+      # Once Console marks it wandb.ai/console-managed: "true", lookup preserves its live data.
+      # Set a name to reference an existing external Secret instead.
       oidcSecret:
         name: ""
         secretKey: "OIDC_SECRET"
@@ -725,6 +752,7 @@ api:
           optional: true
   envFrom:
     '{{ include "wandb.oidc.configMapName" . }}': "configMapRef"
+    '{{ include "wandb.slack.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -934,6 +962,7 @@ app:
           optional: true
   envFrom:
     '{{ include "wandb.oidc.configMapName" . }}': "configMapRef"
+    '{{ include "wandb.slack.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -3542,6 +3571,11 @@ clickhouseMigrationJob:
   kind: Job
   podDisruptionBudget:
     enabled: false
+  # This pre-upgrade hook never connects to MySQL. Do not make it depend on a
+  # MySQL CA Secret that may be created by the same upgrade the hook precedes.
+  # Keep other global volumes, including custom ClickHouse trust roots.
+  globalOptOut:
+    mysqlCaCert: true
   # The job needs no k8s API access. This also avoids a helm hook ordering
   # deadlock: same-weight hooks run sorted by name, so a dedicated
   # ServiceAccount would be created after the Job that references it.
@@ -3562,7 +3596,11 @@ clickhouseMigrationJob:
     ch-migrate:
       # Only render when at least one global.olap feature is enabled.
       enabled: '{{ include "wandb.olapAnyFeatureEnabled" . }}'
-      backoffLimit: 0
+      # One retry: an idle ClickHouse Cloud service accepts TCP (so the wait
+      # below passes) but times out the first native-protocol handshake while
+      # it wakes. That happens before any DDL runs, so a sequential retry is
+      # safe; a dirty database still fails fast on the second attempt.
+      backoffLimit: 1
       activeDeadlineSeconds: 900
       volumes:
         - name: temp-dir

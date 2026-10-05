@@ -1,30 +1,47 @@
-{{- $oidc := .Values.global.auth.oidc -}}
-{{- if not $oidc.oidcConfigMap.name -}}
+{{- /* Legacy user specs disable OIDC with null; treat it as empty configuration. */ -}}
+{{- $oidc := .Values.global.auth.oidc | default dict -}}
+{{- $configMap := $oidc.oidcConfigMap | default dict -}}
+{{- $secret := $oidc.oidcSecret | default dict -}}
+{{- $secretKey := $secret.secretKey | default "OIDC_SECRET" -}}
+{{- if not $configMap.name -}}
+  {{- $name := include "wandb.oidc.configMapName" . -}}
+  {{- $existing := lookup "v1" "ConfigMap" .Release.Namespace $name | default dict -}}
+  {{- $metadata := get $existing "metadata" | default dict -}}
+  {{- $annotations := get $metadata "annotations" | default dict -}}
+  {{- $consoleManaged := eq (get $annotations "wandb.ai/console-managed") "true" -}}
   {{- $data := dict -}}
-  {{- $corsOrigins := list -}}
-  {{- if $oidc.clientId -}}
-    {{- $_ := set $data "GORILLA_OIDC_CLIENT_ID" ($oidc.clientId | toString) -}}
-    {{- $_ := set $data "GORILLA_OIDC_ISSUER" ($oidc.issuer | toString) -}}
-    {{- $_ := set $data "GORILLA_AUTH_METHOD" ($oidc.authMethod | toString) -}}
-    {{- /* Retain the environment names used by existing app versions. */ -}}
-    {{- $_ := set $data "OIDC_CLIENT_ID" ($oidc.clientId | toString) -}}
-    {{- $_ := set $data "OIDC_ISSUER" ($oidc.issuer | toString) -}}
-    {{- $_ := set $data "OIDC_AUTH_METHOD" ($oidc.authMethod | toString) -}}
-    {{- $corsOrigins = list .Values.global.host "null" | compact -}}
-  {{- end -}}
-  {{- if .Values.app.extraCors -}}
-    {{- $corsOrigins = concat .Values.app.extraCors $corsOrigins | compact -}}
-  {{- end -}}
-  {{- if gt (len $corsOrigins) 0 -}}
-    {{- $_ := set $data "GORILLA_CORS_ORIGINS" (join "," $corsOrigins) -}}
+  {{- if $consoleManaged -}}
+    {{- /* Empty data is intentional when Console disables OIDC; never fall back to inline values. */ -}}
+    {{- $data = get $existing "data" | default dict -}}
+  {{- else -}}
+    {{- $corsOrigins := list -}}
+    {{- if $oidc.clientId -}}
+      {{- $_ := set $data "GORILLA_OIDC_CLIENT_ID" ($oidc.clientId | toString) -}}
+      {{- $_ := set $data "GORILLA_OIDC_ISSUER" ($oidc.issuer | toString) -}}
+      {{- $_ := set $data "GORILLA_AUTH_METHOD" ($oidc.authMethod | toString) -}}
+      {{- /* Retain the environment names used by existing app versions. */ -}}
+      {{- $_ := set $data "OIDC_CLIENT_ID" ($oidc.clientId | toString) -}}
+      {{- $_ := set $data "OIDC_ISSUER" ($oidc.issuer | toString) -}}
+      {{- $_ := set $data "OIDC_AUTH_METHOD" ($oidc.authMethod | toString) -}}
+      {{- $corsOrigins = list .Values.global.host "null" | compact -}}
+    {{- end -}}
+    {{- if .Values.app.extraCors -}}
+      {{- $corsOrigins = concat .Values.app.extraCors $corsOrigins | compact -}}
+    {{- end -}}
+    {{- if gt (len $corsOrigins) 0 -}}
+      {{- $_ := set $data "GORILLA_CORS_ORIGINS" (join "," $corsOrigins) -}}
+    {{- end -}}
   {{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "wandb.oidc.configMapName" . }}
+  name: {{ $name }}
   annotations:
     # Retain the resource when switching to an external reference with the same name.
     "helm.sh/resource-policy": "keep"
+  {{- if $consoleManaged }}
+    "wandb.ai/console-managed": "true"
+  {{- end }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
@@ -32,15 +49,32 @@ data:
 ---
 {{- end }}
 
-{{- if and .Values.global.auth.oidc.secret (not .Values.global.auth.oidc.oidcSecret.name) }}
+{{- if not $secret.name -}}
+  {{- $name := include "wandb.oidc.secretSecret" . -}}
+  {{- $existing := lookup "v1" "Secret" .Release.Namespace $name | default dict -}}
+  {{- $metadata := get $existing "metadata" | default dict -}}
+  {{- $annotations := get $metadata "annotations" | default dict -}}
+  {{- $consoleManaged := eq (get $annotations "wandb.ai/console-managed") "true" -}}
+  {{- $data := dict -}}
+  {{- if $consoleManaged -}}
+    {{- /* Secret data is already base64 encoded; preserve empty data without restoring inline credentials. */ -}}
+    {{- $data = get $existing "data" | default dict -}}
+  {{- else if $oidc.secret -}}
+    {{- $_ := set $data $secretKey ($oidc.secret | b64enc) -}}
+  {{- end }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "wandb.oidc.secretSecret" . }}
+  name: {{ $name }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+  {{- if $consoleManaged }}
+    "wandb.ai/console-managed": "true"
+  {{- end }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
-  {{ .Values.global.auth.oidc.oidcSecret.secretKey }}: {{ .Values.global.auth.oidc.secret | b64enc }}
+  {{- $data | toYaml | nindent 2 }}
 ---
 {{- end }}
 

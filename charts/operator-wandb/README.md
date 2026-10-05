@@ -51,6 +51,18 @@ By default, the W&B Server chart includes an in-cluster MySQL deployment that is
 
 For production deployments, you should use an external MySQL database. You can configure the chart to use an external MySQL database by setting the appropriate parameters in the `global.mysql` section.
 
+##### Aurora IAM authentication
+
+`global.mysql.rdsIamAuth` defaults to `false`. Enable it only with a server image containing the [Aurora IAM connector](https://github.com/wandb/core/pull/49035), an IAM-enabled Aurora cluster, and a dedicated database user configured for IAM authentication.
+
+Set `global.mysql.host` to the Aurora endpoint, `user` to the IAM database user, `awsRegion` to the cluster's region, and `caCert` to the regional RDS CA bundle. Leave `password` and `passwordSecret.name` empty. Disable `mysql.install`, `app.initContainers.init-db.enabled`, and `prometheus.mysql-exporter.install`. The chart rejects conflicting password configuration and renders a password-free DSN with certificate verification.
+
+The CA can be an inline PEM bundle or a `valueFrom.secretKeyRef` or `valueFrom.configMapKeyRef` mapping with `name` and `key`. References mount the existing object and use its key as the certificate filename; the chart does not create a CA Secret for them.
+
+Each database workload needs a service-account role authorized for that cluster resource ID and database user. Preserve its existing object-storage, queue, KMS, and Secrets Manager permissions when assigning the role. The [IAM render fixture](../../../test-configs/operator-wandb/mysql-aws-iam.yaml) shows the workload annotations; its CA and role ARN are test values. Weave and Weave Trace are excluded from these database-role annotations.
+
+The ClickHouse migration hook does not mount the MySQL CA Secret, which may not exist until the same upgrade creates it. Its global custom CA ConfigMap remains mounted. To return to password authentication, disable `rdsIamAuth`, restore the password configuration, and restore the initializer and exporter settings used before cutover.
+
 #### Redis
 
 By default, the W&B Server chart includes an in-cluster Redis deployment that is provided by bitnami/Redis. This deployment is for trial purposes only and not recommended for use in production.
@@ -320,12 +332,52 @@ The following Terraform (IaC) options use this approach:
 
 For production-grade implementation, the appropriate chart parameters should be used to point to prebuilt, externalized state stores.
 
+## Customer-owned Slack configuration
+
+Helm always creates `<release>-slack-secret` from `global.slack.clientId` and
+`global.slack.secret`, with empty data when neither is configured. API and legacy
+app workloads import it through `envFrom`. The fixed keys are
+`GORILLA_SLACK_CLIENT_ID`, `GORILLA_SLACK_SECRET`, `SLACK_CLIENT_ID`, and
+`SLACK_SECRET`; the legacy aliases contain the same values. Slack keys are no
+longer rendered in the shared global Secret.
+
+Console patches the Secret and sets `wandb.ai/console-managed: "true"`. Helm
+preserves marked live data through `lookup`, including removed keys; unmarked
+Secrets continue following inline values. The `helm.sh/resource-policy: keep`
+annotation preserves the resource when switching to an external reference; it
+is not what protects data from reconciliation. Set
+`global.slack.slackSecret.name` to reference an existing Secret with the same
+fixed keys instead of rendering the default Secret. Argo CD requires separate
+sync ownership rules because offline templating does not resolve live `lookup`.
+
+Roll out this chart before the Console change. Dedicated Cloud Console patches
+the existing Secret and restarts the API deployment. The Secret reference is
+always present, so first credentials, replacements, and removals take effect on
+restart without another Helm update. Existing inline values remain supported;
+legacy/self-managed Console retains its user-spec path.
+
 ## Customer-owned OIDC configuration
 
 By default, Helm creates `<release>-oidc-configmap` from the existing inline
 `global.auth.oidc` settings and CORS inputs. It still creates the ConfigMap when
 OIDC is unset; the data is empty unless extra CORS origins are configured.
 The app and API always import the selected ConfigMap through `envFrom`.
+
+To hand the chart-created ConfigMap over to Console, Console must set
+`wandb.ai/console-managed: "true"` on the ConfigMap when it starts managing its
+data. During Helm install/upgrade, `lookup` reads that annotation and reuses the
+live data, including an intentionally empty map. The chart continues rendering
+the ConfigMap and the annotation; no external name or install hook is needed.
+Until the annotation is set, inline values (including operator user-spec and
+Terraform inputs) continue to update the ConfigMap as before. Leave
+Terraform-controlled configuration unmarked. Removing the annotation returns
+data ownership to inline values on the next Helm upgrade.
+
+This preservation requires Helm to render with cluster access, as operator v1
+does. Offline `helm template`, including Argo CD rendering, cannot read the live
+ConfigMap and renders inline values. Argo therefore needs separate data ownership
+rules when it takes over deployment. `helm.sh/resource-policy: keep` protects
+against deletion; it does not prevent data updates.
 
 Set `global.auth.oidc.oidcConfigMap.name` to use an existing ConfigMap in the
 release namespace instead. Helm then references it without creating or reading
@@ -363,15 +415,33 @@ An API-only external ConfigMap needs only the `GORILLA_*` keys. For CORS, preser
 `null` origin. An empty ConfigMap supplies no OIDC variables. Explicit environment
 overrides retain precedence over `envFrom`.
 
-Client secrets keep their existing behavior: inline `global.auth.oidc.secret`
-or an external `oidcSecret.name` with `oidcSecret.secretKey` (default `OIDC_SECRET`).
-The existing Secret references provide both `GORILLA_OIDC_SECRET` and `OIDC_SECRET`;
-no Secret format migration is required to adopt the ConfigMap option.
+By default, Helm always creates `<release>-oidc-secret`, using inline
+`global.auth.oidc.secret` when configured and `data: {}` otherwise. This gives
+Console an existing Secret to patch, including for customers without a client
+secret. Console can take ownership by setting `wandb.ai/console-managed: "true"`
+on that Secret along with its data. Helm then preserves the live data, including
+empty data, and keeps rendering the Secret after the inline value is removed.
+The app/API always reference the chart-created Secret with `optional: true`.
+A missing credential key does not add an environment variable or prevent startup;
+it does not enable OIDC. Adding the first credential, changing it, or removing
+its key takes effect when the consuming workload restarts, without needing a
+Helm render to change the Deployment's Secret references. To clear a credential,
+Console should remove its key from the Secret. Unmarked Secrets continue
+following inline values.
+
+An external `oidcSecret.name` still references an existing Secret without
+rendering or looking it up. `oidcSecret.secretKey` remains supported (default
+`OIDC_SECRET`), and both `GORILLA_OIDC_SECRET` and `OIDC_SECRET` reference that
+same key. Explicit external Secret references remain required, so a missing
+Secret or key prevents startup as before. No Secret format migration is required.
+As with the ConfigMap,
+preservation requires cluster access during Helm rendering; Argo needs separate
+ownership rules. Terraform-controlled Secrets must remain unmarked.
 
 Provision a named external ConfigMap before selecting it. A missing named
 resource prevents container startup; an empty name uses the inline values.
 After changing external data, restart the consuming workloads to pick it up.
-Helm's `keep` annotation retains a chart-created ConfigMap during a same-name
+Helm's `keep` annotation retains a chart-created ConfigMap or Secret during a same-name
 ownership transfer. Console editing and Argo ownership rules are separate work.
 
 ## Using External Secrets
