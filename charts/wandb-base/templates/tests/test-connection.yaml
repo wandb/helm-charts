@@ -8,8 +8,18 @@ metadata:
   annotations:
     "helm.sh/hook": test
 spec:
+  {{- $profile := include "wandb-base.securityProfile" (dict "root" . "podData" .Values.test "container" dict) | fromYaml }}
+  {{- if $profile.enabled }}
+  automountServiceAccountToken: {{ $profile.automountServiceAccountToken }}
+  securityContext:
+    {{- include "wandb-base.podSecurityProfile" (dict "context" dict "profile" $profile) | nindent 4 }}
+  {{- end }}
   containers:
     - name: wget
+  {{- if $profile.enabled }}
+      securityContext:
+        {{- include "wandb-base.containerSecurityProfile" (dict "context" dict "profile" $profile) | nindent 8 }}
+  {{- end }}
       image: busybox
       command: ['wget']
       args: ['{{ include "wandb-base.fullname" . }}:{{ .Values.service.port }}']
