@@ -1,53 +1,67 @@
-{{/*
-Return the SMTP host
-*/}}
-{{- define "wandb.smtp.host" -}}
-{{- print $.Values.global.email.smtp.host -}}
+{{- define "wandb.smtp.secretName" -}}
+  {{- printf "%s-smtp-secret" .Release.Name -}}
 {{- end -}}
 
-{{/*
-Return the SMTP port
-*/}}
-{{- define "wandb.smtp.port" -}}
-{{- print $.Values.global.email.smtp.port -}}
+{{/* A valueFrom map stays on the pod; it is never copied into our Secret. */}}
+{{- define "wandb.smtp.isExternal" -}}
+  {{- if and (kindIs "map" .) (hasKey . "valueFrom") -}}
+    true
+  {{- end -}}
 {{- end -}}
 
-{{/*
-Return the SMTP user
-*/}}
-{{- define "wandb.smtp.user" -}}
-{{- print $.Values.global.email.smtp.user -}}
+{{/* External connection fields require Kubernetes to assemble the SMTP URL. */}}
+{{- define "wandb.smtp.hasConnectionRefs" -}}
+  {{- $email := .Values.global.email | default dict -}}
+  {{- $smtp := $email.smtp | default dict -}}
+  {{- $externalHost := include "wandb.smtp.isExternal" $smtp.host -}}
+  {{- $externalPort := include "wandb.smtp.isExternal" $smtp.port -}}
+  {{- $externalUser := include "wandb.smtp.isExternal" $smtp.user -}}
+  {{- $externalPassword := include "wandb.smtp.isExternal" $smtp.password -}}
+  {{- if and $smtp.host (or $externalHost $externalPort $externalUser $externalPassword) -}}
+    true
+  {{- end -}}
 {{- end -}}
 
-{{/*
-Return the SMTP password
-*/}}
-{{- define "wandb.smtp.password" -}}
-{{- print $.Values.global.email.smtp.password -}}
-{{- end -}}
-
-{{/*
-Return the SMTP mailFrom address
-*/}}
-{{- define "wandb.smtp.mailFrom" -}}
-{{- print $.Values.global.email.smtp.mailFrom -}}
-{{- end -}}
-
-{{/*
-Const: Internals should not be tied back to the values.yaml in any way.
-*/}}
-{{- define "wandb.smtp.internalSecretName" -}}
-{{- print .Release.Name "-smtp-secret" -}}
-{{- end -}}
-
-{{- define "wandb.smtp.internalSecretKey" -}}
-{{- print "SMTP_PASSWORD" -}}
-{{- end -}}
-
-{{- define "wandb.emailSink" -}}
-  {{- if ne .Values.global.email.smtp.host "" -}}
-smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)
+{{/* Accept both scalar values and Kubernetes-style {value: ...} maps. */}}
+{{- define "wandb.smtp.inlineValue" -}}
+  {{- if kindIs "map" . -}}
+    {{- if hasKey . "value" -}}
+      {{- .value | toString -}}
+    {{- end -}}
   {{- else -}}
-https://api.wandb.ai/email/dispatch
+    {{- . | default "" | toString -}}
+  {{- end -}}
+{{- end -}}
+
+{{- define "wandb.smtpEnvs" -}}
+  {{- $email := .Values.global.email | default dict -}}
+  {{- $smtp := $email.smtp | default dict -}}
+  {{- /* Inline fields are already loaded from the shared Secret via envFrom. */ -}}
+  {{- if include "wandb.smtp.isExternal" $smtp.host }}
+- name: SMTP_HOST
+  {{- toYaml $smtp.host | nindent 2 }}
+  {{- end }}
+  {{- if include "wandb.smtp.isExternal" $smtp.port }}
+- name: SMTP_PORT
+  {{- toYaml $smtp.port | nindent 2 }}
+  {{- end }}
+  {{- if include "wandb.smtp.isExternal" $smtp.user }}
+- name: SMTP_USER
+  {{- toYaml $smtp.user | nindent 2 }}
+  {{- end }}
+  {{- if include "wandb.smtp.isExternal" $smtp.password }}
+- name: SMTP_PASSWORD
+  {{- toYaml $smtp.password | nindent 2 }}
+  {{- end }}
+  {{- if include "wandb.smtp.isExternal" $smtp.mailFrom }}
+- name: GORILLA_EMAIL_FROM_ADDRESS
+  {{- toYaml $smtp.mailFrom | nindent 2 }}
+  {{- end }}
+  {{- /* Kubernetes loads envFrom first, then expands env.value in order.
+    Keep this URL after the external references so all SMTP fields are available.
+  */ -}}
+  {{- if include "wandb.smtp.hasConnectionRefs" . }}
+- name: GORILLA_EMAIL_SINK
+  value: "smtp://$(SMTP_USER):$(SMTP_PASSWORD)@$(SMTP_HOST):$(SMTP_PORT)"
   {{- end -}}
 {{- end -}}
