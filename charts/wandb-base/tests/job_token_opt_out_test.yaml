@@ -1,0 +1,119 @@
+suite: Job profile opt-out with a shared service account
+templates:
+  - job.yaml
+  - cronjob.yaml
+  - serviceaccount.yaml
+set:
+  global.workloadSecurityProfile.enabled: true
+  jobs:
+    legacy:
+      workloadSecurityProfile:
+        enabled: false
+      containers:
+        task: {}
+tests:
+  - it: restores the legacy job policy while keeping the generated account hardened
+    asserts:
+      - template: job.yaml
+        equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+      - template: serviceaccount.yaml
+        equal:
+          path: automountServiceAccountToken
+          value: false
+  - it: preserves a legacy service account opt-out
+    template: job.yaml
+    set:
+      serviceAccount.automount: false
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+  - it: respects an explicit job token opt-out
+    template: job.yaml
+    set:
+      jobs.legacy.automountServiceAccountToken: false
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+  - it: does not override an external service account policy
+    template: job.yaml
+    set:
+      serviceAccount.create: false
+      serviceAccount.name: external
+    asserts:
+      - notExists:
+          path: spec.template.spec.automountServiceAccountToken
+  - it: leaves the pod policy unset when the entire chart profile is disabled
+    template: job.yaml
+    set:
+      workloadSecurityProfile.enabled: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.automountServiceAccountToken
+  - it: keeps enabled sibling jobs hardened
+    template: job.yaml
+    set:
+      jobs.sibling:
+        containers:
+          task: {}
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-sibling
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+  - it: restores the legacy policy for cronjobs too
+    template: cronjob.yaml
+    set:
+      cronJobs:
+        legacy:
+          schedule: '0 * * * *'
+          concurrencyPolicy: Forbid
+          workloadSecurityProfile:
+            enabled: false
+          containers:
+            task: {}
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.automountServiceAccountToken
+          value: true
+  - it: preserves Kubernetes default mounting when the legacy account value is null
+    template: job.yaml
+    set:
+      serviceAccount.automount: null
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+  - it: does not infer policy for the shared trace identity account
+    template: job.yaml
+    set:
+      serviceAccount.useWeaveTraceIdentity: true
+    asserts:
+      - notExists:
+          path: spec.template.spec.automountServiceAccountToken
+  - it: does not infer policy for a shared storage identity account
+    template: job.yaml
+    set:
+      global.azureStorageIdentity:
+        tenantId: example-tenant
+        clientId: example-client
+      global.defaultBucket.provider: az
+      podLabels:
+        azure.workload.identity/use: 'true'
+    asserts:
+      - notExists:
+          path: spec.template.spec.automountServiceAccountToken
+  - it: preserves a disabled legacy account when its enabled profile permits tokens
+    template: job.yaml
+    set:
+      serviceAccount.automount: false
+      global.workloadSecurityProfile.automountServiceAccountToken: true
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
