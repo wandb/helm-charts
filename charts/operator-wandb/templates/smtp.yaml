@@ -9,25 +9,36 @@
 {{- if $consoleManaged -}}
   {{- $data = $existing.data | default dict -}}
 {{- else -}}
-  {{- $fields := dict "host" "SMTP_HOST" "port" "SMTP_PORT" "user" "SMTP_USER" "password" "SMTP_PASSWORD" "mailFrom" "GORILLA_EMAIL_FROM_ADDRESS" -}}
-  {{- range $field, $env := $fields -}}
-    {{- $value := get $smtp $field -}}
-    {{- if eq $field "port" -}}
-      {{- $value = $value | default 587 -}}
-    {{- end -}}
-    {{- $external := and (kindIs "map" $value) (hasKey $value "valueFrom") -}}
-    {{- if not $external -}}
-      {{- $inline := include "wandb.smtp.inlineValue" $value -}}
-      {{- if or (ne $field "mailFrom") $inline -}}
-        {{- $_ := set $data $env ($inline | b64enc) -}}
-      {{- end -}}
-    {{- end -}}
+  {{- $host := include "wandb.smtp.inlineValue" $smtp.host -}}
+  {{- $port := include "wandb.smtp.inlineValue" ($smtp.port | default 587) -}}
+  {{- $user := include "wandb.smtp.inlineValue" $smtp.user -}}
+  {{- $password := include "wandb.smtp.inlineValue" $smtp.password -}}
+  {{- $mailFrom := include "wandb.smtp.inlineValue" $smtp.mailFrom -}}
+
+  {{- /* Store inline fields here; external fields keep their pod valueFrom references. */ -}}
+  {{- if not (include "wandb.smtp.isExternal" $smtp.host) -}}
+    {{- $_ := set $data "SMTP_HOST" ($host | b64enc) -}}
   {{- end -}}
+  {{- if not (include "wandb.smtp.isExternal" $smtp.port) -}}
+    {{- $_ := set $data "SMTP_PORT" ($port | b64enc) -}}
+  {{- end -}}
+  {{- if not (include "wandb.smtp.isExternal" $smtp.user) -}}
+    {{- $_ := set $data "SMTP_USER" ($user | b64enc) -}}
+  {{- end -}}
+  {{- if not (include "wandb.smtp.isExternal" $smtp.password) -}}
+    {{- $_ := set $data "SMTP_PASSWORD" ($password | b64enc) -}}
+  {{- end -}}
+  {{- if and $mailFrom (not (include "wandb.smtp.isExternal" $smtp.mailFrom)) -}}
+    {{- $_ := set $data "GORILLA_EMAIL_FROM_ADDRESS" ($mailFrom | b64enc) -}}
+  {{- end -}}
+
+  {{- /* All-inline settings can store a complete URL. Secret values are not expanded
+    by Kubernetes, so URLs with external fields are assembled in wandb.smtpEnvs.
+  */ -}}
   {{- if not (include "wandb.smtp.hasConnectionRefs" .) -}}
-    {{- $host := get $data "SMTP_HOST" | b64dec -}}
     {{- $sink := "https://api.wandb.ai/email/dispatch" -}}
     {{- if $host -}}
-      {{- $sink = printf "smtp://%s:%s@%s:%s" (get $data "SMTP_USER" | b64dec) (get $data "SMTP_PASSWORD" | b64dec) $host (get $data "SMTP_PORT" | b64dec) -}}
+      {{- $sink = printf "smtp://%s:%s@%s:%s" $user $password $host $port -}}
     {{- end -}}
     {{- $_ := set $data "GORILLA_EMAIL_SINK" ($sink | b64enc) -}}
   {{- end -}}
