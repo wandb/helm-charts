@@ -151,10 +151,7 @@ global:
   #
   # FOR ADVANCED USERS:
   # the following mysql config options can passed as maps/objects
-  # References are resolved with lookup into <release>-smtp-secret when Helm renders.
-  # Referenced resources must already exist in the release namespace.
-  # Source changes require Helm reconciliation before a pod restart can pick them up.
-  # After Console takes ownership, its saved settings are preserved instead.
+  # so that their values can be pulled by existing secrets populated by other systems
   #
   # mysql:
   #   host:
@@ -234,10 +231,7 @@ global:
   #
   # FOR ADVANCED USERS:
   # the following clickhouse config options can passed as maps/objects
-  # References are resolved with lookup into <release>-smtp-secret when Helm renders.
-  # Referenced resources must already exist in the release namespace.
-  # Source changes require Helm reconciliation before a pod restart can pick them up.
-  # After Console takes ownership, its saved settings are preserved instead.
+  # so that their values can be pulled by existing secrets populated by other systems
   #
   # clickhouse:
   #   host:
@@ -409,11 +403,10 @@ global:
 
   #
   # For Advanced Users:
-  # the following email config options can passed as maps/objects
-  # References are resolved with lookup into <release>-smtp-secret when Helm renders.
-  # Referenced resources must already exist in the release namespace.
-  # Source changes require Helm reconciliation before a pod restart can pick them up.
-  # After Console takes ownership, its saved settings are preserved instead.
+  # SMTP fields can use existing Kubernetes env sources (valueFrom or value).
+  # Supplied references are passed directly to pods; Helm never copies their values.
+  # Inline/default values are stored in <release>-smtp-secret using fixed env keys.
+  # Console-owned Secret data is preserved on upgrades.
   #
   # email:
   #   smtp:
@@ -760,7 +753,6 @@ api:
           key: "GORILLA_COREWEAVE_OBSERVABILITY_API_KEY"
           optional: true
   envFrom:
-    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     '{{ include "wandb.oidc.configMapName" . }}': "configMapRef"
     '{{ include "wandb.slack.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
@@ -771,6 +763,7 @@ api:
     "{{ .Release.Name }}-api-configmap": "configMapRef"
     "{{ .Release.Name }}-gorilla-session-key": "secretRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.sessionKeyEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
@@ -862,6 +855,7 @@ api:
     - name: temp-dir
       emptyDir: {}
   podAnnotationsTpls:
+    - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   size: ""
   sizing:
@@ -970,7 +964,6 @@ app:
           key: "GORILLA_COREWEAVE_OBSERVABILITY_API_KEY"
           optional: true
   envFrom:
-    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     '{{ include "wandb.oidc.configMapName" . }}': "configMapRef"
     '{{ include "wandb.slack.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
@@ -984,7 +977,10 @@ app:
     "{{ .Release.Name }}-frontend-configmap": "configMapRef"
     "{{ .Release.Name }}-app-configmap": "configMapRef"
     "{{ .Release.Name }}-local-configmap": "configMapRef"
+  podAnnotationsTpls:
+    - '{{ include "wandb.smtp.podAnnotations" . }}'
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.sessionKeyEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
@@ -1297,7 +1293,6 @@ executor:
   deploymentPostfix: "bc"
   workerConcurrency: 10
   envFrom:
-    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -1305,6 +1300,7 @@ executor:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-executor-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -1322,6 +1318,7 @@ executor:
     GORILLA_TASK_QUEUE:
       value: '{{ include "wandb.executor.taskQueue" . }}'
   podAnnotationsTpls:
+    - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     executor:
@@ -1428,13 +1425,13 @@ filemeta:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FILEMETA:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
-    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -1447,6 +1444,7 @@ filemeta:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
+    - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     filemeta:
@@ -1597,7 +1595,6 @@ filestream:
   pubSub:
     subscription: ""
   envFrom:
-    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -1605,6 +1602,7 @@ filestream:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-filestream-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -1621,6 +1619,7 @@ filestream:
     GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
       value: '{{ include "wandb.fileStreamStoreConsumer" . }}'
   podAnnotationsTpls:
+    - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     filestream:
@@ -1713,7 +1712,6 @@ flat-run-fields-updater:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
-    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -1721,6 +1719,7 @@ flat-run-fields-updater:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-flat-run-fields-updater-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
@@ -1756,6 +1755,7 @@ flat-run-fields-updater:
     repository: wandb/megabinary
     tag: latest
   podAnnotationsTpls:
+    - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   size: ""
   sizing:
@@ -2015,7 +2015,6 @@ history-updater:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_HISTORY_UPDATER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
-    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -2023,6 +2022,7 @@ history-updater:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-history-updater-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
     - '{{ include "wandb.mysqlEnvs" . }}'
@@ -2036,6 +2036,7 @@ history-updater:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
+    - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     history-updater:
@@ -2852,7 +2853,6 @@ glue:
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   envFrom:
-    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -2860,6 +2860,7 @@ glue:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-glue-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -2926,6 +2927,7 @@ glue:
         - name: temp-dir
           mountPath: /tmp/
   podAnnotationsTpls:
+    - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   image:
     repository: wandb/megabinary
@@ -3056,7 +3058,6 @@ metric-observer:
     GORILLA_METRIC_OBSERVER_STORE:
       value: '{{ include "wandb.redis.connectionString" . | trim }}'
   envFrom:
-    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -3064,6 +3065,7 @@ metric-observer:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-flat-run-fields-updater-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -3077,6 +3079,7 @@ metric-observer:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
+    - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     metric-observer:
@@ -3212,7 +3215,6 @@ parquet:
         ephemeral-storage: 10Gi
     fileCacheCapacity: 9.5Gi
   envFrom:
-    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -3220,6 +3222,7 @@ parquet:
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-parquet-configmap": "configMapRef"
   envTpls:
+    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -3234,6 +3237,7 @@ parquet:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
+    - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.gcsFuseAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:

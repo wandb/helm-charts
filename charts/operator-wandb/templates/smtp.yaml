@@ -7,20 +7,31 @@
 {{- $consoleManaged := eq (get $annotations "wandb.ai/console-managed") "true" -}}
 {{- $data := dict -}}
 {{- if $consoleManaged -}}
+  {{- /* Preserve Console edits and intentional removals on subsequent upgrades. */ -}}
   {{- $data = $existing.data | default dict -}}
 {{- else -}}
-  {{- $host := include "wandb.smtp.resolveValue" (dict "root" . "field" "host" "value" ($smtp.host)) -}}
-  {{- $port := include "wandb.smtp.resolveValue" (dict "root" . "field" "port" "value" ($smtp.port | default 587)) -}}
-  {{- $user := include "wandb.smtp.resolveValue" (dict "root" . "field" "user" "value" ($smtp.user)) -}}
-  {{- $password := include "wandb.smtp.resolveValue" (dict "root" . "field" "password" "value" ($smtp.password)) -}}
-  {{- $sink := "https://api.wandb.ai/email/dispatch" -}}
-  {{- if $host -}}
-    {{- $sink = printf "smtp://%s:%s@%s:%s" $user $password $host $port -}}
+  {{- /* Only inline/default values belong here. External sources stay in pod env references. */ -}}
+  {{- if not (kindIs "map" $smtp.host) -}}
+    {{- $_ := set $data "SMTP_HOST" ($smtp.host | default "" | toString | b64enc) -}}
   {{- end -}}
-  {{- $data = dict "SMTP_HOST" ($host | b64enc) "SMTP_PORT" ($port | b64enc) "SMTP_USER" ($user | b64enc) "SMTP_PASSWORD" ($password | b64enc) "GORILLA_EMAIL_SINK" ($sink | b64enc) -}}
-  {{- $mailFrom := include "wandb.smtp.resolveValue" (dict "root" . "field" "mailFrom" "value" $smtp.mailFrom) -}}
-  {{- if $mailFrom -}}
-    {{- $_ := set $data "GORILLA_EMAIL_FROM_ADDRESS" ($mailFrom | b64enc) -}}
+  {{- if not (kindIs "map" $smtp.port) -}}
+    {{- $_ := set $data "SMTP_PORT" ($smtp.port | default 587 | toString | b64enc) -}}
+  {{- end -}}
+  {{- if not (kindIs "map" $smtp.user) -}}
+    {{- $_ := set $data "SMTP_USER" ($smtp.user | default "" | toString | b64enc) -}}
+  {{- end -}}
+  {{- if not (kindIs "map" $smtp.password) -}}
+    {{- $_ := set $data "SMTP_PASSWORD" ($smtp.password | default "" | toString | b64enc) -}}
+  {{- end -}}
+  {{- if and (not (kindIs "map" $smtp.mailFrom)) (not (empty $smtp.mailFrom)) -}}
+    {{- $_ := set $data "GORILLA_EMAIL_FROM_ADDRESS" ($smtp.mailFrom | toString | b64enc) -}}
+  {{- end -}}
+  {{- if not (include "wandb.smtp.hasReferences" .) -}}
+    {{- $sink := "https://api.wandb.ai/email/dispatch" -}}
+    {{- if $smtp.host -}}
+      {{- $sink = printf "smtp://%s:%s@%s:%s" ($smtp.user | default "" | toString) ($smtp.password | default "" | toString) ($smtp.host | toString) ($smtp.port | default 587 | toString) -}}
+    {{- end -}}
+    {{- $_ := set $data "GORILLA_EMAIL_SINK" ($sink | b64enc) -}}
   {{- end -}}
 {{- end }}
 apiVersion: v1
