@@ -151,7 +151,10 @@ global:
   #
   # FOR ADVANCED USERS:
   # the following mysql config options can passed as maps/objects
-  # so that their values can be pulled by existing secrets populated by other systems
+  # References are resolved with lookup into <release>-smtp-secret when Helm renders.
+  # Referenced resources must already exist in the release namespace.
+  # Source changes require Helm reconciliation before a pod restart can pick them up.
+  # After Console takes ownership, its saved settings are preserved instead.
   #
   # mysql:
   #   host:
@@ -231,7 +234,10 @@ global:
   #
   # FOR ADVANCED USERS:
   # the following clickhouse config options can passed as maps/objects
-  # so that their values can be pulled by existing secrets populated by other systems
+  # References are resolved with lookup into <release>-smtp-secret when Helm renders.
+  # Referenced resources must already exist in the release namespace.
+  # Source changes require Helm reconciliation before a pod restart can pick them up.
+  # After Console takes ownership, its saved settings are preserved instead.
   #
   # clickhouse:
   #   host:
@@ -404,7 +410,10 @@ global:
   #
   # For Advanced Users:
   # the following email config options can passed as maps/objects
-  # so that their values can be pulled by existing secrets populated by other systems
+  # References are resolved with lookup into <release>-smtp-secret when Helm renders.
+  # Referenced resources must already exist in the release namespace.
+  # Source changes require Helm reconciliation before a pod restart can pick them up.
+  # After Console takes ownership, its saved settings are preserved instead.
   #
   # email:
   #   smtp:
@@ -751,6 +760,7 @@ api:
           key: "GORILLA_COREWEAVE_OBSERVABILITY_API_KEY"
           optional: true
   envFrom:
+    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     '{{ include "wandb.oidc.configMapName" . }}': "configMapRef"
     '{{ include "wandb.slack.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
@@ -771,7 +781,6 @@ api:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
@@ -961,6 +970,7 @@ app:
           key: "GORILLA_COREWEAVE_OBSERVABILITY_API_KEY"
           optional: true
   envFrom:
+    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     '{{ include "wandb.oidc.configMapName" . }}': "configMapRef"
     '{{ include "wandb.slack.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
@@ -985,7 +995,6 @@ app:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.oidcEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.rateLimitEnvs" . }}'
@@ -1288,6 +1297,7 @@ executor:
   deploymentPostfix: "bc"
   workerConcurrency: 10
   envFrom:
+    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -1305,7 +1315,6 @@ executor:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
@@ -1419,6 +1428,7 @@ filemeta:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FILEMETA:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
+    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -1433,7 +1443,6 @@ filemeta:
     - '{{ include "wandb.queueEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
@@ -1588,6 +1597,7 @@ filestream:
   pubSub:
     subscription: ""
   envFrom:
+    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -1604,7 +1614,6 @@ filestream:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
@@ -1704,6 +1713,7 @@ flat-run-fields-updater:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_FLAT_RUN_FIELDS_UPDATER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
+    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -1719,7 +1729,6 @@ flat-run-fields-updater:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
@@ -2006,6 +2015,7 @@ history-updater:
     GORILLA_RUN_UPDATE_SHADOW_QUEUE_SUBSCRIPTIONS_HISTORY_UPDATER:
       value: '{{ include "wandb.runUpdateShadowQueue" . }}'
   envFrom:
+    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -2022,7 +2032,6 @@ history-updater:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
@@ -2843,6 +2852,7 @@ glue:
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'
   envFrom:
+    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -2859,7 +2869,6 @@ glue:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.registrySearchEnvs" . }}'
@@ -3047,6 +3056,7 @@ metric-observer:
     GORILLA_METRIC_OBSERVER_STORE:
       value: '{{ include "wandb.redis.connectionString" . | trim }}'
   envFrom:
+    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
@@ -3063,7 +3073,6 @@ metric-observer:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
@@ -3203,6 +3212,7 @@ parquet:
         ephemeral-storage: 10Gi
     fileCacheCapacity: 9.5Gi
   envFrom:
+    '{{ include "wandb.smtp.secretName" . }}': "secretRef"
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
     "{{ .Release.Name }}-redis-configmap": "configMapRef"
     "{{ .Release.Name }}-kafka-configmap": "configMapRef"
@@ -3220,7 +3230,6 @@ parquet:
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
-    - '{{ include "wandb.smtpEnvs" . }}'
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
