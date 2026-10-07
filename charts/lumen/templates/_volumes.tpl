@@ -1,10 +1,10 @@
 {{- define "wandb.lumenStagingVolumeMount" }}
-- name: lumen-staging-dir
+- name: {{ .Values.stagingDirectory.name }}
   mountPath: {{ include "wandb.lumen.stagingPath" . }}
 {{- end }}
 
 {{- define "wandb.lumenStagingVolume" }}
-- name: lumen-staging-dir
+- name: {{ .Values.stagingDirectory.name }}
   ephemeral:
     volumeClaimTemplate:
       spec:
