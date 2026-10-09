@@ -618,3 +618,24 @@ Direct Helm tests inherit the global profile. Override them with
 `testHooks.workloadSecurityProfile` or
 `testHooks.<connection|weave|mcp|olap>.workloadSecurityProfile`. Python verification
 hooks install packages and require writable installation paths.
+
+### Chart-managed bucket connection strings
+
+For chart-managed bucket credentials, Helm writes a complete connection string
+into `BUCKET_URL` in `<release>-bucket`. Bucket consumers reference this key
+through `secretKeyRef`; they do not assemble the URL using Kubernetes environment
+variable expansion. Helm regenerates the value from the effective
+`global.bucket` or `global.defaultBucket` settings on each render. A pod-template
+checksum rolls consuming workloads when the URL changes, so existing Console
+versions can continue saving bucket settings through the user spec.
+
+The existing bucket ConfigMap fields and credential Secret keys remain available,
+including custom credential key names, for compatibility with older chart
+versions. Rolling back restores those versions' environment-variable expressions.
+Direct edits to individual keys do not rebuild `BUCKET_URL`; use Helm values to
+update chart-managed settings.
+
+When `global.bucket.secret.secretName` is supplied, the chart keeps its existing
+external-Secret references and runtime URL expansion. It does not copy external
+credentials or create a replacement credential Secret. This change does not add
+Console ownership, lookups, or change Azure identity or ServiceAccount selection.

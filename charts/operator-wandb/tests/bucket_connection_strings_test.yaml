@@ -1,0 +1,335 @@
+suite: Bucket connection strings
+templates:
+  - templates/bucket.yaml
+  - charts/app/templates/deployment.yaml
+  - charts/api/templates/deployment.yaml
+  - charts/settingsMigrationJob/templates/job.yaml
+release:
+  name: chartsnap
+tests:
+  - it: stores a complete S3 URL and retains legacy credentials
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        provider: s3
+        name: customer-bucket
+        path: artifacts/runs
+        accessKey: access
+        secretKey: secret
+    asserts:
+      - equal:
+          path: data.BUCKET_URL
+          value: czM6Ly9hY2Nlc3M6c2VjcmV0QGN1c3RvbWVyLWJ1Y2tldC9hcnRpZmFjdHMvcnVucw==
+      - equal:
+          path: data.ACCESS_KEY
+          value: YWNjZXNz
+      - equal:
+          path: data.SECRET_KEY
+          value: c2VjcmV0
+  - it: supports S3 identity authentication without embedded credentials
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        provider: s3
+        name: customer-bucket
+        path: ''
+    asserts:
+      - equal:
+          path: data.BUCKET_URL
+          value: czM6Ly9jdXN0b21lci1idWNrZXQ=
+  - it: uses the default bucket when no customer bucket is configured
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.defaultBucket:
+        provider: s3
+        name: managed-bucket
+        path: files
+        accessKey: default-access
+        secretKey: default-secret
+    asserts:
+      - equal:
+          path: data.BUCKET_URL
+          value: czM6Ly9kZWZhdWx0LWFjY2VzczpkZWZhdWx0LXNlY3JldEBtYW5hZ2VkLWJ1Y2tldC9maWxlcw==
+  - it: rebuilds the full URL from edited spec values
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        provider: s3
+        name: edited-bucket
+        path: new-prefix
+        accessKey: new-access
+        secretKey: new-secret
+    asserts:
+      - equal:
+          path: data.BUCKET_URL
+          value: czM6Ly9uZXctYWNjZXNzOm5ldy1zZWNyZXRAZWRpdGVkLWJ1Y2tldC9uZXctcHJlZml4
+  - it: preserves gcs URL scheme and trailing path slash
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        provider: gcs
+        name: storage
+        path: container/prefix/
+    asserts:
+      - equal:
+          path: data.BUCKET_URL
+          value: Z3M6Ly9zdG9yYWdlL2NvbnRhaW5lci9wcmVmaXgv
+  - it: preserves az URL scheme and trailing path slash
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        provider: az
+        name: storage
+        path: container/prefix/
+    asserts:
+      - equal:
+          path: data.BUCKET_URL
+          value: YXo6Ly9zdG9yYWdlL2NvbnRhaW5lci9wcmVmaXgv
+  - it: preserves cw URL scheme and trailing path slash
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        provider: cw
+        name: storage
+        path: container/prefix/
+    asserts:
+      - equal:
+          path: data.BUCKET_URL
+          value: Y3c6Ly9zdG9yYWdlL2NvbnRhaW5lci9wcmVmaXgv
+  - it: preserves literal credential characters without Kubernetes expansion
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        provider: s3
+        name: bucket
+        path: prefix
+        accessKey: test-access
+        secretKey: test+/$encoded==
+    asserts:
+      - equal:
+          path: data.BUCKET_URL
+          value: czM6Ly90ZXN0LWFjY2Vzczp0ZXN0Ky8kZW5jb2RlZD09QGJ1Y2tldC9wcmVmaXg=
+  - it: reads BUCKET directly from the chart Secret
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BUCKET
+            valueFrom:
+              secretKeyRef:
+                name: chartsnap-bucket
+                key: BUCKET_URL
+  - it: reads GORILLA_FILE_STORE directly from the chart Secret
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STORE
+            valueFrom:
+              secretKeyRef:
+                name: chartsnap-bucket
+                key: BUCKET_URL
+  - it: reads GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE directly from the chart Secret
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+            valueFrom:
+              secretKeyRef:
+                name: chartsnap-bucket
+                key: BUCKET_URL
+  - it: reads GORILLA_STORAGE_BUCKET directly from the chart Secret
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_STORAGE_BUCKET
+            valueFrom:
+              secretKeyRef:
+                name: chartsnap-bucket
+                key: BUCKET_URL
+  - it: preserves explicit environment overrides
+    template: charts/app/templates/deployment.yaml
+    set:
+      app.env.GORILLA_FILE_STORE: s3://override
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STORE
+            value: s3://override
+  - it: keeps external credentials referenced with the original interpolation
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.bucket:
+        name: external-bucket
+        provider: s3
+        path: files
+        secret:
+          secretName: customer-secret
+          accessKeyName: access
+          secretKeyName: secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STORE
+            value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BUCKET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: customer-secret
+                key: access
+                optional: true
+  - it: does not create a credential Secret for external credentials
+    template: templates/bucket.yaml
+    set:
+      global.bucket.secret.secretName: customer-secret
+    asserts:
+      - hasDocuments:
+          count: 1
+  - it: adds a rollout checksum for the chart-created connection string
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/bucket"]
+          pattern: ^[a-f0-9]{64}$
+  - it: uses the finished URL in the API
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STORE
+            valueFrom: &id001
+              secretKeyRef:
+                name: chartsnap-bucket
+                key: BUCKET_URL
+  - it: uses the finished URL in settings migration jobs
+    template: charts/settingsMigrationJob/templates/job.yaml
+    set:
+      settingsMigrationJob.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMJ_FILE_STORE
+            valueFrom: *id001
+  - it: preserves settings migration overrides
+    template: charts/settingsMigrationJob/templates/job.yaml
+    set:
+      settingsMigrationJob.install: true
+      settingsMigrationJob.env.SMJ_FILE_STORE:
+        value: s3://override
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMJ_FILE_STORE
+            value: s3://override
+  - it: keeps settings migration interpolation for external Secrets
+    template: charts/settingsMigrationJob/templates/job.yaml
+    set:
+      settingsMigrationJob.install: true
+      global.bucket:
+        provider: s3
+        name: external
+        path: ''
+        secret:
+          secretName: external
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SMJ_FILE_STORE
+            value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
+  - it: keeps custom credential keys alongside the finished URL for rollback
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        provider: cw
+        name: bucket
+        path: ''
+        accessKey: access
+        secretKey: secret
+        secret:
+          accessKeyName: custom-access
+          secretKeyName: custom-secret
+    asserts:
+      - equal:
+          path: data.custom-access
+          value: YWNjZXNz
+      - equal:
+          path: data.custom-secret
+          value: c2VjcmV0
+      - equal:
+          path: data.BUCKET_URL
+          value: Y3c6Ly9hY2Nlc3M6c2VjcmV0QGJ1Y2tldA==
+  - it: rolls pods for spec URL before-edit
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.bucket:
+        provider: s3
+        name: before-edit
+        path: prefix
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/bucket"]
+          value: b24cce31af106b1606dc5a1fa5ca825b9d179003aca4bd0fa8427001786144bb
+  - it: rolls pods for spec URL after-edit
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.bucket:
+        provider: s3
+        name: after-edit
+        path: prefix
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/bucket"]
+          value: 9dc948bf04e78c8c2c001722e4e37afff869883589d261dd3297af64fef32a47
+  - it: does not add a new rollout trigger to the external Secret path
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.bucket.secret.secretName: external
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations["checksum/bucket"]
+  - it: preserves the unconfigured default bucket URL
+    template: templates/bucket.yaml
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: data.BUCKET_URL
+          value: czM6Ly8=
+  - it: does not append a path when the customer path is omitted
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        name: runs
+        provider: s3
+        accessKey: access
+        secretKey: secret
+    asserts:
+      - equal:
+          path: data.BUCKET_URL
+          value: czM6Ly9hY2Nlc3M6c2VjcmV0QHJ1bnM=
