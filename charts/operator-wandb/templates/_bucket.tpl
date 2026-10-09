@@ -241,3 +241,50 @@ secretName: {{ include "wandb.bucket.secret" . }}
   {{- $url = trimSuffix "/" $url }}
 url: {{ $url }}
 {{- end -}}
+
+
+{{/* Build the chart-owned Secret's URL from actual Helm values. External
+Secrets retain their existing runtime interpolation and are never copied here.
+*/}}
+{{- define "wandb.bucket.connectionString" -}}
+  {{- $bucket := .Values.global.defaultBucket -}}
+  {{- if .Values.global.bucket.name -}}
+    {{- $bucket = .Values.global.bucket -}}
+  {{- end -}}
+  {{- $scheme := $bucket.provider -}}
+  {{- if eq $scheme "gcs" -}}
+    {{- $scheme = "gs" -}}
+  {{- end -}}
+  {{- if has $bucket.provider (list "s3" "cw" "az" "gcs") -}}
+    {{- $credentials := "" -}}
+    {{- $usesKeyPair := and (has $scheme (list "s3" "cw")) $bucket.accessKey $bucket.secretKey -}}
+    {{- if $usesKeyPair -}}
+      {{- $credentials = printf "%s:%s@" $bucket.accessKey $bucket.secretKey -}}
+    {{- end -}}
+    {{- $path := "" -}}
+    {{- if $bucket.path -}}
+      {{- $path = printf "/%s" $bucket.path -}}
+    {{- end -}}
+    {{- printf "%s://%s%s%s" $scheme $credentials ($bucket.name | default "" | toString) $path -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* Select the existing external-Secret expression or our finished URL. */}}
+{{- define "wandb.bucket.connectionEnv" -}}
+- name: {{ .name }}
+  {{- if .root.Values.global.bucket.secret.secretName }}
+  value: {{ (include "wandb.bucket" .root | fromYaml).url | quote }}
+  {{- else }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "wandb.bucket.secret" .root | quote }}
+      key: BUCKET_URL
+  {{- end }}
+{{- end -}}
+
+{{/* Spec edits must still roll workloads after moving their URL into a Secret. */}}
+{{- define "wandb.bucket.podAnnotations" -}}
+  {{- if not .Values.global.bucket.secret.secretName -}}
+checksum/bucket: {{ include "wandb.bucket.connectionString" . | sha256sum | quote }}
+  {{- end -}}
+{{- end -}}

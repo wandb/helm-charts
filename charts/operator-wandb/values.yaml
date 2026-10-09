@@ -855,6 +855,7 @@ api:
     - name: temp-dir
       emptyDir: {}
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   size: ""
@@ -978,6 +979,7 @@ app:
     "{{ .Release.Name }}-app-configmap": "configMapRef"
     "{{ .Release.Name }}-local-configmap": "configMapRef"
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.smtp.podAnnotations" . }}'
   envTpls:
     - '{{ include "wandb.smtpEnvs" . }}'
@@ -1318,6 +1320,7 @@ executor:
     GORILLA_TASK_QUEUE:
       value: '{{ include "wandb.executor.taskQueue" . }}'
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
@@ -1444,6 +1447,7 @@ filemeta:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
@@ -1619,6 +1623,7 @@ filestream:
     GORILLA_FILE_STREAM_WORKER_SOURCE_ADDRESS:
       value: '{{ include "wandb.fileStreamStoreConsumer" . }}'
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
@@ -1755,6 +1760,7 @@ flat-run-fields-updater:
     repository: wandb/megabinary
     tag: latest
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   size: ""
@@ -2036,6 +2042,7 @@ history-updater:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
@@ -2323,6 +2330,7 @@ run-store-accelerator-run-updater:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     run-store-accelerator-run-updater:
@@ -2619,6 +2627,8 @@ history-reader:
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-history-reader-configmap": "configMapRef"
+  podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
   envTpls:
     - '{{ include "wandb.downwardEnvs" . }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
@@ -2927,6 +2937,7 @@ glue:
         - name: temp-dir
           mountPath: /tmp/
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   image:
@@ -3079,6 +3090,7 @@ metric-observer:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
@@ -3237,6 +3249,7 @@ parquet:
     - '{{ include "wandb.sslCertEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.smtp.podAnnotations" . }}'
     - '{{ include "wandb.gcsFuseAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
@@ -3421,6 +3434,7 @@ parquet-metadata-cache:
     - '{{ include "wandb.license" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
     - '{{ include "wandb.lumen.agent.target" . }}'
   containers:
     parquet-metadata-cache:
@@ -3540,8 +3554,6 @@ settingsMigrationJob:
           - update
           - patch
   env:
-    SMJ_FILE_STORE:
-      value: '{{ (include "wandb.bucket" . | fromYaml).url }}'
     SMJ_K8S_ACTIVE_SPEC_SECRET_NAME:
       value: "wandb-spec-active"
     SMJ_K8S_USER_SPEC_SECRET_NAME:
@@ -3552,7 +3564,10 @@ settingsMigrationJob:
           fieldPath: metadata.namespace
   envFrom:
     "{{ .Release.Name }}-bucket-configmap": "configMapRef"
+  podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
   envTpls:
+    - '{{ include "wandb.bucket.connectionEnv" (dict "root" . "name" "SMJ_FILE_STORE") }}'
     - '{{ include "wandb.bucket.cwIdentity" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.bucketEnvs" . }}'
@@ -4725,6 +4740,8 @@ lumen-agent:
       - apiGroups: ["apps.wandb.com"]
         resources: ["weightsandbiases"]
         verbs: ["get", "list"]
+  podAnnotationsTpls:
+    - '{{ include "wandb.bucket.podAnnotations" . }}'
   envTpls:
     - '{{ include "wandb.bucketEnvs" . }}'
   cronJobs:
