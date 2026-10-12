@@ -91,6 +91,16 @@ Global values will override any chart-specific values.
   value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
 - name: GORILLA_FILE_STORE
   value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
+  {{- $export := index .Values.global "weave-trace" "bulkExport" | default dict -}}
+  {{- if (index $export "enabled" | default false) }}
+- name: GORILLA_WEAVE_BULK_EXPORT_ENABLED
+  value: "true"
+    {{- $storage := include "wandb.weaveTraceBulkExportStorage" . | fromYaml -}}
+    {{- if $storage.isOverride }}
+- name: GORILLA_WEAVE_EXPORT_FILE_STORE
+  value: {{ default $storage.uri (index $export "signingFileStore") | quote }}
+    {{- end }}
+  {{- end }}
 - name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
   value: {{ (include "wandb.bucket" . | fromYaml).url | quote }}
 - name: GORILLA_STORAGE_BUCKET

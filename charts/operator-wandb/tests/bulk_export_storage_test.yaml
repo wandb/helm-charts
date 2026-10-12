@@ -1,0 +1,108 @@
+suite: weave bulk export storage
+templates:
+  - templates/weave-trace.yaml
+tests:
+  - it: stays disabled by default
+    asserts:
+      - equal:
+          path: data.WEAVE_BULK_EXPORT_ENABLED
+          value: "false"
+      - notExists:
+          path: data.WF_FILE_STORAGE_URI
+  - it: uses the existing S3 deployment bucket
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.collectionURL: https://s3.amazonaws.com/deployment-files/
+      global.defaultBucket.provider: s3
+      global.defaultBucket.name: deployment-files
+      global.defaultBucket.region: us-west-2
+    asserts:
+      - notExists:
+          path: data.WF_FILE_STORAGE_URI
+      - equal:
+          path: data.WF_FILE_STORAGE_AWS_REGION
+          value: us-west-2
+      - equal:
+          path: data.WEAVE_BULK_EXPORT_ENABLED
+          value: "true"
+  - it: honors the deployment bucket override
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.collectionURL: https://s3.amazonaws.com/deployment-files/
+      global.bucket.provider: s3
+      global.bucket.name: deployment-override
+      global.bucket.region: eu-west-1
+    asserts:
+      - notExists:
+          path: data.WF_FILE_STORAGE_URI
+  - it: honors explicit export storage ahead of default storage
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.collectionURL: https://s3.amazonaws.com/deployment-files/
+      global.weave-trace.bulkExport.storageURI: s3://export-override
+      global.weave-trace.bulkExport.awsRegion: eu-west-1
+      global.defaultBucket.name: deployment-files
+    asserts:
+      - equal:
+          path: data.WF_FILE_STORAGE_URI
+          value: s3://export-override
+      - equal:
+          path: data.WF_FILE_STORAGE_AWS_REGION
+          value: eu-west-1
+  - it: supports GCS deployment storage
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.collectionURL: https://s3.amazonaws.com/deployment-files/
+      global.defaultBucket.provider: gcs
+      global.defaultBucket.name: deployment-files
+    asserts:
+      - notExists:
+          path: data.WF_FILE_STORAGE_URI
+      - notExists:
+          path: data.WF_FILE_STORAGE_AWS_REGION
+  - it: rejects multi-tenant enablement
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.collectionURL: https://s3.amazonaws.com/deployment-files/
+      global.weave-trace.bulkExport.deploymentMode: multi-tenant
+    asserts:
+      - failedTemplate:
+          errorMessage: Weave bulk export is supported only for dedicated and self-managed deployments
+  - it: rejects deployment object prefixes
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.collectionURL: https://s3.amazonaws.com/deployment-files/
+      global.defaultBucket.name: deployment-files
+      global.defaultBucket.path: prefix
+    asserts:
+      - failedTemplate:
+          errorMessage: Weave bulk export requires a deployment bucket root or explicit storageURI
+  - it: requires the declared ClickHouse writer URL
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.defaultBucket.provider: s3
+      global.defaultBucket.name: deployment-files
+    asserts:
+      - failedTemplate:
+          errorMessage: Weave bulk export requires collectionURL matching the ClickHouse weave_exports named collection
+  - it: uses S3-compatible storage for a CoreWeave deployment bucket
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.collectionURL: https://caios.example/deployment-files/
+      global.defaultBucket.provider: cw
+      global.defaultBucket.name: deployment-files
+    asserts:
+      - notExists:
+          path: data.WF_FILE_STORAGE_URI
+
+  - it: lets an existing WF_FILE_STORAGE_URI override deployment storage
+    set:
+      global.extraEnv.WF_FILE_STORAGE_URI: s3://existing-weave-bucket
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.collectionURL: https://s3.amazonaws.com/existing-weave-bucket/
+      global.defaultBucket.name: deployment-files
+      global.defaultBucket.provider: s3
+    asserts:
+      - equal:
+          path: data.WF_FILE_STORAGE_URI
+          value: s3://existing-weave-bucket

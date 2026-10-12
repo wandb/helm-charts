@@ -241,3 +241,46 @@ secretName: {{ include "wandb.bucket.secret" . }}
   {{- $url = trimSuffix "/" $url }}
 url: {{ $url }}
 {{- end -}}
+
+
+{{/* Bulk exports reuse deployment storage unless an explicit URI overrides it. */}}
+{{- define "wandb.weaveTraceBulkExportStorage" -}}
+  {{- $weaveTrace := index .Values.global "weave-trace" | default dict -}}
+  {{- $export := index $weaveTrace "bulkExport" | default dict -}}
+  {{- if (index $export "enabled" | default false) -}}
+    {{- $mode := index $export "deploymentMode" | default "" -}}
+    {{- if not (has $mode (list "dedicated" "self-managed")) -}}
+      {{- fail "Weave bulk export is supported only for dedicated and self-managed deployments" -}}
+    {{- end -}}
+    {{- $traceValues := index .Values "weave-trace" | default dict -}}
+    {{- $extraEnv := merge (deepCopy (index $traceValues "extraEnv" | default dict)) (.Values.global.extraEnv | default dict) -}}
+    {{- $uri := default (index $export "storageURI") (index $extraEnv "WF_FILE_STORAGE_URI") | default "" -}}
+    {{- $explicitURI := not (empty $uri) -}}
+    {{- $region := index $export "awsRegion" | default "" -}}
+    {{- if empty $uri -}}
+      {{- $bucket := .Values.global.defaultBucket -}}
+      {{- if .Values.global.bucket.name -}}
+        {{- $bucket = .Values.global.bucket -}}
+      {{- end -}}
+      {{- if or (empty $bucket.name) (not (empty $bucket.path)) -}}
+        {{- fail "Weave bulk export requires a deployment bucket root or explicit storageURI" -}}
+      {{- end -}}
+      {{- if has $bucket.provider (list "s3" "cw") -}}
+        {{- $uri = printf "s3://%s" $bucket.name -}}
+        {{- $region = $bucket.region | default "" -}}
+      {{- else if has $bucket.provider (list "gcs" "gs") -}}
+        {{- $uri = printf "gs://%s" $bucket.name -}}
+      {{- else -}}
+        {{- fail "Weave bulk export currently requires S3 or GCS deployment storage" -}}
+      {{- end -}}
+    {{- end -}}
+    {{- $collectionURL := index $export "collectionURL" | default "" -}}
+    {{- if empty $collectionURL -}}
+      {{- fail "Weave bulk export requires collectionURL matching the ClickHouse weave_exports named collection" -}}
+    {{- end -}}
+uri: {{ $uri | quote }}
+awsRegion: {{ $region | quote }}
+collectionURL: {{ $collectionURL | quote }}
+isOverride: {{ $explicitURI }}
+  {{- end -}}
+{{- end }}

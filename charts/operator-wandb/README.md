@@ -618,3 +618,37 @@ Direct Helm tests inherit the global profile. Override them with
 `testHooks.workloadSecurityProfile` or
 `testHooks.<connection|weave|mcp|olap>.workloadSecurityProfile`. Python verification
 hooks install packages and require writable installation paths.
+
+## Weave bulk export storage
+
+Bulk export defaults to disabled. For a dedicated or self-managed deployment:
+
+```yaml
+global:
+  weave-trace:
+    bulkExport:
+      enabled: true
+      deploymentMode: dedicated
+      # Empty storageURI selects global.bucket, then global.defaultBucket.
+      storageURI: ""
+      # Must match the preconfigured ClickHouse weave_exports collection.
+      collectionURL: https://s3.us-west-2.amazonaws.com/deployment-files/
+```
+
+The chart sets Weave API enablement, region, and the declared writer URL.
+With default deployment storage, Weave resolves the bucket through Gorilla and
+the chart leaves the media-storage URI unchanged. It also enables Gorilla's export-download signer. Configure ClickHouse's
+`weave_exports` collection and writer credentials separately on all nodes or
+through ClickHouse Cloud. Weave requires manifest read/write access; Gorilla
+requires download read/signing access. Redis admits one active export job across
+the deployment. This chart creates no bucket.
+
+An existing `WF_FILE_STORAGE_URI` in the Weave extra environment takes precedence;
+otherwise an explicit `storageURI` overrides deployment storage. The chart supplies that
+URI to Weave and `GORILLA_WEAVE_EXPORT_FILE_STORE`. Set `signingFileStore` when
+Gorilla needs provider connection options, such as an S3-compatible endpoint;
+store credentials in existing Secrets/credential mounts. Mount the provider
+configuration and credentials independently for ClickHouse and Weave. Their
+actual destinations must match. Export objects use the `exports/` prefix.
+The current writer supports S3-compatible/GCS storage; multi-tenant enablement
+and Azure export writes are unsupported in this version.
