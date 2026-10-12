@@ -635,8 +635,9 @@ global:
       collectionURL: https://s3.us-west-2.amazonaws.com/deployment-files/
 ```
 
-The chart sets the Weave API enablement, storage URI, region, and declared writer
-URL. It also enables Gorilla's export-download signer. Configure ClickHouse's
+The chart sets Weave API enablement, region, and the declared writer URL.
+With default deployment storage, Weave resolves the bucket through Gorilla and
+the chart leaves the media-storage URI unchanged. It also enables Gorilla's export-download signer. Configure ClickHouse's
 `weave_exports` collection and writer credentials separately on all nodes or
 through ClickHouse Cloud. Weave requires manifest read/write access; Gorilla
 requires download read/signing access. Redis admits one active export job across
