@@ -27,7 +27,17 @@ data:
   KAFKA_BROKER_HOST: "{{ include "wandb.kafka.brokerHost" . }}"
   KAFKA_BROKER_PORT: "{{ include "wandb.kafka.brokerPort" . }}"
   WEAVE_REDIS_URL: "{{ include "wandb.redis.connectionString" . | trim }}"
-{{- $fileStorageURI := include "wandb.weaveTraceFileStorageURI" . }}
+{{- $bulkExport := index .Values.global "weave-trace" "bulkExport" | default dict }}
+  WEAVE_BULK_EXPORT_ENABLED: {{ (index $bulkExport "enabled" | default false) | quote }}
+  WEAVE_BULK_EXPORT_DEPLOYMENT_MODE: {{ (index $bulkExport "deploymentMode" | default "") | quote }}
+{{- $exportStorage := include "wandb.weaveTraceBulkExportStorage" . | fromYaml }}
+{{- if $exportStorage.collectionURL }}
+  WEAVE_EXPORT_COLLECTION_URL: {{ $exportStorage.collectionURL | quote }}
+{{- end }}
+{{- $fileStorageURI := default (include "wandb.weaveTraceFileStorageURI" .) $exportStorage.uri }}
 {{- if $fileStorageURI }}
   WF_FILE_STORAGE_URI: {{ $fileStorageURI | quote }}
+{{- end }}
+{{- if $exportStorage.awsRegion }}
+  WF_FILE_STORAGE_AWS_REGION: {{ $exportStorage.awsRegion | quote }}
 {{- end }}
