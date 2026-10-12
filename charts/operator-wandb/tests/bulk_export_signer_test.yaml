@@ -1,0 +1,58 @@
+suite: bulk export Gorilla signer
+templates:
+  - charts/app/templates/deployment.yaml
+tests:
+  - it: uses the export override without changing the deployment file store
+    set:
+      global.defaultBucket.name: deployment-files
+      global.defaultBucket.provider: s3
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.storageURI: s3://export-files
+      global.weave-trace.bulkExport.collectionURL: https://s3.amazonaws.com/export-files/
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_BULK_EXPORT_ENABLED
+            value: "true"
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_EXPORT_FILE_STORE
+            value: s3://export-files
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STORE
+            value: s3://$(BUCKET_NAME)
+          any: true
+  - it: allows provider connection settings for the export signer
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.storageURI: s3://export-files
+      global.weave-trace.bulkExport.signingFileStore: s3://minio.internal/export-files?region=us-east-1
+      global.weave-trace.bulkExport.collectionURL: http://minio.internal/export-files/
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_EXPORT_FILE_STORE
+            value: s3://minio.internal/export-files?region=us-east-1
+          any: true
+
+  - it: mirrors an existing WF_FILE_STORAGE_URI override to Gorilla
+    set:
+      global.extraEnv.WF_FILE_STORAGE_URI: s3://existing-weave-bucket
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.collectionURL: https://s3.amazonaws.com/existing-weave-bucket/
+      global.defaultBucket.name: deployment-files
+      global.defaultBucket.provider: s3
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_EXPORT_FILE_STORE
+            value: s3://existing-weave-bucket
+          any: true
