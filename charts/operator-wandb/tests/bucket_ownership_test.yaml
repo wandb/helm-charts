@@ -1,0 +1,378 @@
+# Ownership preservation alone does not advertise full Console bucket-settings support.
+suite: Bucket Console ownership
+templates:
+  - templates/bucket.yaml
+  - charts/app/templates/deployment.yaml
+release:
+  name: customer
+  namespace: dedicated
+  isUpgrade: true
+set:
+  global.bucket:
+    provider: s3
+    name: inline-bucket
+    path: files
+    region: us-east-1
+    kmsKey: old-kms
+    accessKey: inline-access
+    secretKey: inline-secret
+kubernetesProvider:
+  scheme:
+    v1/Secret:
+      gvr:
+        version: v1
+        resource: secrets
+      namespaced: true
+    v1/ConfigMap:
+      gvr:
+        version: v1
+        resource: configmaps
+      namespaced: true
+tests:
+  - it: preserves every Console-owned Secret key and annotation without double encoding
+    template: templates/bucket.yaml
+    documentIndex: 1
+    kubernetesProvider:
+      objects:
+        - &consoleSecret
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider": "s3", "name": "console-bucket", "path": "saved"}'
+              example.com/note: keep
+            resourceVersion: '123'
+          data:
+            BUCKET: czM6Ly9jb25zb2xlLWJ1Y2tldC9zYXZlZA==
+            GORILLA_FILE_STORE: czM6Ly9jb25zb2xlLWJ1Y2tldC9zYXZlZA==
+            GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE: czM6Ly9jb25zb2xlLWJ1Y2tldC9zYXZlZA==
+            GORILLA_STORAGE_BUCKET: czM6Ly9jb25zb2xlLWJ1Y2tldC9zYXZlZA==
+            SMJ_FILE_STORE: czM6Ly9jb25zb2xlLWJ1Y2tldC9zYXZlZA==
+            ACCESS_KEY: ''
+            UNRELATED: a2VlcA==
+        - &consoleConfig
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-bucket-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider": "s3", "name": "console-bucket", "path": "saved"}'
+              example.com/note: keep
+            resourceVersion: '123'
+          data:
+            BUCKET_NAME: console-bucket
+            BUCKET_PATH: ''
+            AWS_REGION: us-west-2
+            AWS_S3_KMS_ID: ''
+            EXTRA: keep
+    asserts:
+      - equal:
+          path: data
+          value:
+            BUCKET: czM6Ly9jb25zb2xlLWJ1Y2tldC9zYXZlZA==
+            GORILLA_FILE_STORE: czM6Ly9jb25zb2xlLWJ1Y2tldC9zYXZlZA==
+            GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE: czM6Ly9jb25zb2xlLWJ1Y2tldC9zYXZlZA==
+            GORILLA_STORAGE_BUCKET: czM6Ly9jb25zb2xlLWJ1Y2tldC9zYXZlZA==
+            SMJ_FILE_STORE: czM6Ly9jb25zb2xlLWJ1Y2tldC9zYXZlZA==
+            ACCESS_KEY: ''
+            UNRELATED: a2VlcA==
+      - equal:
+          path: metadata.annotations
+          value:
+            wandb.ai/console-managed: 'true'
+            wandb.ai/bucket-settings: '{"provider": "s3", "name": "console-bucket", "path": "saved"}'
+            example.com/note: keep
+            helm.sh/resource-policy: keep
+      - notExists:
+          path: metadata.resourceVersion
+      - notExists:
+          path: metadata.annotations["wandb.ai/bucket-settings-version"]
+  - it: preserves Console-owned ConfigMap data including cleared values and removed keys
+    template: templates/bucket.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - *consoleSecret
+        - *consoleConfig
+    asserts:
+      - equal:
+          path: data
+          value:
+            BUCKET_NAME: console-bucket
+            BUCKET_PATH: ''
+            AWS_REGION: us-west-2
+            AWS_S3_KMS_ID: ''
+            EXTRA: keep
+      - equal:
+          path: metadata.annotations
+          value:
+            wandb.ai/console-managed: 'true'
+            wandb.ai/bucket-settings: '{"provider": "s3", "name": "console-bucket", "path": "saved"}'
+            example.com/note: keep
+            helm.sh/resource-policy: keep
+  - it: keeps intentionally empty Console-owned Secret data empty
+    template: templates/bucket.yaml
+    documentIndex: 1
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider": "s3", "name": "console-bucket", "path": "saved"}'
+              example.com/note: keep
+            resourceVersion: '123'
+          data: {}
+    asserts:
+      - equal:
+          path: data
+          value: {}
+  - it: keeps missing Console-owned Secret data empty
+    template: templates/bucket.yaml
+    documentIndex: 1
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider": "s3", "name": "console-bucket", "path": "saved"}'
+              example.com/note: keep
+            resourceVersion: '123'
+    asserts:
+      - equal:
+          path: data
+          value: {}
+  - it: applies spec edits to an existing Secret with ownership None
+    template: templates/bucket.yaml
+    documentIndex: 1
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations: {}
+            resourceVersion: '123'
+          data:
+            STALE: stale
+    asserts:
+      - equal:
+          path: data.BUCKET
+          value: czM6Ly9pbmxpbmUtYWNjZXNzOmlubGluZS1zZWNyZXRAaW5saW5lLWJ1Y2tldC9maWxlcw==
+      - equal:
+          path: data.ACCESS_KEY
+          value: aW5saW5lLWFjY2Vzcw==
+      - notExists:
+          path: data.STALE
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+  - it: applies spec edits to an existing Secret with ownership false
+    template: templates/bucket.yaml
+    documentIndex: 1
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'false'
+            resourceVersion: '123'
+          data:
+            STALE: stale
+    asserts:
+      - equal:
+          path: data.BUCKET
+          value: czM6Ly9pbmxpbmUtYWNjZXNzOmlubGluZS1zZWNyZXRAaW5saW5lLWJ1Y2tldC9maWxlcw==
+      - equal:
+          path: data.ACCESS_KEY
+          value: aW5saW5lLWFjY2Vzcw==
+      - notExists:
+          path: data.STALE
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+  - it: keeps intentionally empty Console-owned ConfigMap data empty
+    template: templates/bucket.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-bucket-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider": "s3", "name": "console-bucket", "path": "saved"}'
+              example.com/note: keep
+            resourceVersion: '123'
+          data: {}
+    asserts:
+      - equal:
+          path: data
+          value: {}
+  - it: keeps missing Console-owned ConfigMap data empty
+    template: templates/bucket.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-bucket-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider": "s3", "name": "console-bucket", "path": "saved"}'
+              example.com/note: keep
+            resourceVersion: '123'
+    asserts:
+      - equal:
+          path: data
+          value: {}
+  - it: applies spec edits to an existing ConfigMap with ownership None
+    template: templates/bucket.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-bucket-configmap
+            namespace: dedicated
+            annotations: {}
+            resourceVersion: '123'
+          data:
+            STALE: stale
+    asserts:
+      - equal:
+          path: data.BUCKET_NAME
+          value: inline-bucket
+      - equal:
+          path: data.AWS_REGION
+          value: us-east-1
+      - notExists:
+          path: data.STALE
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+  - it: applies spec edits to an existing ConfigMap with ownership false
+    template: templates/bucket.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-bucket-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'false'
+            resourceVersion: '123'
+          data:
+            STALE: stale
+    asserts:
+      - equal:
+          path: data.BUCKET_NAME
+          value: inline-bucket
+      - equal:
+          path: data.AWS_REGION
+          value: us-east-1
+      - notExists:
+          path: data.STALE
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+  - it: preserves a managed Secret during a partial Console save while ConfigMap still follows spec
+    template: templates/bucket.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - *consoleSecret
+    asserts:
+      - equal:
+          path: data.BUCKET_NAME
+          value: inline-bucket
+  - it: does not take ownership of the Secret when only ConfigMap is managed
+    template: templates/bucket.yaml
+    documentIndex: 1
+    kubernetesProvider:
+      objects:
+        - *consoleConfig
+    asserts:
+      - equal:
+          path: data.BUCKET
+          value: czM6Ly9pbmxpbmUtYWNjZXNzOmlubGluZS1zZWNyZXRAaW5saW5lLWJ1Y2tldC9maWxlcw==
+  - it: uses the preserved URL for the rollout checksum despite spec name inline-bucket
+    template: charts/app/templates/deployment.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - *consoleSecret
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/bucket"]
+          value: ffcaba9db5310def5eb615d432ec178f1e6878ae33386a6bdcb0093e2086da15
+    set:
+      global.bucket.name: inline-bucket
+  - it: uses the preserved URL for the rollout checksum despite spec name edited-again
+    template: charts/app/templates/deployment.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - *consoleSecret
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/bucket"]
+          value: ffcaba9db5310def5eb615d432ec178f1e6878ae33386a6bdcb0093e2086da15
+    set:
+      global.bucket.name: edited-again
+  - it: does not fall back to spec for an intentionally empty managed URL
+    template: charts/app/templates/deployment.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider": "s3", "name": "console-bucket", "path": "saved"}'
+              example.com/note: keep
+            resourceVersion: '123'
+          data: {}
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["checksum/bucket"]
+          value: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - it: keeps the external Secret path and its ConfigMap driven by spec
+    template: templates/bucket.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - *consoleSecret
+        - *consoleConfig
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: data.BUCKET_NAME
+          value: inline-bucket
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+    set:
+      global.bucket.secret.secretName: external-secret
