@@ -69,6 +69,16 @@ envFrom:
   app-secrets: "secretRef"
 ```
 
+For conditional sources, use `envFromTpls` at chart or container level. Each
+entry renders a list of `envFrom` sources; empty output is omitted. Shared
+entries follow `envFrom`, then container entries follow shared entries. Explicit
+`env` values take precedence over all imported values.
+
+```yaml
+envFromTpls:
+  - '{{ if .Values.useSecret }}- secretRef: {name: "{{ .Release.Name }}-settings"}{{ end }}'
+```
+
 Subcharts inherit `global.env` and the legacy `global.extraEnv` by default. A
 workload that must receive only its chart-local environment can disable that
 inheritance without changing other subcharts:

@@ -624,8 +624,8 @@ hooks install packages and require writable installation paths.
 For chart-managed bucket credentials, Helm writes a complete connection string
 into application environment keys (`BUCKET`, `GORILLA_FILE_STORE`,
 `GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE`, `GORILLA_STORAGE_BUCKET`,
-and `SMJ_FILE_STORE`) in `<release>-bucket`. Bucket consumers reference these keys directly with
-`secretKeyRef`; they do not assemble the URL using Kubernetes environment variable
+and `SMJ_FILE_STORE`) in `<release>-bucket`. Bucket consumers load these keys with
+`envFrom`; they do not assemble the URL using Kubernetes environment variable
 expansion. Helm regenerates the value from the effective
 `global.bucket` or `global.defaultBucket` settings on each render. A pod-template
 checksum rolls consuming workloads when the URL changes, so existing Console
