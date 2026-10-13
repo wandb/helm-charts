@@ -1,39 +1,59 @@
-{{- $azureIdentity := include "wandb.azureStorageIdentity" . | fromYaml -}}
+{{- $configName := include "wandb.bucket.config" . -}}
+{{- $ownedConfig := include "wandb.bucket.consoleOwnedResource" (dict "root" . "kind" "ConfigMap" "name" $configName) | fromYaml -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "wandb.bucket.config" . }}
+  name: {{ $configName }}
+{{- with $ownedConfig }}
+  annotations:
+    {{- toYaml .annotations | nindent 4 }}
+{{- end }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
-{{- with include "wandb.bucket" . | fromYaml }}
+{{- if $ownedConfig }}
+  {{- toYaml $ownedConfig.data | nindent 2 }}
+{{- else }}
+  {{- with include "wandb.bucket" . | fromYaml }}
   BUCKET_NAME: "{{ .name }}"
   BUCKET_PATH: "{{ .path }}"
   AWS_REGION: "{{ .region }}"
   AWS_S3_KMS_ID: "{{ .kmsKey }}"
-{{- end }}
+  {{- end }}
   GORILLA_DEFAULT_REGION: "minio-local"
+{{- end }}
 {{- if not .Values.global.bucket.secret.secretName }}
-  {{- $connectionString := include "wandb.bucket.connectionString" . | b64enc }}
+  {{- $secretName := include "wandb.bucket.secret" . }}
+  {{- $ownedSecret := include "wandb.bucket.consoleOwnedResource" (dict "root" . "kind" "Secret" "name" $secretName) | fromYaml }}
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "wandb.bucket.secret" . }}
+  name: {{ $secretName }}
+  {{- with $ownedSecret }}
+  annotations:
+    {{- toYaml .annotations | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
+  {{- if $ownedSecret }}
+    {{- toYaml $ownedSecret.data | nindent 2 }}
+  {{- else }}
+    {{- $azureIdentity := include "wandb.azureStorageIdentity" . | fromYaml }}
+    {{- $connectionString := include "wandb.bucket.connectionString" . | b64enc }}
   BUCKET: {{ $connectionString | quote }}
   GORILLA_FILE_STORE: {{ $connectionString | quote }}
   GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE: {{ $connectionString | quote }}
   GORILLA_STORAGE_BUCKET: {{ $connectionString | quote }}
   SMJ_FILE_STORE: {{ $connectionString | quote }}
-  {{- with include "wandb.bucket" . | fromYaml }}
-    {{- if and .accessKey (not $azureIdentity.enabled) }}
+    {{- with include "wandb.bucket" . | fromYaml }}
+      {{- if and .accessKey (not $azureIdentity.enabled) }}
   {{ .accessKeyName }}: {{ .accessKey | b64enc }}
-    {{- end }}
-    {{- if and .secretKey (not $azureIdentity.enabled) }}
+      {{- end }}
+      {{- if and .secretKey (not $azureIdentity.enabled) }}
   {{ .secretKeyName }}: {{ .secretKey | b64enc }}
+      {{- end }}
     {{- end }}
   {{- end }}
 {{- end }}

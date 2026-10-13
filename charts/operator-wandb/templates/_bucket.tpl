@@ -285,9 +285,33 @@ Secrets retain their existing runtime interpolation and are never copied here.
   {{- end }}
 {{- end -}}
 
-{{/* Spec edits must still roll workloads after moving their URL into a Secret. */}}
+{{/* Only chart-owned bucket resources participate in Console ownership. Preserve
+all saved data, including intentional removals, rather than merging stale values.
+External Secrets and their existing interpolation path remain spec-controlled.
+*/}}
+{{- define "wandb.bucket.consoleOwnedResource" -}}
+  {{- if not .root.Values.global.bucket.secret.secretName -}}
+    {{- $existing := lookup "v1" .kind .root.Release.Namespace .name | default dict -}}
+    {{- $metadata := $existing.metadata | default dict -}}
+    {{- $annotations := $metadata.annotations | default dict -}}
+    {{- if eq (get $annotations "wandb.ai/console-managed") "true" -}}
+      {{- dict "data" ($existing.data | default dict) "annotations" (mergeOverwrite (deepCopy $annotations) (dict "helm.sh/resource-policy" "keep")) | toYaml -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* Before ownership, spec edits still roll workloads. After ownership, hash the
+saved URL so stale spec values cannot drive the bucket rollout checksum.
+*/}}
 {{- define "wandb.bucket.podAnnotations" -}}
   {{- if not .Values.global.bucket.secret.secretName -}}
-checksum/bucket: {{ include "wandb.bucket.connectionString" . | sha256sum | quote }}
+    {{- $owned := include "wandb.bucket.consoleOwnedResource" (dict "root" . "kind" "Secret" "name" (include "wandb.bucket.secret" .)) | fromYaml -}}
+    {{- $connectionString := "" -}}
+    {{- if $owned -}}
+      {{- $connectionString = get $owned.data "BUCKET" | default "" | b64dec -}}
+    {{- else -}}
+      {{- $connectionString = include "wandb.bucket.connectionString" . -}}
+    {{- end }}
+checksum/bucket: {{ $connectionString | sha256sum | quote }}
   {{- end -}}
 {{- end -}}
