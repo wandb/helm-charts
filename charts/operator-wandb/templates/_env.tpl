@@ -87,10 +87,10 @@ Global values will override any chart-specific values.
       name: {{ (include "wandb.bucket" . | fromYaml).secretName | quote }}
       key: {{ (include "wandb.bucket" . | fromYaml).secretKeyName | quote }}
       optional: true
-{{ include "wandb.bucket.externalConnectionEnv" (dict "root" . "name" "BUCKET") }}
-{{ include "wandb.bucket.externalConnectionEnv" (dict "root" . "name" "GORILLA_FILE_STORE") }}
-{{ include "wandb.bucket.externalConnectionEnv" (dict "root" . "name" "GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE") }}
-{{ include "wandb.bucket.externalConnectionEnv" (dict "root" . "name" "GORILLA_STORAGE_BUCKET") }}
+{{ include "wandb.bucket.connectionEnv" (dict "root" . "name" "BUCKET") }}
+{{ include "wandb.bucket.connectionEnv" (dict "root" . "name" "GORILLA_FILE_STORE") }}
+{{ include "wandb.bucket.connectionEnv" (dict "root" . "name" "GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE") }}
+{{ include "wandb.bucket.connectionEnv" (dict "root" . "name" "GORILLA_STORAGE_BUCKET") }}
 {{- end -}}
 
 {{- define "wandb.bucket.cwIdentity" -}}

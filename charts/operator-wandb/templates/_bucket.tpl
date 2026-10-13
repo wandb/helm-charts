@@ -269,19 +269,16 @@ Secrets retain their existing runtime interpolation and are never copied here.
   {{- end -}}
 {{- end -}}
 
-{{/* Chart-owned connection strings are already named for their application consumers. */}}
-{{- define "wandb.bucket.envFrom" -}}
-  {{- if not .Values.global.bucket.secret.secretName }}
-- secretRef:
-    name: {{ include "wandb.bucket.secret" . | quote }}
-  {{- end }}
-{{- end -}}
-
-{{/* External credentials retain the original runtime interpolation. */}}
-{{- define "wandb.bucket.externalConnectionEnv" -}}
-  {{- if .root.Values.global.bucket.secret.secretName }}
+{{/* Read the finished value from our Secret, retaining the external credential path. */}}
+{{- define "wandb.bucket.connectionEnv" -}}
 - name: {{ .name }}
+  {{- if .root.Values.global.bucket.secret.secretName }}
   value: {{ (include "wandb.bucket" .root | fromYaml).url | quote }}
+  {{- else }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "wandb.bucket.secret" .root | quote }}
+      key: {{ .name | quote }}
   {{- end }}
 {{- end -}}
 
