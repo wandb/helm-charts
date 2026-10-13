@@ -47,6 +47,7 @@
       {{- end -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
       {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) -}}
+      {{- $_ = set $container "envFromTpls" (concat (default list $.root.Values.envFromTpls) (default list $container.envFromTpls)) -}}
       {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $globalEnv $globalExtraEnv) -}}
       {{- $_ = set $container "root" $.root -}}
       {{- if eq $.source "containers" }}
@@ -127,6 +128,11 @@
   envFrom:
   {{- if .envFrom }}
     {{- tpl (include "wandb-base.envFrom" . | nindent 4) $.root }}
+  {{- end }}
+  {{- range .envFromTpls }}
+    {{- with tpl . $.root | trim }}
+      {{- . | nindent 4 }}
+    {{- end }}
   {{- end }}
   env:
   {{- if .envTpls }}
