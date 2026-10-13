@@ -14,6 +14,7 @@ data:
 {{- end }}
   GORILLA_DEFAULT_REGION: "minio-local"
 {{- if not .Values.global.bucket.secret.secretName }}
+  {{- $connectionString := include "wandb.bucket.connectionString" . | b64enc }}
 ---
 apiVersion: v1
 kind: Secret
@@ -22,7 +23,11 @@ metadata:
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
 data:
-  BUCKET_URL: {{ include "wandb.bucket.connectionString" . | b64enc | quote }}
+  BUCKET: {{ $connectionString | quote }}
+  GORILLA_FILE_STORE: {{ $connectionString | quote }}
+  GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE: {{ $connectionString | quote }}
+  GORILLA_STORAGE_BUCKET: {{ $connectionString | quote }}
+  SMJ_FILE_STORE: {{ $connectionString | quote }}
   {{- with include "wandb.bucket" . | fromYaml }}
     {{- if and .accessKey (not $azureIdentity.enabled) }}
   {{ .accessKeyName }}: {{ .accessKey | b64enc }}

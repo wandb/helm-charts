@@ -19,7 +19,7 @@ tests:
         secretKey: secret
     asserts:
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: czM6Ly9hY2Nlc3M6c2VjcmV0QGN1c3RvbWVyLWJ1Y2tldC9hcnRpZmFjdHMvcnVucw==
       - equal:
           path: data.ACCESS_KEY
@@ -27,6 +27,20 @@ tests:
       - equal:
           path: data.SECRET_KEY
           value: c2VjcmV0
+      - equal:
+          path: data.BUCKET
+          value: czM6Ly9hY2Nlc3M6c2VjcmV0QGN1c3RvbWVyLWJ1Y2tldC9hcnRpZmFjdHMvcnVucw==
+      - equal:
+          path: data.GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
+          value: czM6Ly9hY2Nlc3M6c2VjcmV0QGN1c3RvbWVyLWJ1Y2tldC9hcnRpZmFjdHMvcnVucw==
+      - equal:
+          path: data.GORILLA_STORAGE_BUCKET
+          value: czM6Ly9hY2Nlc3M6c2VjcmV0QGN1c3RvbWVyLWJ1Y2tldC9hcnRpZmFjdHMvcnVucw==
+      - equal:
+          path: data.SMJ_FILE_STORE
+          value: czM6Ly9hY2Nlc3M6c2VjcmV0QGN1c3RvbWVyLWJ1Y2tldC9hcnRpZmFjdHMvcnVucw==
+      - notExists:
+          path: data.BUCKET_URL
   - it: supports S3 identity authentication without embedded credentials
     template: templates/bucket.yaml
     documentIndex: 1
@@ -37,7 +51,7 @@ tests:
         path: ''
     asserts:
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: czM6Ly9jdXN0b21lci1idWNrZXQ=
   - it: uses the default bucket when no customer bucket is configured
     template: templates/bucket.yaml
@@ -51,7 +65,7 @@ tests:
         secretKey: default-secret
     asserts:
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: czM6Ly9kZWZhdWx0LWFjY2VzczpkZWZhdWx0LXNlY3JldEBtYW5hZ2VkLWJ1Y2tldC9maWxlcw==
   - it: rebuilds the full URL from edited spec values
     template: templates/bucket.yaml
@@ -65,7 +79,7 @@ tests:
         secretKey: new-secret
     asserts:
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: czM6Ly9uZXctYWNjZXNzOm5ldy1zZWNyZXRAZWRpdGVkLWJ1Y2tldC9uZXctcHJlZml4
   - it: preserves gcs URL scheme and trailing path slash
     template: templates/bucket.yaml
@@ -77,7 +91,7 @@ tests:
         path: container/prefix/
     asserts:
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: Z3M6Ly9zdG9yYWdlL2NvbnRhaW5lci9wcmVmaXgv
   - it: preserves az URL scheme and trailing path slash
     template: templates/bucket.yaml
@@ -89,7 +103,7 @@ tests:
         path: container/prefix/
     asserts:
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: YXo6Ly9zdG9yYWdlL2NvbnRhaW5lci9wcmVmaXgv
   - it: preserves cw URL scheme and trailing path slash
     template: templates/bucket.yaml
@@ -101,7 +115,7 @@ tests:
         path: container/prefix/
     asserts:
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: Y3c6Ly9zdG9yYWdlL2NvbnRhaW5lci9wcmVmaXgv
   - it: preserves literal credential characters without Kubernetes expansion
     template: templates/bucket.yaml
@@ -115,52 +129,60 @@ tests:
         secretKey: test+/$encoded==
     asserts:
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: czM6Ly90ZXN0LWFjY2Vzczp0ZXN0Ky8kZW5jb2RlZD09QGJ1Y2tldC9wcmVmaXg=
   - it: reads BUCKET directly from the chart Secret
     template: charts/app/templates/deployment.yaml
     asserts:
       - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: chartsnap-bucket
+      - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: BUCKET
-            valueFrom:
-              secretKeyRef:
-                name: chartsnap-bucket
-                key: BUCKET_URL
+          any: true
   - it: reads GORILLA_FILE_STORE directly from the chart Secret
     template: charts/app/templates/deployment.yaml
     asserts:
       - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: chartsnap-bucket
+      - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_FILE_STORE
-            valueFrom:
-              secretKeyRef:
-                name: chartsnap-bucket
-                key: BUCKET_URL
+          any: true
   - it: reads GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE directly from the chart Secret
     template: charts/app/templates/deployment.yaml
     asserts:
       - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: chartsnap-bucket
+      - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE
-            valueFrom:
-              secretKeyRef:
-                name: chartsnap-bucket
-                key: BUCKET_URL
+          any: true
   - it: reads GORILLA_STORAGE_BUCKET directly from the chart Secret
     template: charts/app/templates/deployment.yaml
     asserts:
       - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: chartsnap-bucket
+      - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_STORAGE_BUCKET
-            valueFrom:
-              secretKeyRef:
-                name: chartsnap-bucket
-                key: BUCKET_URL
+          any: true
   - it: preserves explicit environment overrides
     template: charts/app/templates/deployment.yaml
     set:
@@ -197,6 +219,16 @@ tests:
                 name: customer-secret
                 key: access
                 optional: true
+      - notContains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: chartsnap-bucket
+      - notContains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: customer-secret
   - it: does not create a credential Secret for external credentials
     template: templates/bucket.yaml
     set:
@@ -216,23 +248,30 @@ tests:
       global.api.enabled: true
     asserts:
       - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: chartsnap-bucket
+      - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_FILE_STORE
-            valueFrom: &id001
-              secretKeyRef:
-                name: chartsnap-bucket
-                key: BUCKET_URL
+          any: true
   - it: uses the finished URL in settings migration jobs
     template: charts/settingsMigrationJob/templates/job.yaml
     set:
       settingsMigrationJob.install: true
     asserts:
       - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: chartsnap-bucket
+      - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: SMJ_FILE_STORE
-            valueFrom: *id001
+          any: true
   - it: preserves settings migration overrides
     template: charts/settingsMigrationJob/templates/job.yaml
     set:
@@ -282,7 +321,7 @@ tests:
           path: data.custom-secret
           value: c2VjcmV0
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: Y3c6Ly9hY2Nlc3M6c2VjcmV0QGJ1Y2tldA==
   - it: rolls pods for spec URL before-edit
     template: charts/app/templates/deployment.yaml
@@ -318,7 +357,7 @@ tests:
     documentIndex: 1
     asserts:
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: czM6Ly8=
   - it: does not append a path when the customer path is omitted
     template: templates/bucket.yaml
@@ -331,5 +370,5 @@ tests:
         secretKey: secret
     asserts:
       - equal:
-          path: data.BUCKET_URL
+          path: data.GORILLA_FILE_STORE
           value: czM6Ly9hY2Nlc3M6c2VjcmV0QHJ1bnM=
