@@ -246,6 +246,11 @@ url: {{ $url }}
 {{/* Build the chart-owned Secret's URL from actual Helm values. External
 Secrets retain their existing runtime interpolation and are never copied here.
 */}}
+{{/* Percent-encode URL userinfo; urlquery's "+" for spaces decodes as a literal plus in userinfo. */}}
+{{- define "wandb.bucket.userinfoEscape" -}}
+  {{- . | toString | urlquery | replace "+" "%20" -}}
+{{- end -}}
+
 {{- define "wandb.bucket.connectionString" -}}
   {{- $bucket := .Values.global.defaultBucket -}}
   {{- if .Values.global.bucket.name -}}
@@ -259,7 +264,7 @@ Secrets retain their existing runtime interpolation and are never copied here.
     {{- $credentials := "" -}}
     {{- $usesKeyPair := and (has $scheme (list "s3" "cw")) $bucket.accessKey $bucket.secretKey -}}
     {{- if $usesKeyPair -}}
-      {{- $credentials = printf "%s:%s@" $bucket.accessKey $bucket.secretKey -}}
+      {{- $credentials = printf "%s:%s@" (include "wandb.bucket.userinfoEscape" $bucket.accessKey) (include "wandb.bucket.userinfoEscape" $bucket.secretKey) -}}
     {{- end -}}
     {{- $path := "" -}}
     {{- if $bucket.path -}}

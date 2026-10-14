@@ -117,7 +117,7 @@ tests:
       - equal:
           path: data.GORILLA_FILE_STORE
           value: Y3c6Ly9zdG9yYWdlL2NvbnRhaW5lci9wcmVmaXgv
-  - it: preserves literal credential characters without Kubernetes expansion
+  - it: percent-encodes literal credential characters without Kubernetes expansion
     template: templates/bucket.yaml
     documentIndex: 1
     set:
@@ -130,7 +130,35 @@ tests:
     asserts:
       - equal:
           path: data.GORILLA_FILE_STORE
-          value: czM6Ly90ZXN0LWFjY2Vzczp0ZXN0Ky8kZW5jb2RlZD09QGJ1Y2tldC9wcmVmaXg=
+          value: czM6Ly90ZXN0LWFjY2Vzczp0ZXN0JTJCJTJGJTI0ZW5jb2RlZCUzRCUzREBidWNrZXQvcHJlZml4
+  - it: percent-encodes URL userinfo characters in chart-owned bucket credentials
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        provider: s3
+        name: bucket
+        path: prefix
+        accessKey: AKIAEXAMPLE
+        secretKey: abc/def+ghi
+    asserts:
+      - equal:
+          path: data.BUCKET
+          value: czM6Ly9BS0lBRVhBTVBMRTphYmMlMkZkZWYlMkJnaGlAYnVja2V0L3ByZWZpeA==
+  - it: encodes spaces as percent-escapes in chart-owned bucket credentials
+    template: templates/bucket.yaml
+    documentIndex: 1
+    set:
+      global.bucket:
+        provider: s3
+        name: bucket
+        path: prefix
+        accessKey: AKIAEXAMPLE
+        secretKey: abc def
+    asserts:
+      - equal:
+          path: data.BUCKET
+          value: czM6Ly9BS0lBRVhBTVBMRTphYmMlMjBkZWZAYnVja2V0L3ByZWZpeA==
   - it: reads BUCKET directly from the chart Secret
     template: charts/app/templates/deployment.yaml
     asserts:
