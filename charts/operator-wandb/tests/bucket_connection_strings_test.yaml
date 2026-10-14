@@ -229,6 +229,51 @@ tests:
           content:
             secretRef:
               name: customer-secret
+  - it: preserves CoreWeave URL interpolation with external credentials
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.bucket:
+        name: external-bucket
+        provider: cw
+        path: files
+        secret:
+          secretName: customer-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STORE
+            value: cw://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)
+  - it: preserves Azure URL interpolation with an external Secret
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.bucket:
+        name: external-bucket
+        provider: az
+        path: container/files
+        secret:
+          secretName: customer-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STORE
+            value: az://$(BUCKET_NAME)/$(BUCKET_PATH)
+  - it: preserves GCS URL interpolation with an external Secret
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.bucket:
+        name: external-bucket
+        provider: gcs
+        path: files
+        secret:
+          secretName: customer-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STORE
+            value: gs://$(BUCKET_NAME)/$(BUCKET_PATH)
   - it: does not create a credential Secret for external credentials
     template: templates/bucket.yaml
     set:

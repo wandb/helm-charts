@@ -185,60 +185,21 @@ azureAuthMethod: {{ $azureAuthMethod | toJson }}
 accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
 secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}
-  {{- if not $path -}}
-
-    {{- if eq $provider "cw" -}}
-      {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
-        {{- $url = "cw://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)" -}}
-      {{- else -}}
-        {{- $url = "cw://$(BUCKET_NAME)" -}}
-      {{- end -}}
-    {{- end -}}
-
-    {{- if eq $provider "az" -}}
-      {{- $url = "az://$(BUCKET_NAME)" -}}
-    {{- end -}}
-
-    {{- if eq $provider "gcs" -}}
-      {{- $url = "gs://$(BUCKET_NAME)" -}}
-    {{- end -}}
-
-    {{- if eq $provider "s3" -}}
-      {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
-        {{- $url = "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)" -}}
-      {{- else -}}
-        {{- $url = "s3://$(BUCKET_NAME)" -}}
-      {{- end -}}
-    {{- end -}}
-
-  {{- else -}}
-
-    {{- if eq $provider "cw" -}}
-      {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
-        {{- $url = "cw://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
-      {{- else -}}
-        {{- $url = "cw://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
-      {{- end -}}
-    {{- end -}}
-
-    {{- if eq $provider "az" -}}
-      {{- $url = "az://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
-    {{- end -}}
-
-    {{- if eq $provider "gcs" -}}
-      {{- $url = "gs://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
-    {{- end -}}
-
-    {{- if eq $provider "s3" -}}
-      {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
-        {{- $url = "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
-      {{- else -}}
-        {{- $url = "s3://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
-      {{- end -}}
-    {{- end -}}
-
+  {{- $scheme := $provider -}}
+  {{- if eq $scheme "gcs" -}}
+    {{- $scheme = "gs" -}}
   {{- end -}}
-  {{- $url = trimSuffix "/" $url }}
+  {{- if has $provider (list "s3" "cw" "az" "gcs") -}}
+    {{- $credentials := "" -}}
+    {{- $usesKeyPair := and (has $provider (list "s3" "cw")) (or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName) -}}
+    {{- if $usesKeyPair -}}
+      {{- $credentials = "$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@" -}}
+    {{- end -}}
+    {{- $url = printf "%s://%s$(BUCKET_NAME)" $scheme $credentials -}}
+    {{- if $path -}}
+      {{- $url = printf "%s/$(BUCKET_PATH)" $url -}}
+    {{- end -}}
+  {{- end }}
 url: {{ $url }}
 {{- end -}}
 
