@@ -243,14 +243,14 @@ url: {{ $url }}
 {{- end -}}
 
 
-{{/* Build the chart-owned Secret's URL from actual Helm values. External
-Secrets retain their existing runtime interpolation and are never copied here.
-*/}}
 {{/* Percent-encode URL userinfo; urlquery's "+" for spaces decodes as a literal plus in userinfo. */}}
 {{- define "wandb.bucket.userinfoEscape" -}}
   {{- . | toString | urlquery | replace "+" "%20" -}}
 {{- end -}}
 
+{{/* Build the chart-owned Secret's URL from actual Helm values. External
+Secrets retain their existing runtime interpolation and are never copied here.
+*/}}
 {{- define "wandb.bucket.connectionString" -}}
   {{- $bucket := .Values.global.defaultBucket -}}
   {{- if .Values.global.bucket.name -}}
