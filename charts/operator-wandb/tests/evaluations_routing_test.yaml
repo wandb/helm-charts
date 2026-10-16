@@ -1,0 +1,121 @@
+suite: Evaluations same-origin routing
+templates:
+  - templates/ingress.yaml
+  - templates/traefik-ingress.yaml
+  - templates/frontend.yaml
+  - templates/nginx.yaml
+  - templates/evaluations-migration.yaml
+  - charts/evaluations/templates/deployment.yaml
+  - charts/evaluations/templates/service.yaml
+release:
+  name: customer
+  namespace: customer-ns
+tests:
+  - it: omits the evaluations path from both ingresses when disabled
+    set:
+      global.traefikIngress: true
+    templates: &ingresses
+      - templates/ingress.yaml
+      - templates/traefik-ingress.yaml
+    asserts:
+      - notContains:
+          path: spec.rules[0].http.paths
+          content: &route
+            pathType: Prefix
+            path: /evaluations
+            backend:
+              service:
+                name: customer-evaluations
+                port:
+                  number: 9300
+  - it: omits the frontend URL and local proxy route when disabled
+    asserts:
+      - notExists:
+          path: data.REACT_APP_EVALUATIONS_BASE_URL
+        template: templates/frontend.yaml
+        documentIndex: 0
+      - notMatchRegex:
+          path: data["nginx.conf"]
+          pattern: /evaluations
+        template: templates/nginx.yaml
+  - it: routes primary and alias hosts directly to CES in both ingresses
+    values: &enabled
+      - ../../../test-configs/operator-wandb/evaluations.yaml
+    set:
+      global.traefikIngress: true
+      ingress.additionalHosts: [alias.example.com]
+    templates: *ingresses
+    asserts:
+      - contains:
+          path: spec.rules[0].http.paths
+          content: *route
+      - contains:
+          path: spec.rules[1].http.paths
+          content: *route
+      - notExists:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/rewrite-target"]
+  - it: keeps the Traefik IP allowlist middleware on the shared ingress
+    values:
+      - ../../../test-configs/operator-wandb/evaluations-traefik.yaml
+    template: templates/traefik-ingress.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["traefik.ingress.kubernetes.io/router.middlewares"]
+          value: customer-ns-customer-ip-allowlist@kubernetescrd
+      - contains:
+          path: spec.rules[0].http.paths
+          content: *route
+  - it: supplies the same-origin frontend URL only when enabled
+    values: *enabled
+    template: templates/frontend.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: data.REACT_APP_EVALUATIONS_BASE_URL
+          value: /evaluations
+  - it: delegates prefix handling to CES in the API and migration environment
+    values: *enabled
+    templates:
+      - charts/evaluations/templates/deployment.yaml
+      - templates/evaluations-migration.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CES_PATH_PREFIX
+            value: /evaluations
+      - lengthEqual:
+          path: spec.template.spec.containers
+          count: 1
+  - it: forwards exact and subtree local proxy requests without stripping the URI
+    values: *enabled
+    template: templates/nginx.yaml
+    asserts:
+      - matchRegex:
+          path: data["nginx.conf"]
+          pattern: 'location = /evaluations \{\s+proxy_pass http://customer-evaluations:9300;'
+      - matchRegex:
+          path: data["nginx.conf"]
+          pattern: 'location /evaluations/ \{\s+proxy_pass http://customer-evaluations:9300;'
+  - it: uses prefixed liveness for AWS backend checks
+    values: *enabled
+    set:
+      global.cloudProvider: aws
+    template: charts/evaluations/templates/service.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["alb.ingress.kubernetes.io/healthcheck-path"]
+          value: /evaluations/livez
+  - it: uses prefixed liveness for GCP backend checks
+    values: *enabled
+    set:
+      global.cloudProvider: gcp
+    template: charts/evaluations/templates/service.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.healthCheck
+          value:
+            type: HTTP
+            port: 9300
+            requestPath: /evaluations/livez

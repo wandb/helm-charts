@@ -199,6 +199,15 @@ It expects a dictionary with two entries:
 {{/* Keep the legacy primary and Traefik application paths identical, including traces. */}}
 {{- define "wandb.primaryIngressPaths" -}}
   {{- include "IngressPath" . }}
+  {{- if .Values.evaluations.install }}
+- pathType: Prefix
+  path: /evaluations
+  backend:
+    service:
+      name: {{ include "wandb-base.serviceName" (index .Subcharts "evaluations") }}
+      port:
+        number: 9300
+  {{- end }}
   {{- if index .Values "weave-trace" "install" }}
 - pathType: Prefix
   path: /traces
