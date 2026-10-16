@@ -1,5 +1,7 @@
 {{/* Shared inline configuration: this helper runs in the evaluations subchart context. */}}
 {{- define "wandb.evaluations.env" -}}
+- name: CES_PATH_PREFIX
+  value: "/evaluations"
 - name: CES_HTTP_ADDRESS
   value: ":9300"
 - name: WANDB_BASE_URL

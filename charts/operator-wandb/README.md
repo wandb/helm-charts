@@ -691,3 +691,11 @@ Implementation requirements were checked against the CES
 [`main.go`](https://github.com/wandb/core/blob/main/services/evaluations/main.go),
 [`deployment chart`](https://github.com/wandb/core/tree/main/services/evaluations/deploy/evaluations),
 and [`architecture`](https://github.com/wandb/core/blob/main/services/evaluations/docs/architecture.md).
+
+When enabled, legacy and Traefik primary ingresses and the local NGINX proxy
+forward `/evaluations` and its subtree directly to CES on port 9300.
+`CES_PATH_PREFIX=/evaluations` makes CES remove the prefix; no ingress rewrite
+is needed. Existing routes and IP allowlists remain in effect. The frontend gets
+`REACT_APP_EVALUATIONS_BASE_URL=/evaluations` only when CES is enabled.
+Cloud load-balancer checks use `/evaluations/livez` to avoid withdrawing the
+backend on database blips; pod readiness still checks both databases at `/readyz`.
