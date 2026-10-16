@@ -130,7 +130,10 @@ cannot be represented without changing Weave's object layout.
   {{- $fileStorage := index $weaveTrace "fileStorage" | default dict -}}
   {{- $globalIdentity := default (dict) .Values.global.azureStorageIdentity -}}
   {{- $identityConfigured := and (not (empty $globalIdentity.tenantId)) (not (empty $globalIdentity.clientId)) -}}
-{{- and (index $fileStorage "useDefaultBucket" | default false) $identityConfigured -}}
+  {{- $export := index $weaveTrace "bulkExport" | default dict -}}
+  {{- $exportURI := include "wandb.bulkExportStorageURI" . -}}
+  {{- $exportsUseAzure := and ($export.enabled | default false) (hasPrefix "az://" $exportURI) -}}
+{{- and (or (index $fileStorage "useDefaultBucket" | default false) $exportsUseAzure) $identityConfigured -}}
 {{- end }}
 
 {{/*
