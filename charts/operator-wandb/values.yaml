@@ -4953,3 +4953,90 @@ testHooks:
     workloadSecurityProfile: {}
   olap:
     workloadSecurityProfile: {}
+
+# CoreWeave Evaluations service. Provision separate CES databases/users before enabling.
+evaluations:
+  install: false
+  image:
+    repository: wandb/evaluations
+    # Set to the same server release tag used by the other server images.
+    tag: latest
+  replicaCount: 1
+  # pre-install/pre-upgrade blocks API rollout, including first enablement on upgrade.
+  # Inline env avoids ConfigMaps created later in this release. Password Secrets,
+  # referenced CA objects and any custom service account MUST already exist.
+  # Inline global.mysql.caCert gets a separate, earlier CES hook Secret.
+  # Helm serializes a release; never run another migration runner for these databases.
+  serviceAccount:
+    create: false
+    name: default
+  automountServiceAccountToken: false
+  globalOptOut:
+    env: true
+    volumes: true
+  mysql:
+    host: ""
+    port: 3306
+    database: evaluations
+    user: ""
+    passwordSecret:
+      name: ""
+      key: password
+    # required verifies against system roots plus global.mysql.caCert, when configured.
+    # disabled is permitted by CES only for a literal loopback IP (encrypted proxy).
+    tls: required
+  clickhouse:
+    # ClickHouse Cloud native endpoint; a dedicated CES database with replicated DDL.
+    # Must support CES migrations (including ClickHouse 26.2+ text-index syntax).
+    host: ""
+    nativePort: 9440
+    database: evaluations
+    user: ""
+    passwordSecret:
+      name: ""
+      key: password
+    tls: required
+  migration:
+    activeDeadlineSeconds: 900
+    backoffLimit: 0
+  volumesTpls:
+    - '{{ include "wandb.evaluations.caVolumes" . }}'
+  containers:
+    evaluations:
+      envTpls:
+        - '{{ include "wandb.evaluations.env" . }}'
+      ports:
+        - name: http
+          containerPort: 9300
+          protocol: TCP
+      startupProbe:
+        httpGet:
+          path: /livez
+          port: http
+        failureThreshold: 30
+        periodSeconds: 10
+      livenessProbe:
+        httpGet:
+          path: /livez
+          port: http
+        timeoutSeconds: 2
+      readinessProbe:
+        httpGet:
+          path: /readyz
+          port: http
+        timeoutSeconds: 6
+      volumeMountsTpls:
+        - '{{ include "wandb.mysql.caCertVolumeMount" . }}'
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 1Gi
+  service:
+    enabled: true
+    ports:
+      - name: http
+        port: 9300
+        targetPort: 9300
+        protocol: TCP

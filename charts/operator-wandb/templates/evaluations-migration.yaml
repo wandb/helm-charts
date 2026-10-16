@@ -1,0 +1,29 @@
+{{- if .Values.evaluations.install }}
+  {{- include "wandb.evaluations.validate" . }}
+  {{- $context := index .Subcharts "evaluations" }}
+  {{- $pod := deepCopy $context.Values }}
+  {{- $_ := set $pod "restartPolicy" "Never" }}
+  {{- $container := deepCopy $context.Values.containers.evaluations }}
+  {{- range $field := list "ports" "startupProbe" "livenessProbe" "readinessProbe" }}
+    {{- $_ := unset $container $field }}
+  {{- end }}
+  {{- $_ := set $container "args" (list "migrate" "up") }}
+  {{- $_ := set $pod "containers" (dict "evaluations" $container) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-evaluations-migrate
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  parallelism: 1
+  completions: 1
+  backoffLimit: {{ .Values.evaluations.migration.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.evaluations.migration.activeDeadlineSeconds }}
+  template:
+    {{- include "wandb-base.pod" (dict "root" $context "podData" $pod) | nindent 4 }}
+{{- end }}

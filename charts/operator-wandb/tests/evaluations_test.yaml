@@ -1,0 +1,273 @@
+suite: Evaluations service and ordered migrations
+templates:
+  - charts/evaluations/templates/deployment.yaml
+  - charts/evaluations/templates/service.yaml
+  - templates/evaluations-migration.yaml
+  - templates/evaluations-mysql-ca.yaml
+release:
+  name: customer
+  namespace: customer-ns
+tests:
+  - it: renders no migration or CA hook by default
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: templates/evaluations-migration.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/evaluations-mysql-ca.yaml
+  - it: uses a singleton blocking pre-install and pre-upgrade migration job
+    values: &enabled
+      - ../../../test-configs/operator-wandb/evaluations.yaml
+    template: templates/evaluations-migration.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-install,pre-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation,hook-succeeded
+      - equal:
+          path: spec.parallelism
+          value: 1
+      - equal:
+          path: spec.completions
+          value: 1
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value: [migrate, up]
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: wandb/evaluations:server-release
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: default
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - isNull:
+          path: spec.template.spec.initContainers
+      - isNull:
+          path: spec.template.spec.containers[0].livenessProbe
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value: null
+  - it: separates API probes and connects to the split Gorilla API
+    values: *enabled
+    template: charts/evaluations/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /livez
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.path
+          value: /livez
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /readyz
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_BASE_URL
+            value: http://customer-api:8081/
+      - isNull:
+          path: spec.template.spec.initContainers
+      - isNull:
+          path: spec.template.spec.containers[0].args
+  - it: shares database credentials and trusted CA with API and migration
+    values: *enabled
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CES_MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: evaluations-mysql
+                key: mysql-password
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CES_CLICKHOUSE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: evaluations-clickhouse
+                key: clickhouse-password
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CES_CLICKHOUSE_NATIVE_PORT
+            value: "9440"
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: mysql-ca
+            secret:
+              secretName: existing-mysql-ca
+              items:
+                - key: rds-ca.pem
+                  path: rds-ca.pem
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: mysql-ca
+            mountPath: /etc/ssl/certs/rds-ca.pem
+            subPath: rds-ca.pem
+    templates:
+      - charts/evaluations/templates/deployment.yaml
+      - templates/evaluations-migration.yaml
+  - it: creates an inline CA before the migration and retains it for API pods
+    values: *enabled
+    set:
+      global.mysql.caCert: example-pem
+    template: templates/evaluations-mysql-ca.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "-10"
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - equal:
+          path: data["mysql_ca.pem"]
+          value: ZXhhbXBsZS1wZW0=
+  - it: mounts the earlier inline CA in both workloads
+    values: *enabled
+    set:
+      global.mysql.caCert: example-pem
+    templates:
+      - charts/evaluations/templates/deployment.yaml
+      - templates/evaluations-migration.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: mysql-ca
+            secret:
+              secretName: customer-evaluations-mysql-ca
+              items:
+                - key: mysql_ca.pem
+                  path: mysql_ca.pem
+  - it: supports an existing ConfigMap CA and monolith Gorilla
+    values: *enabled
+    set:
+      global.api.enabled: false
+      global.mysql.caCert.valueFrom.secretKeyRef: null
+      global.mysql.caCert:
+        valueFrom:
+          configMapKeyRef:
+            name: existing-ca
+            key: ca.pem
+      evaluations.serviceAccount.name: existing-ces-account
+    templates:
+      - charts/evaluations/templates/deployment.yaml
+      - templates/evaluations-migration.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: existing-ces-account
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_BASE_URL
+            value: http://customer-app:8080/
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: mysql-ca
+            configMap:
+              name: existing-ca
+              items:
+                - key: ca.pem
+                  path: ca.pem
+  - it: rejects plaintext MySQL away from loopback
+    values: *enabled
+    set:
+      evaluations.mysql.tls: disabled
+    template: templates/evaluations-migration.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: evaluations.mysql.tls=disabled requires a literal loopback IP
+  - it: permits an encrypted local MySQL proxy
+    values: *enabled
+    set:
+      evaluations.mysql.host: "127.0.0.1"
+      evaluations.mysql.tls: disabled
+    template: templates/evaluations-migration.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CES_MYSQL_TLS
+            value: disabled
+  - it: rejects the Gorilla database
+    values: *enabled
+    set:
+      evaluations.mysql.database: wandb_local
+    template: templates/evaluations-migration.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: evaluations.mysql.database must be separate from Gorilla
+  - it: rejects the Weave database
+    values: *enabled
+    set:
+      evaluations.clickhouse.database: weave_trace_db
+    template: templates/evaluations-migration.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: evaluations.clickhouse.database must be separate from Weave Trace
+
+  - it: rejects local-mode overrides that bypass production TLS and migration settings
+    values: *enabled
+    set:
+      evaluations.env.CES_ENVIRONMENT: local
+    template: templates/evaluations-migration.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: evaluations CES_ENVIRONMENT=local is unsupported
+
+  - it: uses repository prefixes and the same image digest in API and migration
+    values: *enabled
+    set:
+      global.repositoryPrefix: registry.example.com
+      evaluations.image.digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    templates:
+      - charts/evaluations/templates/deployment.yaml
+      - templates/evaluations-migration.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.com/wandb/evaluations@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+  - it: permits an IPv6 loopback proxy without adding a CA dependency
+    values: *enabled
+    set:
+      evaluations.mysql.host: "::1"
+      evaluations.mysql.tls: disabled
+      global.mysql.caCert: ""
+    template: templates/evaluations-migration.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CES_MYSQL_HOST
+            value: "::1"
+      - equal:
+          path: spec.template.spec.volumes
+          value: null
+
+  - it: rejects invalid numeric loopback addresses
+    values: *enabled
+    set:
+      evaluations.mysql.host: "127.999.0.1"
+      evaluations.mysql.tls: disabled
+    template: templates/evaluations-migration.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: evaluations.mysql.tls=disabled requires a literal loopback IP

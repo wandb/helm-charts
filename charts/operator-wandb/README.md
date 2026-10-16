@@ -641,3 +641,53 @@ When `global.bucket.secret.secretName` is supplied, the chart keeps its existing
 external-Secret references and runtime URL expansion. It does not copy external
 credentials or create a replacement credential Secret. This change does not add
 Console ownership, lookups, or change Azure identity or ServiceAccount selection.
+
+## Evaluations (Dedicated Cloud, opt-in)
+
+`evaluations.install` defaults to `false`. CES uses `wandb/evaluations`; set
+`evaluations.image.tag` to the same release tag as the other server images.
+[test-configs/operator-wandb/evaluations.yaml](../../../test-configs/operator-wandb/evaluations.yaml)
+shows the connection and password Secret configuration without credentials.
+
+Provision a separate MySQL database and a separate ClickHouse database, their
+users, and migration privileges before enabling CES. Supply password Secrets by
+name/key in `evaluations.mysql.passwordSecret` and
+`evaluations.clickhouse.passwordSecret`. These must already exist in the release
+namespace. CES does not inherit Gorilla or Weave database names or credentials.
+Use a ClickHouse Cloud native TLS endpoint (typically port 9440), a database
+engine that propagates replicated DDL, and a server supporting the CES migration
+syntax (including ClickHouse 26.2+ text indexes). Validate migrations against the
+chosen Cloud service before customer enablement.
+
+MySQL `tls: required` verifies system roots; `global.mysql.caCert` also mounts at
+`/etc/ssl/certs/<file>` in both CES containers using the existing chart helpers.
+CA Secret/ConfigMap references must pre-exist. An inline PEM gets a separate CES
+CA Secret in a weight -10 pre-install/pre-upgrade hook, retained for API pods.
+This hook Secret persists after uninstall and can be removed once CES is gone.
+MySQL `tls: disabled` is allowed only for a literal loopback IP backed by an
+encrypted proxy. ClickHouse always requires verified TLS. Leave
+`CES_ENVIRONMENT` unset; local mode is unsuitable for Dedicated Cloud.
+
+A single weight 0 pre-install/pre-upgrade Job runs the same image with
+`[migrate, up]`. Helm waits for success before applying the API Deployment on
+install, upgrade, and first enablement during an upgrade. Failure blocks the new
+rollout and leaves the previous Deployment unchanged. The Job uses inline env,
+pre-existing credential Secrets and the default service account without API
+token mounting. To use a custom account, provision it first and set
+`evaluations.serviceAccount.name`; chart-created accounts are intentionally
+disallowed because the hook precedes regular resources. Image pull Secrets must
+also pre-exist. Hooks cannot use databases created in the same release.
+
+Do not run other migration processes against these databases. ClickHouse has no
+cross-process migration lock; Helm serializes operations for a release, and the
+Job has one completion, parallelism one, and no retries by default. Operators
+must serialize database migrations across releases too. API replicas never run
+migrations in init containers. `/livez` handles startup and liveness; `/readyz`
+checks both databases. `WANDB_BASE_URL` selects the internal split API or app
+Service. Optional CES runtime tuning can be supplied through `evaluations.env`
+and is shared by the API and migration Job.
+
+Implementation requirements were checked against the CES
+[`main.go`](https://github.com/wandb/core/blob/main/services/evaluations/main.go),
+[`deployment chart`](https://github.com/wandb/core/tree/main/services/evaluations/deploy/evaluations),
+and [`architecture`](https://github.com/wandb/core/blob/main/services/evaluations/docs/architecture.md).
