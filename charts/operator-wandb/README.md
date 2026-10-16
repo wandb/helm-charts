@@ -641,3 +641,61 @@ When `global.bucket.secret.secretName` is supplied, the chart keeps its existing
 external-Secret references and runtime URL expansion. It does not copy external
 credentials or create a replacement credential Secret. This change does not add
 Console ownership, lookups, or change Azure identity or ServiceAccount selection.
+
+## Bulk export (managed installs)
+
+Bulk export is opt-in through `global.weave-trace.bulkExport.enabled`. It requires
+an image containing the bulk-export APIs and safeguards and a matching Gorilla
+storage/signing API. MTSaaS leaves this setting disabled; on-prem rollout follows
+managed-install validation.
+
+```yaml
+global:
+  weave-trace:
+    bulkExport:
+      enabled: true
+      collection: weave_exports
+      cluster: default
+      maxRows: 5000000
+      timeoutSeconds: 1800
+      maxThreads: 2
+      maxMemoryBytes: 2147483648
+```
+
+With empty `storageURI`, the non-secret writer file selects the existing deployment
+bucket/container while the trace service asks Gorilla to discover storage and sign
+reads. This does not enable media offloading or set `WF_FILE_STORAGE_URI`. An
+explicit `storageURI` sets that existing environment override and selects local SDK
+read signing. If an independent environment override already selects media storage,
+keep the writer configuration aligned with it. Configure `awsRegion` for S3 SDK
+signing when the pod's standard AWS region configuration is insufficient.
+
+The chart mounts `export-storage.json` at `/etc/weave/export-storage.json`. It contains
+only `storage_uri`, `collection` and `cluster`. Its generated ConfigMap name changes
+with export configuration so the pod rolls when settings change. An external
+`configMapName` can supply the same file; its volume is optional so missing export
+configuration does not block ordinary trace startup. Diagnose setup on the first
+export request. External ConfigMap updates require an operator-managed rollout.
+
+The collection must already exist on every participating ClickHouse node. Provision
+it through the database administrator's tooling using a separate writer identity
+with direct access to the selected `exports/` namespace. The chart does not create
+buckets, install writer secrets, run bootstrap Jobs or grant the trace application
+permission to create Kubernetes Jobs. Provider details stay in the named collection
+and SDK identities, not export request bodies.
+
+The trace service needs read/write access for manifests. Default-bucket downloads
+use Gorilla's existing signing identity; explicit destinations additionally require
+local read-signing permission (GCS IAM `signBlob` or a key signer; Azure delegation
+permission; S3/KMS read permission). Reuse existing service-account/identity values
+and Secret mounts for credentials. Azure exports can use the configured workload
+identity without enabling media offloading. ClickHouse needs collection visibility,
+query-log/process visibility and cluster-wide cancellation permission. Redis must
+preserve non-TTL coordination records with persistence and a non-evicting or
+volatile-only eviction policy.
+
+The feature admits one export per deployment, including row counts and sequential
+writes. Links expire after one hour and the creator can renew them. Cancellation
+waits for confirmed query termination. Failed/cancelled files are left for operator
+cleanup; successful-file retention is not managed by v1. See the core service's
+export contract for API usage and diagnostic codes.

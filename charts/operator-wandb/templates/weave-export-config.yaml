@@ -1,0 +1,11 @@
+{{- $config := include "wandb.bulkExportConfig" . | fromYaml }}
+{{- if and $config.enabled (empty $config.configMapName) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "wandb.bulkExportConfigMapName" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  export-storage.json: {{ dict "storage_uri" (include "wandb.bulkExportStorageURI" .) "collection" $config.collection "cluster" $config.cluster | toJson | quote }}
+{{- end }}

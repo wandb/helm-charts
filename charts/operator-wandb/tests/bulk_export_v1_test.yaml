@@ -1,0 +1,177 @@
+suite: Bulk export deployment selection
+templates:
+  - templates/weave-export-config.yaml
+  - templates/weave-trace.yaml
+  - charts/weave-trace/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+set:
+  weave-trace.install: true
+tests:
+  - it: creates no export selection when disabled
+    template: templates/weave-export-config.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: leaves ordinary trace startup disabled by default
+    template: templates/weave-trace.yaml
+    asserts:
+      - notExists:
+          path: data.WEAVE_BULK_EXPORT_ENABLED
+      - notExists:
+          path: data.WF_FILE_STORAGE_URI
+  - it: selects the existing S3 bucket without changing media storage
+    template: templates/weave-export-config.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.defaultBucket.provider: s3
+      global.defaultBucket.name: deployment-bucket
+    asserts:
+      - equal:
+          path: data["export-storage.json"]
+          value: '{"cluster":"default","collection":"weave_exports","storage_uri":"s3://deployment-bucket"}'
+  - it: selects GCS through the GCS XML writer adapter
+    template: templates/weave-export-config.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.defaultBucket.provider: gcs
+      global.defaultBucket.name: deployment-bucket
+    asserts:
+      - matchRegex:
+          path: data["export-storage.json"]
+          pattern: '"storage_uri":"gs://deployment-bucket"'
+  - it: selects the Azure account and container
+    template: templates/weave-export-config.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.defaultBucket.provider: az
+      global.defaultBucket.name: storageaccount
+      global.defaultBucket.path: wandb
+    asserts:
+      - matchRegex:
+          path: data["export-storage.json"]
+          pattern: '"storage_uri":"az://storageaccount/wandb"'
+  - it: honors the deployment-selected external bucket
+    template: templates/weave-export-config.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.defaultBucket.provider: s3
+      global.defaultBucket.name: unused-managed-bucket
+      global.bucket.provider: gcs
+      global.bucket.name: selected-bucket
+    asserts:
+      - matchRegex:
+          path: data["export-storage.json"]
+          pattern: '"storage_uri":"gs://selected-bucket"'
+  - it: binds an explicit storage override to the environment and writer selection
+    template: templates/weave-trace.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.storageURI: gs://explicit-bucket
+    asserts:
+      - equal:
+          path: data.WF_FILE_STORAGE_URI
+          value: gs://explicit-bucket
+      - equal:
+          path: data.WEAVE_BULK_EXPORT_ENABLED
+          value: "true"
+  - it: keeps default storage discovery in Gorilla
+    template: templates/weave-trace.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+    asserts:
+      - notExists:
+          path: data.WF_FILE_STORAGE_URI
+      - notExists:
+          path: data.WEAVE_BULK_EXPORT_DEPLOYMENT_MODE
+  - it: preserves integer environment defaults after YAML round trips
+    template: templates/weave-trace.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+    asserts:
+      - equal:
+          path: data.WF_EXPORT_MAX_ROWS
+          value: "5000000"
+      - equal:
+          path: data.WF_EXPORT_MAX_MEMORY_BYTES
+          value: "2147483648"
+      - equal:
+          path: data.WF_EXPORT_MAX_EXECUTION_SECONDS
+          value: "1800"
+      - equal:
+          path: data.WF_EXPORT_MAX_THREADS
+          value: "2"
+  - it: renders configurable query budgets
+    template: templates/weave-trace.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.maxRows: 100
+      global.weave-trace.bulkExport.timeoutSeconds: 60
+      global.weave-trace.bulkExport.maxThreads: 1
+      global.weave-trace.bulkExport.maxMemoryBytes: 1024
+      global.weave-trace.bulkExport.awsRegion: us-west-2
+    asserts:
+      - equal:
+          path: data.WF_EXPORT_MAX_ROWS
+          value: "100"
+      - equal:
+          path: data.WF_EXPORT_MAX_EXECUTION_SECONDS
+          value: "60"
+      - equal:
+          path: data.WF_EXPORT_MAX_THREADS
+          value: "1"
+      - equal:
+          path: data.WF_EXPORT_MAX_MEMORY_BYTES
+          value: "1024"
+      - equal:
+          path: data.WF_FILE_STORAGE_AWS_REGION
+          value: us-west-2
+  - it: mounts the non-secret config at the well-known directory
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: weave-export-config
+            mountPath: /etc/weave
+            readOnly: true
+  - it: permits a missing external configmap so normal startup still works
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.configMapName: operator-export-config
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: weave-export-config
+            configMap:
+              name: operator-export-config
+              optional: true
+  - it: does not create an externally managed configmap
+    template: templates/weave-export-config.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.configMapName: operator-export-config
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: uses Azure workload identity for exports without enabling media offloading
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.defaultBucket.provider: az
+      global.defaultBucket.name: storageaccount
+      global.defaultBucket.path: wandb
+      global.azureStorageIdentity.tenantId: test-tenant
+      global.azureStorageIdentity.clientId: test-client
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["azure.workload.identity/use"]
+          value: "true"
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-bucket-access

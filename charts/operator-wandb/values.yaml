@@ -633,6 +633,20 @@ global:
     # Enable only with a Weave image that supports Azure workload identity.
     fileStorage:
       useDefaultBucket: false
+    # Export is opt-in. The ClickHouse collection must already exist on every node.
+    bulkExport:
+      enabled: false
+      # Explicit WF_FILE_STORAGE_URI override; empty reuses Gorilla's deployment bucket.
+      storageURI: ""
+      awsRegion: ""
+      collection: weave_exports
+      cluster: default
+      # Optional external ConfigMap with export-storage.json; absence fails on request.
+      configMapName: ""
+      maxRows: 5000000
+      timeoutSeconds: 1800
+      maxThreads: 2
+      maxMemoryBytes: 2147483648
 
   # As part of the migration away from using local, the `bypass` setting will
   # control whether the gorilla services will use the app service (and, thus, local)
@@ -4042,6 +4056,8 @@ weave-trace:
     "{{ .Release.Name }}-global-configmap": "configMapRef"
     "{{ .Release.Name }}-global-secret": "secretRef"
     "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+  volumesTpls:
+    - '{{ include "wandb.bulkExportVolumes" . }}'
   envTpls:
     - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
     - '{{ include "wandb.sslCertEnvs" . }}'
@@ -4085,6 +4101,8 @@ weave-trace:
         - name: http
           containerPort: 8080
           protocol: TCP
+      volumeMountsTpls:
+        - '{{ include "wandb.bulkExportVolumeMounts" . }}'
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/
