@@ -7,8 +7,7 @@ release:
   namespace: default
 set:
   weave-trace.install: true
-  global.weave-trace.bulkExport.provisioner.clickhouseCredentialsSecret: export-ddl
-  global.weave-trace.bulkExport.provisioner.writerCredentialsSecret: export-writer
+  global.weave-trace.bulkExport.writerCredentialsSecret: export-writer
 tests:
   - it: leaves ordinary trace startup disabled by default
     template: templates/weave-trace.yaml
@@ -17,17 +16,12 @@ tests:
           path: data.WEAVE_BULK_EXPORT_ENABLED
       - notExists:
           path: data.WF_FILE_STORAGE_URI
-  - it: skips export setup in the existing init container when disabled
+  - it: keeps the existing init container without adding another
     template: charts/weave-trace/templates/deployment.yaml
     asserts:
       - lengthEqual:
           path: spec.template.spec.initContainers
           count: 1
-      - notContains:
-          path: spec.template.spec.initContainers[0].env
-          content:
-            name: WF_EXPORT_PROVISION_ENABLED
-          any: true
   - it: does not change media storage for a disabled export override
     template: templates/weave-trace.yaml
     set:
@@ -110,20 +104,6 @@ tests:
           path: spec.template.spec.initContainers
           count: 1
       - contains:
-          path: spec.template.spec.initContainers[0].env
-          content:
-            name: WF_EXPORT_PROVISION_ENABLED
-            value: "true"
-      - contains:
-          path: spec.template.spec.initContainers[0].env
-          content:
-            name: WF_EXPORT_CLICKHOUSE_PASS
-            valueFrom:
-              secretKeyRef:
-                name: export-ddl
-                key: password
-                optional: true
-      - contains:
           path: spec.template.spec.initContainers[0].envFrom
           content:
             secretRef:
@@ -144,33 +124,18 @@ tests:
           content:
             name: weave-export-config
           any: true
-  - it: supports separately managed ClickHouse collections
+  - it: permits absent export writer credentials without adding a secret reference
     template: charts/weave-trace/templates/deployment.yaml
     set:
       global.weave-trace.bulkExport.enabled: true
-      global.weave-trace.bulkExport.provisioner.enabled: false
+      global.weave-trace.bulkExport.writerCredentialsSecret: ""
     asserts:
       - lengthEqual:
           path: spec.template.spec.initContainers
           count: 1
       - notContains:
-          path: spec.template.spec.initContainers[0].env
+          path: spec.template.spec.initContainers[0].envFrom
           content:
-            name: WF_EXPORT_PROVISION_ENABLED
+            secretRef:
+              name: export-writer
           any: true
-  - it: requires a separate DDL credential secret when provisioning is enabled
-    template: charts/weave-trace/templates/deployment.yaml
-    set:
-      global.weave-trace.bulkExport.enabled: true
-      global.weave-trace.bulkExport.provisioner.clickhouseCredentialsSecret: ""
-    asserts:
-      - failedTemplate:
-          errorMessage: bulkExport.provisioner.clickhouseCredentialsSecret is required for init provisioning
-  - it: requires an explicit writer credential secret
-    template: charts/weave-trace/templates/deployment.yaml
-    set:
-      global.weave-trace.bulkExport.enabled: true
-      global.weave-trace.bulkExport.provisioner.writerCredentialsSecret: ""
-    asserts:
-      - failedTemplate:
-          errorMessage: bulkExport.provisioner.writerCredentialsSecret is required for init provisioning
