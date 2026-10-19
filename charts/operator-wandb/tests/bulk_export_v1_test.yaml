@@ -17,13 +17,16 @@ tests:
           path: data.WEAVE_BULK_EXPORT_ENABLED
       - notExists:
           path: data.WF_FILE_STORAGE_URI
-  - it: omits the export init container when disabled
+  - it: skips export setup in the existing init container when disabled
     template: charts/weave-trace/templates/deployment.yaml
     asserts:
-      - notContains:
+      - lengthEqual:
           path: spec.template.spec.initContainers
+          count: 1
+      - notContains:
+          path: spec.template.spec.initContainers[0].env
           content:
-            name: weave-trace-provision-export
+            name: WF_EXPORT_PROVISION_ENABLED
           any: true
   - it: does not change media storage for a disabled export override
     template: templates/weave-trace.yaml
@@ -91,7 +94,7 @@ tests:
       - equal:
           path: data.WF_EXPORT_MAX_MEMORY_BYTES
           value: "1024"
-  - it: provisions on every enabled pod start using the application image
+  - it: provisions in the existing migration init container
     template: charts/weave-trace/templates/deployment.yaml
     set:
       global.weave-trace.bulkExport.enabled: true
@@ -100,11 +103,19 @@ tests:
       - contains:
           path: spec.template.spec.initContainers
           content:
-            name: weave-trace-provision-export
-            args: [python, -m, src.trace_server_backend.bulk_export.provision]
+            name: weave-trace-migrate
+            args: [python, migrator.py]
           any: true
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 1
       - contains:
-          path: spec.template.spec.initContainers[1].env
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_EXPORT_PROVISION_ENABLED
+            value: "true"
+      - contains:
+          path: spec.template.spec.initContainers[0].env
           content:
             name: WF_EXPORT_CLICKHOUSE_PASS
             valueFrom:
@@ -113,7 +124,7 @@ tests:
                 key: password
                 optional: true
       - contains:
-          path: spec.template.spec.initContainers[1].envFrom
+          path: spec.template.spec.initContainers[0].envFrom
           content:
             secretRef:
               name: export-writer
@@ -139,10 +150,13 @@ tests:
       global.weave-trace.bulkExport.enabled: true
       global.weave-trace.bulkExport.provisioner.enabled: false
     asserts:
-      - notContains:
+      - lengthEqual:
           path: spec.template.spec.initContainers
+          count: 1
+      - notContains:
+          path: spec.template.spec.initContainers[0].env
           content:
-            name: weave-trace-provision-export
+            name: WF_EXPORT_PROVISION_ENABLED
           any: true
   - it: requires a separate DDL credential secret when provisioning is enabled
     template: charts/weave-trace/templates/deployment.yaml

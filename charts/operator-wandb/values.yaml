@@ -633,7 +633,7 @@ global:
     # Enable only with a Weave image that supports Azure workload identity.
     fileStorage:
       useDefaultBucket: false
-    # Export is opt-in. An enabled init container provisions weave_exports.
+    # Export is opt-in. The existing migration init container provisions weave_exports.
     bulkExport:
       enabled: false
       # Required explicit bucket/container URI, optionally including an object prefix.
@@ -4067,13 +4067,6 @@ weave-trace:
       args: ["python", "migrator.py"]
       envTpls:
         - '{{ include "wandb.weaveTraceClickhouseMigratorEnvs" . }}'
-      volumeMounts:
-        - name: temp-dir
-          mountPath: /tmp/
-    weave-trace-provision-export:
-      enabled: '{{ and (index .Values.global "weave-trace" "bulkExport" "enabled") (index .Values.global "weave-trace" "bulkExport" "provisioner" "enabled") }}'
-      args: ["python", "-m", "src.trace_server_backend.bulk_export.provision"]
-      envTpls:
         - '{{ include "wandb.bulkExportInitEnvs" . }}'
       envFromTpls:
         - '{{ include "wandb.bulkExportWriterSecret" . }}'

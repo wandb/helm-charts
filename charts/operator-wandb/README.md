@@ -689,21 +689,23 @@ existing Secrets; it does not create credentials or a bucket:
   regional S3 or MinIO endpoints. The Secret is injected only into the init
   container, never the regular application container.
 
-Each enabled Weave pod runs `python -m
-src.trace_server_backend.bulk_export.provision` after its migration init container,
-using the same image and existing ClickHouse connection/cluster settings. It creates
-or updates fixed `weave_exports`, holding the root bucket/container and writer
+Each enabled Weave pod runs export setup inside its existing
+`weave-trace-migrate` init container, after schema migrations. The chart sets
+`WF_EXPORT_PROVISION_ENABLED=true` only in that container, alongside the init-only
+credentials. No additional init container is created. The existing ClickHouse
+connection/cluster settings are reused. Setup creates or updates fixed `weave_exports`, holding the root bucket/container and writer
 credentials. The application supplies the object prefix in each bound filename.
 Self-managed clusters use distributed DDL; ClickHouse Cloud requires supported,
 replicated named-collection metadata. Validate Cloud support before rollout.
 
 Provisioning runs on pod starts, including a rollout that enables the feature on an
-existing cluster. No application-version upgrade or Helm hook is required. Provisioning
-failures log redacted warnings and allow application startup to continue. Missing
+existing cluster. No application-version upgrade or Helm hook is required.
+Provisioning failures log redacted warnings and allow application startup to continue. Missing
 referenced Secrets or keys are optional at the Kubernetes boundary so the init
 process can report the missing configuration without blocking the pod. Export
 execution independently validates collection readiness and rejects unavailable
-storage; inspect the init-container logs to diagnose setup warnings. Default-off deployments have no export init container.
+storage; inspect the init-container logs to diagnose setup warnings. Default-off
+deployments skip export setup in the migration init container.
 Credential Secret changes require a rollout to refresh the ClickHouse collection.
 Concurrent retries update the same destination; an existing collection pointing to
 a different bucket/container is rejected. Quiesce exports and migrate it explicitly
