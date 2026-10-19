@@ -698,9 +698,12 @@ Self-managed clusters use distributed DDL; ClickHouse Cloud requires supported,
 replicated named-collection metadata. Validate Cloud support before rollout.
 
 Provisioning runs on pod starts, including a rollout that enables the feature on an
-existing cluster. No application-version upgrade or Helm hook is required. An init
-failure blocks that new pod from starting; inspect its init-container logs for
-redacted diagnostics. Default-off deployments have no export init container.
+existing cluster. No application-version upgrade or Helm hook is required. Provisioning
+failures log redacted warnings and allow application startup to continue. Missing
+referenced Secrets or keys are optional at the Kubernetes boundary so the init
+process can report the missing configuration without blocking the pod. Export
+execution independently validates collection readiness and rejects unavailable
+storage; inspect the init-container logs to diagnose setup warnings. Default-off deployments have no export init container.
 Credential Secret changes require a rollout to refresh the ClickHouse collection.
 Concurrent retries update the same destination; an existing collection pointing to
 a different bucket/container is rejected. Quiesce exports and migrate it explicitly
