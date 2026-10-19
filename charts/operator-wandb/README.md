@@ -641,3 +641,75 @@ When `global.bucket.secret.secretName` is supplied, the chart keeps its existing
 external-Secret references and runtime URL expansion. It does not copy external
 credentials or create a replacement credential Secret. This change does not add
 Console ownership, lookups, or change Azure identity or ServiceAccount selection.
+
+## Bulk export
+
+Bulk export for MI and on-prem is opt-in through
+`global.weave-trace.bulkExport.enabled`. Use a Weave Trace image containing the
+export execution, Redis safeguards, API and init provisioning module. Keep MTSaaS
+disabled. No Gorilla changes, default-bucket discovery or signed-download service
+are needed.
+
+```yaml
+global:
+  weave-trace:
+    bulkExport:
+      enabled: true
+      storageURI: s3://customer-bucket/backups/weave
+      provisioner:
+        enabled: true
+        clickhouseCredentialsSecret: weave-export-ddl
+        writerCredentialsSecret: weave-export-writer
+      maxRows: 5000000
+      timeoutSeconds: 1800
+      maxThreads: 2
+      maxMemoryBytes: 2147483648
+```
+
+The explicit `storageURI` sets `WF_FILE_STORAGE_URI`, optionally including an object
+prefix. The existing global environment override can also supply the URI. There is
+no automatic default-bucket fallback and no mounted export JSON/ConfigMap.
+Successful artifact URIs use `<prefix>/exports/<project>/<uuid>/<target>/data.parquet`;
+customers retrieve files with their own cloud credentials. Weave separately needs
+metadata read/write access under the same prefix through its existing provider
+identity configuration.
+
+Create the two referenced Secrets in the workload namespace. The chart references
+existing Secrets; it does not create credentials or a bucket:
+
+* `clickhouseCredentialsSecret` contains `username` and `password` for a bootstrap
+  identity with ClickHouse create/alter named-collection permissions and collection/
+  cluster visibility. Its values are exposed only as `WF_EXPORT_CLICKHOUSE_USER`
+  and `WF_EXPORT_CLICKHOUSE_PASS` in the provisioning init container.
+* `writerCredentialsSecret` contains `WF_EXPORT_WRITER_ACCESS_KEY_ID` and
+  `WF_EXPORT_WRITER_SECRET_ACCESS_KEY` for S3-compatible storage or GCS HMAC, or
+  `WF_EXPORT_WRITER_ACCOUNT_KEY` for Azure Blob. These explicit credentials must
+  permit ClickHouse writes; they are not the Weave metadata identity. An optional
+  `WF_EXPORT_WRITER_URL` selects a matching S3/GCS bucket-root endpoint, including
+  regional S3 or MinIO endpoints. The Secret is injected only into the init
+  container, never the regular application container.
+
+Each enabled Weave pod runs `python -m
+src.trace_server_backend.bulk_export.provision` after its migration init container,
+using the same image and existing ClickHouse connection/cluster settings. It creates
+or updates fixed `weave_exports`, holding the root bucket/container and writer
+credentials. The application supplies the object prefix in each bound filename.
+Self-managed clusters use distributed DDL; ClickHouse Cloud requires supported,
+replicated named-collection metadata. Validate Cloud support before rollout.
+
+Provisioning runs on pod starts, including a rollout that enables the feature on an
+existing cluster. No application-version upgrade or Helm hook is required. An init
+failure blocks that new pod from starting; inspect its init-container logs for
+redacted diagnostics. Default-off deployments have no export init container.
+Credential Secret changes require a rollout to refresh the ClickHouse collection.
+Concurrent retries update the same destination; an existing collection pointing to
+a different bucket/container is rejected. Quiesce exports and migrate it explicitly
+before changing the root destination. Set `provisioner.enabled: false` only when a
+DB operator manages a matching collection separately, for example with a different
+ClickHouse-native authentication mechanism.
+
+The later coordination/API layer admits one export per deployment, including
+preflight and writes. Query limits are uniform and configurable as above. V1 has
+no cancellation, retention management, automatic cleanup or presigned downloads.
+The chart neither runs bootstrap Jobs nor grants the application Kubernetes Job
+creation permissions.

@@ -1,0 +1,160 @@
+suite: Bulk export explicit storage and init provisioning
+templates:
+  - templates/weave-trace.yaml
+  - charts/weave-trace/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+set:
+  weave-trace.install: true
+  global.weave-trace.bulkExport.provisioner.clickhouseCredentialsSecret: export-ddl
+  global.weave-trace.bulkExport.provisioner.writerCredentialsSecret: export-writer
+tests:
+  - it: leaves ordinary trace startup disabled by default
+    template: templates/weave-trace.yaml
+    asserts:
+      - notExists:
+          path: data.WEAVE_BULK_EXPORT_ENABLED
+      - notExists:
+          path: data.WF_FILE_STORAGE_URI
+  - it: omits the export init container when disabled
+    template: charts/weave-trace/templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: weave-trace-provision-export
+          any: true
+  - it: does not change media storage for a disabled export override
+    template: templates/weave-trace.yaml
+    set:
+      global.weave-trace.bulkExport.storageURI: s3://ignored/prefix
+    asserts:
+      - notExists:
+          path: data.WF_FILE_STORAGE_URI
+  - it: passes explicit storage and its prefix when enabled
+    template: templates/weave-trace.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.storageURI: gs://customer-bucket/backups/weave
+    asserts:
+      - equal:
+          path: data.WF_FILE_STORAGE_URI
+          value: gs://customer-bucket/backups/weave
+      - equal:
+          path: data.WEAVE_BULK_EXPORT_ENABLED
+          value: "true"
+  - it: does not infer the deployment bucket as export storage
+    template: templates/weave-trace.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.defaultBucket.provider: s3
+      global.defaultBucket.name: unrelated-bucket
+    asserts:
+      - notExists:
+          path: data.WF_FILE_STORAGE_URI
+  - it: preserves integer environment defaults
+    template: templates/weave-trace.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+    asserts:
+      - equal:
+          path: data.WF_EXPORT_MAX_ROWS
+          value: "5000000"
+      - equal:
+          path: data.WF_EXPORT_MAX_MEMORY_BYTES
+          value: "2147483648"
+      - equal:
+          path: data.WF_EXPORT_MAX_EXECUTION_SECONDS
+          value: "1800"
+      - equal:
+          path: data.WF_EXPORT_MAX_THREADS
+          value: "2"
+  - it: renders configurable query budgets
+    template: templates/weave-trace.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.maxRows: 100
+      global.weave-trace.bulkExport.timeoutSeconds: 60
+      global.weave-trace.bulkExport.maxThreads: 1
+      global.weave-trace.bulkExport.maxMemoryBytes: 1024
+    asserts:
+      - equal:
+          path: data.WF_EXPORT_MAX_ROWS
+          value: "100"
+      - equal:
+          path: data.WF_EXPORT_MAX_EXECUTION_SECONDS
+          value: "60"
+      - equal:
+          path: data.WF_EXPORT_MAX_THREADS
+          value: "1"
+      - equal:
+          path: data.WF_EXPORT_MAX_MEMORY_BYTES
+          value: "1024"
+  - it: provisions on every enabled pod start using the application image
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.storageURI: s3://customer/prefix
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: weave-trace-provision-export
+            args: [python, -m, src.trace_server_backend.bulk_export.provision]
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[1].env
+          content:
+            name: WF_EXPORT_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: export-ddl
+                key: password
+      - contains:
+          path: spec.template.spec.initContainers[1].envFrom
+          content:
+            secretRef:
+              name: export-writer
+      - notContains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: export-writer
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_EXPORT_CLICKHOUSE_PASS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: weave-export-config
+          any: true
+  - it: supports separately managed ClickHouse collections
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.provisioner.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: weave-trace-provision-export
+          any: true
+  - it: requires a separate DDL credential secret when provisioning is enabled
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.provisioner.clickhouseCredentialsSecret: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: bulkExport.provisioner.clickhouseCredentialsSecret is required for init provisioning
+  - it: requires an explicit writer credential secret
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.weave-trace.bulkExport.enabled: true
+      global.weave-trace.bulkExport.provisioner.writerCredentialsSecret: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: bulkExport.provisioner.writerCredentialsSecret is required for init provisioning
