@@ -1,0 +1,25 @@
+{{/* Explicit storage and init-only credentials for bulk export. */}}
+{{- define "wandb.bulkExportConfig" -}}
+  {{- index .Values.global "weave-trace" "bulkExport" | default dict | toYaml -}}
+{{- end }}
+
+{{- define "wandb.bulkExportStorageURI" -}}
+  {{- $config := include "wandb.bulkExportConfig" . | fromYaml -}}
+  {{- $explicit := get (.Values.global.extraEnv | default dict) "WF_FILE_STORAGE_URI" | default "" -}}
+  {{- if and (kindIs "string" $explicit) (not (empty $explicit)) -}}
+    {{- $explicit -}}
+  {{- else if $config.storageURI -}}
+    {{- $config.storageURI -}}
+  {{- else -}}
+    {{- include "wandb.weaveTraceFileStorageURI" . -}}
+  {{- end -}}
+{{- end }}
+
+{{- define "wandb.bulkExportWriterSecret" -}}
+  {{- $config := include "wandb.bulkExportConfig" . | fromYaml -}}
+  {{- if $config.writerCredentialsSecret -}}
+- secretRef:
+    name: {{ $config.writerCredentialsSecret | quote }}
+    optional: true
+  {{- end }}
+{{- end }}

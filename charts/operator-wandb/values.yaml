@@ -633,6 +633,19 @@ global:
     # Enable only with a Weave image that supports Azure workload identity.
     fileStorage:
       useDefaultBucket: false
+    # Export is opt-in. The existing migration init container provisions weave_exports.
+    bulkExport:
+      enabled: false
+      # Required explicit bucket/container URI, optionally including an object prefix.
+      storageURI: ""
+      awsRegion: ""
+      # Optional existing Secret with WF_EXPORT_WRITER_* provider credentials.
+      # Only the existing migration init container receives these credentials.
+      writerCredentialsSecret: ""
+      maxRows: 5000000
+      timeoutSeconds: 1800
+      maxThreads: 2
+      maxMemoryBytes: 2147483648
 
   # As part of the migration away from using local, the `bypass` setting will
   # control whether the gorilla services will use the app service (and, thus, local)
@@ -4050,6 +4063,8 @@ weave-trace:
       args: ["python", "migrator.py"]
       envTpls:
         - '{{ include "wandb.weaveTraceClickhouseMigratorEnvs" . }}'
+      envFromTpls:
+        - '{{ include "wandb.bulkExportWriterSecret" . }}'
       volumeMounts:
         - name: temp-dir
           mountPath: /tmp/

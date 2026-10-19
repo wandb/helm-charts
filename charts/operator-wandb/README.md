@@ -641,3 +641,59 @@ When `global.bucket.secret.secretName` is supplied, the chart keeps its existing
 external-Secret references and runtime URL expansion. It does not copy external
 credentials or create a replacement credential Secret. This change does not add
 Console ownership, lookups, or change Azure identity or ServiceAccount selection.
+
+## Bulk export
+
+Bulk export for MI and on-prem is opt-in through
+`global.weave-trace.bulkExport.enabled`. Use a Weave Trace image containing the
+export execution, Redis safeguards, API and init provisioning module. Keep MTSaaS
+disabled. No Gorilla changes, default-bucket discovery or signed-download service
+are needed.
+
+```yaml
+global:
+  weave-trace:
+    bulkExport:
+      enabled: true
+      storageURI: s3://customer-bucket/backups/weave
+      writerCredentialsSecret: weave-export-writer
+      maxRows: 5000000
+      timeoutSeconds: 1800
+      maxThreads: 2
+      maxMemoryBytes: 2147483648
+```
+
+The explicit `storageURI` sets `WF_FILE_STORAGE_URI`, optionally including an object
+prefix. The existing global environment override can also supply the URI. There is
+no automatic default-bucket fallback and no mounted export JSON/ConfigMap.
+Successful artifact URIs use `<prefix>/exports/<project>/<uuid>/<target>/data.parquet`;
+customers retrieve files with their own cloud credentials. Weave separately needs
+metadata read/write access under the same prefix through its existing provider
+identity configuration.
+
+The existing `python migrator.py` init container attempts collection setup after
+schema migrations whenever `WF_FILE_STORAGE_URI` is present. It reuses its existing
+ClickHouse client and credentials; that identity needs named-collection create/alter
+permissions and collection/cluster visibility. There is no separate provisioning
+flag, DDL identity or additional init container.
+
+The optional `writerCredentialsSecret` references an existing Secret injected only
+into that init container. It contains `WF_EXPORT_WRITER_ACCESS_KEY_ID` and
+`WF_EXPORT_WRITER_SECRET_ACCESS_KEY` for S3-compatible storage or GCS HMAC, or
+`WF_EXPORT_WRITER_ACCOUNT_KEY` for Azure Blob. An optional `WF_EXPORT_WRITER_URL`
+selects a regional or compatible bucket-root endpoint. These credentials grant
+ClickHouse write access independently of the Weave metadata identity. A missing
+Secret is optional at the Kubernetes boundary and produces a setup warning.
+
+Setup errors log redacted warnings and allow initialization to continue. Normal
+schema migration failures remain fatal. Export execution independently checks
+collection readiness. With no URI, collection setup is skipped. The chart creates
+no credentials or bucket; Secret changes require a pod rollout to rerun setup.
+Self-managed clusters use distributed DDL; ClickHouse Cloud requires supported,
+replicated named-collection metadata and live acceptance testing before rollout.
+
+The later coordination/API layer admits one export per deployment, including
+preflight and writes. Query limits are uniform and configurable as above. V1 has
+no cancellation, retention management, automatic cleanup or presigned downloads.
+The chart neither runs bootstrap Jobs nor grants the application Kubernetes Job
+creation permissions.
