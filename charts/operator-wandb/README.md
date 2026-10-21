@@ -641,3 +641,7 @@ When `global.bucket.secret.secretName` is supplied, the chart keeps its existing
 external-Secret references and runtime URL expansion. It does not copy external
 credentials or create a replacement credential Secret. This change does not add
 Console ownership, lookups, or change Azure identity or ServiceAccount selection.
+
+## Native history import
+
+See [native history import workers](docs/native-history-import.md) for provisioning, resource limits and rollout. Workers are suspended by default.

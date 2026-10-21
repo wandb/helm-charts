@@ -2963,6 +2963,49 @@ glue:
   image:
     repository: wandb/megabinary
     tag: latest
+  # Provisioned suspended. Enable only after the native-import Core stack is deployed.
+  cronJobs:
+    native-history-import:
+      enabled: false
+      schedule: "* * * * *"
+      concurrencyPolicy: Forbid
+      parallelism: 1
+      completions: 1
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      ttlSecondsAfterFinished: 3600
+      successfulJobsHistoryLimit: 1
+      failedJobsHistoryLimit: 2
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: temp-dir
+          emptyDir:
+            sizeLimit: 1Gi
+      volumesTpls:
+        - '{{ include "wandb.internalSignerVolumes" . }}'
+      containers:
+        native-history-import:
+          args: ["glue"]
+          env:
+            GORILLA_GLUE_EXECUTE: "true"
+            GORILLA_GLUE_EXECUTE_TASK_NAME: "NATIVE_HISTORY_IMPORT_WORKER"
+            GORILLA_GLUE_LEADER_ELECTION_ENABLED: "false"
+            GORILLA_MYSQL_MAX_OPEN_CONNS: "5"
+            GORILLA_MYSQL_MAX_IDLE_CONNS: "2"
+          volumeMounts:
+            - name: temp-dir
+              mountPath: /tmp/
+          volumeMountsTpls:
+            - '{{ include "wandb.internalSignerVolumeMounts" . }}'
+          resources:
+            requests:
+              cpu: "2"
+              memory: 2Gi
+              ephemeral-storage: 1Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
+              ephemeral-storage: 1Gi
   # Run glue as a multi-replica (HA) Deployment; only the Lease holder runs
   # tasks. Just set replicaCount + enabled (strategy/PDB/affinity default).
   leaderElection:

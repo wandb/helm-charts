@@ -1,0 +1,71 @@
+suite: native history import worker provisioning
+templates:
+  - charts/glue/templates/cronjob.yaml
+release:
+  name: wandb
+  namespace: default
+tests:
+  - it: stays suspended by default with bounded resources and no Kubernetes retry
+    set:
+      global.glue.enabled: true
+    asserts:
+      - equal:
+          path: spec.suspend
+          value: true
+      - equal:
+          path: spec.concurrencyPolicy
+          value: Forbid
+      - equal:
+          path: spec.jobTemplate.spec.backoffLimit
+          value: 0
+      - equal:
+          path: spec.jobTemplate.spec.parallelism
+          value: 1
+      - equal:
+          path: spec.jobTemplate.spec.activeDeadlineSeconds
+          value: 900
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].resources.limits
+          value:
+            cpu: "2"
+            memory: 2Gi
+            ephemeral-storage: 1Gi
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_GLUE_EXECUTE_TASK_NAME
+            value: NATIVE_HISTORY_IMPORT_WORKER
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: wandb-global-secret
+  - it: enables configurable worker slots and inherits the deployed glue image
+    set:
+      global.glue.enabled: true
+      glue.cronJobs.native-history-import.enabled: true
+      glue.cronJobs.native-history-import.parallelism: 3
+      glue.cronJobs.native-history-import.completions: 3
+      glue.image.tag: native-import-test
+    asserts:
+      - equal:
+          path: spec.suspend
+          value: false
+      - equal:
+          path: spec.jobTemplate.spec.parallelism
+          value: 3
+      - equal:
+          path: spec.jobTemplate.spec.completions
+          value: 3
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].image
+          value: wandb/megabinary:native-import-test
+  - it: an explicit emergency suspend overrides enablement
+    set:
+      global.glue.enabled: true
+      glue.cronJobs.native-history-import.enabled: true
+      glue.cronJobs.native-history-import.suspend: true
+    asserts:
+      - equal:
+          path: spec.suspend
+          value: true
