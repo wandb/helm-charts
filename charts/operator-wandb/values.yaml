@@ -2963,6 +2963,43 @@ glue:
   image:
     repository: wandb/megabinary
     tag: latest
+  # Isolated workers for native Parquet history imports. Each run claims queued
+  # imports through SQL leases. The worker refuses to start without finite CPU
+  # and memory limits. Enable only on servers that include the import worker.
+  cronJobs:
+    native-history-import:
+      enabled: false
+      schedule: "* * * * *"
+      concurrencyPolicy: Forbid
+      backoffLimit: 1
+      ttlSecondsAfterFinished: 3600
+      successfulJobsHistoryLimit: 1
+      failedJobsHistoryLimit: 2
+      volumes:
+        - name: temp-dir
+          emptyDir:
+            sizeLimit: 1Gi
+      volumesTpls:
+        - '{{ include "wandb.internalSignerVolumes" . }}'
+      containers:
+        native-history-import:
+          args: ["glue"]
+          env:
+            GORILLA_GLUE_EXECUTE: "true"
+            GORILLA_GLUE_EXECUTE_TASK_NAME: "NATIVE_HISTORY_IMPORT_WORKER"
+            GORILLA_GLUE_LEADER_ELECTION_ENABLED: "false"
+          volumeMounts:
+            - name: temp-dir
+              mountPath: /tmp/
+          volumeMountsTpls:
+            - '{{ include "wandb.internalSignerVolumeMounts" . }}'
+          resources:
+            requests:
+              cpu: "2"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
   # Run glue as a multi-replica (HA) Deployment; only the Lease holder runs
   # tasks. Just set replicaCount + enabled (strategy/PDB/affinity default).
   leaderElection:
