@@ -69,6 +69,48 @@ Return the db user
 {{- end -}}
 
 {{/*
+MYSQL_PASSWORD env entry: from global.mysql.fromSecret, an inline valueFrom
+map, or the password Secret.
+*/}}
+{{- define "wandb.mysql.passwordEnv" -}}
+- name: MYSQL_PASSWORD
+  {{- if .Values.global.mysql.fromSecret }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.global.mysql.fromSecret | quote }}
+      key: "password"
+  {{- else if kindIs "map" .Values.global.mysql.password }}
+    {{- toYaml .Values.global.mysql.password | nindent 2 }}
+  {{- else }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "wandb.mysql.passwordSecret" . | quote}}
+      key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
+  {{- end }}
+{{- end -}}
+
+{{/*
+Env entry for one global.mysql setting: from global.mysql.fromSecret, an
+inline valueFrom map, or the plain value.
+Usage: dict "root" . "name" "MYSQL_HOST" "key" "host"
+*/}}
+{{- define "wandb.mysql.settingEnv" -}}
+  {{- $mysql := .root.Values.global.mysql -}}
+  {{- $setting := get $mysql .key -}}
+- name: {{ .name }}
+  {{- if $mysql.fromSecret }}
+  valueFrom:
+    secretKeyRef:
+      name: {{ $mysql.fromSecret | quote }}
+      key: {{ .key | quote }}
+  {{- else if kindIs "map" $setting }}
+    {{- toYaml $setting | nindent 2 }}
+  {{- else }}
+  value: "{{ include (printf "wandb.mysql.%s" .key) .root }}"
+  {{- end }}
+{{- end -}}
+
+{{/*
 Return the db password
 */}}
 {{- define "wandb.mysql.password" -}}
