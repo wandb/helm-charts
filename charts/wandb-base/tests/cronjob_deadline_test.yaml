@@ -1,0 +1,22 @@
+suite: CronJob job deadline
+templates:
+  - cronjob.yaml
+set:
+  cronJobs:
+    worker:
+      schedule: '* * * * *'
+      concurrencyPolicy: Forbid
+      containers:
+        task: {}
+tests:
+  - it: caps each job's runtime when a deadline is set
+    set:
+      cronJobs.worker.activeDeadlineSeconds: 3600
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.activeDeadlineSeconds
+          value: 3600
+  - it: leaves the runtime uncapped by default
+    asserts:
+      - notExists:
+          path: spec.jobTemplate.spec.activeDeadlineSeconds
