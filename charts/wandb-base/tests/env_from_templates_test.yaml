@@ -35,3 +35,23 @@ tests:
           path: spec.template.spec.containers[0].envFrom
           value:
             - configMapRef: {name: static-config}
+  - it: adds global envFrom sources
+    set:
+      global.envFrom:
+        shared-env: secretRef
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value:
+            - secretRef: {name: shared-env}
+            - configMapRef: {name: static-config}
+  - it: skips global envFrom sources with the global env opt-out
+    set:
+      global.envFrom:
+        shared-env: secretRef
+      globalOptOut.env: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value:
+            - configMapRef: {name: static-config}
