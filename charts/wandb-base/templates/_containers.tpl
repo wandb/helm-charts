@@ -33,6 +33,7 @@
       {{- end -}}
       {{- $globalEnv := ternary dict (default dict $.root.Values.global.env) $globalOptOutEnv }}
       {{- $globalExtraEnv := ternary dict (default dict $.root.Values.global.extraEnv) $globalOptOutEnv }}
+      {{- $globalEnvFrom := ternary dict (default dict $.root.Values.global.envFrom) $globalOptOutEnv }}
       {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
       {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) $globalOptOutVolumes }}
       {{- $container := dict }}
@@ -46,7 +47,7 @@
         {{- $_ = set $container "securityContext" (include "wandb-base.containerSecurityProfile" (dict "context" $container.securityContext "profile" $profile) | fromYaml) -}}
       {{- end -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
-      {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) -}}
+      {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom)) $globalEnvFrom) -}}
       {{- $_ = set $container "envFromTpls" (concat (default list $.root.Values.envFromTpls) (default list $container.envFromTpls)) -}}
       {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $globalEnv $globalExtraEnv) -}}
       {{- $_ = set $container "root" $.root -}}

@@ -69,6 +69,10 @@ envFrom:
   app-secrets: "secretRef"
 ```
 
+`global.envFrom` takes the same shape and adds its sources to every container
+in every subchart. A chart-level or container-level entry with the same name
+wins.
+
 For conditional sources, use `envFromTpls` at chart or container level. Each
 entry renders a list of `envFrom` sources; empty output is omitted. Shared
 entries follow `envFrom`, then container entries follow shared entries. Explicit
@@ -79,7 +83,7 @@ envFromTpls:
   - '{{ if .Values.useSecret }}- secretRef: {name: "{{ .Release.Name }}-settings"}{{ end }}'
 ```
 
-Subcharts inherit `global.env` and the legacy `global.extraEnv` by default. A
+Subcharts inherit `global.env`, `global.envFrom` and the legacy `global.extraEnv` by default. A
 workload that must receive only its chart-local environment can disable that
 inheritance without changing other subcharts:
 
@@ -89,7 +93,7 @@ globalOptOut:
   volumes: true
 ```
 
-`globalOptOut.env` does not remove chart-local `env`, `extraEnv`, `envTpls`, or
+`globalOptOut.env` excludes all three. It does not remove chart-local `env`, `extraEnv`, `envTpls`, or
 `envFrom` values. `globalOptOut.volumes` excludes inherited `global.volumes`
 and `global.volumesTpls` while retaining chart-local `volumes` and
 `volumesTpls`. Existing installations remain unchanged when either option is
