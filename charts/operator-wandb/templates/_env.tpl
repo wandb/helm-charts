@@ -24,12 +24,31 @@ Global values will override any chart-specific values.
 {{- end -}}
 
 {{- define "wandb.redisEnvs" -}}
+  {{- with .Values.global.redis.fromSecret -}}
+- name: REDIS_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ . | quote }}
+      key: "password"
+      optional: true
+- name: REDIS_HOST
+  valueFrom:
+    secretKeyRef:
+      name: {{ . | quote }}
+      key: "host"
+- name: REDIS_PORT
+  valueFrom:
+    secretKeyRef:
+      name: {{ . | quote }}
+      key: "port"
+  {{- else -}}
 - name: REDIS_PASSWORD
   valueFrom:
     secretKeyRef:
       name: "{{ include "wandb.redis.passwordSecret" . }}"
       key: "{{ .Values.global.redis.secret.secretKey }}"
       optional: true
+  {{- end }}
 - name: REDIS
   value: "{{ include "wandb.redis.connectionString" . | trim }}"
 - name: GORILLA_ACTIVITY_STORE_CACHE_ADDRESS
@@ -159,49 +178,12 @@ Global values will override any chart-specific values.
   */ -}}
 
   {{- if not .Values.global.mysql.rdsIamAuth }}
-    {{- if kindIs "map" .Values.global.mysql.password }}
-- name: MYSQL_PASSWORD
-{{- toYaml .Values.global.mysql.password | nindent 2 }}
-    {{- else }}
-- name: MYSQL_PASSWORD
-  valueFrom:
-    secretKeyRef:
-      name: {{ include "wandb.mysql.passwordSecret" . | quote}}
-      key: "{{ .Values.global.mysql.passwordSecret.passwordKey }}"
-    {{- end }}
+    {{- include "wandb.mysql.passwordEnv" . | nindent 0 }}
   {{- end }}
-
-  {{- if kindIs "map" .Values.global.mysql.port }}
-- name: MYSQL_PORT
-{{- toYaml .Values.global.mysql.port | nindent 2 }}
-  {{- else }}
-- name: MYSQL_PORT
-  value: "{{ include "wandb.mysql.port" . }}"
-  {{- end }}
-
-  {{- if kindIs "map" .Values.global.mysql.host }}
-- name: MYSQL_HOST
-{{- toYaml .Values.global.mysql.host | nindent 2 }}
-  {{- else }}
-- name: MYSQL_HOST
-  value: "{{ include "wandb.mysql.host" . }}"
-  {{- end }}
-
-  {{- if kindIs "map" .Values.global.mysql.database }}
-- name: MYSQL_DATABASE
-{{- toYaml .Values.global.mysql.database | nindent 2 }}
-  {{- else }}
-- name: MYSQL_DATABASE
-  value: "{{ include "wandb.mysql.database" . }}"
-  {{- end }}
-
-  {{- if kindIs "map" .Values.global.mysql.user }}
-- name: MYSQL_USER
-{{- toYaml .Values.global.mysql.user | nindent 2 }}
-  {{- else }}
-- name: MYSQL_USER
-  value: "{{ include "wandb.mysql.user" . }}"
-  {{- end -}}
+  {{- include "wandb.mysql.settingEnv" (dict "root" . "name" "MYSQL_PORT" "key" "port") | nindent 0 }}
+  {{- include "wandb.mysql.settingEnv" (dict "root" . "name" "MYSQL_HOST" "key" "host") | nindent 0 }}
+  {{- include "wandb.mysql.settingEnv" (dict "root" . "name" "MYSQL_DATABASE" "key" "database") | nindent 0 }}
+  {{- include "wandb.mysql.settingEnv" (dict "root" . "name" "MYSQL_USER" "key" "user") | nindent 0 }}
 
   {{- if or (kindIs "map" .Values.global.mysql.caCert) (and (kindIs "string" .Values.global.mysql.caCert) (ne .Values.global.mysql.caCert "")) }}
 - name: MYSQL_CA_CERT_PATH
