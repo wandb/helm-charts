@@ -37,6 +37,9 @@ tests:
           path: spec.jobTemplate.spec.backoffLimit
           value: 1
       - equal:
+          path: spec.jobTemplate.spec.activeDeadlineSeconds
+          value: 3600
+      - equal:
           path: spec.jobTemplate.spec.template.spec.restartPolicy
           value: Never
       - equal:
@@ -80,3 +83,16 @@ tests:
           content:
             name: GORILLA_HISTORY_STORE
             value: http://wandb-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+
+  - it: lets operators size the job deadline for their workload
+    set:
+      global.glue.enabled: true
+      glue.cronJobs.native-history-import.enabled: true
+      glue.cronJobs.native-history-import.activeDeadlineSeconds: 7200
+    documentSelector:
+      path: metadata.name
+      value: wandb-native-history-import
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.activeDeadlineSeconds
+          value: 7200
