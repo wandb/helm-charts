@@ -2963,6 +2963,51 @@ glue:
   image:
     repository: wandb/megabinary
     tag: latest
+  # Isolated workers for native Parquet history imports. Each run claims queued
+  # imports through SQL leases. The worker refuses to start without finite CPU
+  # and memory limits. Enable only on servers that include the import worker.
+  cronJobs:
+    native-history-import:
+      enabled: false
+      schedule: "* * * * *"
+      concurrencyPolicy: Forbid
+      backoffLimit: 1
+      # Hard cap on each worker Job. Forbid starts no new Job while one is
+      # active, so a stuck pod would otherwise block every later run. One hour
+      # covers pod start, one import (numImportsToProcess defaults to 1) of
+      # roughly 10 GB at the slowest measured processing rate, and cleanup.
+      # Raise it with numImportsToProcess or larger snapshot limits. A killed
+      # import's lease lapses and another worker retries it; publication is one
+      # transaction, so nothing is left half-written.
+      activeDeadlineSeconds: 3600
+      ttlSecondsAfterFinished: 3600
+      successfulJobsHistoryLimit: 1
+      failedJobsHistoryLimit: 2
+      volumes:
+        - name: temp-dir
+          emptyDir:
+            sizeLimit: 1Gi
+      volumesTpls:
+        - '{{ include "wandb.internalSignerVolumes" . }}'
+      containers:
+        native-history-import:
+          args: ["glue"]
+          env:
+            GORILLA_GLUE_EXECUTE: "true"
+            GORILLA_GLUE_EXECUTE_TASK_NAME: "NATIVE_HISTORY_IMPORT_WORKER"
+            GORILLA_GLUE_LEADER_ELECTION_ENABLED: "false"
+          volumeMounts:
+            - name: temp-dir
+              mountPath: /tmp/
+          volumeMountsTpls:
+            - '{{ include "wandb.internalSignerVolumeMounts" . }}'
+          resources:
+            requests:
+              cpu: "2"
+              memory: 2Gi
+            limits:
+              cpu: "2"
+              memory: 2Gi
   # Run glue as a multi-replica (HA) Deployment; only the Lease holder runs
   # tasks. Just set replicaCount + enabled (strategy/PDB/affinity default).
   leaderElection:

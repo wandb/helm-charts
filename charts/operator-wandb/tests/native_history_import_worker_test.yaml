@@ -1,0 +1,98 @@
+suite: native history import worker
+templates:
+  - charts/glue/templates/cronjob.yaml
+release:
+  name: wandb
+  namespace: default
+
+# The glue subchart renders only when global.glue.enabled is set, so every case
+# enables it. wandb-base renders a disabled cron job as suspended.
+tests:
+  - it: provisions the worker suspended by default
+    set:
+      global.glue.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: wandb-native-history-import
+    asserts:
+      - equal:
+          path: spec.suspend
+          value: true
+
+  - it: runs isolated glue workers with finite limits when enabled
+    set:
+      global.glue.enabled: true
+      glue.cronJobs.native-history-import.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: wandb-native-history-import
+    asserts:
+      - equal:
+          path: spec.suspend
+          value: false
+      - equal:
+          path: spec.concurrencyPolicy
+          value: Forbid
+      - equal:
+          path: spec.jobTemplate.spec.backoffLimit
+          value: 1
+      - equal:
+          path: spec.jobTemplate.spec.activeDeadlineSeconds
+          value: 3600
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.restartPolicy
+          value: Never
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.serviceAccountName
+          value: wandb-glue
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].args
+          value: ["glue"]
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_GLUE_EXECUTE
+            value: "true"
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_GLUE_EXECUTE_TASK_NAME
+            value: NATIVE_HISTORY_IMPORT_WORKER
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_GLUE_LEADER_ELECTION_ENABLED
+            value: "false"
+      # The worker refuses to run without finite cgroup CPU and memory limits.
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].resources.limits
+          value:
+            cpu: "2"
+            memory: 2Gi
+
+  - it: reads the same history route as the API
+    set:
+      global.glue.enabled: true
+      glue.cronJobs.native-history-import.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: wandb-native-history-import
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_HISTORY_STORE
+            value: http://wandb-parquet:8087/_goRPC_,mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+
+  - it: lets operators size the job deadline for their workload
+    set:
+      global.glue.enabled: true
+      glue.cronJobs.native-history-import.enabled: true
+      glue.cronJobs.native-history-import.activeDeadlineSeconds: 7200
+    documentSelector:
+      path: metadata.name
+      value: wandb-native-history-import
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.activeDeadlineSeconds
+          value: 7200
