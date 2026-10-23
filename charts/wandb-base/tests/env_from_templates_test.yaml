@@ -35,16 +35,30 @@ tests:
           path: spec.template.spec.containers[0].envFrom
           value:
             - configMapRef: {name: static-config}
-  - it: adds global envFrom sources
+  - it: adds global envFrom sources after chart-owned sources so they take precedence
     set:
       global.envFrom:
+        aaa-shared-env: secretRef
+      envFromTpls:
+        - '- configMapRef: {name: templated-config}'
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value:
+            - configMapRef: {name: static-config}
+            - configMapRef: {name: templated-config}
+            - secretRef: {name: aaa-shared-env}
+  - it: renders a source listed both globally and locally once, in the local position
+    set:
+      global.envFrom:
+        static-config: configMapRef
         shared-env: secretRef
     asserts:
       - equal:
           path: spec.template.spec.containers[0].envFrom
           value:
-            - secretRef: {name: shared-env}
             - configMapRef: {name: static-config}
+            - secretRef: {name: shared-env}
   - it: skips global envFrom sources with the global env opt-out
     set:
       global.envFrom:
