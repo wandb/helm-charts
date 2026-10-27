@@ -1,0 +1,102 @@
+suite: CA certs volume optionality
+templates:
+  - charts/api/templates/deployment.yaml
+  - charts/clickhouseMigrationJob/templates/job.yaml
+release:
+  name: wandb
+  namespace: default
+tests:
+  - it: keeps the ca-certs volume required on api when customCACerts is empty
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wandb-ca-certs
+            configMap:
+              name: wandb-ca-certs
+      - notExists:
+          path: spec.template.spec.volumes[?(@.name == "wandb-ca-certs")].configMap.optional
+
+  - it: keeps the ca-certs volume required on api when a cert is configured
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      global.customCACerts:
+        - "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wandb-ca-certs
+            configMap:
+              name: wandb-ca-certs
+      - notExists:
+          path: spec.template.spec.volumes[?(@.name == "wandb-ca-certs")].configMap.optional
+
+  - it: leaves the user ca-certs volume optional regardless of customCACerts
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.api.enabled: true
+      global.customCACerts:
+        - "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wandb-ca-certs-user
+            configMap:
+              name: noCertProvided
+              optional: true
+
+  - it: marks the ca-certs volume optional on the ch-migrate job when customCACerts is empty
+    template: charts/clickhouseMigrationJob/templates/job.yaml
+    set:
+      global.olap.default.host: clickhouse.example.com
+      global.olap.history.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: wandb-ch-migrate
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wandb-ca-certs
+            configMap:
+              name: wandb-ca-certs
+              optional: true
+
+  - it: keeps the ca-certs volume required on the ch-migrate job when a cert is configured
+    template: charts/clickhouseMigrationJob/templates/job.yaml
+    set:
+      global.olap.default.host: clickhouse.example.com
+      global.olap.history.enabled: true
+      global.customCACerts:
+        - "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wandb-ca-certs
+            configMap:
+              name: wandb-ca-certs
+      - notExists:
+          path: spec.template.spec.volumes[?(@.name == "wandb-ca-certs")].configMap.optional
+
+  - it: keeps the ca-certs volume required on the ch-migrate job when the opt-out is off
+    template: charts/clickhouseMigrationJob/templates/job.yaml
+    set:
+      global.olap.default.host: clickhouse.example.com
+      global.olap.history.enabled: true
+      clickhouseMigrationJob.globalOptOut.requiredInlineCaCerts: false
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wandb-ca-certs
+            configMap:
+              name: wandb-ca-certs
+      - notExists:
+          path: spec.template.spec.volumes[?(@.name == "wandb-ca-certs")].configMap.optional
