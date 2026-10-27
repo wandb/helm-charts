@@ -16,11 +16,15 @@
 
 {{- define "wandb.caCertsVolumes" -}}
   {{- $globalOptOut := default dict .Values.globalOptOut -}}
+  {{- $inlineCaCertsOptional := and ($globalOptOut.requiredInlineCaCerts | default false) (empty .Values.global.customCACerts) -}}
 - name: wandb-ca-certs-root
   emptyDir: {}
 - name: wandb-ca-certs
   configMap:
     name: "{{ .Release.Name }}-ca-certs"
+  {{- if $inlineCaCertsOptional }}
+    optional: true
+  {{- end }}
 - name: wandb-ca-certs-user
   configMap:
     name: '{{ .Values.global.caCertsConfigMap | default "noCertProvided" }}'
