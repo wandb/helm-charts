@@ -1,0 +1,125 @@
+suite: Console route
+templates:
+- templates/ingress.yaml
+- templates/traefik-ingress.yaml
+- templates/nginx.yaml
+release:
+  name: customer
+  namespace: customer-ns
+set:
+  global.host: https://customer.example.com
+  global.traefikIngress: true
+tests:
+- it: routes /console to the console service by default
+  template: templates/ingress.yaml
+  asserts:
+  - contains:
+      path: spec.rules[0].http.paths
+      content:
+        pathType: Prefix
+        path: /console
+        backend:
+          service:
+            name: customer-console
+            port:
+              number: 8082
+- it: routes /console to the console service by default on Traefik
+  template: templates/traefik-ingress.yaml
+  asserts:
+  - contains:
+      path: spec.rules[0].http.paths
+      content:
+        pathType: Prefix
+        path: /console
+        backend:
+          service:
+            name: customer-console
+            port:
+              number: 8082
+- it: proxies /console in nginx by default
+  template: templates/nginx.yaml
+  asserts:
+  - matchRegex:
+      path: data["nginx.conf"]
+      pattern: "location /console"
+- it: routes /console when console.install is false
+  template: templates/ingress.yaml
+  set:
+    console.install: false
+  asserts:
+  - contains:
+      path: spec.rules[0].http.paths
+      content:
+        pathType: Prefix
+        path: /console
+        backend:
+          service:
+            name: customer-console
+            port:
+              number: 8082
+- it: omits /console from the ingress when disabled
+  template: templates/ingress.yaml
+  set:
+    ingress.console.enabled: false
+  asserts:
+  - notContains:
+      path: spec.rules[0].http.paths
+      content:
+        pathType: Prefix
+        path: /console
+        backend:
+          service:
+            name: customer-console
+            port:
+              number: 8082
+  - equal:
+      path: spec.rules[0].http.paths
+      value:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: customer-app
+            port:
+              number: 8080
+- it: omits /console from Traefik when disabled
+  template: templates/traefik-ingress.yaml
+  set:
+    ingress.console.enabled: false
+  asserts:
+  - equal:
+      path: spec.rules[0].http.paths
+      value:
+      - pathType: Prefix
+        path: /
+        backend:
+          service:
+            name: customer-app
+            port:
+              number: 8080
+- it: omits /console from nginx when disabled
+  template: templates/nginx.yaml
+  set:
+    ingress.console.enabled: false
+  asserts:
+  - notMatchRegex:
+      path: data["nginx.conf"]
+      pattern: "console"
+- it: fails on the legacy ingress when the default backend is console and console routing is disabled
+  template: templates/ingress.yaml
+  set:
+    global.traefikIngress: false
+    ingress.console.enabled: false
+    ingress.defaultBackend: console
+  asserts:
+  - failedTemplate:
+      errorMessage: ingress.defaultBackend is "console" but ingress.console.enabled is false
+- it: fails on Traefik when the default backend is console and console routing is disabled
+  template: templates/traefik-ingress.yaml
+  set:
+    global.legacyIngress: false
+    ingress.console.enabled: false
+    ingress.defaultBackend: console
+  asserts:
+  - failedTemplate:
+      errorMessage: ingress.defaultBackend is "console" but ingress.console.enabled is false
