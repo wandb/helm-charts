@@ -1,0 +1,73 @@
+suite: GCP BackendConfig custom response headers
+templates:
+  - service.yaml
+set:
+  global.cloudProvider: gcp
+  service:
+    enabled: true
+    ports:
+      - port: 8080
+        name: http
+tests:
+  - it: renders no customResponseHeaders when unset
+    documentSelector:
+      path: kind
+      value: BackendConfig
+    asserts:
+      - notExists:
+          path: spec.customResponseHeaders
+      - equal:
+          path: spec.timeoutSec
+          value: 120
+  - it: renders no customResponseHeaders for an empty list
+    set:
+      global.gcpCustomResponseHeaders: []
+    documentSelector:
+      path: kind
+      value: BackendConfig
+    asserts:
+      - notExists:
+          path: spec.customResponseHeaders
+  - it: adds headers next to the Cloud Armor policy
+    set:
+      global.gcpSecurityPolicy: wandb-test-default-security-policy
+      global.gcpCustomResponseHeaders:
+        - "Strict-Transport-Security: max-age=300"
+    documentSelector:
+      path: kind
+      value: BackendConfig
+    asserts:
+      - equal:
+          path: spec.customResponseHeaders.headers
+          value:
+            - "Strict-Transport-Security: max-age=300"
+      - equal:
+          path: spec.securityPolicy.name
+          value: wandb-test-default-security-policy
+  - it: keeps the Service pointed at the same BackendConfig
+    set:
+      global.gcpCustomResponseHeaders:
+        - "Strict-Transport-Security: max-age=300"
+    documentSelector:
+      path: kind
+      value: Service
+    asserts:
+      - matchRegex:
+          path: metadata.annotations["cloud.google.com/backend-config"]
+          pattern: '"default": ".+-backend-config"'
+  - it: renders no BackendConfig outside GCP
+    set:
+      global.cloudProvider: aws
+      global.gcpCustomResponseHeaders:
+        - "Strict-Transport-Security: max-age=300"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Service
+  - it: rejects a non-list value
+    set:
+      global.gcpCustomResponseHeaders: "Strict-Transport-Security: max-age=300"
+    asserts:
+      - failedTemplate:
+          errorPattern: global.gcpCustomResponseHeaders must be a list

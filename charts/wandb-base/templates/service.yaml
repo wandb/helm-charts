@@ -21,6 +21,15 @@ spec:
     name: {{ $root.Values.global.gcpSecurityPolicy }}
       {{- end }}
   timeoutSec: 120
+      {{- /* Headers ride this BackendConfig because a Service port takes only one, and it already carries Cloud Armor. */}}
+      {{- with $root.Values.global.gcpCustomResponseHeaders }}
+        {{- if not (kindIs "slice" .) }}
+          {{- fail "global.gcpCustomResponseHeaders must be a list of \"Header-Name: value\" strings" }}
+        {{- end }}
+  customResponseHeaders:
+    headers:
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
       {{- with $service.healthCheck }}
   healthCheck:
     {{- toYaml . | nindent 4 }}
