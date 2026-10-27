@@ -35,6 +35,10 @@ It expects a dictionary with two entries:
 {{- default .global.provider .local.provider -}}
 {{- end -}}
 
+{{- define "wandb.ingress.consoleEnabled" -}}
+  {{- if ne (dig "console" "enabled" true .Values.ingress) false -}}true{{- end -}}
+{{- end -}}
+
 {{- define "defaultHost" -}}
 {{- replace "https://" "" (replace "http://" "" .Values.global.host) }}
 {{- end -}}
@@ -46,6 +50,9 @@ It expects a dictionary with two entries:
   backend:
     service:
   {{- if eq $.Values.ingress.defaultBackend "console" }}
+    {{- if not (include "wandb.ingress.consoleEnabled" $) }}
+      {{- fail "ingress.defaultBackend is \"console\" but ingress.console.enabled is false" }}
+    {{- end }}
       name: {{ $.Release.Name }}-console
       port:
         number: 8082
@@ -187,6 +194,7 @@ It expects a dictionary with two entries:
       port:
         number: {{ include "wandb.mcpServicePort" $ }}
   {{- end }}
+  {{- if include "wandb.ingress.consoleEnabled" $ }}
 - pathType: Prefix
   path: /console
   backend:
@@ -194,6 +202,7 @@ It expects a dictionary with two entries:
       name: {{ $.Release.Name }}-console
       port:
         number: 8082
+  {{- end }}
 {{- end }}
 
 {{/* Keep the legacy primary and Traefik application paths identical, including traces. */}}
