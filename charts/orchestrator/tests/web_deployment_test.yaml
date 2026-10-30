@@ -1,6 +1,7 @@
 suite: web deployment
 templates:
   - charts/web/templates/deployment.yaml
+  - charts/web/templates/service.yaml
   - templates/secrets.yaml
 release:
   name: orchestrator
@@ -111,3 +112,49 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].resources.limits.memory
           value: 4Gi
+
+  - it: probes the web container on / with explicit settings
+    template: charts/web/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe
+          value:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+            successThreshold: 1
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe
+          value:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1
+
+  - it: sets an explicit GCP load balancer health check on /
+    template: charts/web/templates/service.yaml
+    set:
+      global:
+        cloudProvider: gcp
+    documentSelector:
+      path: kind
+      value: BackendConfig
+    asserts:
+      - equal:
+          path: spec.healthCheck
+          value:
+            type: HTTP
+            requestPath: /
+            port: 3000
+            checkIntervalSec: 10
+            timeoutSec: 5
+            healthyThreshold: 2
+            unhealthyThreshold: 3
