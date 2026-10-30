@@ -1,0 +1,77 @@
+suite: Site bootstrap hook
+templates:
+  - charts/siteBootstrap/templates/job.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: renders a post-install and post-upgrade hook Job when enabled
+    set:
+      siteBootstrap.install: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.name
+          value: wandb-site-bootstrap
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-install,post-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: before-hook-creation
+      - equal:
+          path: spec.activeDeadlineSeconds
+          value: 900
+      - equal:
+          path: spec.backoffLimit
+          value: 0
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value:
+            - site-bootstrap
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: wandb/megabinary:latest
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_SITE_BOOTSTRAP_WAIT
+            value: 10m
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-global-configmap
+      - exists:
+          path: spec.template.spec.containers[0].env[?(@.name == "GORILLA_METADATA_STORE")]
+
+  - it: uses the configured image tag
+    set:
+      siteBootstrap.install: true
+      siteBootstrap.image.tag: 0.99.0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: wandb/megabinary:0.99.0
+
+  - it: takes the metadata store from the same mysql env as the api
+    set:
+      siteBootstrap.install: true
+    asserts:
+      - exists:
+          path: spec.template.spec.containers[0].env[?(@.name == "GORILLA_METADATA_STORE")]
+
+  - it: lets global.extraEnv override GORILLA_ONPREM
+    set:
+      siteBootstrap.install: true
+      global.extraEnv.GORILLA_ONPREM: "false"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_ONPREM
+            value: "false"

@@ -3752,6 +3752,42 @@ clickhouseMigrationJob:
             - name: temp-dir
               mountPath: /tmp/
 
+# Creates the shared `wandb` entity and its chart presets on a fresh install
+# where the on-prem bootstrap doesn't run. Off by default. Runs as a Helm hook
+# and does nothing on a database that already has the `wandb` entity.
+siteBootstrap:
+  install: false
+  # The job needs no k8s API access.
+  serviceAccount:
+    create: false
+  kind: Job
+  podDisruptionBudget:
+    enabled: false
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  helmHook:
+    enabled: true
+    hook: "post-install,post-upgrade"
+    # Keep the last Job until the next run so a failure's logs stay readable.
+    hookDeletePolicy: "before-hook-creation"
+  envFrom:
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.mysqlEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  env:
+    GORILLA_SITE_BOOTSTRAP_WAIT:
+      value: "10m"
+  jobs:
+    site-bootstrap:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      containers:
+        site-bootstrap:
+          args:
+            - "site-bootstrap"
+
 weave:
   install: true
   deploymentPostfix: "bc"
