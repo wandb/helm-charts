@@ -35,34 +35,49 @@ tests:
           path: spec.template.spec.containers[0].envFrom
           value:
             - configMapRef: {name: static-config}
-  - it: adds global envFrom sources after chart-owned sources so they take precedence
+  - it: adds global envFrom sources
+    set:
+      global.envFrom:
+        shared-env: secretRef
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value:
+            - secretRef: {name: shared-env}
+            - configMapRef: {name: static-config}
+  - it: renders global envFromOverrides after all other sources so they take precedence
     set:
       global.envFrom:
         aaa-shared-env: secretRef
+      global.envFromOverrides:
+        aaa-override-env: secretRef
       envFromTpls:
         - '- configMapRef: {name: templated-config}'
     asserts:
       - equal:
           path: spec.template.spec.containers[0].envFrom
           value:
+            - secretRef: {name: aaa-shared-env}
             - configMapRef: {name: static-config}
             - configMapRef: {name: templated-config}
-            - secretRef: {name: aaa-shared-env}
-  - it: renders a source listed both globally and locally once, in the local position
+            - secretRef: {name: aaa-override-env}
+  - it: renders an override source also listed as envFrom once, in the envFrom position
     set:
-      global.envFrom:
+      global.envFromOverrides:
         static-config: configMapRef
-        shared-env: secretRef
+        override-env: secretRef
     asserts:
       - equal:
           path: spec.template.spec.containers[0].envFrom
           value:
             - configMapRef: {name: static-config}
-            - secretRef: {name: shared-env}
+            - secretRef: {name: override-env}
   - it: skips global envFrom sources with the global env opt-out
     set:
       global.envFrom:
         shared-env: secretRef
+      global.envFromOverrides:
+        override-env: secretRef
       globalOptOut.env: true
     asserts:
       - equal:

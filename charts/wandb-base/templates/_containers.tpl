@@ -34,6 +34,7 @@
       {{- $globalEnv := ternary dict (default dict $.root.Values.global.env) $globalOptOutEnv }}
       {{- $globalExtraEnv := ternary dict (default dict $.root.Values.global.extraEnv) $globalOptOutEnv }}
       {{- $globalEnvFrom := ternary dict (default dict $.root.Values.global.envFrom) $globalOptOutEnv }}
+      {{- $globalEnvFromOverrides := ternary dict (default dict $.root.Values.global.envFromOverrides) $globalOptOutEnv }}
       {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
       {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) $globalOptOutVolumes }}
       {{- $container := dict }}
@@ -47,16 +48,15 @@
         {{- $_ = set $container "securityContext" (include "wandb-base.containerSecurityProfile" (dict "context" $container.securityContext "profile" $profile) | fromYaml) -}}
       {{- end -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
-      {{- $localEnvFrom := merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom)) -}}
-      {{- $_ = set $container "envFrom" $localEnvFrom -}}
-      {{- /* Global sources render last so their keys override chart-owned ConfigMaps, like global extraEnv does. */ -}}
-      {{- $globalOnlyEnvFrom := dict -}}
-      {{- range $name, $kind := $globalEnvFrom -}}
-        {{- if not (hasKey $localEnvFrom $name) -}}
-          {{- $_ = set $globalOnlyEnvFrom $name $kind -}}
+      {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom)) $globalEnvFrom) -}}
+      {{- /* Overrides render after every other envFrom source, so their keys win over chart-owned ConfigMaps. */ -}}
+      {{- $envFromOverrides := dict -}}
+      {{- range $name, $kind := $globalEnvFromOverrides -}}
+        {{- if not (hasKey $container.envFrom $name) -}}
+          {{- $_ = set $envFromOverrides $name $kind -}}
         {{- end -}}
       {{- end -}}
-      {{- $_ = set $container "globalEnvFrom" $globalOnlyEnvFrom -}}
+      {{- $_ = set $container "envFromOverrides" $envFromOverrides -}}
       {{- $_ = set $container "envFromTpls" (concat (default list $.root.Values.envFromTpls) (default list $container.envFromTpls)) -}}
       {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $globalEnv $globalExtraEnv) -}}
       {{- $_ = set $container "root" $.root -}}
@@ -144,7 +144,7 @@
       {{- . | nindent 4 }}
     {{- end }}
   {{- end }}
-  {{- with .globalEnvFrom }}
+  {{- with .envFromOverrides }}
     {{- tpl (include "wandb-base.envFrom" (dict "envFrom" .) | nindent 4) $.root }}
   {{- end }}
   env:
