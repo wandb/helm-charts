@@ -4834,7 +4834,20 @@ spec:
               with patch.object(wandb, "Api", VerifyApi):
                   return original_check_run(api)
 
-          with patch.object(verify, "check_run", check_run):
+          # Current local servers reject a repeated sweep parameter set.
+          # verify() requests 10 runs from a 9-point random sweep, so the agent
+          # waits on a heartbeat that never returns a run. One trial still
+          # creates the sweep and executes the agent.
+          original_agent = wandb.agent
+
+          def agent(*args, **kwargs):
+              kwargs["count"] = 1
+              return original_agent(*args, **kwargs)
+
+          with (
+              patch.object(verify, "check_run", check_run),
+              patch.object(wandb, "agent", agent),
+          ):
               cli.verify()
 
 
