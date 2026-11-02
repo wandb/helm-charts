@@ -1,0 +1,28 @@
+suite: Optional global.envFrom sources
+templates:
+  - charts/api/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+values:
+  - ../../../test-configs/operator-wandb/secrets-from-eso.yaml
+set:
+  global.envFrom:
+    optional-env:
+      kind: secretRef
+      optional: true
+tests:
+  - it: marks a map-form source optional in wandb-base containers
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: optional-env
+              optional: true
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: managed-spec-server-env
