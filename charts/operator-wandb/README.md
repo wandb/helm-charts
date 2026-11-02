@@ -320,6 +320,14 @@ component name overrides. `mcp-server.service.ports` must contain exactly one
 named `http` TCP port from 1 to 65535 with `targetPort: 8080`. For example, a
 Service port of 9090 is supported while application and probe ports remain 8080.
 
+## Console routing
+
+The Ingress, Traefik Ingress and NGINX config route `/console` to the
+`<release>-console` Service by default, regardless of `console.install`, because
+the Console may be deployed separately from this chart. Set
+`ingress.console.enabled: false` for installs that run no Console. Rendering
+fails if `ingress.defaultBackend` is `console` while this is disabled.
+
 ## Use External Stateful Data
 
 You can configure the W&B Server Helm chart to point to external stateful storage for items like MySQL, Redis, and Storage.
