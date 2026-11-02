@@ -47,7 +47,16 @@
         {{- $_ = set $container "securityContext" (include "wandb-base.containerSecurityProfile" (dict "context" $container.securityContext "profile" $profile) | fromYaml) -}}
       {{- end -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
-      {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom)) $globalEnvFrom) -}}
+      {{- $localEnvFrom := merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom)) -}}
+      {{- $_ = set $container "envFrom" $localEnvFrom -}}
+      {{- /* Global sources render last so their keys override chart-owned ConfigMaps, like global extraEnv does. */ -}}
+      {{- $globalOnlyEnvFrom := dict -}}
+      {{- range $name, $kind := $globalEnvFrom -}}
+        {{- if not (hasKey $localEnvFrom $name) -}}
+          {{- $_ = set $globalOnlyEnvFrom $name $kind -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $_ = set $container "globalEnvFrom" $globalOnlyEnvFrom -}}
       {{- $_ = set $container "envFromTpls" (concat (default list $.root.Values.envFromTpls) (default list $container.envFromTpls)) -}}
       {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $globalEnv $globalExtraEnv) -}}
       {{- $_ = set $container "root" $.root -}}
@@ -134,6 +143,9 @@
     {{- with tpl . $.root | trim }}
       {{- . | nindent 4 }}
     {{- end }}
+  {{- end }}
+  {{- with .globalEnvFrom }}
+    {{- tpl (include "wandb-base.envFrom" (dict "envFrom" .) | nindent 4) $.root }}
   {{- end }}
   env:
   {{- if .envTpls }}
