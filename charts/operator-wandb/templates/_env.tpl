@@ -3,12 +3,6 @@
 - {{ $kind }}:
     name: {{ tpl $name $ }}
   {{- end }}
-  {{- range $name, $kind := .Values.global.envFromOverrides }}
-    {{- if not (hasKey ($.Values.global.envFrom | default dict) $name) }}
-- {{ $kind }}:
-    name: {{ tpl $name $ }}
-    {{- end }}
-  {{- end }}
 {{- end -}}
 
 {{- define "wandb.extraEnvFrom" -}}
