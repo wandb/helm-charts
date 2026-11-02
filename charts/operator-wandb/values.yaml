@@ -1574,7 +1574,13 @@ anaconda2:
     "{{ .Release.Name }}-anaconda2-configmap": "configMapRef"
   containers:
     anaconda2:
-      env: {}
+      env: 
+        GUNICORN_WORKERS: 2
+        GUNICORN_THREADS: 2
+        OMP_NUM_THREADS: 1
+        MKL_NUM_THREADS: 1
+        NUMEXPR_NUM_THREADS: 1
+        BLAS_NUM_THREADS: 1
       envFrom: {}
       ports:
         - name: http
@@ -1603,16 +1609,23 @@ anaconda2:
     default:
       resources:
         limits:
-          cpu: "1"
-          memory: 1Gi
+          cpu: "6"
+          memory: 2Gi
         requests:
-          cpu: "1"
-          memory: 1Gi
+          cpu: "4"
+          memory: 2Gi
       autoscaling:
         horizontal:
           enabled: true
-          maxReplicas: 3
+          targetCPUUtilizationPercentage: 70
+          maxReplicas: 4
           minReplicas: 2
+    # Install tests set global.size to testing. Keep the kind-node CPU cap.
+    testing:
+      resources:
+        limits:
+          cpu: "1"
+          memory: 1Gi
 
 filestream:
   podLabels:
