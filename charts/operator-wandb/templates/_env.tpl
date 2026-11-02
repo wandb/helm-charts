@@ -1,3 +1,16 @@
+{{- define "wandb.globalEnvFrom" -}}
+  {{- range $name, $kind := .Values.global.envFrom }}
+- {{ $kind }}:
+    name: {{ tpl $name $ }}
+  {{- end }}
+  {{- range $name, $kind := .Values.global.envFromOverrides }}
+    {{- if not (hasKey ($.Values.global.envFrom | default dict) $name) }}
+- {{ $kind }}:
+    name: {{ tpl $name $ }}
+    {{- end }}
+  {{- end }}
+{{- end -}}
+
 {{- define "wandb.extraEnvFrom" -}}
   {{- $global := deepCopy (get .root.Values.global "extraEnvFrom" | default (dict)) -}}
   {{- $values := deepCopy (get .root.Values "extraEnvFrom" | default (dict)) -}}

@@ -34,6 +34,7 @@
       {{- $globalEnv := ternary dict (default dict $.root.Values.global.env) $globalOptOutEnv }}
       {{- $globalExtraEnv := ternary dict (default dict $.root.Values.global.extraEnv) $globalOptOutEnv }}
       {{- $globalEnvFrom := ternary dict (default dict $.root.Values.global.envFrom) $globalOptOutEnv }}
+      {{- $globalEnvFromOverrides := ternary dict (default dict $.root.Values.global.envFromOverrides) $globalOptOutEnv }}
       {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
       {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) $globalOptOutVolumes }}
       {{- $container := dict }}
@@ -48,6 +49,14 @@
       {{- end -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
       {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom)) $globalEnvFrom) -}}
+      {{- /* Overrides render after every other envFrom source, so their keys win over chart-owned ConfigMaps. */ -}}
+      {{- $envFromOverrides := dict -}}
+      {{- range $name, $kind := $globalEnvFromOverrides -}}
+        {{- if not (hasKey $container.envFrom $name) -}}
+          {{- $_ = set $envFromOverrides $name $kind -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $_ = set $container "envFromOverrides" $envFromOverrides -}}
       {{- $_ = set $container "envFromTpls" (concat (default list $.root.Values.envFromTpls) (default list $container.envFromTpls)) -}}
       {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $globalEnv $globalExtraEnv) -}}
       {{- $_ = set $container "root" $.root -}}
@@ -134,6 +143,9 @@
     {{- with tpl . $.root | trim }}
       {{- . | nindent 4 }}
     {{- end }}
+  {{- end }}
+  {{- with .envFromOverrides }}
+    {{- tpl (include "wandb-base.envFrom" (dict "envFrom" .) | nindent 4) $.root }}
   {{- end }}
   env:
   {{- if .envTpls }}
