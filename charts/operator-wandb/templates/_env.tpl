@@ -1,8 +1,21 @@
 {{- define "wandb.globalEnvFrom" -}}
-  {{- range $name, $kind := .Values.global.envFrom }}
-- {{ $kind }}:
+  {{- range $name, $value := .Values.global.envFrom }}
+    {{- $source := include "wandb.envFromSource" $value | fromYaml }}
+- {{ $source.kind }}:
     name: {{ tpl $name $ }}
+    {{- if $source.optional }}
+    optional: true
+    {{- end }}
   {{- end }}
+{{- end -}}
+
+{{/* A global.envFrom value is a kind ("secretRef") or a map with kind and optional. */}}
+{{- define "wandb.envFromSource" -}}
+  {{- if kindIs "map" . -}}
+    {{- toYaml (dict "kind" .kind "optional" (.optional | default false)) -}}
+  {{- else -}}
+    {{- toYaml (dict "kind" . "optional" false) -}}
+  {{- end -}}
 {{- end -}}
 
 {{- define "wandb.extraEnvFrom" -}}

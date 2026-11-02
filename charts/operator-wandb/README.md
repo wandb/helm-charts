@@ -468,7 +468,7 @@ The following credentials can be pulled from external Kubernetes Secrets:
 | **MySQL** | `global.mysql.fromSecret` | Secret name; host, port, database, user and password are read from keys of the same names |
 | **Redis** | `global.redis.secret` | `secretName`, `secretKey` |
 | **Redis** | `global.redis.fromSecret` | Secret name; host, port and password are read from keys of the same names. `params` and `caCert` stay in values |
-| **Environment** | `global.envFrom` | Map of Secret or ConfigMap name to `secretRef`/`configMapRef`; every key becomes an env var in every wandb-base container |
+| **Environment** | `global.envFrom` | Map of Secret or ConfigMap name to `secretRef`/`configMapRef`, or to `{kind, optional: true}` for a source that may not exist; every key becomes an env var in every wandb-base container |
 | **Weave Trace ClickHouse** | `global.clickhouse.*` or an enabled `global.olap.weaveTrace.*` profile | `global.weaveTrace.clickhouseSource` defaults to `auto`; each connection field can be a string or a map with `valueFrom` |
 | **Kafka** | `global.kafka.passwordSecret` | `name`, `passwordKey` |
 | **OIDC** | `global.auth.oidc.oidcSecret` | `name`, `secretKey` |

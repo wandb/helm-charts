@@ -232,7 +232,20 @@
 
 {{- define "wandb-base.envFrom" -}}
   {{- range $key, $value := .envFrom }}
-- {{ $value }}:
+    {{- $source := include "wandb-base.envFromSource" $value | fromYaml }}
+- {{ $source.kind }}:
     name: {{ $key }}
+    {{- if $source.optional }}
+    optional: true
+    {{- end }}
   {{- end }}
 {{- end }}
+
+{{/* An envFrom value is a kind ("secretRef") or a map with kind and optional. */}}
+{{- define "wandb-base.envFromSource" -}}
+  {{- if kindIs "map" . -}}
+    {{- toYaml (dict "kind" .kind "optional" (.optional | default false)) -}}
+  {{- else -}}
+    {{- toYaml (dict "kind" . "optional" false) -}}
+  {{- end -}}
+{{- end -}}

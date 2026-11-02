@@ -69,6 +69,16 @@ envFrom:
   app-secrets: "secretRef"
 ```
 
+A source that may not exist takes a map instead of a kind. The container then
+starts without its keys while the Secret or ConfigMap is absent:
+
+```yaml
+envFrom:
+  app-optional-secrets:
+    kind: secretRef
+    optional: true
+```
+
 `global.envFrom` takes the same shape and adds its sources to every container
 in every subchart. A chart-level or container-level entry with the same name
 wins.
