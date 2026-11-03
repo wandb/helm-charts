@@ -1,0 +1,39 @@
+suite: live history store on history workers
+templates:
+  - charts/filestream/templates/deployment.yaml
+  - charts/flat-run-fields-updater/templates/deployment.yaml
+  - charts/metric-observer/templates/deployment.yaml
+  - charts/parquet-metadata-cache/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+
+# These workers default to install: false, so the test installs them to render
+# their deployments.
+tests:
+  - it: resolves the ClickHouse live history store on every worker that reads it
+    set:
+      filestream.install: true
+      flat-run-fields-updater.install: true
+      metric-observer.install: true
+      parquet-metadata-cache.install: true
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          default:
+            host: history-clickhouse.example.com
+            password: history-password
+          history:
+            enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
+            value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+            value: $(GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS)
