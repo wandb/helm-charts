@@ -8707,9 +8707,24 @@ spec:
               kwargs["count"] = 1
               return original_agent(*args, **kwargs)
 
+          # FMB publishes run updates through the pubsub emulator. UseArtifact reads
+          # the run immediately, before that update is visible.
+          original_use_artifact = wandb.sdk.wandb_run.Run.use_artifact
+
+          def use_artifact(run, *args, **kwargs):
+              deadline = time.monotonic() + 30
+              while True:
+                  try:
+                      return original_use_artifact(run, *args, **kwargs)
+                  except Exception as exc:
+                      if "failed to find run" not in str(exc) or time.monotonic() >= deadline:
+                          raise
+                      time.sleep(1)
+
           with (
               patch.object(verify, "check_run", check_run),
               patch.object(wandb, "agent", agent),
+              patch.object(wandb.sdk.wandb_run.Run, "use_artifact", use_artifact),
           ):
               cli.verify()
 
