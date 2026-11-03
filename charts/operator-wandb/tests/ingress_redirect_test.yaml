@@ -1,0 +1,110 @@
+---
+suite: Primary gce Ingress HTTP to HTTPS redirect
+templates:
+- templates/ingress.yaml
+release:
+  name: customer
+  namespace: customer-ns
+set:
+  global.host: https://customer.example.com
+  global.cloudProvider: gcp
+  global.legacyIngress: true
+  ingress.class: gce
+  ingress.issuer.create: false
+  ingress.secondary.create: false
+tests:
+- it: renders only the Ingress when the flag is off
+  asserts:
+  - hasDocuments:
+      count: 1
+  - isKind:
+      of: Ingress
+  - notExists:
+      path: metadata.annotations["networking.gke.io/v1beta1.FrontendConfig"]
+- it: renders a 308 FrontendConfig and references it from the Ingress
+  set:
+    ingress.redirectToHttps: true
+  asserts:
+  - hasDocuments:
+      count: 2
+  - containsDocument:
+      apiVersion: networking.gke.io/v1beta1
+      kind: FrontendConfig
+      name: customer-ingress-redirect
+  - equal:
+      path: spec.redirectToHttps
+      value:
+        enabled: true
+        responseCodeName: PERMANENT_REDIRECT
+    documentSelector:
+      path: kind
+      value: FrontendConfig
+  - equal:
+      path: metadata.annotations["networking.gke.io/v1beta1.FrontendConfig"]
+      value: customer-ingress-redirect
+    documentSelector:
+      path: kind
+      value: Ingress
+- it: keeps annotations passed in from values
+  set:
+    ingress.redirectToHttps: true
+    ingress.annotations:
+      kubernetes.io/ingress.global-static-ip-name: customer-operator-address
+  asserts:
+  - equal:
+      path: metadata.annotations["kubernetes.io/ingress.global-static-ip-name"]
+      value: customer-operator-address
+    documentSelector:
+      path: kind
+      value: Ingress
+  - equal:
+      path: metadata.annotations["networking.gke.io/v1beta1.FrontendConfig"]
+      value: customer-ingress-redirect
+    documentSelector:
+      path: kind
+      value: Ingress
+- it: does nothing outside GCP
+  set:
+    global.cloudProvider: aws
+    ingress.redirectToHttps: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - notExists:
+      path: metadata.annotations["networking.gke.io/v1beta1.FrontendConfig"]
+- it: defers to issuer.create, which already turns HTTP off
+  set:
+    ingress.redirectToHttps: true
+    ingress.issuer.create: true
+    ingress.issuer.provider: google
+  asserts:
+  - containsDocument:
+      apiVersion: networking.gke.io/v1beta1
+      kind: FrontendConfig
+      name: customer-ingress-redirect
+    not: true
+  - equal:
+      path: metadata.annotations["kubernetes.io/ingress.allow-http"]
+      value: "false"
+    documentSelector:
+      path: kind
+      value: Ingress
+  - notExists:
+      path: metadata.annotations["networking.gke.io/v1beta1.FrontendConfig"]
+    documentSelector:
+      path: kind
+      value: Ingress
+- it: renders nothing when the legacy Ingress is off
+  set:
+    global.legacyIngress: false
+    ingress.redirectToHttps: true
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: renders nothing when the Ingress is not created
+  set:
+    ingress.create: false
+    ingress.redirectToHttps: true
+  asserts:
+  - hasDocuments:
+      count: 0
