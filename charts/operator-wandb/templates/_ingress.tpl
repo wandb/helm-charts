@@ -56,7 +56,7 @@ true
 {{- end -}}
 
 {{- define "wandb.ingress.redirectFrontendConfigName" -}}
-{{- printf "%s-ingress-redirect" .Release.Name | trunc 63 | trimSuffix "-" -}}
+  {{- printf "%s-ingress-redirect" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 
