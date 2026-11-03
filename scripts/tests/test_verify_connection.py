@@ -35,9 +35,39 @@ class VerifyConnectionTest(unittest.TestCase):
             id="test-check_run", history_keys=complete_history(),
             summary_metrics={"loss": 0.1}, load=Mock(),
         )
+        self.other_run = SimpleNamespace(id="other-run")
+        self.agent = Mock(return_value="agent-result")
+        self.use_artifact = Mock(return_value="artifact-result")
+        target, other = self.metric_run, self.other_run
+        use_artifact = self.use_artifact
+
+        class Api:
+            def run(self, path):
+                return target if path == "target" else other
+
+        class Run:
+            def use_artifact(run, *args, **kwargs):
+                return use_artifact(run, *args, **kwargs)
+
+        self.wandb = ModuleType("wandb")
+        self.wandb.Api = Api
+        self.wandb.agent = self.agent
+        self.wandb.sdk = SimpleNamespace(wandb_run=SimpleNamespace(Run=Run))
+        self.sdk_verify = SimpleNamespace(
+            check_run=Mock(), nice_id=lambda _: self.metric_run.id,
+        )
 
     def advance(self, seconds):
         self.now += seconds
+
+    def run_verifier(self, cli_verify):
+        modules = {
+            "wandb": self.wandb,
+            "wandb.cli": SimpleNamespace(cli=SimpleNamespace(verify=cli_verify)),
+            "wandb.sdk.verify": SimpleNamespace(verify=self.sdk_verify),
+        }
+        with patch.dict(sys.modules, modules):
+            verifier.main()
 
     def test_complete_metrics_do_not_wait(self):
         verifier.wait_for_run_metrics(self.metric_run)
@@ -87,40 +117,83 @@ class VerifyConnectionTest(unittest.TestCase):
             verifier.wait_for_run_metrics(self.metric_run)
 
     def test_sdk_assertions_and_other_checks_keep_their_results(self):
-        wandb = ModuleType("wandb")
+        wandb = self.wandb
         target = self.metric_run
-        other = SimpleNamespace(id="other-run")
-
-        class Api:
-            def run(self, path):
-                return target if path == "target" else other
-
-        wandb.Api = Api
+        other = self.other_run
+        Api = wandb.Api
+        original_use_artifact = wandb.sdk.wandb_run.Run.use_artifact
 
         def original_check_run(api):
             self.assertIs(wandb.Api().run("target"), target)
             self.assertIs(wandb.Api().run("other"), other)
             return False  # An unrelated original SDK assertion still fails.
 
-        sdk_verify = SimpleNamespace(check_run=original_check_run, nice_id=lambda _: target.id)
+        sdk_verify = self.sdk_verify
+        sdk_verify.check_run = original_check_run
 
         def cli_verify():
             self.assertFalse(sdk_verify.check_run(Api()))
             self.assertIs(wandb.Api, Api)
             raise SystemExit(1)
 
-        modules = {
-            "wandb": wandb,
-            "wandb.cli": SimpleNamespace(cli=SimpleNamespace(verify=cli_verify)),
-            "wandb.sdk.verify": SimpleNamespace(verify=sdk_verify),
-        }
-        with patch.dict(sys.modules, modules), patch.object(verifier, "wait_for_run_metrics") as wait:
+        with patch.object(verifier, "wait_for_run_metrics") as wait:
             with self.assertRaises(SystemExit) as result:
-                verifier.main()
+                self.run_verifier(cli_verify)
             self.assertEqual(result.exception.code, 1)
             wait.assert_called_once_with(target)
         self.assertIs(wandb.Api, Api)
+        self.assertIs(wandb.agent, self.agent)
+        self.assertIs(wandb.sdk.wandb_run.Run.use_artifact, original_use_artifact)
         self.assertIs(sdk_verify.check_run, original_check_run)
+
+    def test_sweep_agent_executes_one_trial(self):
+        def cli_verify():
+            self.assertEqual(
+                self.wandb.agent("sweep-id", function="trial", count=10),
+                "agent-result",
+            )
+
+        self.run_verifier(cli_verify)
+        self.agent.assert_called_once_with("sweep-id", function="trial", count=1)
+        self.assertIs(self.wandb.agent, self.agent)
+
+    def test_artifact_use_waits_for_run_visibility(self):
+        self.use_artifact.side_effect = [
+            RuntimeError("failed to find run verify/test-use_artifact"),
+            "artifact-result",
+        ]
+        run = self.wandb.sdk.wandb_run.Run()
+
+        def cli_verify():
+            self.assertEqual(run.use_artifact("artifact:v0", type="dataset"), "artifact-result")
+
+        self.run_verifier(cli_verify)
+        self.assertEqual(self.use_artifact.call_count, 2)
+        self.use_artifact.assert_called_with(run, "artifact:v0", type="dataset")
+        self.assertEqual(self.now, 1)
+
+    def test_artifact_use_does_not_retry_other_errors(self):
+        error = RuntimeError("permission denied")
+        self.use_artifact.side_effect = error
+        run = self.wandb.sdk.wandb_run.Run()
+
+        with self.assertRaises(RuntimeError) as result:
+            self.run_verifier(lambda: run.use_artifact("artifact:v0"))
+
+        self.assertIs(result.exception, error)
+        self.use_artifact.assert_called_once_with(run, "artifact:v0")
+        self.assertEqual(self.now, 0)
+
+    def test_artifact_use_stops_waiting_after_thirty_seconds(self):
+        error = RuntimeError("failed to find run verify/test-use_artifact")
+        self.use_artifact.side_effect = error
+        run = self.wandb.sdk.wandb_run.Run()
+
+        with self.assertRaises(RuntimeError) as result:
+            self.run_verifier(lambda: run.use_artifact("artifact:v0"))
+
+        self.assertIs(result.exception, error)
+        self.assertEqual(self.now, 30)
 
 
 if __name__ == "__main__":
