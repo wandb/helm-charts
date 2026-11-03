@@ -5,7 +5,8 @@
 Return the bucket credential Secret reference. Inline keys on the effective
 bucket win over global.bucket.secret: a managed spec derives that reference
 from Terraform's bucket, while a user spec can select another bucket with its
-own key. The chart then owns the Secret with its default key names.
+own key. The chart then owns the Secret with its default key names. Azure
+needs only accessKey; other providers need the full key pair.
 */}}
 {{- define "wandb.bucket.secretRef" -}}
   {{- $bucket := .Values.global.defaultBucket -}}
@@ -13,7 +14,10 @@ own key. The chart then owns the Secret with its default key names.
     {{- $bucket = .Values.global.bucket -}}
   {{- end -}}
   {{- $secretRef := .Values.global.bucket.secret -}}
-  {{- $hasInlineCredentials := or $bucket.accessKey $bucket.secretKey -}}
+  {{- $hasInlineCredentials := and $bucket.accessKey $bucket.secretKey -}}
+  {{- if eq $bucket.provider "az" -}}
+    {{- $hasInlineCredentials = $bucket.accessKey -}}
+  {{- end -}}
   {{- if and $secretRef.secretName $hasInlineCredentials -}}
     {{- $secretRef = dict "secretName" "" "accessKeyName" "ACCESS_KEY" "secretKeyName" "SECRET_KEY" -}}
   {{- end -}}
