@@ -1,9 +1,29 @@
 {{/*
   Assorted bucket related helpers.
 */}}
+{{/*
+Return the bucket credential Secret reference. Inline keys on the effective
+bucket win over global.bucket.secret: a managed spec derives that reference
+from Terraform's bucket, while a user spec can select another bucket with its
+own key. The chart then owns the Secret with its default key names.
+*/}}
+{{- define "wandb.bucket.secretRef" -}}
+  {{- $bucket := .Values.global.defaultBucket -}}
+  {{- if .Values.global.bucket.name -}}
+    {{- $bucket = .Values.global.bucket -}}
+  {{- end -}}
+  {{- $secretRef := .Values.global.bucket.secret -}}
+  {{- $hasInlineCredentials := or $bucket.accessKey $bucket.secretKey -}}
+  {{- if and $secretRef.secretName $hasInlineCredentials -}}
+    {{- $secretRef = dict "secretName" "" "accessKeyName" "ACCESS_KEY" "secretKeyName" "SECRET_KEY" -}}
+  {{- end -}}
+{{- $secretRef | toYaml -}}
+{{- end }}
+
 {{- define "wandb.bucket.secret" -}}
-  {{- if .Values.global.bucket.secret.secretName -}}
-  {{ .Values.global.bucket.secret.secretName }}
+  {{- $secretRef := include "wandb.bucket.secretRef" . | fromYaml -}}
+  {{- if $secretRef.secretName -}}
+  {{ $secretRef.secretName }}
   {{- else }}
   {{- print .Release.Name "-bucket" -}}
   {{- end -}}
@@ -144,6 +164,7 @@ templates/weave-trace-serviceaccount.yaml. Must stay identical to
 
 
 {{- define "wandb.bucket" -}}
+  {{- $secretRef := include "wandb.bucket.secretRef" . | fromYaml -}}
   {{- $url := "" -}}
   {{- $path := "" -}}
   {{- $provider := "" -}}
@@ -182,13 +203,13 @@ secretKey: {{ $secretKey }}
 azureTenantId: {{ $azureTenantId | toJson }}
 azureClientId: {{ $azureClientId | toJson }}
 azureAuthMethod: {{ $azureAuthMethod | toJson }}
-accessKeyName: {{ .Values.global.bucket.secret.accessKeyName }}
-secretKeyName: {{ .Values.global.bucket.secret.secretKeyName }}
+accessKeyName: {{ $secretRef.accessKeyName }}
+secretKeyName: {{ $secretRef.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}
   {{- if not $path -}}
 
     {{- if eq $provider "cw" -}}
-      {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
+      {{- if or (and $accessKey $secretKey) $secretRef.secretName -}}
         {{- $url = "cw://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)" -}}
       {{- else -}}
         {{- $url = "cw://$(BUCKET_NAME)" -}}
@@ -204,7 +225,7 @@ secretName: {{ include "wandb.bucket.secret" . }}
     {{- end -}}
 
     {{- if eq $provider "s3" -}}
-      {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
+      {{- if or (and $accessKey $secretKey) $secretRef.secretName -}}
         {{- $url = "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)" -}}
       {{- else -}}
         {{- $url = "s3://$(BUCKET_NAME)" -}}
@@ -214,7 +235,7 @@ secretName: {{ include "wandb.bucket.secret" . }}
   {{- else -}}
 
     {{- if eq $provider "cw" -}}
-      {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
+      {{- if or (and $accessKey $secretKey) $secretRef.secretName -}}
         {{- $url = "cw://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
       {{- else -}}
         {{- $url = "cw://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
@@ -230,7 +251,7 @@ secretName: {{ include "wandb.bucket.secret" . }}
     {{- end -}}
 
     {{- if eq $provider "s3" -}}
-      {{- if or (and $accessKey $secretKey) .Values.global.bucket.secret.secretName -}}
+      {{- if or (and $accessKey $secretKey) $secretRef.secretName -}}
         {{- $url = "s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
       {{- else -}}
         {{- $url = "s3://$(BUCKET_NAME)/$(BUCKET_PATH)" -}}
@@ -276,7 +297,7 @@ Secrets retain their existing runtime interpolation and are never copied here.
 
 {{/* Chart-owned connection strings are already named for their application consumers. */}}
 {{- define "wandb.bucket.envFrom" -}}
-  {{- if not .Values.global.bucket.secret.secretName }}
+  {{- if not (include "wandb.bucket.secretRef" . | fromYaml).secretName }}
 - secretRef:
     name: {{ include "wandb.bucket.secret" . | quote }}
   {{- end }}
@@ -284,7 +305,7 @@ Secrets retain their existing runtime interpolation and are never copied here.
 
 {{/* External credentials retain the original runtime interpolation. */}}
 {{- define "wandb.bucket.externalConnectionEnv" -}}
-  {{- if .root.Values.global.bucket.secret.secretName }}
+  {{- if (include "wandb.bucket.secretRef" .root | fromYaml).secretName }}
 - name: {{ .name }}
   value: {{ (include "wandb.bucket" .root | fromYaml).url | quote }}
   {{- end }}
@@ -295,7 +316,7 @@ all saved data, including intentional removals, rather than merging stale values
 External Secrets and their existing interpolation path remain spec-controlled.
 */}}
 {{- define "wandb.bucket.consoleOwnedResource" -}}
-  {{- if not .root.Values.global.bucket.secret.secretName -}}
+  {{- if not (include "wandb.bucket.secretRef" .root | fromYaml).secretName -}}
     {{- $existing := lookup "v1" .kind .root.Release.Namespace .name | default dict -}}
     {{- $metadata := $existing.metadata | default dict -}}
     {{- $annotations := $metadata.annotations | default dict -}}
@@ -309,7 +330,7 @@ External Secrets and their existing interpolation path remain spec-controlled.
 saved URL so stale spec values cannot drive the bucket rollout checksum.
 */}}
 {{- define "wandb.bucket.podAnnotations" -}}
-  {{- if not .Values.global.bucket.secret.secretName -}}
+  {{- if not (include "wandb.bucket.secretRef" . | fromYaml).secretName -}}
     {{- $owned := include "wandb.bucket.consoleOwnedResource" (dict "root" . "kind" "Secret" "name" (include "wandb.bucket.secret" .)) | fromYaml -}}
     {{- $connectionString := "" -}}
     {{- if $owned -}}

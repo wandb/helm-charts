@@ -985,3 +985,81 @@ tests:
       - equal:
           path: subjects[0].name
           value: bufstream-service-account
+
+  - it: keeps an inline customer key when a managed bucket Secret is also referenced
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+          azureAuthMethod: workloadIdentity
+        bucket:
+          provider: az
+          name: customer-storage-account
+          path: customer-container
+          accessKey: customer-storage-key
+          secret:
+            secretName: managed-spec-default-bucket
+            accessKeyName: accessKey
+            secretKeyName: secretKey
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: chartsnap-bucket
+                key: ACCESS_KEY
+                optional: true
+
+  - it: renders the inline customer key into the chart-owned Secret despite a managed bucket Secret
+    set:
+      global:
+        bucket:
+          provider: az
+          name: customer-storage-account
+          path: customer-container
+          accessKey: customer-storage-key
+          secret:
+            secretName: managed-spec-default-bucket
+            accessKeyName: accessKey
+            secretKeyName: secretKey
+    template: templates/bucket.yaml
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: metadata.name
+          value: chartsnap-bucket
+      - equal:
+          path: data.ACCESS_KEY
+          value: Y3VzdG9tZXItc3RvcmFnZS1rZXk=
+
+  - it: reads the managed bucket Secret when the bucket has no inline key
+    set:
+      global:
+        defaultBucket:
+          provider: az
+          name: managed-storage-account
+          path: managed-container
+        bucket:
+          secret:
+            secretName: managed-spec-default-bucket
+            accessKeyName: accessKey
+            secretKeyName: secretKey
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: managed-spec-default-bucket
+                key: accessKey
+                optional: true
