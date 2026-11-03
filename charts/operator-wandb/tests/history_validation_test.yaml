@@ -1,0 +1,40 @@
+suite: history store validation
+templates:
+  - templates/history-validation.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: accepts the default liveStore
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts liveStore clickhouse with history OLAP enabled
+    set:
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects liveStore clickhouse without history OLAP
+    set:
+      global:
+        historyStore:
+          liveStore: clickhouse
+    asserts:
+      - failedTemplate:
+          errorMessage: global.historyStore.liveStore "clickhouse" requires global.olap.history.enabled
+
+  - it: rejects an unknown liveStore
+    set:
+      global:
+        historyStore:
+          liveStore: bigquery
+    asserts:
+      - failedTemplate:
+          errorMessage: global.historyStore.liveStore must be "auto" or "clickhouse", got "bigquery"
