@@ -26,21 +26,26 @@
 {{- end -}}
 
 {{- define "wandb.liveHistoryStore" -}}
-  {{- $historyStore := include "wandb.mysql" . -}}
-  {{- if or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled -}}
-    {{- $stores := list -}}
+  {{- if eq .Values.global.historyStore.liveStore "clickhouse" -}}
+    {{- /* Defined by wandb.historyEnvs, which must precede wandb.historyStoreEnvs. */ -}}
+$(GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS)
+  {{- else -}}
+    {{- $historyStore := include "wandb.mysql" . -}}
+    {{- if or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled -}}
+      {{- $stores := list -}}
 
-    {{- if .Values.global.bigtable.v3.enabled -}}
-      {{- $stores = append $stores (printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
+      {{- if .Values.global.bigtable.v3.enabled -}}
+        {{- $stores = append $stores (printf "bigtablev3://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
+      {{- end -}}
+
+      {{- if .Values.global.bigtable.v2.enabled -}}
+        {{- $stores = append $stores (printf "bigtablev2://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
+      {{- end -}}
+
+      {{- $historyStore = join "," $stores -}}
     {{- end -}}
-
-    {{- if .Values.global.bigtable.v2.enabled -}}
-      {{- $stores = append $stores (printf "bigtablev2://%s/%s" .Values.global.bigtable.project .Values.global.bigtable.instance) -}}
-    {{- end -}}
-
-    {{- $historyStore = join "," $stores -}}
-  {{- end -}}
 {{- $historyStore -}}
+  {{- end -}}
 {{- end -}}
 
 {{- define "wandb.fileStreamWorkerStore" -}}
