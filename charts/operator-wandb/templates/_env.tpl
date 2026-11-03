@@ -33,17 +33,20 @@ Global values will override any chart-specific values.
 {{- define "wandb.redisEnvs" -}}
   {{- with .Values.global.redis.fromSecret -}}
 - name: REDIS_PASSWORD
+  value: ""
   valueFrom:
     secretKeyRef:
       name: {{ . | quote }}
       key: "password"
       optional: true
 - name: REDIS_HOST
+  value: ""
   valueFrom:
     secretKeyRef:
       name: {{ . | quote }}
       key: "host"
 - name: REDIS_PORT
+  value: ""
   valueFrom:
     secretKeyRef:
       name: {{ . | quote }}
