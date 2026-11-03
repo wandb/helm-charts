@@ -117,6 +117,19 @@ global:
   priorityClassName: ""
 ```
 
+### Datastore and license Secret precedence
+
+When `global.mysql.fromSecret` or `global.redis.fromSecret` is set, the named
+Secret supplies the connection settings instead of the corresponding inline
+`global.mysql` or `global.redis` values. Likewise, `global.licenseSecret.name`
+selects the external license Secret instead of `global.license`.
+
+These Secret-backed env entries also render `value: ""` so Helm clears any
+inline env value left by an earlier upgrade. This makes the Secret take effect
+while the old Terraform CR fields are still present, including after a partial
+upgrade. Render-time options such as MySQL CA certificates and IAM settings
+remain Helm values.
+
 ### Azure managed storage workload identity
 
 Before setting `global.azureStorageIdentity`, deploy a server build containing
