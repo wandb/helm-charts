@@ -17,6 +17,27 @@ cd helm-charts
 helm upgrade --namespace=wandb --create-namespace --install operator .
 ```
 
+## GKE FrontendConfig permissions
+
+Operator chart 1.4.11 adds `create`, `delete`, `get`, `list`, `patch`, `update`, and
+`watch` for `frontendconfigs` in the `networking.gke.io` API group. The
+operator-wandb chart renders a FrontendConfig when `ingress.redirectToHttps` is
+enabled on GCP. Without this rule the operator's Helm upgrade is forbidden, and the
+install stops reconciling everything in that upgrade, not just the redirect.
+
+The rule follows the same ClusterRole and `namespaceIsolation` behavior as the
+Traefik middleware rule below. If you override `role.rules`, include it in your
+replacement list.
+
+Upgrade the installed operator chart to 1.4.11 or later before enabling
+`ingress.redirectToHttps` in operator-wandb. Rendering RBAC does not update a
+running operator's permissions until the chart is upgraded. To check an install:
+
+```sh
+kubectl auth can-i get frontendconfigs.networking.gke.io \
+  --as=system:serviceaccount:<operator-namespace>:wandb-manager -n <release-namespace>
+```
+
 ## Traefik middleware permissions
 
 Operator chart 1.4.10 adds `create`, `delete`, `get`, `list`, `patch`, `update`, and

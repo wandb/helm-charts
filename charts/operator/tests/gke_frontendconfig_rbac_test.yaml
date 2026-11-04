@@ -1,0 +1,46 @@
+suite: GKE FrontendConfig reconciliation permissions
+templates:
+  - templates/role.yaml
+release:
+  name: operator-v1
+  namespace: operator-system
+tests:
+  - it: grants FrontendConfig reconciliation through the default ClusterRole
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - contains: &frontendconfig_rule
+          path: rules
+          content:
+            apiGroups: [networking.gke.io]
+            resources: [frontendconfigs]
+            verbs: [create, delete, get, list, patch, update, watch]
+          count: 1
+      - contains:
+          path: rules
+          content:
+            apiGroups: [cloud.google.com]
+            resources: [backendconfigs]
+            verbs: [create, delete, get, list, update, watch, patch]
+  - it: grants FrontendConfig reconciliation within the isolated release namespace
+    set:
+      namespaceIsolation.enabled: true
+    asserts:
+      - isKind:
+          of: Role
+      - equal:
+          path: metadata.namespace
+          value: operator-system
+      - contains: *frontendconfig_rule
+  - it: grants FrontendConfig reconciliation in every configured additional namespace
+    set:
+      namespaceIsolation.enabled: true
+      namespaceIsolation.additionalNamespaces: [tenant-a]
+    asserts:
+      - hasDocuments:
+          count: 2
+      - contains: *frontendconfig_rule
+      - equal:
+          path: metadata.namespace
+          value: tenant-a
+        documentIndex: 1
