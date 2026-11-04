@@ -3902,8 +3902,11 @@ weave:
 ## access, workload limits, admission, and deadlines. The chart resolves `auto`
 ## to an exact profile before rendering the pod; it never emits `auto` as
 ## runtime evidence. Dedicated v0.4 supports Models-only (17 read-write tools)
-## and classic Weave (22 read-write tools). Weave Agent, ARIA, and raw GraphQL
-## profiles are intentionally unavailable from this chart.
+## and classic Weave (22 read-write tools). Since server 0.4.4 a tool profile is
+## a base profile plus additive extensions (WANDB_MCP_TOOL_EXTENSIONS); the
+## chart only accepts the base profiles and extensions the server's runtime
+## contract approves for the dedicated workload. Weave Agent, ARIA, Agent Lens,
+## and raw GraphQL are not approved for Dedicated in 0.4.4.
 ## Disabled by default. Enable with: mcp-server.install: true
 ## Docs: https://github.com/wandb/wandb-mcp-server
 mcp-server:
@@ -3921,6 +3924,19 @@ mcp-server:
     ## - models-weave: 22 read-write / 20 read-only tools; requires a trace
     ##   backend selected below.
     profile: auto
+    ## Additive extension groups layered on the base profile (server 0.4.4+,
+    ## WANDB_MCP_TOOL_EXTENSIONS). Known: agent-lens, aria, raw-graphql. The
+    ## chart rejects any extension the runtime contract does not approve for
+    ## the dedicated workload; none is approved in 0.4.4, so leave this empty.
+    extensions: []
+    ## Typed endpoints for extensions that call another service. Each is
+    ## required by, and only allowed with, its extension.
+    aria:
+      ## Absolute HTTP(S) origin of the W&B agent service (WB_AGENT_BASE_URL).
+      baseUrl: ""
+    agentLens:
+      ## Absolute HTTP(S) origin of the Agent Lens service (AGENT_LENS_BASE_URL).
+      baseUrl: ""
   ## Controls write-capable tool registration without changing the tool profile.
   accessMode: read-write
   traceBackend:
