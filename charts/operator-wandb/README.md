@@ -267,6 +267,11 @@ mcp-server:
     digest: ""
   tools:
     profile: auto # auto | models-only | models-weave
+    extensions: [] # additive groups; none approved for Dedicated in 0.4.4
+    aria:
+      baseUrl: "" # required by, and only with, the aria extension
+    agentLens:
+      baseUrl: "" # required by, and only with, the agent-lens extension
   accessMode: read-write # read-write | read-only
   traceBackend:
     mode: auto # auto | disabled
@@ -282,8 +287,20 @@ mcp-server:
 `tools.profile=auto` resolves during chart rendering to `models-only` when no
 trace backend is available and `models-weave` otherwise. The pod always receives
 the resolved profile, never `auto`. In v0.4 these correspond to exact 17/22
-read-write tool manifests (15/20 in read-only mode). Agent, ARIA, and raw GraphQL
-profiles cannot be enabled through this chart.
+read-write tool manifests (15/20 in read-only mode).
+
+Since server 0.4.4 a tool profile is a base profile plus additive extensions
+(`WANDB_MCP_TOOL_EXTENSIONS`: `agent-lens`, `aria`, `raw-graphql`).
+`tools.extensions` is the typed way to select them and the pod always receives
+the canonical sorted set (empty when none). The chart accepts only the base
+profiles and extensions the server's runtime contract approves for the
+`dedicated` workload, so a pod can never start with a group the server refuses.
+In 0.4.4 no extension is approved for Dedicated: `tools.extensions` must stay
+empty and Weave Agent, ARIA, Agent Lens, and raw GraphQL remain unavailable.
+When the contract approves one, the chart change is a one-line allowlist edit,
+and `aria` / `agent-lens` carry their service endpoints through the typed
+`tools.aria.baseUrl` / `tools.agentLens.baseUrl` values (`WB_AGENT_BASE_URL`,
+`AGENT_LENS_BASE_URL`), which are rejected from generic `env`.
 
 For the v0.4 transition, the existing Managed Spec
 `datadog.enabled/mode/env/service/deploymentType` and `privacy.logLevel` fields

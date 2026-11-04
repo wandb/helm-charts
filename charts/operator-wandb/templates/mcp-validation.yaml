@@ -14,7 +14,7 @@
   {{- $mcpEnvFrom := index $mcp "envFrom" | default dict -}}
   {{- $mcpContainerEnvFrom := index $mcpContainer "envFrom" | default dict -}}
   {{- $reservedEnvNames := include "wandb.mcpReservedEnvNames" . | fromJsonArray -}}
-  {{- $reservedEnvPrefixes := list "WANDB_" "WEAVE_TRACE_" "WF_TRACE_" "WB_AGENT_" "MCP_" "MAX_" "SESSION_" "UVICORN_" "DD_" "OTEL_" -}}
+  {{- $reservedEnvPrefixes := list "WANDB_" "WEAVE_TRACE_" "WF_TRACE_" "WB_AGENT_" "AGENT_LENS_" "MCP_" "MAX_" "SESSION_" "UVICORN_" "DD_" "OTEL_" -}}
   {{- $ownedBenignEnvNames := list "WANDB_SILENT" "WEAVE_SILENT" "WEAVE_DISABLED" "ENVIRONMENT" -}}
   {{- $reservedEnvNames = concat $reservedEnvNames $ownedBenignEnvNames -}}
   {{- range $channel := list $mcpEnv $mcpExtraEnv $mcpContainerEnv -}}
@@ -130,15 +130,80 @@
     {{- end -}}
   {{- end -}}
 
-  {{/* Tool profile and access mode are the complete Dedicated product surface. */}}
+  {{/* Tool profile, extensions, and access mode are the complete Dedicated product surface. */}}
   {{- $tools := index $mcp "tools" | default dict -}}
+  {{- $dedicatedToolProfiles := include "wandb.mcpDedicatedToolProfiles" . | fromJsonArray -}}
+  {{- $toolProfileError := printf "mcp-server.tools.profile must be one of: %s" (join ", " $dedicatedToolProfiles) -}}
   {{- $rawToolProfile := index $tools "profile" | default "auto" -}}
   {{- if not (kindIs "string" $rawToolProfile) -}}
-    {{- fail "mcp-server.tools.profile must be one of: auto, models-only, models-weave" -}}
+    {{- fail $toolProfileError -}}
   {{- end -}}
   {{- $toolProfile := $rawToolProfile | trim -}}
-  {{- if not (has $toolProfile (list "auto" "models-only" "models-weave")) -}}
-    {{- fail "mcp-server.tools.profile must be one of: auto, models-only, models-weave" -}}
+  {{- if not (has $toolProfile $dedicatedToolProfiles) -}}
+    {{- fail $toolProfileError -}}
+  {{- end -}}
+
+  {{/* Extensions are additive groups; Dedicated accepts only contract-approved ones. */}}
+  {{- $rawExtensions := index $tools "extensions" | default list -}}
+  {{- if not (kindIs "slice" $rawExtensions) -}}
+    {{- fail "mcp-server.tools.extensions must be a list of extension names" -}}
+  {{- end -}}
+  {{- $knownExtensions := include "wandb.mcpKnownToolExtensions" . | fromJsonArray -}}
+  {{- $approvedExtensions := include "wandb.mcpDedicatedToolExtensions" . | fromJsonArray -}}
+  {{- $approvedSummary := ternary "none is approved for Dedicated in this chart release" (printf "approved for Dedicated: %s" (join ", " $approvedExtensions)) (empty $approvedExtensions) -}}
+  {{- $extensions := list -}}
+  {{- range $rawExtensions -}}
+    {{- if not (kindIs "string" .) -}}
+      {{- fail "mcp-server.tools.extensions must be a list of extension names" -}}
+    {{- end -}}
+    {{- $extension := . | trim | lower -}}
+    {{- if not (has $extension $knownExtensions) -}}
+      {{- fail (printf "mcp-server.tools.extensions contains unknown extension %q; known extensions: %s" $extension (join ", " $knownExtensions)) -}}
+    {{- end -}}
+    {{- if has $extension $extensions -}}
+      {{- fail (printf "mcp-server.tools.extensions lists %s more than once" $extension) -}}
+    {{- end -}}
+    {{- if not (has $extension $approvedExtensions) -}}
+      {{- fail (printf "mcp-server.tools.extensions: %s is not approved for the dedicated workload by the MCP runtime contract (%s)" $extension $approvedSummary) -}}
+    {{- end -}}
+    {{- $extensions = append $extensions $extension -}}
+  {{- end -}}
+  {{- $hasAria := has "aria" $extensions -}}
+  {{- $hasAgentLens := has "agent-lens" $extensions -}}
+  {{- $hasRawGraphQL := has "raw-graphql" $extensions -}}
+
+  {{/* Typed extension endpoints exist only for the extension that uses them. */}}
+  {{- $ariaTools := index $tools "aria" | default dict -}}
+  {{- $rawAriaURL := index $ariaTools "baseUrl" | default "" -}}
+  {{- $ariaError := "mcp-server.tools.aria.baseUrl must be an absolute HTTP(S) origin without credentials, path, query, or fragment" -}}
+  {{- if not (kindIs "string" $rawAriaURL) -}}
+    {{- fail $ariaError -}}
+  {{- end -}}
+  {{- $ariaURL := tpl $rawAriaURL (deepCopy $mcpTplContext) | trim -}}
+  {{- if and (ne $ariaURL "") (not $hasAria) -}}
+    {{- fail "mcp-server.tools.aria.baseUrl requires the aria extension in mcp-server.tools.extensions" -}}
+  {{- end -}}
+  {{- if and $hasAria (eq $ariaURL "") -}}
+    {{- fail "mcp-server.tools.extensions aria requires mcp-server.tools.aria.baseUrl" -}}
+  {{- end -}}
+  {{- if ne $ariaURL "" -}}
+    {{- include "wandb.validateMcpEndpoint" (dict "url" $ariaURL "errorMessage" $ariaError) -}}
+  {{- end -}}
+  {{- $agentLensTools := index $tools "agentLens" | default dict -}}
+  {{- $rawAgentLensURL := index $agentLensTools "baseUrl" | default "" -}}
+  {{- $agentLensError := "mcp-server.tools.agentLens.baseUrl must be an absolute HTTP(S) origin without credentials, path, query, or fragment" -}}
+  {{- if not (kindIs "string" $rawAgentLensURL) -}}
+    {{- fail $agentLensError -}}
+  {{- end -}}
+  {{- $agentLensURL := tpl $rawAgentLensURL (deepCopy $mcpTplContext) | trim -}}
+  {{- if and (ne $agentLensURL "") (not $hasAgentLens) -}}
+    {{- fail "mcp-server.tools.agentLens.baseUrl requires the agent-lens extension in mcp-server.tools.extensions" -}}
+  {{- end -}}
+  {{- if and $hasAgentLens (eq $agentLensURL "") -}}
+    {{- fail "mcp-server.tools.extensions agent-lens requires mcp-server.tools.agentLens.baseUrl" -}}
+  {{- end -}}
+  {{- if ne $agentLensURL "" -}}
+    {{- include "wandb.validateMcpEndpoint" (dict "url" $agentLensURL "errorMessage" $agentLensError) -}}
   {{- end -}}
   {{- $rawAccessMode := index $mcp "accessMode" | default "read-write" -}}
   {{- if not (kindIs "string" $rawAccessMode) -}}
@@ -177,6 +242,16 @@
   {{- $resolvedToolProfile := include "wandb.resolveMcpToolProfile" (dict "profile" $toolProfile "hasTraceBackend" $hasTraceBackend) -}}
   {{- if and (eq $resolvedToolProfile "models-weave") (not $hasTraceBackend) -}}
     {{- fail "mcp-server.tools.profile=models-weave requires global.weave-trace.enabled=true or traceBackend.url" -}}
+  {{- end -}}
+
+  {{/* Extension prerequisites follow the contract's `requires` groups. */}}
+  {{- $resolvedHasWeave := ne $resolvedToolProfile "models-only" -}}
+  {{- $resolvedHasAgents := eq $resolvedToolProfile "models-weave-agents" -}}
+  {{- if and (or $hasAria $hasAgentLens) (not (and $resolvedHasWeave $resolvedHasAgents)) -}}
+    {{- fail "mcp-server.tools.extensions aria and agent-lens require the models-weave-agents base profile" -}}
+  {{- end -}}
+  {{- if and $hasRawGraphQL (not $resolvedHasWeave) -}}
+    {{- fail "mcp-server.tools.extensions raw-graphql requires a Weave base profile" -}}
   {{- end -}}
 
   {{/* Capacity is derived from the existing chart size, never a free-form MCP override. */}}
