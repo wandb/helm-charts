@@ -698,6 +698,12 @@ global:
   # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#cloud_armor
   gcpSecurityPolicy: ""
 
+  # GCP only value: response headers the gce LoadBalancer adds to every response from each
+  # Service, via the same BackendConfig, e.g. ["Strict-Transport-Security: max-age=31536000"].
+  # Empty renders no customResponseHeaders block.
+  # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#response_headers
+  gcpCustomResponseHeaders: []
+
   statsig:
     apiKey: ""
 
@@ -713,6 +719,12 @@ ingress:
   install: true
   create: true
   nameOverride: ""
+  # GCP only: answer plain HTTP on the primary gce Ingress with a 308 redirect to
+  # HTTPS through a GKE FrontendConfig. Requires the GKE FrontendConfig CRD.
+  # Ignored when issuer.create is set, which already turns HTTP off.
+  # Needs operator chart 1.4.11 or later, which grants the operator frontendconfigs.
+  # On an older operator, enabling this blocks the install's whole Helm upgrade.
+  redirectToHttps: false
   defaultBackend: "app"
   console:
     # Route /console to <release>-console even when console.install is false (separately deployed Console).
@@ -4470,6 +4482,98 @@ weave-trace-agent-scoring-worker:
         - "python"
         - "-m"
         - "src.workers.agent_scoring_worker"
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 2
+    large:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 8
+          minReplicas: 2
+
+weave-trace-alert-worker:
+  install: false
+  serviceAccount:
+    useWeaveTraceIdentity: true
+  deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  azureStorageUseSharedServiceAccount: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  image:
+    repository: wandb/weave-trace
+    tag: latest
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  env:
+    WANDB_INTERNAL_SERVICE_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: weave-worker-auth
+          key: key
+  containers:
+    weave-trace-alert-worker:
+      args:
+        - "python"
+        - "-m"
+        - "src.workers.alert_worker.alert_worker"
   size: ""
   sizing:
     small:

@@ -1,0 +1,67 @@
+suite: Weave alert worker event production
+templates:
+  - templates/weave-trace.yaml
+release:
+  name: wandb
+tests:
+  - it: keeps finished-call event production disabled by default
+    asserts:
+      - equal:
+          path: data.WEAVE_ENABLE_ONLINE_EVAL
+          value: "false"
+  - it: enables finished-call events for alerts without installing the scoring worker
+    set:
+      weave-trace-alert-worker.install: true
+      weave-trace.install: true
+      global.kafka.brokerHost: kafka.example.com
+      weave-trace-worker.install: false
+    asserts:
+      - equal:
+          path: data.WEAVE_ENABLE_ONLINE_EVAL
+          value: "true"
+      - equal:
+          path: data.WEAVE_ENABLE_AGENT_SCORING
+          value: "false"
+  - it: accepts bundled Kafka as the sole broker for alerts without scoring
+    set:
+      weave-trace-alert-worker.install: true
+      weave-trace.install: true
+      weave-trace-worker.install: false
+      kafka.install: true
+      bufstream.install: false
+      global.kafka.brokerHost: ""
+    asserts:
+      - equal:
+          path: data.WEAVE_ENABLE_ONLINE_EVAL
+          value: "true"
+      - equal:
+          path: data.KAFKA_BROKER_HOST
+          value: wandb-kafka
+      - equal:
+          path: data.KAFKA_BROKER_PORT
+          value: "9092"
+  - it: preserves finished-call events for the existing scoring worker
+    set:
+      weave-trace-alert-worker.install: false
+      weave-trace-worker.install: true
+    asserts:
+      - equal:
+          path: data.WEAVE_ENABLE_ONLINE_EVAL
+          value: "true"
+  - it: rejects an alert worker without its trace ServiceAccount owner
+    set:
+      weave-trace-alert-worker.install: true
+      weave-trace.install: false
+    asserts:
+      - failedTemplate:
+          errorMessage: weave-trace-alert-worker.install requires weave-trace.install=true
+  - it: rejects an alert worker without explicit queue configuration
+    set:
+      weave-trace-alert-worker.install: true
+      weave-trace.install: true
+      kafka.install: false
+      bufstream.install: false
+      global.kafka.brokerHost: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: weave-trace-alert-worker.install requires Kafka/Bufstream installation or global.kafka.brokerHost
