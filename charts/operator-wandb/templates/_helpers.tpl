@@ -115,7 +115,9 @@ these name a user with wb_user_id on its dangerzone secrets endpoint.
   {{- $subjects := list -}}
   {{- range $value := .Values.app.internalJWTMap -}}
     {{- $inJWTMap := and (not (empty $value.subject)) (not (empty $value.issuer)) -}}
-    {{- if and $inJWTMap $value.resolveUserSecrets -}}
+    {{- /* Only a boolean true grants access: Go templates treat any non-empty string, such as "false", as true. */ -}}
+    {{- $granted := and (kindIs "bool" $value.resolveUserSecrets) $value.resolveUserSecrets -}}
+    {{- if and $inJWTMap $granted -}}
       {{- $subjects = append $subjects $value.subject -}}
     {{- end -}}
   {{- end -}}
