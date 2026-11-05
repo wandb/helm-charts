@@ -39,7 +39,20 @@ tests:
       - failedTemplate:
           errorMessage: global.historyStore.liveStore must be "auto" or "clickhouse", got "bigquery"
 
-  - it: accepts liveStore clickhouse when history OLAP inherits default.enabled
+  - it: accepts liveStore clickhouse when history OLAP inherits default.enabled and history-updater is installed
+    set:
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          default:
+            enabled: true
+      history-updater:
+        install: true
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects liveStore clickhouse when only default.enabled leaves history-updater uninstalled
     set:
       global:
         historyStore:
@@ -48,7 +61,24 @@ tests:
           default:
             enabled: true
     asserts:
-      - notFailedTemplate: {}
+      - failedTemplate:
+          errorMessage: global.historyStore.liveStore "clickhouse" requires history-updater, which global.olap.default.enabled does not install; set global.olap.history.enabled or history-updater.install
+
+  - it: rejects liveStore clickhouse when history-updater.install loses to history OLAP
+    set:
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          default:
+            enabled: true
+          history:
+            enabled: false
+      history-updater:
+        install: true
+    asserts:
+      - failedTemplate:
+          errorMessage: global.historyStore.liveStore "clickhouse" requires global.olap.history.enabled
 
   - it: rejects liveStore clickhouse when history OLAP overrides default.enabled
     set:
@@ -91,6 +121,101 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: global.extraEnv.GORILLA_PARQUET_LIVE_HISTORY_STORE must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: rejects a reader extraEnv HISTORY_* override with liveStore clickhouse
+    set:
+      api:
+        extraEnv:
+          HISTORY_PASSWORD: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: api.extraEnv.HISTORY_PASSWORD must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: rejects a reader env HISTORY_* override with liveStore clickhouse
+    set:
+      app:
+        env:
+          HISTORY_HOST: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: app.env.HISTORY_HOST must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: rejects a reader container env live store override with liveStore clickhouse
+    set:
+      executor:
+        containers:
+          executor:
+            env:
+              GORILLA_PARQUET_LIVE_HISTORY_STORE: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: executor.containers.executor.env.GORILLA_PARQUET_LIVE_HISTORY_STORE must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: rejects a reader init container env HISTORY_* override with liveStore clickhouse
+    set:
+      glue:
+        initContainers:
+          migrate-db:
+            env:
+              HISTORY_USER: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: glue.initContainers.migrate-db.env.HISTORY_USER must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: rejects a reader sizing env HISTORY_* override with liveStore clickhouse
+    set:
+      parquet:
+        sizing:
+          large:
+            env:
+              HISTORY_PORT: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: parquet.sizing.large.env.HISTORY_PORT must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: allows HISTORY_* overrides on workers that do not read the live store
+    set:
+      filestream:
+        extraEnv:
+          HISTORY_PASSWORD: unrelated
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - notFailedTemplate: {}
 
   - it: allows global.env HISTORY_* names with the auto liveStore
     set:
