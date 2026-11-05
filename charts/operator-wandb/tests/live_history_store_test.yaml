@@ -1,0 +1,73 @@
+suite: live history store selection
+templates:
+  - charts/api/templates/deployment.yaml
+  - charts/glue/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+set:
+  global.api.enabled: true
+  global.glue.enabled: true
+
+tests:
+  - it: defaults api and glue to the MySQL live history store
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+            value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+
+  - it: uses Bigtable for the auto live history store when Bigtable is enabled
+    set:
+      global:
+        bigtable:
+          project: example-project
+          instance: example-instance
+          v3:
+            enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+            value: bigtablev3://example-project/example-instance
+
+  - it: points api and glue at the ClickHouse history DSN when liveStore is clickhouse
+    set:
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          default:
+            host: history-clickhouse.example.com
+            password: history-password
+          history:
+            enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
+            value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+            value: $(GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS)
+
+  - it: keeps MySQL as the live history store when only history OLAP is enabled
+    set:
+      global:
+        olap:
+          default:
+            host: history-clickhouse.example.com
+            password: history-password
+          history:
+            enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+            value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
