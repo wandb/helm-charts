@@ -1,8 +1,19 @@
-{{- $liveStore := .Values.global.historyStore.liveStore -}}
+{{- $liveStore := toString .Values.global.historyStore.liveStore -}}
 {{- if not (has $liveStore (list "auto" "clickhouse")) -}}
-  {{- fail (printf "global.historyStore.liveStore must be \"auto\" or \"clickhouse\", got %q" (toString $liveStore)) -}}
+  {{- fail (printf "global.historyStore.liveStore must be \"auto\" or \"clickhouse\", got %q" $liveStore) -}}
 {{- end -}}
 
-{{- if and (eq $liveStore "clickhouse") (not .Values.global.olap.history.enabled) -}}
-  {{- fail "global.historyStore.liveStore \"clickhouse\" requires global.olap.history.enabled" -}}
+{{- if eq (include "wandb.liveHistoryStoreIsClickhouse" .) "true" -}}
+  {{- $history := include "wandb.olapConfig" (dict "root" . "featureName" "history") | fromYaml -}}
+  {{- if not $history.enabled -}}
+    {{- fail "global.historyStore.liveStore \"clickhouse\" requires global.olap.history.enabled" -}}
+  {{- end -}}
+  {{- /* Explicit env values render after envTpls, so they would break the $(HISTORY_*) expansion in the live store DSN. */ -}}
+  {{- range $channel := list "env" "extraEnv" -}}
+    {{- range $name, $_ := index $.Values.global $channel | default dict -}}
+      {{- if or (eq $name "GORILLA_PARQUET_LIVE_HISTORY_STORE") (hasPrefix "HISTORY_" $name) -}}
+        {{- fail (printf "global.%s.%s must not be set when global.historyStore.liveStore is \"clickhouse\"; configure the connection under global.olap.history" $channel $name) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
 {{- end -}}

@@ -1,4 +1,4 @@
-suite: live history store on history workers
+suite: live history store least privilege
 templates:
   - charts/filestream/templates/deployment.yaml
   - charts/flat-run-fields-updater/templates/deployment.yaml
@@ -8,10 +8,11 @@ release:
   name: wandb
   namespace: default
 
-# These workers default to install: false, so the test installs them to render
-# their deployments.
+# These workers never read GORILLA_PARQUET_LIVE_HISTORY_STORE, so selecting the
+# ClickHouse live store must not hand them history credentials. They default to
+# install: false, so the test installs them to render their deployments.
 tests:
-  - it: resolves the ClickHouse live history store on every worker that reads it
+  - it: keeps history credentials off workers that do not read the live history store
     set:
       filestream.install: true
       flat-run-fields-updater.install: true
@@ -27,13 +28,13 @@ tests:
           history:
             enabled: true
     asserts:
-      - contains:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HISTORY_PASSWORD
+          any: true
+      - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
-            value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-            value: $(GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS)
+          any: true

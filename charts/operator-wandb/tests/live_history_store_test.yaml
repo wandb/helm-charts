@@ -1,16 +1,20 @@
 suite: live history store selection
 templates:
   - charts/api/templates/deployment.yaml
+  - charts/app/templates/deployment.yaml
   - charts/glue/templates/deployment.yaml
+  - charts/executor/templates/deployment.yaml
+  - charts/parquet/templates/deployment.yaml
 release:
   name: wandb
   namespace: default
 set:
   global.api.enabled: true
   global.glue.enabled: true
+  executor.install: true
 
 tests:
-  - it: defaults api and glue to the MySQL live history store
+  - it: defaults every live history store reader to MySQL
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
@@ -33,29 +37,6 @@ tests:
             name: GORILLA_PARQUET_LIVE_HISTORY_STORE
             value: bigtablev3://example-project/example-instance
 
-  - it: points api and glue at the ClickHouse history DSN when liveStore is clickhouse
-    set:
-      global:
-        historyStore:
-          liveStore: clickhouse
-        olap:
-          default:
-            host: history-clickhouse.example.com
-            password: history-password
-          history:
-            enabled: true
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
-            value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: GORILLA_PARQUET_LIVE_HISTORY_STORE
-            value: $(GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS)
-
   - it: keeps MySQL as the live history store when only history OLAP is enabled
     set:
       global:
@@ -71,3 +52,132 @@ tests:
           content:
             name: GORILLA_PARQUET_LIVE_HISTORY_STORE
             value: mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
+
+  - it: keeps history credentials off api, app and glue with the auto live history store
+    templates:
+      - charts/api/templates/deployment.yaml
+      - charts/app/templates/deployment.yaml
+      - charts/glue/templates/deployment.yaml
+    set:
+      global:
+        olap:
+          default:
+            host: history-clickhouse.example.com
+            password: history-password
+          history:
+            enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HISTORY_PASSWORD
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
+          any: true
+
+  - it: composes the ClickHouse live history store DSN from the HISTORY_* env vars
+    set:
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          default:
+            host: history-clickhouse.example.com
+            password: history-password
+          history:
+            enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_PARQUET_LIVE_HISTORY_STORE
+            value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: HISTORY_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: wandb-olap-history
+                key: HISTORY_PASSWORD
+
+  # Kubernetes expands $(VAR) only from env vars listed earlier in the same
+  # container, so each HISTORY_* variable must precede the live store DSN.
+  - it: defines the HISTORY_* env vars before the api live history store
+    template: charts/api/templates/deployment.yaml
+    set: &clickhouseLiveStore
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          default:
+            host: history-clickhouse.example.com
+            password: history-password
+          history:
+            enabled: true
+    asserts: &historyBeforeLiveStoreAt40
+      - equal:
+          path: spec.template.spec.containers[0].env[40].name
+          value: HISTORY_HOST
+      - equal:
+          path: spec.template.spec.containers[0].env[41].name
+          value: HISTORY_PORT
+      - equal:
+          path: spec.template.spec.containers[0].env[42].name
+          value: HISTORY_DATABASE
+      - equal:
+          path: spec.template.spec.containers[0].env[43].name
+          value: HISTORY_USER
+      - equal:
+          path: spec.template.spec.containers[0].env[44].name
+          value: HISTORY_PASSWORD
+      - equal:
+          path: spec.template.spec.containers[0].env[45].name
+          value: HISTORY_PARAMS
+      - equal:
+          path: spec.template.spec.containers[0].env[48].name
+          value: GORILLA_PARQUET_LIVE_HISTORY_STORE
+
+  - it: defines the HISTORY_* env vars before the app live history store
+    template: charts/app/templates/deployment.yaml
+    set: *clickhouseLiveStore
+    asserts: *historyBeforeLiveStoreAt40
+
+  - it: defines the HISTORY_* env vars before the glue live history store
+    template: charts/glue/templates/deployment.yaml
+    set: *clickhouseLiveStore
+    asserts: *historyBeforeLiveStoreAt40
+
+  - it: defines the HISTORY_* env vars before the parquet live history store
+    template: charts/parquet/templates/deployment.yaml
+    set: *clickhouseLiveStore
+    asserts: *historyBeforeLiveStoreAt40
+
+  - it: defines the HISTORY_* env vars before the executor live history store
+    template: charts/executor/templates/deployment.yaml
+    set: *clickhouseLiveStore
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env[39].name
+          value: HISTORY_HOST
+      - equal:
+          path: spec.template.spec.containers[0].env[40].name
+          value: HISTORY_PORT
+      - equal:
+          path: spec.template.spec.containers[0].env[41].name
+          value: HISTORY_DATABASE
+      - equal:
+          path: spec.template.spec.containers[0].env[42].name
+          value: HISTORY_USER
+      - equal:
+          path: spec.template.spec.containers[0].env[43].name
+          value: HISTORY_PASSWORD
+      - equal:
+          path: spec.template.spec.containers[0].env[44].name
+          value: HISTORY_PARAMS
+      - equal:
+          path: spec.template.spec.containers[0].env[47].name
+          value: GORILLA_PARQUET_LIVE_HISTORY_STORE

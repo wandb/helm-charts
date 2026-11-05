@@ -25,10 +25,20 @@
     {{- join "," $stores -}}
 {{- end -}}
 
+{{- define "wandb.liveHistoryStoreIsClickhouse" -}}
+  {{- /* toString lets history-validation.yaml reject non-string values instead of eq failing first. */ -}}
+{{- eq (toString .Values.global.historyStore.liveStore) "clickhouse" -}}
+{{- end -}}
+
 {{- define "wandb.liveHistoryStore" -}}
-  {{- if eq .Values.global.historyStore.liveStore "clickhouse" -}}
-    {{- /* Defined by wandb.historyEnvs, which must precede wandb.historyStoreEnvs. */ -}}
-$(GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS)
+  {{- if eq (include "wandb.liveHistoryStoreIsClickhouse" .) "true" -}}
+    {{- $config := include "wandb.olapConfig" (dict "root" . "featureName" "history") | fromYaml -}}
+    {{- /*
+      Uses the HISTORY_* parts from wandb.historyEnvs, which must precede
+      wandb.historyStoreEnvs, rather than GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS:
+      an explicit env override of that address renders after this value.
+    */ -}}
+{{- include "wandb.olapConnectionUrl" (dict "type" $config.type "envVarPrefix" "HISTORY") -}}
   {{- else -}}
     {{- $historyStore := include "wandb.mysql" . -}}
     {{- if or .Values.global.bigtable.v2.enabled .Values.global.bigtable.v3.enabled -}}

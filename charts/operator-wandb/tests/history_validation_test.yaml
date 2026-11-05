@@ -38,3 +38,64 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: global.historyStore.liveStore must be "auto" or "clickhouse", got "bigquery"
+
+  - it: accepts liveStore clickhouse when history OLAP inherits default.enabled
+    set:
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          default:
+            enabled: true
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects liveStore clickhouse when history OLAP overrides default.enabled
+    set:
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          default:
+            enabled: true
+          history:
+            enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: global.historyStore.liveStore "clickhouse" requires global.olap.history.enabled
+
+  - it: rejects a global.env HISTORY_* override with liveStore clickhouse
+    set:
+      global:
+        env:
+          HISTORY_PASSWORD: override
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: global.env.HISTORY_PASSWORD must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: rejects a global.extraEnv live store override with liveStore clickhouse
+    set:
+      global:
+        extraEnv:
+          GORILLA_PARQUET_LIVE_HISTORY_STORE: override
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: global.extraEnv.GORILLA_PARQUET_LIVE_HISTORY_STORE must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: allows global.env HISTORY_* names with the auto liveStore
+    set:
+      global:
+        env:
+          HISTORY_PASSWORD: unrelated
+    asserts:
+      - notFailedTemplate: {}
