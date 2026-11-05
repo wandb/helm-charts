@@ -203,6 +203,41 @@ tests:
     asserts:
       - notFailedTemplate: {}
 
+  - it: rejects a HISTORY_* override in the preset selected by a reader size
+    set:
+      parquet:
+        size: large
+        sizing:
+          large:
+            env:
+              HISTORY_PORT: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: parquet.sizing.large.env.HISTORY_PORT must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: rejects a HISTORY_* override in the default sizing preset
+    set:
+      parquet:
+        sizing:
+          default:
+            env:
+              HISTORY_PORT: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: parquet.sizing.default.env.HISTORY_PORT must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
   - it: rejects a reader sizing env HISTORY_* override with liveStore clickhouse
     set:
       parquet:
