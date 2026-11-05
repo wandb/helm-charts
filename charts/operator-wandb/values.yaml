@@ -597,6 +597,22 @@ global:
     # When enabled, historyStore will query the history-reader gRPC service
     # first (backed by ClickHouse).
     historyReaderEnabled: false
+    # Selects the live store that parquet export reads from
+    # (GORILLA_PARQUET_LIVE_HISTORY_STORE on api, app, glue, executor and
+    # parquet).
+    # "auto" uses Bigtable when it is enabled and MySQL otherwise.
+    # "clickhouse" uses the global.olap.history connection and requires
+    # global.olap.history.enabled. It also requires history-updater, which
+    # writes that store; global.olap.default.enabled alone does not install
+    # it, so set global.olap.history.enabled or history-updater.install.
+    # HISTORY_* and GORILLA_PARQUET_LIVE_HISTORY_STORE must not be set through
+    # global or reader env channels.
+    # Gorilla sizes unset GORILLA_PARQUET_POLICY_* export settings by t-shirt
+    # size only for a MySQL live store, so "clickhouse" also changes them to
+    # EXPORT_BACKFILLER_CONCURRENCY=100, ROWS_BEFORE_PARTIAL_EXPORT=100000,
+    # FILESTREAM_SIZE_BEFORE_PARTIAL_EXPORT=20000000 and
+    # MIN_ROWS_PER_ROW_GROUP=64000. Set them explicitly where that matters.
+    liveStore: auto
 
   pubSub:
     enabled: false
@@ -798,6 +814,7 @@ api:
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.liveHistoryStoreEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
@@ -1021,6 +1038,7 @@ app:
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.liveHistoryStoreEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
@@ -2922,6 +2940,7 @@ glue:
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.liveHistoryStoreEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
