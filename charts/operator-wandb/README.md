@@ -261,7 +261,7 @@ mcp-server:
   install: true
   image:
     repository: wandb/mcp-server
-    tag: "0.4.0"
+    tag: "0.4.0" # Managed Spec pins the Dedicated fleet version over this
     # For an immutable release, set this to sha256: followed by 64 lowercase
     # hexadecimal characters.
     digest: ""
@@ -281,32 +281,39 @@ mcp-server:
   observability:
     provider: none # none | datadog-agent | otel
     privacy: standard # off | standard | strict
+    datadog: # bounded labels for datadog-agent; empty = chart defaults
+      service: ""
+      env: ""
+      deploymentType: ""
   resources: {}
 ```
 
 `tools.profile=auto` resolves during chart rendering to `models-only` when no
 trace backend is available and `models-weave` otherwise. The pod always receives
-the resolved profile, never `auto`. In v0.4 these correspond to exact 17/22
-read-write tool manifests (15/20 in read-only mode).
+the resolved profile, never `auto`. The exact tool set behind each profile is
+owned by the pinned MCP image and published in its release note, not by the
+chart.
 
-Since server 0.4.4 a tool profile is a base profile plus additive extensions
+A tool profile is a base profile plus additive extensions
 (`WANDB_MCP_TOOL_EXTENSIONS`: `agent-lens`, `aria`, `raw-graphql`).
 `tools.extensions` is the typed way to select them and the pod always receives
 the canonical sorted set (empty when none). The chart accepts only the base
 profiles and extensions the server's runtime contract approves for the
 `dedicated` workload, so a pod can never start with a group the server refuses.
-In 0.4.4 no extension is approved for Dedicated: `tools.extensions` must stay
+Currently no extension is approved for Dedicated: `tools.extensions` must stay
 empty and Weave Agent, ARIA, Agent Lens, and raw GraphQL remain unavailable.
 When the contract approves one, the chart change is a one-line allowlist edit,
 and `aria` / `agent-lens` carry their service endpoints through the typed
 `tools.aria.baseUrl` / `tools.agentLens.baseUrl` values (`WB_AGENT_BASE_URL`,
 `AGENT_LENS_BASE_URL`), which are rejected from generic `env`.
 
-For the v0.4 transition, the existing Managed Spec
-`datadog.enabled/mode/env/service/deploymentType` and `privacy.logLevel` fields
-remain as a narrow, validated compatibility bridge. They cannot enable direct
-forwarding, inject credentials, or override a conflicting non-default typed
-provider. New configurations should use `observability` only.
+Datadog labels are typed under `observability.datadog` (`service`, `env`,
+`deploymentType`). The older `datadog.enabled/mode/env/service/deploymentType`
+and `privacy.logLevel` fields remain only as a narrow, validated compatibility
+bridge for the current Managed Spec fragment and will be removed once it moves
+to the typed keys; a typed value and a differing legacy value are rejected. The
+bridge cannot enable direct forwarding, inject credentials, or override a
+conflicting non-default typed provider.
 
 The server-owned `dedicated` workload profile controls limits, admission,
 deadlines, sessions, and worker policy. Low-level environment overrides and

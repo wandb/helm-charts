@@ -285,6 +285,44 @@ tests:
     asserts:
       - notFailedTemplate: {}
 
+  - it: accepts typed Datadog labels
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: datadog-agent
+      mcp-server.observability.datadog.service: wandb-mcp-server-dedicated
+      mcp-server.observability.datadog.env: production
+      mcp-server.observability.datadog.deploymentType: dedicated
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an unbounded typed Datadog label
+    set:
+      mcp-server.install: true
+      mcp-server.observability.datadog.service: "has spaces"
+    asserts:
+      - failedTemplate:
+          errorPattern: "observability/datadog/service"
+
+  - it: rejects a legacy Datadog label that disagrees with the typed one
+    set:
+      mcp-server.install: true
+      mcp-server.datadog.enabled: true
+      mcp-server.datadog.service: wandb-mcp-server-dedicated
+      mcp-server.observability.datadog.service: other-service
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.datadog.service conflicts with mcp-server.observability.datadog.service
+
+  - it: accepts a legacy Datadog label that matches the typed one
+    set:
+      mcp-server.install: true
+      mcp-server.datadog.enabled: true
+      mcp-server.datadog.service: wandb-mcp-server-dedicated
+      mcp-server.observability.provider: datadog-agent
+      mcp-server.observability.datadog.service: wandb-mcp-server-dedicated
+    asserts:
+      - notFailedTemplate: {}
+
   - it: accepts an explicitly empty extension set
     set:
       mcp-server.install: true

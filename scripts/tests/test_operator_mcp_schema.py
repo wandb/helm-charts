@@ -47,6 +47,13 @@ class OperatorMcpSchemaTest(unittest.TestCase):
             ["off", "standard", "strict"],
         )
 
+    def test_datadog_labels_are_bounded(self) -> None:
+        datadog = self.mcp["observability"]["properties"]["datadog"]["properties"]
+        for field in ("service", "env", "deploymentType"):
+            self.assertEqual(
+                datadog[field]["pattern"], "^(|[A-Za-z0-9][A-Za-z0-9._-]{0,62})$"
+            )
+
     def test_trace_backend_mode_is_typed(self) -> None:
         self.assertEqual(
             self.mcp["traceBackend"]["properties"]["mode"]["enum"],

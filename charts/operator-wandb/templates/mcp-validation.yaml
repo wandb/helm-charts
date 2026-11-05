@@ -346,6 +346,18 @@
     {{- fail "mcp-server.observability.privacy must be one of: off, standard, strict" -}}
   {{- end -}}
 
+  {{/* Typed Datadog labels are bounded telemetry values, like the legacy bridge. */}}
+  {{- $typedDatadog := index $observability "datadog" | default dict -}}
+  {{- range $field := keys $typedDatadog -}}
+    {{- if not (has $field (list "service" "env" "deploymentType")) -}}
+      {{- fail (printf "mcp-server.observability.datadog.%s is not supported; use service, env, or deploymentType" $field) -}}
+    {{- end -}}
+    {{- $value := index $typedDatadog $field -}}
+    {{- if or (not (kindIs "string" $value)) (and (ne $value "") (not (regexMatch `^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$` $value))) -}}
+      {{- fail (printf "mcp-server.observability.datadog.%s must be a bounded telemetry label" $field) -}}
+    {{- end -}}
+  {{- end -}}
+
   {{/* Temporary compatibility for the current Managed Spec MCP fragment. */}}
   {{- $legacyDatadog := index $mcp "datadog" | default dict -}}
   {{- if $legacyDatadog -}}
@@ -373,6 +385,10 @@
         {{- $value := index $legacyDatadog $field -}}
         {{- if or (not (kindIs "string" $value)) (not (regexMatch `^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$` $value)) -}}
           {{- fail (printf "mcp-server.datadog.%s must be a bounded telemetry label" $field) -}}
+        {{- end -}}
+        {{- $typedValue := index $typedDatadog $field | default "" | toString -}}
+        {{- if and (ne $typedValue "") (ne $typedValue $value) -}}
+          {{- fail (printf "mcp-server.datadog.%s conflicts with mcp-server.observability.datadog.%s" $field $field) -}}
         {{- end -}}
       {{- end -}}
     {{- end -}}

@@ -112,8 +112,7 @@ the port through JSON to preserve its Helm type.
   operator-provided free-form tags are deliberately excluded.
 */}}
 {{- define "wandb.mcpDatadogTags" -}}
-  {{- $legacyDatadog := index .Values "datadog" | default dict -}}
-  {{- $deploymentType := index $legacyDatadog "deploymentType" | default "self-managed" -}}
+  {{- $deploymentType := include "wandb.mcpDatadogLabel" (dict "Values" .Values "field" "deploymentType" "default" "self-managed") -}}
 {{ list "product:wandb" "component:mcp-server" (printf "deployment_type:%s" $deploymentType) | toJson }}
 {{- end -}}
 
@@ -139,13 +138,28 @@ the port through JSON to preserve its Helm type.
   SCOPE NOTE: same as wandb.mcpDatadogTags -- .Values is the "mcp-server"
   subtree at call time.
 */}}
+{{/*
+  One Datadog label (service, env, deploymentType): the typed
+  observability.datadog value wins, the legacy datadog.* bridge is the fallback,
+  then the chart default. Validation rejects a typed/legacy conflict.
+*/}}
+{{- define "wandb.mcpDatadogLabel" -}}
+  {{- $observability := index .Values "observability" | default dict -}}
+  {{- $typed := index (index $observability "datadog" | default dict) .field | default "" | toString | trim -}}
+  {{- $legacy := index (index .Values "datadog" | default dict) .field | default "" | toString | trim -}}
+  {{- if ne $typed "" -}}
+    {{- $typed -}}
+  {{- else if ne $legacy "" -}}
+    {{- $legacy -}}
+  {{- else -}}
+    {{- .default -}}
+  {{- end -}}
+{{- end -}}
 {{- define "wandb.mcpDDService" -}}
-  {{- $legacyDatadog := index .Values "datadog" | default dict -}}
-{{- index $legacyDatadog "service" | default "wandb-mcp-server-onprem" -}}
+{{- include "wandb.mcpDatadogLabel" (dict "Values" .Values "field" "service" "default" "wandb-mcp-server-onprem") -}}
 {{- end -}}
 {{- define "wandb.mcpDDEnv" -}}
-  {{- $legacyDatadog := index .Values "datadog" | default dict -}}
-{{- index $legacyDatadog "env" | default "production" -}}
+{{- include "wandb.mcpDatadogLabel" (dict "Values" .Values "field" "env" "default" "production") -}}
 {{- end -}}
 
 {{/*
