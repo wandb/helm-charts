@@ -1,0 +1,118 @@
+suite: Weave alert worker deployment
+templates:
+  - charts/weave-trace-alert-worker/templates/deployment.yaml
+  - charts/weave-trace-alert-worker/templates/serviceaccount.yaml
+release:
+  name: wandb
+  namespace: default
+set:
+  weave-trace.install: true
+  global.kafka.brokerHost: kafka.example.com
+tests:
+  - it: uses the shared trace identity and the configured release image
+    template: charts/weave-trace-alert-worker/templates/deployment.yaml
+    set:
+      weave-trace.install: true
+      weave-trace-alert-worker:
+        install: true
+        image:
+          tag: test-server-release
+      global.repositoryPrefix: registry.example.com
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-weave-trace
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: registry.example.com/wandb/weave-trace:test-server-release
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value: [python, -m, src.workers.alert_worker.alert_worker]
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-weave-trace-configmap
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_INTERNAL_SERVICE_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: weave-worker-auth
+                key: key
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_FILE
+            value: /etc/ssl/certs/ca-certificates.crt
+  - it: does not create a second ServiceAccount for the worker
+    template: charts/weave-trace-alert-worker/templates/serviceaccount.yaml
+    set:
+      weave-trace-alert-worker.install: true
+    asserts:
+      - hasDocuments:
+          count: 0
+  - it: honors OLAP ClickHouse secret references and batch-size overrides
+    template: charts/weave-trace-alert-worker/templates/deployment.yaml
+    set:
+      weave-trace-alert-worker:
+        install: true
+        env:
+          ALERT_WORKER_BATCH_SIZE: "50"
+      global.weaveTrace.clickhouseSource: olap
+      global.olap.weaveTrace:
+        enabled: true
+        host: clickhouse.example.com
+        user:
+          valueFrom:
+            secretKeyRef:
+              name: weave-clickhouse
+              key: username
+        password:
+          valueFrom:
+            secretKeyRef:
+              name: weave-clickhouse
+              key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: clickhouse.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: weave-clickhouse
+                key: username
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: weave-clickhouse
+                key: password
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ALERT_WORKER_BATCH_SIZE
+            value: "50"
+  - it: scales independently using the worker sizing profile
+    template: charts/weave-trace-alert-worker/templates/deployment.yaml
+    set:
+      weave-trace-alert-worker:
+        install: true
+        size: small
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests
+          value:
+            cpu: "1"
+            memory: 3Gi
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 6Gi
