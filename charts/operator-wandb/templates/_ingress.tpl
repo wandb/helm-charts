@@ -43,6 +43,22 @@ It expects a dictionary with two entries:
 {{- replace "https://" "" (replace "http://" "" .Values.global.host) }}
 {{- end -}}
 
+{{/*
+Whether the primary gce Ingress answers plain HTTP with a redirect, through a
+GKE FrontendConfig. Opt-in because customer-managed GCP installs may run
+another ingress class or lack the GKE CRD. Skipped when issuer.create already
+turns HTTP off with kubernetes.io/ingress.allow-http.
+*/}}
+{{- define "wandb.ingress.redirectToHttpsEnabled" -}}
+  {{- if and (eq .Values.global.cloudProvider "gcp") .Values.ingress.redirectToHttps (not .Values.ingress.issuer.create) -}}
+true
+  {{- end -}}
+{{- end -}}
+
+{{- define "wandb.ingress.redirectFrontendConfigName" -}}
+  {{- printf "%s-ingress-redirect" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
 
 {{- define "IngressPath" -}}
 - pathType: Prefix
