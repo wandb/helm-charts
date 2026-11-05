@@ -1,0 +1,48 @@
+{{- $liveStore := toString .Values.global.historyStore.liveStore -}}
+{{- if not (has $liveStore (list "auto" "clickhouse")) -}}
+  {{- fail (printf "global.historyStore.liveStore must be \"auto\" or \"clickhouse\", got %q" $liveStore) -}}
+{{- end -}}
+
+{{- if eq (include "wandb.liveHistoryStoreIsClickhouse" .) "true" -}}
+  {{- $history := include "wandb.olapConfig" (dict "root" . "featureName" "history") | fromYaml -}}
+  {{- if not $history.enabled -}}
+    {{- fail "global.historyStore.liveStore \"clickhouse\" requires global.olap.history.enabled" -}}
+  {{- end -}}
+  {{- /* history-updater writes the ClickHouse history store. Its Chart.yaml condition reads global.olap.history.enabled, then history-updater.install, never global.olap.default.enabled. */ -}}
+  {{- $historyEnabled := index (.Values.global.olap.history | default dict) "enabled" -}}
+  {{- $historyUpdaterInstalled := false -}}
+  {{- if kindIs "bool" $historyEnabled -}}
+    {{- $historyUpdaterInstalled = $historyEnabled -}}
+  {{- else -}}
+    {{- $historyUpdaterInstalled = (index .Values "history-updater").install -}}
+  {{- end -}}
+  {{- if not $historyUpdaterInstalled -}}
+    {{- fail "global.historyStore.liveStore \"clickhouse\" requires history-updater, which global.olap.default.enabled does not install; set global.olap.history.enabled or history-updater.install" -}}
+  {{- end -}}
+  {{- /* Explicit env values render after envTpls, so they would break the $(HISTORY_*) expansion in the live store DSN. */ -}}
+  {{- $envChannels := dict "global.env" .Values.global.env "global.extraEnv" .Values.global.extraEnv -}}
+  {{- range $chart := list "api" "app" "glue" "executor" "parquet" -}}
+    {{- $chartValues := index $.Values $chart | default dict -}}
+    {{- $_ := set $envChannels (printf "%s.env" $chart) $chartValues.env -}}
+    {{- $_ = set $envChannels (printf "%s.extraEnv" $chart) $chartValues.extraEnv -}}
+    {{- range $kind := list "containers" "initContainers" -}}
+      {{- range $name, $entry := index $chartValues $kind | default dict -}}
+        {{- $_ = set $envChannels (printf "%s.%s.%s.env" $chart $kind $name) (index ($entry | default dict) "env") -}}
+      {{- end -}}
+    {{- end -}}
+    {{- /* wandb-base.sizingInfo applies only the default and selected presets. */ -}}
+    {{- $size := toString (coalesce $chartValues.size $.Values.global.size "") -}}
+    {{- range $name, $entry := $chartValues.sizing | default dict -}}
+      {{- if or (eq $name "default") (and $size (eq $name $size)) -}}
+        {{- $_ = set $envChannels (printf "%s.sizing.%s.env" $chart $name) (index ($entry | default dict) "env") -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- range $channel, $env := $envChannels -}}
+    {{- range $name, $_ := $env | default dict -}}
+      {{- if or (eq $name "GORILLA_PARQUET_LIVE_HISTORY_STORE") (hasPrefix "HISTORY_" $name) -}}
+        {{- fail (printf "%s.%s must not be set when global.historyStore.liveStore is \"clickhouse\"; configure the connection under global.olap.history" $channel $name) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
