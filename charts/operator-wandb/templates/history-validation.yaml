@@ -25,9 +25,16 @@
     {{- $chartValues := index $.Values $chart | default dict -}}
     {{- $_ := set $envChannels (printf "%s.env" $chart) $chartValues.env -}}
     {{- $_ = set $envChannels (printf "%s.extraEnv" $chart) $chartValues.extraEnv -}}
-    {{- range $kind := list "containers" "initContainers" "sizing" -}}
+    {{- range $kind := list "containers" "initContainers" -}}
       {{- range $name, $entry := index $chartValues $kind | default dict -}}
         {{- $_ = set $envChannels (printf "%s.%s.%s.env" $chart $kind $name) (index ($entry | default dict) "env") -}}
+      {{- end -}}
+    {{- end -}}
+    {{- /* wandb-base.sizingInfo applies only the default and selected presets. */ -}}
+    {{- $size := toString (coalesce $chartValues.size $.Values.global.size "") -}}
+    {{- range $name, $entry := $chartValues.sizing | default dict -}}
+      {{- if or (eq $name "default") (and $size (eq $name $size)) -}}
+        {{- $_ = set $envChannels (printf "%s.sizing.%s.env" $chart $name) (index ($entry | default dict) "env") -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}

@@ -186,6 +186,23 @@ tests:
       - failedTemplate:
           errorMessage: glue.initContainers.migrate-db.env.HISTORY_USER must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
 
+  - it: allows a HISTORY_* override in an inactive reader sizing preset
+    set:
+      parquet:
+        sizing:
+          large:
+            env:
+              HISTORY_PORT: override
+      global:
+        size: small
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - notFailedTemplate: {}
+
   - it: rejects a reader sizing env HISTORY_* override with liveStore clickhouse
     set:
       parquet:
@@ -194,6 +211,7 @@ tests:
             env:
               HISTORY_PORT: override
       global:
+        size: large
         historyStore:
           liveStore: clickhouse
         olap:
