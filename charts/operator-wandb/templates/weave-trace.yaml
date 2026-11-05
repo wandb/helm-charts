@@ -1,3 +1,12 @@
+{{- $alertWorkerEnabled := index .Values "weave-trace-alert-worker" "install" -}}
+{{- if $alertWorkerEnabled -}}
+  {{- if not (index .Values "weave-trace" "install") -}}
+    {{- fail "weave-trace-alert-worker.install requires weave-trace.install=true" -}}
+  {{- end -}}
+  {{- if not (or .Values.kafka.install .Values.bufstream.install .Values.global.kafka.brokerHost) -}}
+    {{- fail "weave-trace-alert-worker.install requires Kafka/Bufstream installation or global.kafka.brokerHost" -}}
+  {{- end -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -19,7 +28,8 @@ data:
 {{- end }}
   WF_TRACE_SERVER_URL: "{{ .Values.global.host }}/traces"
   WF_ENFORCE_PASSWORD_LENGTH: "false"
-  WEAVE_ENABLE_ONLINE_EVAL: {{ (get  .Values "weave-trace-worker").install | quote }}
+{{- /* Both consumers need finished-call events, even when scoring is disabled. */}}
+  WEAVE_ENABLE_ONLINE_EVAL: {{ or (index .Values "weave-trace-worker" "install") (index .Values "weave-trace-alert-worker" "install") | quote }}
   WEAVE_ENABLE_EVALUATE_MODEL_WORKER: {{ (get  .Values "weave-evaluate-model-worker").install | quote }}
   WEAVE_ENABLE_AGENT_SCORING: {{ (get  .Values "weave-trace-agent-scoring-worker").install | quote }}
   WEAVE_TRACE_SERVER_BASE_URL: "{{ .Values.global.host }}/traces"
