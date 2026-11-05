@@ -256,11 +256,85 @@ tests:
       - failedTemplate:
           errorMessage: parquet.sizing.large.env.HISTORY_PORT must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
 
+  - it: rejects a HISTORY_* override in a reader cron job container
+    set:
+      parquet:
+        cronJobs:
+          parquet-backfill:
+            containers:
+              backfill-job:
+                env:
+                  HISTORY_PASSWORD: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: parquet.cronJobs.parquet-backfill.containers.backfill-job.env.HISTORY_PASSWORD must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: rejects a live store override in a reader job init container
+    set:
+      glue:
+        jobs:
+          reindex:
+            initContainers:
+              wait:
+                env:
+                  GORILLA_PARQUET_LIVE_HISTORY_STORE: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: glue.jobs.reindex.initContainers.wait.env.GORILLA_PARQUET_LIVE_HISTORY_STORE must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
+  - it: allows non-history env in a reader cron job container
+    set:
+      parquet:
+        cronJobs:
+          parquet-backfill:
+            containers:
+              backfill-job:
+                env:
+                  GORILLA_GLUE_EXECUTE_TASK_NAME: EXPORTHISTORYTOPARQUET
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - notFailedTemplate: {}
+
   - it: allows HISTORY_* overrides on workers that do not read the live store
     set:
       filestream:
         extraEnv:
           HISTORY_PASSWORD: unrelated
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: allows HISTORY_* overrides in jobs of workers that do not read the live store
+    set:
+      settingsMigrationJob:
+        jobs:
+          smj:
+            containers:
+              smj:
+                env:
+                  HISTORY_PASSWORD: unrelated
       global:
         historyStore:
           liveStore: clickhouse
