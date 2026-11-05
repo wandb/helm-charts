@@ -106,3 +106,18 @@ otlp+{{ .Values.global.otel.traces.proto }}://{{ .Release.Name }}-otel-daemonset
 {{- join ", " $items -}}
 }'
 {{- end -}}
+
+{{/*
+Subjects of internalJWTMap entries that set resolveUserSecrets. Gorilla lets
+these name a user with wb_user_id on its dangerzone secrets endpoint.
+*/}}
+{{- define "wandb.internalJWTUserSecretSubjects" -}}
+  {{- $subjects := list -}}
+  {{- range $value := .Values.app.internalJWTMap -}}
+    {{- $inJWTMap := and (not (empty $value.subject)) (not (empty $value.issuer)) -}}
+    {{- if and $inJWTMap $value.resolveUserSecrets -}}
+      {{- $subjects = append $subjects $value.subject -}}
+    {{- end -}}
+  {{- end -}}
+{{- $subjects | toJson | squote -}}
+{{- end -}}
