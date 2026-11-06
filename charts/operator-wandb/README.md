@@ -29,6 +29,49 @@ The W&B Operator Helm chart is made up of multiple subcharts and components, eac
 - **etcd**: Distributed key-value store (used by bufstream)
 
 
+## Agent Lens metric-threshold alert worker
+
+`weave-trace-alert-worker.install` defaults to `false`. Enable it alongside
+`weave-trace.install` to run `python -m src.workers.alert_worker.alert_worker`
+in a separate deployment using the `wandb/weave-trace` image. Set the worker's
+`image.tag` or `image.digest` to the compatible server release used by your
+installation; the chart's `latest` default is not a compatibility guarantee.
+
+The chart rejects enabling the alert worker without `weave-trace.install` or
+a configured broker (in-chart Kafka/Bufstream or `global.kafka.brokerHost`).
+
+The worker shares the trace ServiceAccount, ClickHouse connection selection,
+CA configuration and trace ConfigMap. Enabling it also enables finished-call
+event production through `WEAVE_ENABLE_ONLINE_EVAL`, even when
+`weave-trace-worker.install` is `false`; it does not install the scoring worker.
+The worker needs a reachable Kafka-compatible broker, ClickHouse and Gorilla,
+the existing `weave-worker-auth` secret, and Redis for cross-replica alert
+suppression. Provision `weave.call_ended` and, for server images that start the
+span consumer in the same process, `weave.score_agent_spans`, with suitable
+consumer permissions and retention. Span-based alerts additionally require
+the selected server release's span-event producer configuration; enabling this
+worker alone does not enable agent scoring. Confirm the broker's initial-offset and
+retained-backlog behavior before first enablement.
+
+Use `global.kafka.brokerHost` / `brokerPort` for an external broker, or the
+chart's Kafka/Bufstream configuration. If broker authentication is required,
+configure `KAFKA_CLIENT_USER` and `KAFKA_CLIENT_PASSWORD` for both the trace
+producer and worker using the server release's supported mechanism; reference
+existing Secrets for credentials. Rendering the chart does not establish
+broker reachability, topic availability, or notification delivery.
+
+Worker-specific environment overrides, such as `ALERT_WORKER_BATCH_SIZE`, go
+under `weave-trace-alert-worker.env`. Resource and scaling overrides belong to
+that worker's values block. The inherited sizing presets need validation
+against actual call volume and rule complexity.
+
+Validate a finished call through to the configured automation destination in a
+non-production environment before customer enablement. Disabling the worker
+stops consumption; retain shared topics, offsets, storage and credentials for
+other workers and subsequent re-enablement. This chart configures operator-v1;
+Operator v2 requires a separate application in the server manifest in
+`wandb/core/onprem/server-manifest`.
+
 ## Prerequisites
 
 ### Kubectl
@@ -116,6 +159,19 @@ global:
   # Global priority class applied to all deployments/pods
   priorityClassName: ""
 ```
+
+### Datastore and license Secret precedence
+
+When `global.mysql.fromSecret` or `global.redis.fromSecret` is set, the named
+Secret supplies the connection settings instead of the corresponding inline
+`global.mysql` or `global.redis` values. Likewise, `global.licenseSecret.name`
+selects the external license Secret instead of `global.license`.
+
+These Secret-backed env entries also render `value: ""` so Helm clears any
+inline env value left by an earlier upgrade. This makes the Secret take effect
+while the old Terraform CR fields are still present, including after a partial
+upgrade. Render-time options such as MySQL CA certificates and IAM settings
+remain Helm values.
 
 ### Azure managed storage workload identity
 

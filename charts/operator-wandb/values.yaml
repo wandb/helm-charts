@@ -597,6 +597,22 @@ global:
     # When enabled, historyStore will query the history-reader gRPC service
     # first (backed by ClickHouse).
     historyReaderEnabled: false
+    # Selects the live store that parquet export reads from
+    # (GORILLA_PARQUET_LIVE_HISTORY_STORE on api, app, glue, executor and
+    # parquet).
+    # "auto" uses Bigtable when it is enabled and MySQL otherwise.
+    # "clickhouse" uses the global.olap.history connection and requires
+    # global.olap.history.enabled. It also requires history-updater, which
+    # writes that store; global.olap.default.enabled alone does not install
+    # it, so set global.olap.history.enabled or history-updater.install.
+    # HISTORY_* and GORILLA_PARQUET_LIVE_HISTORY_STORE must not be set through
+    # global or reader env channels.
+    # Gorilla sizes unset GORILLA_PARQUET_POLICY_* export settings by t-shirt
+    # size only for a MySQL live store, so "clickhouse" also changes them to
+    # EXPORT_BACKFILLER_CONCURRENCY=100, ROWS_BEFORE_PARTIAL_EXPORT=100000,
+    # FILESTREAM_SIZE_BEFORE_PARTIAL_EXPORT=20000000 and
+    # MIN_ROWS_PER_ROW_GROUP=64000. Set them explicitly where that matters.
+    liveStore: auto
 
   pubSub:
     enabled: false
@@ -692,6 +708,12 @@ global:
   # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#cloud_armor
   gcpSecurityPolicy: ""
 
+  # GCP only value: response headers the gce LoadBalancer adds to every response from each
+  # Service, via the same BackendConfig, e.g. ["Strict-Transport-Security: max-age=31536000"].
+  # Empty renders no customResponseHeaders block.
+  # https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration#response_headers
+  gcpCustomResponseHeaders: []
+
   statsig:
     apiKey: ""
 
@@ -707,6 +729,12 @@ ingress:
   install: true
   create: true
   nameOverride: ""
+  # GCP only: answer plain HTTP on the primary gce Ingress with a 308 redirect to
+  # HTTPS through a GKE FrontendConfig. Requires the GKE FrontendConfig CRD.
+  # Ignored when issuer.create is set, which already turns HTTP off.
+  # Needs operator chart 1.4.11 or later, which grants the operator frontendconfigs.
+  # On an older operator, enabling this blocks the install's whole Helm upgrade.
+  redirectToHttps: false
   defaultBackend: "app"
   console:
     # Route /console to <release>-console even when console.install is false (separately deployed Console).
@@ -786,6 +814,7 @@ api:
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.liveHistoryStoreEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
@@ -1009,6 +1038,7 @@ app:
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.liveHistoryStoreEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
@@ -2910,6 +2940,7 @@ glue:
     - '{{ include "wandb.mysqlEnvs" . }}'
     - '{{ include "wandb.redisEnvs" . }}'
     - '{{ include "wandb.queueEnvs" . }}'
+    - '{{ include "wandb.liveHistoryStoreEnvs" . }}'
     - '{{ include "wandb.historyStoreEnvs" . }}'
     - '{{ include "wandb.observabilityEnvs" . }}'
     - '{{ include "wandb.statsigEnvs" . }}'
@@ -3688,11 +3719,11 @@ clickhouseMigrationJob:
     ch-migrate:
       # Only render when at least one global.olap feature is enabled.
       enabled: '{{ include "wandb.olapAnyFeatureEnabled" . }}'
-      # One retry: an idle ClickHouse Cloud service accepts TCP (so the wait
-      # below passes) but times out the first native-protocol handshake while
-      # it wakes. That happens before any DDL runs, so a sequential retry is
-      # safe; a dirty database still fails fast on the second attempt.
-      backoffLimit: 1
+      # Retry up to 4 times: pod backoff (10+20+40+80s) gives ClickHouse Cloud
+      # about 150s to wake or finish a slow native handshake, within the 900s
+      # deadline. Handshake failures precede any DDL, so retrying is safe; a
+      # dirty database still fails fast on every attempt.
+      backoffLimit: 4
       activeDeadlineSeconds: 900
       volumes:
         - name: temp-dir
@@ -4481,6 +4512,98 @@ weave-trace-agent-scoring-worker:
         - "python"
         - "-m"
         - "src.workers.agent_scoring_worker"
+  size: ""
+  sizing:
+    small:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 2
+          minReplicas: 1
+    medium:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 3
+          minReplicas: 2
+    large:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 4
+          minReplicas: 2
+    xlarge:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 6
+          minReplicas: 2
+    xxlarge:
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 3Gi
+      autoscaling:
+        horizontal:
+          enabled: true
+          maxReplicas: 8
+          minReplicas: 2
+
+weave-trace-alert-worker:
+  install: false
+  serviceAccount:
+    useWeaveTraceIdentity: true
+  deploymentPostfix: "bc"
+  podLabels:
+    azure.workload.identity/use: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  azureStorageUseSharedServiceAccount: '{{ include `wandb.weaveTraceUsesAzureWorkloadIdentity` . }}'
+  image:
+    repository: wandb/weave-trace
+    tag: latest
+  envFrom:
+    "{{ .Release.Name }}-global-secret": "secretRef"
+    "{{ .Release.Name }}-weave-trace-configmap": "configMapRef"
+  envTpls:
+    - '{{ include "wandb.weaveTraceClickhouseEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  env:
+    WANDB_INTERNAL_SERVICE_TOKEN:
+      valueFrom:
+        secretKeyRef:
+          name: weave-worker-auth
+          key: key
+  containers:
+    weave-trace-alert-worker:
+      args:
+        - "python"
+        - "-m"
+        - "src.workers.alert_worker.alert_worker"
   size: ""
   sizing:
     small:

@@ -33,17 +33,20 @@ Global values will override any chart-specific values.
 {{- define "wandb.redisEnvs" -}}
   {{- with .Values.global.redis.fromSecret -}}
 - name: REDIS_PASSWORD
+  value: ""
   valueFrom:
     secretKeyRef:
       name: {{ . | quote }}
       key: "password"
       optional: true
 - name: REDIS_HOST
+  value: ""
   valueFrom:
     secretKeyRef:
       name: {{ . | quote }}
       key: "host"
 - name: REDIS_PORT
+  value: ""
   valueFrom:
     secretKeyRef:
       name: {{ . | quote }}
@@ -476,7 +479,7 @@ Global values will override any chart-specific values.
       name: {{ $secretName | quote }}
       key: {{ $secretKey | quote }}
     {{- end }}
-    {{- $finalConnectionUrl := printf "%s://$(%s_USER):$(%s_PASSWORD)@$(%s_HOST):$(%s_PORT)/$(%s_DATABASE)$(%s_PARAMS)" $config.type $prefix $prefix $prefix $prefix $prefix $prefix }}
+    {{- $finalConnectionUrl := include "wandb.olapConnectionUrl" (dict "type" $config.type "envVarPrefix" $prefix) }}
 - name: {{ $prefix }}_PARAMS
   value: {{ include "wandb.olapParamsQuery" (dict "params" $config.params) | quote }}
 - name: {{ .finalEnvName }}
@@ -512,6 +515,13 @@ Global values will override any chart-specific values.
 
 {{- define "wandb.historyEnvs" -}}
 {{- include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "history" "envVarPrefix" "HISTORY" "finalEnvName" "GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS") -}}
+{{- end -}}
+
+{{- define "wandb.liveHistoryStoreEnvs" -}}
+  {{- /* api, app and glue need the history connection only to read the ClickHouse live store. */ -}}
+  {{- if eq (include "wandb.liveHistoryStoreIsClickhouse" .) "true" -}}
+{{- include "wandb.historyEnvs" . -}}
+  {{- end -}}
 {{- end -}}
 
 {{- define "wandb.historyMigrateEnvs" -}}

@@ -1,0 +1,21 @@
+suite: history store validation with workloads
+templates:
+  - charts/app/templates/deployment.yaml
+  - templates/history-validation.yaml
+release:
+  name: wandb
+  namespace: default
+
+# Helm renders subchart templates before history-validation.yaml, so the live
+# history store helpers must tolerate a non-string liveStore for the validation
+# message to surface.
+tests:
+  - it: rejects a non-string liveStore with the allowed values
+    template: templates/history-validation.yaml
+    set:
+      global:
+        historyStore:
+          liveStore: true
+    asserts:
+      - failedTemplate:
+          errorMessage: global.historyStore.liveStore must be "auto" or "clickhouse", got "true"

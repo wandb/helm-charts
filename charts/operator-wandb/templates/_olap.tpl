@@ -68,6 +68,21 @@ Returns: e.g. "REGISTRY_SEARCH_PASSWORD"
 {{- end -}}
 
 {{/*
+wandb.olapConnectionUrl composes an OLAP connection URL from the <prefix>_*
+env vars that wandb.olapFeatureEnvs emits, using Kubernetes $(VAR) expansion.
+Those env vars must precede the env var that uses this URL.
+
+Usage:
+  include "wandb.olapConnectionUrl" (dict "type" $config.type "envVarPrefix" "HISTORY")
+
+Returns: e.g. "clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)"
+*/}}
+{{- define "wandb.olapConnectionUrl" -}}
+  {{- $prefix := .envVarPrefix -}}
+  {{- printf "%s://$(%s_USER):$(%s_PASSWORD)@$(%s_HOST):$(%s_PORT)/$(%s_DATABASE)$(%s_PARAMS)" .type $prefix $prefix $prefix $prefix $prefix $prefix -}}
+{{- end -}}
+
+{{/*
 wandb.olapParamsQuery serializes a params map into a URL query string.
 Following the redis wandb.redis.parametersQuery pattern.
 
