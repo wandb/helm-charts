@@ -75,6 +75,7 @@ map, or the password Secret.
 {{- define "wandb.mysql.passwordEnv" -}}
 - name: MYSQL_PASSWORD
   {{- if .Values.global.mysql.fromSecret }}
+  value: ""
   valueFrom:
     secretKeyRef:
       name: {{ .Values.global.mysql.fromSecret | quote }}
@@ -99,6 +100,8 @@ Usage: dict "root" . "name" "MYSQL_HOST" "key" "host"
   {{- $setting := get $mysql .key -}}
 - name: {{ .name }}
   {{- if $mysql.fromSecret }}
+    {{/* Clear the previous inline CR value when switching to the Secret. */}}
+  value: ""
   valueFrom:
     secretKeyRef:
       name: {{ $mysql.fromSecret | quote }}
