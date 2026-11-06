@@ -3719,11 +3719,11 @@ clickhouseMigrationJob:
     ch-migrate:
       # Only render when at least one global.olap feature is enabled.
       enabled: '{{ include "wandb.olapAnyFeatureEnabled" . }}'
-      # One retry: an idle ClickHouse Cloud service accepts TCP (so the wait
-      # below passes) but times out the first native-protocol handshake while
-      # it wakes. That happens before any DDL runs, so a sequential retry is
-      # safe; a dirty database still fails fast on the second attempt.
-      backoffLimit: 1
+      # Retry up to 4 times: pod backoff (10+20+40+80s) gives ClickHouse Cloud
+      # about 150s to wake or finish a slow native handshake, within the 900s
+      # deadline. Handshake failures precede any DDL, so retrying is safe; a
+      # dirty database still fails fast on every attempt.
+      backoffLimit: 4
       activeDeadlineSeconds: 900
       volumes:
         - name: temp-dir
