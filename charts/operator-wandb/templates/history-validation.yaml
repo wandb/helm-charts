@@ -25,9 +25,22 @@
     {{- $chartValues := index $.Values $chart | default dict -}}
     {{- $_ := set $envChannels (printf "%s.env" $chart) $chartValues.env -}}
     {{- $_ = set $envChannels (printf "%s.extraEnv" $chart) $chartValues.extraEnv -}}
-    {{- range $kind := list "containers" "initContainers" -}}
-      {{- range $name, $entry := index $chartValues $kind | default dict -}}
-        {{- $_ = set $envChannels (printf "%s.%s.%s.env" $chart $kind $name) (index ($entry | default dict) "env") -}}
+    {{- /* wandb-base builds job and cronJob pods with the same container env merge as the chart's own pod. */ -}}
+    {{- $pods := dict $chart $chartValues -}}
+    {{- range $podKind := list "jobs" "cronJobs" -}}
+      {{- range $podName, $pod := index $chartValues $podKind | default dict -}}
+        {{- /* wandb-base omits a Job whose enabled is false. A disabled CronJob still renders, suspended, so it stays checked. */ -}}
+        {{- $jobDisabled := and (eq $podKind "jobs") (eq (trim (toString (index ($pod | default dict) "enabled"))) "false") -}}
+        {{- if not $jobDisabled -}}
+          {{- $_ = set $pods (printf "%s.%s.%s" $chart $podKind $podName) $pod -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+    {{- range $podPath, $pod := $pods -}}
+      {{- range $kind := list "containers" "initContainers" -}}
+        {{- range $name, $entry := index ($pod | default dict) $kind | default dict -}}
+          {{- $_ = set $envChannels (printf "%s.%s.%s.env" $podPath $kind $name) (index ($entry | default dict) "env") -}}
+        {{- end -}}
       {{- end -}}
     {{- end -}}
     {{- /* wandb-base.sizingInfo applies only the default and selected presets. */ -}}
