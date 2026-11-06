@@ -3931,27 +3931,43 @@ weave:
 ## MCP Server -- Model Context Protocol server for AI agent access to W&B data.
 ## The server-owned profile contract is the only supported way to select tools,
 ## access, workload limits, admission, and deadlines. The chart resolves `auto`
-## to an exact profile before rendering the pod; it never emits `auto` as
-## runtime evidence. Dedicated v0.4 supports Models-only (17 read-write tools)
-## and classic Weave (22 read-write tools). Weave Agent, ARIA, and raw GraphQL
-## profiles are intentionally unavailable from this chart.
+## to an exact base profile before rendering the pod; it never emits `auto` as
+## runtime evidence. A tool profile is a base profile plus additive extensions
+## (WANDB_MCP_TOOL_EXTENSIONS); the chart accepts only the base profiles and
+## extensions the server's runtime contract approves for the dedicated
+## workload, so the exact tool set is owned by the pinned image, not the chart.
 ## Disabled by default. Enable with: mcp-server.install: true
 ## Docs: https://github.com/wandb/wandb-mcp-server
 mcp-server:
   install: false
   image:
     repository: wandb/mcp-server
+    ## Default release for direct Helm installs; Managed Spec pins the
+    ## Dedicated fleet's version and overrides this.
     tag: "0.4.0"
-    ## Filled with the exact customer digest after Dedicated QA. A non-empty
-    ## digest takes precedence over tag when the Deployment image is rendered.
+    ## Exact customer digest. A non-empty digest takes precedence over tag when
+    ## the Deployment image is rendered.
     digest: ""
   tools:
     ## - auto: models-weave when a configured trace backend is available;
     ##   otherwise models-only.
-    ## - models-only: 17 read-write / 15 read-only tools.
-    ## - models-weave: 22 read-write / 20 read-only tools; requires a trace
-    ##   backend selected below.
+    ## - models-only: Models tools only.
+    ## - models-weave: Models plus Weave tools; requires a trace backend
+    ##   selected below.
     profile: auto
+    ## Additive extension groups layered on the base profile
+    ## (WANDB_MCP_TOOL_EXTENSIONS). Known: agent-lens, aria, raw-graphql. The
+    ## chart rejects any extension the runtime contract does not approve for
+    ## the dedicated workload; currently none is, so leave this empty.
+    extensions: []
+    ## Typed endpoints for extensions that call another service. Each is
+    ## required by, and only allowed with, its extension.
+    aria:
+      ## Absolute HTTP(S) origin of the W&B agent service (WB_AGENT_BASE_URL).
+      baseUrl: ""
+    agentLens:
+      ## Absolute HTTP(S) origin of the Agent Lens service (AGENT_LENS_BASE_URL).
+      baseUrl: ""
   ## Controls write-capable tool registration without changing the tool profile.
   accessMode: read-write
   traceBackend:
@@ -3972,6 +3988,14 @@ mcp-server:
     provider: none
     ## off | standard | strict. Dedicated defaults redact free-text parameters.
     privacy: standard
+    ## Bounded Datadog labels for the datadog-agent provider (DD_SERVICE,
+    ## DD_ENV, the deployment_type autodiscovery tag). Empty keeps the chart
+    ## defaults (wandb-mcp-server-onprem, production, self-managed). These
+    ## replace the legacy mcp-server.datadog.* bridge.
+    datadog:
+      service: ""
+      env: ""
+      deploymentType: ""
   ## MCP does not call the Kubernetes API. Prevent Kubernetes from mounting a
   ## service-account bearer token into the pod.
   serviceAccount:
