@@ -8,11 +8,17 @@
 
 {{- define "wandb.license" -}}
 - name: LICENSE
+  {{- if .Values.global.licenseSecret.name }}
+  value: ""
+  {{- end }}
   valueFrom:
     secretKeyRef:
       name: "{{ include "wandb.license.name" . }}"
       key: "{{ include "wandb.license.key" . }}"
 - name: GORILLA_LICENSE
+  {{- if .Values.global.licenseSecret.name }}
+  value: ""
+  {{- end }}
   valueFrom:
     secretKeyRef:
       name: "{{ include "wandb.license.name" . }}"
