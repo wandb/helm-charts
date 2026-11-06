@@ -294,6 +294,45 @@ tests:
       - failedTemplate:
           errorMessage: glue.jobs.reindex.initContainers.wait.env.GORILLA_PARQUET_LIVE_HISTORY_STORE must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
 
+  - it: allows a live store override in a disabled reader job
+    set:
+      glue:
+        jobs:
+          reindex:
+            enabled: false
+            initContainers:
+              wait:
+                env:
+                  GORILLA_PARQUET_LIVE_HISTORY_STORE: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: still rejects an override in a disabled reader cron job, which renders suspended
+    set:
+      parquet:
+        cronJobs:
+          parquet-backfill:
+            enabled: false
+            containers:
+              backfill-job:
+                env:
+                  HISTORY_PASSWORD: override
+      global:
+        historyStore:
+          liveStore: clickhouse
+        olap:
+          history:
+            enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: parquet.cronJobs.parquet-backfill.containers.backfill-job.env.HISTORY_PASSWORD must not be set when global.historyStore.liveStore is "clickhouse"; configure the connection under global.olap.history
+
   - it: allows a HISTORY_* override in a reader cron job container with the auto liveStore
     set:
       parquet:

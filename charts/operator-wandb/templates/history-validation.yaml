@@ -29,7 +29,11 @@
     {{- $pods := dict $chart $chartValues -}}
     {{- range $podKind := list "jobs" "cronJobs" -}}
       {{- range $podName, $pod := index $chartValues $podKind | default dict -}}
-        {{- $_ = set $pods (printf "%s.%s.%s" $chart $podKind $podName) $pod -}}
+        {{- /* wandb-base omits a Job whose enabled is false. A disabled CronJob still renders, suspended, so it stays checked. */ -}}
+        {{- $jobDisabled := and (eq $podKind "jobs") (eq (trim (toString (index ($pod | default dict) "enabled"))) "false") -}}
+        {{- if not $jobDisabled -}}
+          {{- $_ = set $pods (printf "%s.%s.%s" $chart $podKind $podName) $pod -}}
+        {{- end -}}
       {{- end -}}
     {{- end -}}
     {{- range $podPath, $pod := $pods -}}
