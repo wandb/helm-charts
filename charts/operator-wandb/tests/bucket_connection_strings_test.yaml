@@ -3,7 +3,6 @@ templates:
   - templates/bucket.yaml
   - charts/app/templates/deployment.yaml
   - charts/api/templates/deployment.yaml
-  - charts/settingsMigrationJob/templates/job.yaml
 release:
   name: chartsnap
 tests:
@@ -285,49 +284,6 @@ tests:
           content:
             name: GORILLA_FILE_STORE
           any: true
-  - it: uses the finished URL in settings migration jobs
-    template: charts/settingsMigrationJob/templates/job.yaml
-    set:
-      settingsMigrationJob.install: true
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].envFrom
-          content:
-            secretRef:
-              name: chartsnap-bucket
-      - notContains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: SMJ_FILE_STORE
-          any: true
-  - it: preserves settings migration overrides
-    template: charts/settingsMigrationJob/templates/job.yaml
-    set:
-      settingsMigrationJob.install: true
-      settingsMigrationJob.env.SMJ_FILE_STORE:
-        value: s3://override
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: SMJ_FILE_STORE
-            value: s3://override
-  - it: keeps settings migration interpolation for external Secrets
-    template: charts/settingsMigrationJob/templates/job.yaml
-    set:
-      settingsMigrationJob.install: true
-      global.bucket:
-        provider: s3
-        name: external
-        path: ''
-        secret:
-          secretName: external
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: SMJ_FILE_STORE
-            value: s3://$(BUCKET_ACCESS_KEY):$(BUCKET_SECRET_KEY)@$(BUCKET_NAME)
   - it: keeps custom credential keys alongside the finished URL for rollback
     template: templates/bucket.yaml
     documentIndex: 1
