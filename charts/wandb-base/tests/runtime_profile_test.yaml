@@ -1,0 +1,112 @@
+suite: Container runtime options
+templates:
+  - deployment.yaml
+  - job.yaml
+set:
+  global.workloadSecurityProfile.enabled: true
+  containers:
+    app: {}
+    sidecar: {}
+  initContainers:
+    migrate: {}
+tests:
+  - it: does not infer image compatibility from enabling the baseline
+    template: deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: false
+  - it: applies explicit non-root and read-only settings without adding numeric identities
+    template: deployment.yaml
+    set:
+      podSecurityContext.runAsUser: null
+      podSecurityContext.runAsGroup: null
+      podSecurityContext.fsGroup: null
+      workloadSecurityProfile:
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - notExists:
+          path: spec.template.spec.containers[0].securityContext.runAsUser
+      - notExists:
+          path: spec.template.spec.securityContext.runAsUser
+      - notExists:
+          path: spec.template.spec.securityContext.runAsGroup
+      - notExists:
+          path: spec.template.spec.securityContext.fsGroup
+  - it: honors explicit false exceptions without changing sibling containers
+    template: deployment.yaml
+    set:
+      workloadSecurityProfile:
+        runAsNonRoot: true
+        readOnlyRootFilesystem: true
+      containers.app.workloadSecurityProfile:
+        runAsNonRoot: false
+        readOnlyRootFilesystem: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.runAsNonRoot
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: false
+      - equal:
+          path: spec.template.spec.containers[1].securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.readOnlyRootFilesystem
+          value: true
+  - it: keeps explicit writable mounts for a read-only migration job
+    template: job.yaml
+    set:
+      jobs:
+        migration:
+          workloadSecurityProfile:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+          volumes:
+            - name: temporary
+              emptyDir: {}
+          containers:
+            migration:
+              volumeMounts:
+                - name: temporary
+                  mountPath: /tmp
+          initContainers:
+            setup:
+              volumeMounts:
+                - name: temporary
+                  mountPath: /tmp
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.volumes[0]
+          value:
+            name: temporary
+            emptyDir: {}
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /tmp
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0].name
+          value: temporary
+  - it: rejects ambiguous runtime booleans
+    template: deployment.yaml
+    set:
+      workloadSecurityProfile.readOnlyRootFilesystem: 'true'
+    asserts:
+      - failedTemplate:
+          errorMessage: workloadSecurityProfile.readOnlyRootFilesystem must be a boolean

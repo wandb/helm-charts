@@ -1,0 +1,104 @@
+suite: MySQL CA references
+templates:
+  - charts/api/templates/deployment.yaml
+  - templates/mysql.yaml
+release:
+  name: wandb
+  namespace: default
+tests:
+  - it: mounts a referenced Secret CA for IAM authentication
+    values: &iam_values
+      - ../../../test-configs/operator-wandb/mysql-aws-iam.yaml
+    set:
+      global.mysql.caCert:
+        valueFrom:
+          secretKeyRef:
+            name: existing-rds-ca
+            key: rds-ca.pem
+    asserts: &secret_assertions
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MYSQL_CA_CERT_PATH
+            value: /etc/ssl/certs/rds-ca.pem
+        template: charts/api/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: mysql-ca
+            mountPath: /etc/ssl/certs/rds-ca.pem
+            subPath: rds-ca.pem
+        template: charts/api/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: mysql-ca
+            secret:
+              secretName: existing-rds-ca
+              items:
+                - key: rds-ca.pem
+                  path: rds-ca.pem
+        template: charts/api/templates/deployment.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/mysql.yaml
+
+  - it: mounts a referenced ConfigMap CA for IAM authentication
+    values: *iam_values
+    set:
+      global.mysql.caCert:
+        valueFrom:
+          configMapKeyRef:
+            name: existing-rds-ca
+            key: rds-ca.pem
+    asserts: &configmap_assertions
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MYSQL_CA_CERT_PATH
+            value: /etc/ssl/certs/rds-ca.pem
+        template: charts/api/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: mysql-ca
+            mountPath: /etc/ssl/certs/rds-ca.pem
+            subPath: rds-ca.pem
+        template: charts/api/templates/deployment.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: mysql-ca
+            configMap:
+              name: existing-rds-ca
+              items:
+                - key: rds-ca.pem
+                  path: rds-ca.pem
+        template: charts/api/templates/deployment.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/mysql.yaml
+
+  - it: preserves referenced Secret CAs with password authentication
+    values: *iam_values
+    set:
+      global.mysql.rdsIamAuth: false
+      global.mysql.passwordSecret.name: existing-database-password
+      global.mysql.caCert:
+        valueFrom:
+          secretKeyRef:
+            name: existing-rds-ca
+            key: rds-ca.pem
+    asserts: *secret_assertions
+
+  - it: preserves referenced ConfigMap CAs with password authentication
+    values: *iam_values
+    set:
+      global.mysql.rdsIamAuth: false
+      global.mysql.passwordSecret.name: existing-database-password
+      global.mysql.caCert:
+        valueFrom:
+          configMapKeyRef:
+            name: existing-rds-ca
+            key: rds-ca.pem
+    asserts: *configmap_assertions

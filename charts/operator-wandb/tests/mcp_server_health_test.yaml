@@ -1,0 +1,52 @@
+suite: MCP server health check
+templates:
+  - templates/tests/test-mcp.yaml
+release:
+  name: customer-a
+  namespace: wandb-system
+
+tests:
+  - it: checks the real MCP health endpoint
+    set:
+      mcp-server.install: true
+    asserts:
+      - equal:
+          path: spec.containers[0].args[0]
+          value: http://customer-a-mcp-server:8080/mcp/health
+
+  - it: does not render the check when MCP is disabled
+    set:
+      mcp-server.install: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: uses the actual service name when the release already contains mcp-server
+    release:
+      name: mcp-server
+    set:
+      mcp-server.install: true
+    asserts:
+      - equal:
+          path: spec.containers[0].args[0]
+          value: http://mcp-server:8080/mcp/health
+
+  - it: follows the configured service name and port
+    set:
+      mcp-server.install: true
+      mcp-server.service.name: custom-mcp
+      mcp-server.service.ports:
+        - {name: http, port: 9090, targetPort: 8080, protocol: TCP}
+    asserts:
+      - equal:
+          path: spec.containers[0].args[0]
+          value: http://custom-mcp:9090/mcp/health
+
+  - it: resolves a templated Service name before routing the health check
+    set:
+      mcp-server.install: true
+      mcp-server.service.name: '{{ .Release.Name }}-assistant'
+    asserts:
+      - equal:
+          path: spec.containers[0].args[0]
+          value: http://customer-a-assistant:8080/mcp/health

@@ -1,0 +1,258 @@
+# chartsnap: snapshot_version=v3
+---
+# Source: lumen/charts/compactor/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-compactor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: compactor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "v0.1.5"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: lumen/charts/processor/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chartsnap-processor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: processor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "v0.1.5"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+---
+# Source: lumen/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-compactor-configmap
+data:
+  LUMEN_DATA_ROOT: ""
+  LUMEN_STAGING_ROOT: "file:///scratch/compactor"
+---
+# Source: lumen/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-configmap
+data:
+  LUMEN_DATA_ROOT: ""
+  LUMEN_STAGING_ROOT: "file:///scratch/processor"
+---
+# Source: lumen/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chartsnap-processor-configmap
+data:
+  LUMEN_DATA_ROOT: ""
+  LUMEN_STAGING_ROOT: "file:///scratch/processor"
+---
+# Source: lumen/charts/compactor/templates/cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chartsnap-compactor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: compactor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "v0.1.5"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  concurrencyPolicy: Forbid
+  schedule: "45 * * * *"
+  suspend: false
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 5
+      template:
+        metadata:
+          labels:
+            helm.sh/chart: '###CHART_VERSION###'
+            app.kubernetes.io/name: compactor
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/version: "v0.1.5"
+            app.kubernetes.io/managed-by: Helm
+        spec:
+          containers:
+          - name: collector
+            command:
+            - /app/entrypoint.sh
+            - compactor
+            envFrom:
+            - configMapRef:
+                name: chartsnap-compactor-configmap
+            env:
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                add: []
+                drop: []
+              privileged: false
+              readOnlyRootFilesystem: false
+            image: "us-docker.pkg.dev/wandb-production/public/wandb/lumen:v0.1.5"
+            imagePullPolicy: IfNotPresent
+            resources:
+              limits:
+                cpu: 12
+                memory: 24Gi
+              requests:
+                cpu: 8
+                memory: 12Gi
+            volumeMounts:
+            - name: compactor-scratch
+              mountPath: /scratch/compactor
+          restartPolicy: OnFailure
+          serviceAccountName: chartsnap-compactor
+          securityContext:
+            fsGroup: 0
+            fsGroupChangePolicy: OnRootMismatch
+            runAsGroup: 0
+            runAsNonRoot: true
+            runAsUser: 999
+            seccompProfile:
+              type: RuntimeDefault
+          topologySpreadConstraints:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: chartsnap
+                app.kubernetes.io/name: compactor
+            maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: ScheduleAnyway
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: chartsnap
+                app.kubernetes.io/name: compactor
+            maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+          volumes:
+          - name: compactor-scratch
+            ephemeral:
+              volumeClaimTemplate:
+                spec:
+                  accessModes:
+                  - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: "40Gi"
+---
+# Source: lumen/charts/processor/templates/cronjob.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: chartsnap-processor
+  labels:
+    helm.sh/chart: '###CHART_VERSION###'
+    app.kubernetes.io/name: processor
+    app.kubernetes.io/instance: chartsnap
+    app.kubernetes.io/version: "v0.1.5"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  concurrencyPolicy: Forbid
+  schedule: "15 * * * *"
+  suspend: false
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 5
+      template:
+        metadata:
+          labels:
+            helm.sh/chart: '###CHART_VERSION###'
+            app.kubernetes.io/name: processor
+            app.kubernetes.io/instance: chartsnap
+            app.kubernetes.io/version: "v0.1.5"
+            app.kubernetes.io/managed-by: Helm
+        spec:
+          containers:
+          - name: collector
+            command:
+            - /app/entrypoint.sh
+            - processor
+            envFrom:
+            - configMapRef:
+                name: chartsnap-processor-configmap
+            env:
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                add: []
+                drop: []
+              privileged: false
+              readOnlyRootFilesystem: false
+            image: "us-docker.pkg.dev/wandb-production/public/wandb/lumen:v0.1.5"
+            imagePullPolicy: IfNotPresent
+            resources:
+              limits:
+                cpu: 12
+                memory: 24Gi
+              requests:
+                cpu: 8
+                memory: 12Gi
+            volumeMounts:
+            - name: processor-scratch
+              mountPath: /scratch/processor
+          restartPolicy: OnFailure
+          serviceAccountName: chartsnap-processor
+          securityContext:
+            fsGroup: 0
+            fsGroupChangePolicy: OnRootMismatch
+            runAsGroup: 0
+            runAsNonRoot: true
+            runAsUser: 999
+            seccompProfile:
+              type: RuntimeDefault
+          topologySpreadConstraints:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: chartsnap
+                app.kubernetes.io/name: processor
+            maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: ScheduleAnyway
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/instance: chartsnap
+                app.kubernetes.io/name: processor
+            maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+          volumes:
+          - name: processor-scratch
+            ephemeral:
+              volumeClaimTemplate:
+                spec:
+                  accessModes:
+                  - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: "40Gi"

@@ -34,9 +34,24 @@ spec:
             class: {{ .Values.ingress.class }}
   {{- end }}
 {{- end }}
-{{- if .Values.ingress.install }}
+{{- if and .Values.global.legacyIngress .Values.ingress.install }}
 ---
   {{- if .Values.ingress.create }}
+    {{- if include "wandb.ingress.redirectToHttpsEnabled" . }}
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: {{ include "wandb.ingress.redirectFrontendConfigName" . }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+spec:
+  redirectToHttps:
+    enabled: true
+    # 308 keeps the method and body. GKE defaults to 301, which clients such
+    # as Python requests follow by turning a POST into a GET.
+    responseCodeName: PERMANENT_REDIRECT
+---
+    {{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -55,6 +70,10 @@ metadata:
     "cert-manager.io/acme-challenge-type": "http01"
       {{- end }}
     "kubernetes.io/ingress.allow-http" : "false"
+    {{- end }}
+
+    {{- if include "wandb.ingress.redirectToHttpsEnabled" . }}
+    "networking.gke.io/v1beta1.FrontendConfig": {{ include "wandb.ingress.redirectFrontendConfigName" . | quote }}
     {{- end }}
 
     {{- if .Values.ingress.annotations -}}
@@ -80,21 +99,12 @@ spec:
   - host: {{ . }}
     http:
       paths:
-      {{- include "IngressPath" $dot | nindent 6 }}
-      {{- if index $.Values "weave-trace" "install" }}
-      - pathType: Prefix
-        path: /traces
-        backend:
-          service:
-            name: {{ $.Release.Name }}-weave-trace
-            port:
-              number: 8722
-      {{- end }}
+      {{- include "wandb.primaryIngressPaths" $dot | nindent 6 }}
     {{- end }}
   {{- end }}
 {{- end }}
 ---
-{{- if and .Values.ingress.secondary .Values.ingress.secondary.create }}
+{{- if and .Values.global.legacyIngress .Values.ingress.secondary .Values.ingress.secondary.create }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:

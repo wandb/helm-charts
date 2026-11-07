@@ -1,5 +1,9 @@
 global:
   fqdn: ""
+  # Alternate application hostnames routed by the ingress and accepted by auth.
+  # Entries may be bare hostnames or origin URLs without paths, query strings,
+  # or fragments. global.fqdn remains the canonical URL.
+  additionalHosts: []
 
   env: {}
   # env:
@@ -23,6 +27,14 @@ global:
     #     secretKeyRef:
     #       name: "my-encryption-secret"
     #       key: "AES_256_KEY"
+    # Previous AES key kept readable during key rotation (VARIABLES_AES_256_KEY_PREVIOUS).
+    # Unlike encryptionKey it is NOT auto-generated: empty => the env var is omitted.
+    encryptionKeyPrevious: ""
+    # encryptionKeyPrevious:
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: "my-encryption-secret"
+    #       key: "AES_256_KEY_PREVIOUS"
     # identity<->engine SyncUser RPC shared secret (AUTH_SYNC_SECRET). Wired to
     # identity + workspace-engine ONLY. Unlike authSecret/encryptionKey it is NOT
     # auto-generated: empty => the env var is omitted => user-mirror sync stays off
@@ -227,6 +239,7 @@ identity:
     OTEL_SAMPLER_RATIO: "0.1"
 
   envTpls:
+    - '{{ include "orchestrator.authHostEnvVars" . }}'
     - '{{ include "orchestrator.authProviderEnvVars" . }}'
     - '{{ include "orchestrator.authSyncSecretEnvVars" . }}'
     - '{{ include "orchestrator.authDatabaseEnvVars" . }}'
@@ -290,9 +303,35 @@ web:
         limits:
           cpu: 4000m
           memory: 4Gi
+      livenessProbe:
+        httpGet:
+          path: /
+          port: http
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 12
+        successThreshold: 1
+      readinessProbe:
+        httpGet:
+          path: /
+          port: http
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+        successThreshold: 1
 
   service:
     enabled: true
+    healthCheck:
+      type: HTTP
+      requestPath: /
+      port: 3000
+      checkIntervalSec: 10
+      timeoutSec: 5
+      healthyThreshold: 2
+      unhealthyThreshold: 3
     ports:
       - port: 3000
         targetPort: http

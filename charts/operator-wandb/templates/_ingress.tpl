@@ -35,8 +35,28 @@ It expects a dictionary with two entries:
 {{- default .global.provider .local.provider -}}
 {{- end -}}
 
+{{- define "wandb.ingress.consoleEnabled" -}}
+  {{- if ne (dig "console" "enabled" true .Values.ingress) false -}}true{{- end -}}
+{{- end -}}
+
 {{- define "defaultHost" -}}
 {{- replace "https://" "" (replace "http://" "" .Values.global.host) }}
+{{- end -}}
+
+{{/*
+Whether the primary gce Ingress answers plain HTTP with a redirect, through a
+GKE FrontendConfig. Opt-in because customer-managed GCP installs may run
+another ingress class or lack the GKE CRD. Skipped when issuer.create already
+turns HTTP off with kubernetes.io/ingress.allow-http.
+*/}}
+{{- define "wandb.ingress.redirectToHttpsEnabled" -}}
+  {{- if and (eq .Values.global.cloudProvider "gcp") .Values.ingress.redirectToHttps (not .Values.ingress.issuer.create) -}}
+true
+  {{- end -}}
+{{- end -}}
+
+{{- define "wandb.ingress.redirectFrontendConfigName" -}}
+  {{- printf "%s-ingress-redirect" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
 
@@ -46,6 +66,9 @@ It expects a dictionary with two entries:
   backend:
     service:
   {{- if eq $.Values.ingress.defaultBackend "console" }}
+    {{- if not (include "wandb.ingress.consoleEnabled" $) }}
+      {{- fail "ingress.defaultBackend is \"console\" but ingress.console.enabled is false" }}
+    {{- end }}
       name: {{ $.Release.Name }}-console
       port:
         number: 8082
@@ -183,10 +206,11 @@ It expects a dictionary with two entries:
   path: /mcp
   backend:
     service:
-      name: {{ $.Release.Name }}-mcp-server
+      name: {{ include "wandb.mcpServiceName" $ }}
       port:
-        number: 8080
+        number: {{ include "wandb.mcpServicePort" $ }}
   {{- end }}
+  {{- if include "wandb.ingress.consoleEnabled" $ }}
 - pathType: Prefix
   path: /console
   backend:
@@ -194,4 +218,19 @@ It expects a dictionary with two entries:
       name: {{ $.Release.Name }}-console
       port:
         number: 8082
+  {{- end }}
 {{- end }}
+
+{{/* Keep the legacy primary and Traefik application paths identical, including traces. */}}
+{{- define "wandb.primaryIngressPaths" -}}
+  {{- include "IngressPath" . }}
+  {{- if index .Values "weave-trace" "install" }}
+- pathType: Prefix
+  path: /traces
+  backend:
+    service:
+      name: {{ .Release.Name }}-weave-trace
+      port:
+        number: 8722
+  {{- end }}
+{{- end -}}

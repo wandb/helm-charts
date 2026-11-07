@@ -85,11 +85,71 @@ Create the name of the service to use
 Create the name of the service account to use
 */}}
 {{- define "wandb-base.serviceAccountName" -}}
-  {{- if .Values.serviceAccount.create }}
+  {{- if include "wandb-base.azureStorageServiceAccountEnabled" . | trim | eq "true" }}
+{{- include "wandb-base.azureStorageServiceAccountName" . }}
+  {{- else if .Values.serviceAccount.useWeaveTraceIdentity }}
+{{- include "wandb-base.weaveTraceServiceAccountName" . }}
+  {{- else if .Values.serviceAccount.create }}
 {{- default (include "wandb-base.fullname" .) .Values.serviceAccount.name }}
   {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
   {{- end }}
+{{- end }}
+
+{{/*
+Use the shared account only for workloads that already opt into Azure workload
+identity. This keeps legacy bucket-scoped identities and key-based BYOB on
+their component accounts.
+*/}}
+{{- define "wandb-base.azureStorageServiceAccountEnabled" -}}
+  {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
+  {{- $serviceAccount := default (dict) $identity.serviceAccount -}}
+  {{- $mode := default "shared" $serviceAccount.mode -}}
+  {{- if not (has $mode (list "shared" "component" "grouped")) -}}
+    {{- fail "global.azureStorageIdentity.serviceAccount.mode must be shared, component, or grouped" -}}
+  {{- end -}}
+  {{- $globalConfigured := and (not (empty $identity.tenantId)) (not (empty $identity.clientId)) -}}
+  {{- $bucket := default (dict) .Values.global.bucket -}}
+  {{- $hasCustomerBucket := not (empty $bucket.name) -}}
+  {{- $defaultBucket := default (dict) .Values.global.defaultBucket -}}
+  {{- $usesDeploymentIdentity := or
+  (and (not $hasCustomerBucket) (eq $defaultBucket.provider "az"))
+  (and $hasCustomerBucket (eq $bucket.azureAuthMethod "workloadIdentity"))
+  -}}
+  {{- $explicitSharedServiceAccount := default false .Values.azureStorageUseSharedServiceAccount -}}
+  {{- if kindIs "string" $explicitSharedServiceAccount -}}
+    {{- $explicitSharedServiceAccount = eq (tpl $explicitSharedServiceAccount . | trim) "true" -}}
+  {{- end -}}
+  {{- $podLabels := default (dict) .Values.podLabels -}}
+  {{- $workloadIdentity := get $podLabels "azure.workload.identity/use" | default false -}}
+  {{- $enabled := false -}}
+  {{- if kindIs "string" $workloadIdentity -}}
+    {{- $enabled = eq (tpl $workloadIdentity . | trim) "true" -}}
+  {{- else -}}
+    {{- $enabled = $workloadIdentity -}}
+  {{- end -}}
+  {{- /* Keep Kubernetes RBAC and Weave internal-JWT subjects separate. */ -}}
+  {{- $role := default (dict) .Values.role -}}
+  {{- $componentAccount := default (dict) .Values.serviceAccount -}}
+  {{- $canGroup := and (not $role.create) (not $explicitSharedServiceAccount) (not $componentAccount.useWeaveTraceIdentity) -}}
+  {{- $share := or (eq $mode "shared") (and (eq $mode "grouped") $canGroup) -}}
+{{- and $globalConfigured (or $usesDeploymentIdentity $explicitSharedServiceAccount) $enabled $share -}}
+{{- end }}
+
+{{- define "wandb-base.azureStorageServiceAccountName" -}}
+  {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
+  {{- $serviceAccount := default (dict) $identity.serviceAccount -}}
+{{- default "wandb-bucket-access" $serviceAccount.name -}}
+{{- end }}
+
+{{/*
+Create the name of the shared Weave Trace service account.
+The SA object itself is owned by the operator-wandb umbrella chart
+(templates/weave-trace-serviceaccount.yaml); this must stay identical to
+"wandb.weaveTraceServiceAccountName" in operator-wandb/templates/_bucket.tpl.
+*/}}
+{{- define "wandb-base.weaveTraceServiceAccountName" -}}
+  {{- printf "%s-weave-trace" .Release.Name -}}
 {{- end }}
 
 {{- define "wandb-base.deploymentRolloutStrategy" -}}
@@ -177,3 +237,10 @@ Common annotations - merges global and local common annotations
 {{- toYaml $commonAnnotations }}
   {{- end }}
 {{- end }}
+
+{{/* Whether this component renders and controls its own ServiceAccount. */}}
+{{- define "wandb-base.createsServiceAccount" -}}
+  {{- and .Values.serviceAccount.create
+  (not (include "wandb-base.azureStorageServiceAccountEnabled" . | trim | eq "true"))
+  (not .Values.serviceAccount.useWeaveTraceIdentity) -}}
+{{- end -}}

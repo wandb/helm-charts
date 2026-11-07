@@ -7,5 +7,5 @@
 {{- end -}}
 
 {{- define "wandb.lumen.stagingPath" -}}
-/vol/staging
+{{- .Values.stagingDirectory.mountPath -}}
 {{- end -}}

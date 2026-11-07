@@ -30,9 +30,11 @@ data:
           proxy_pass http://{{ .Release.Name }}-app:8080;
         }
 {{- end }}
+{{- if include "wandb.ingress.consoleEnabled" . }}
         location /console {
           proxy_pass http://{{ .Release.Name }}-console:8082;
         }
+{{- end }}
 {{- if .Values.global.api.enabled }}
   {{- if .Values.global.api.additionalPaths.analytics }}
         location /analytics {
@@ -124,7 +126,7 @@ data:
 
 {{- if index .Values "mcp-server" "install" }}
         location /mcp {
-          proxy_pass http://{{ .Release.Name }}-mcp-server:8080;
+          proxy_pass http://{{ include "wandb.mcpServiceName" . }}:{{ include "wandb.mcpServicePort" . }};
           proxy_buffering off;
           proxy_cache off;
           proxy_read_timeout 86400s;

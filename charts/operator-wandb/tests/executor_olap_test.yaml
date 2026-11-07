@@ -1,0 +1,46 @@
+suite: executor OLAP history env
+templates:
+  - charts/executor/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+
+# helm-unittest cannot assert on templates of a subchart that Helm disabled via
+# its dependency condition. executor.install defaults to false, so both cases
+# below set install: true. The no-OLAP case is also covered by snapshots that
+# install executor without global.olap.history.enabled.
+tests:
+  - it: sets the ClickHouse history DSN on executor when history OLAP is enabled
+    template: charts/executor/templates/deployment.yaml
+    set:
+      executor.install: true
+      global:
+        olap:
+          default:
+            host: history-clickhouse.example.com
+            password: history-password
+          history:
+            enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: wandb-executor-bc
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS
+            value: clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)
+
+  - it: omits the ClickHouse history DSN on executor when history OLAP is disabled
+    template: charts/executor/templates/deployment.yaml
+    set:
+      executor.install: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_HISTORY_STORAGE_ENGINE_ADDRESS

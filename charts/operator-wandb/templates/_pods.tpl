@@ -87,3 +87,9 @@ securityContext:
   {{- toYaml .Values.init.containerSecurityContext | nindent 2 }}
   {{- end }}
 {{- end }}
+
+{{/* Direct Helm test Pods share the workload profile; no legacy identity defaults. */}}
+{{- define "wandb.testSecurityProfile" -}}
+  {{- $hook := default dict (get .root.Values.testHooks .name) -}}
+  {{- include "wandb-base.securityProfile" (dict "root" .root "podData" .root.Values.testHooks "container" $hook) -}}
+{{- end -}}

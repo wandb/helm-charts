@@ -1,0 +1,25 @@
+suite: MCP NGINX Service routing
+templates:
+  - templates/nginx.yaml
+release:
+  name: customer-a
+
+tests:
+  - it: preserves the default MCP Service destination
+    set:
+      mcp-server.install: true
+    asserts:
+      - matchRegex:
+          path: data["nginx.conf"]
+          pattern: 'proxy_pass http://customer-a-mcp-server:8080;'
+
+  - it: follows the configured MCP Service name and port
+    set:
+      mcp-server.install: true
+      mcp-server.service.name: custom-mcp
+      mcp-server.service.ports:
+        - {name: http, port: 9090, targetPort: 8080, protocol: TCP}
+    asserts:
+      - matchRegex:
+          path: data["nginx.conf"]
+          pattern: 'proxy_pass http://custom-mcp:9090;'

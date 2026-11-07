@@ -6,13 +6,20 @@ Usage:
 
 Returns: YAML string of the merged config map.
 
-Sprig `merge` deep-merges nested maps (like params). Feature keys win,
-missing keys fall through from default.
+Feature values replace defaults as complete values, including valueFrom maps.
+The params map is the exception: its nested keys are merged so a feature can
+override one parameter while inheriting the others.
 */}}
 {{- define "wandb.olapConfig" -}}
   {{- $default := deepCopy (default (dict) (index .root.Values.global.olap "default")) -}}
   {{- $feature := deepCopy (default (dict) (index .root.Values.global.olap .featureName)) -}}
-{{- toYaml (merge $feature $default) -}}
+  {{- $config := merge (deepCopy $feature) $default -}}
+  {{- range $key, $value := $feature -}}
+    {{- if ne $key "params" -}}
+      {{- $_ := set $config $key (deepCopy $value) -}}
+    {{- end -}}
+  {{- end -}}
+{{- toYaml $config -}}
 {{- end -}}
 
 {{/*
@@ -58,6 +65,21 @@ Returns: e.g. "REGISTRY_SEARCH_PASSWORD"
 */}}
 {{- define "wandb.olapSecretKey" -}}
   {{- printf "%s_PASSWORD" .envVarPrefix -}}
+{{- end -}}
+
+{{/*
+wandb.olapConnectionUrl composes an OLAP connection URL from the <prefix>_*
+env vars that wandb.olapFeatureEnvs emits, using Kubernetes $(VAR) expansion.
+Those env vars must precede the env var that uses this URL.
+
+Usage:
+  include "wandb.olapConnectionUrl" (dict "type" $config.type "envVarPrefix" "HISTORY")
+
+Returns: e.g. "clickhouse://$(HISTORY_USER):$(HISTORY_PASSWORD)@$(HISTORY_HOST):$(HISTORY_PORT)/$(HISTORY_DATABASE)$(HISTORY_PARAMS)"
+*/}}
+{{- define "wandb.olapConnectionUrl" -}}
+  {{- $prefix := .envVarPrefix -}}
+  {{- printf "%s://$(%s_USER):$(%s_PASSWORD)@$(%s_HOST):$(%s_PORT)/$(%s_DATABASE)$(%s_PARAMS)" .type $prefix $prefix $prefix $prefix $prefix $prefix -}}
 {{- end -}}
 
 {{/*

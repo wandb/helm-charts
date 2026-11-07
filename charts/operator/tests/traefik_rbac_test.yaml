@@ -1,0 +1,161 @@
+suite: Traefik middleware reconciliation permissions
+templates:
+  - templates/role.yaml
+  - templates/rolebinding.yaml
+  - templates/serviceaccount.yaml
+  - templates/deployment.yaml
+release:
+  name: operator-v1
+  namespace: operator-system
+tests:
+  - it: grants middleware reconciliation through the default ClusterRole
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: templates/role.yaml
+      - isKind:
+          of: ClusterRole
+        template: templates/role.yaml
+      - contains: &middleware_rule
+          path: rules
+          content:
+            apiGroups: [traefik.io]
+            resources: [middlewares]
+            verbs: [create, delete, get, list, patch, update, watch]
+          count: 1
+        template: templates/role.yaml
+      - contains:
+          path: rules
+          content:
+            apiGroups: [networking.k8s.io]
+            resources: [ingresses, networkpolicies]
+            verbs: [create, delete, get, list, patch, update, watch]
+        template: templates/role.yaml
+      - isKind:
+          of: ClusterRoleBinding
+        template: templates/rolebinding.yaml
+      - equal:
+          path: roleRef
+          value:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: wandb-manager-role
+        template: templates/rolebinding.yaml
+      - equal: &manager_subject
+          path: subjects
+          value:
+            - kind: ServiceAccount
+              name: wandb-manager
+              namespace: operator-system
+        template: templates/rolebinding.yaml
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-manager
+        template: templates/deployment.yaml
+  - it: grants middleware reconciliation within the isolated release namespace
+    set:
+      namespaceIsolation.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: templates/role.yaml
+      - isKind:
+          of: Role
+        template: templates/role.yaml
+      - equal:
+          path: metadata.namespace
+          value: operator-system
+        template: templates/role.yaml
+      - contains: *middleware_rule
+        template: templates/role.yaml
+      - isKind:
+          of: RoleBinding
+        template: templates/rolebinding.yaml
+      - equal: &role_ref
+          path: roleRef
+          value:
+            apiGroup: rbac.authorization.k8s.io
+            kind: Role
+            name: wandb-manager-role
+        template: templates/rolebinding.yaml
+      - equal: *manager_subject
+        template: templates/rolebinding.yaml
+  - it: grants middleware reconciliation in every configured additional namespace
+    set:
+      namespaceIsolation.enabled: true
+      namespaceIsolation.additionalNamespaces: [tenant-a, tenant-b]
+    asserts:
+      - hasDocuments:
+          count: 3
+        template: templates/role.yaml
+      - isKind:
+          of: Role
+        template: templates/role.yaml
+      - contains: *middleware_rule
+        template: templates/role.yaml
+      - equal:
+          path: metadata.namespace
+          value: tenant-a
+        documentIndex: 1
+        template: templates/role.yaml
+      - equal:
+          path: metadata.namespace
+          value: tenant-b
+        documentIndex: 2
+        template: templates/role.yaml
+      - hasDocuments:
+          count: 3
+        template: templates/rolebinding.yaml
+      - isKind:
+          of: RoleBinding
+        template: templates/rolebinding.yaml
+      - equal: *role_ref
+        template: templates/rolebinding.yaml
+      - equal: *manager_subject
+        template: templates/rolebinding.yaml
+      - equal:
+          path: metadata.namespace
+          value: tenant-a
+        documentIndex: 1
+        template: templates/rolebinding.yaml
+      - equal:
+          path: metadata.namespace
+          value: tenant-b
+        documentIndex: 2
+        template: templates/rolebinding.yaml
+  - it: binds middleware permissions to a supplied operator-v1 service account
+    set:
+      manager.serviceAccount.create: false
+      manager.serviceAccount.name: operator-v1
+    asserts:
+      - contains: *middleware_rule
+        template: templates/role.yaml
+      - equal:
+          path: subjects
+          value:
+            - kind: ServiceAccount
+              name: operator-v1
+              namespace: operator-system
+        template: templates/rolebinding.yaml
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: operator-v1
+        template: templates/deployment.yaml
+      - hasDocuments:
+          count: 0
+        template: templates/serviceaccount.yaml
+  - it: preserves replacement semantics for explicitly supplied role rules
+    set:
+      namespaceIsolation.enabled: true
+      role.rules:
+        - apiGroups: [traefik.io]
+          resources: [middlewares]
+          verbs: [get]
+    asserts:
+      - equal:
+          path: rules
+          value:
+            - apiGroups: [traefik.io]
+              resources: [middlewares]
+              verbs: [get]
+        template: templates/role.yaml

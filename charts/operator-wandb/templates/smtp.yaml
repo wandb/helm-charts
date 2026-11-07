@@ -1,11 +1,50 @@
-# Any time the password is not a map, we need to create this secret manually
-{{- if not (kindIs "map" .Values.global.email.smtp.password) }}
+{{- $email := .Values.global.email | default dict -}}
+{{- $smtp := $email.smtp | default dict -}}
+{{- $name := include "wandb.smtp.secretName" . -}}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $name | default dict -}}
+{{- $metadata := $existing.metadata | default dict -}}
+{{- $annotations := $metadata.annotations | default dict -}}
+{{- $consoleManaged := eq (get $annotations "wandb.ai/console-managed") "true" -}}
+{{- $data := dict -}}
+{{- if $consoleManaged -}}
+  {{- /* Preserve Console edits and intentional removals on subsequent upgrades. */ -}}
+  {{- $data = $existing.data | default dict -}}
+{{- else -}}
+  {{- /* Only inline/default values belong here. External sources stay in pod env references. */ -}}
+  {{- if not (kindIs "map" $smtp.host) -}}
+    {{- $_ := set $data "SMTP_HOST" ($smtp.host | default "" | toString | b64enc) -}}
+  {{- end -}}
+  {{- if not (kindIs "map" $smtp.port) -}}
+    {{- $_ := set $data "SMTP_PORT" ($smtp.port | default 587 | toString | b64enc) -}}
+  {{- end -}}
+  {{- if not (kindIs "map" $smtp.user) -}}
+    {{- $_ := set $data "SMTP_USER" ($smtp.user | default "" | toString | b64enc) -}}
+  {{- end -}}
+  {{- if not (kindIs "map" $smtp.password) -}}
+    {{- $_ := set $data "SMTP_PASSWORD" ($smtp.password | default "" | toString | b64enc) -}}
+  {{- end -}}
+  {{- if and (not (kindIs "map" $smtp.mailFrom)) (not (empty $smtp.mailFrom)) -}}
+    {{- $_ := set $data "GORILLA_EMAIL_FROM_ADDRESS" ($smtp.mailFrom | toString | b64enc) -}}
+  {{- end -}}
+  {{- if not (include "wandb.smtp.hasReferences" .) -}}
+    {{- $sink := "https://api.wandb.ai/email/dispatch" -}}
+    {{- if $smtp.host -}}
+      {{- $sink = printf "smtp://%s:%s@%s:%s" ($smtp.user | default "" | toString) ($smtp.password | default "" | toString) ($smtp.host | toString) ($smtp.port | default 587 | toString) -}}
+    {{- end -}}
+    {{- $_ := set $data "GORILLA_EMAIL_SINK" ($sink | b64enc) -}}
+  {{- end -}}
+{{- end }}
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ include "wandb.smtp.internalSecretName" . | quote }}
+  name: {{ $name | quote }}
+  annotations:
+    helm.sh/resource-policy: keep
+{{- if $consoleManaged }}
+    wandb.ai/console-managed: "true"
+{{- end }}
   labels:
     {{- include "wandb.commonLabels" . | nindent 4 }}
-data: 
-    {{ include "wandb.smtp.internalSecretKey" . }}: "{{ include "wandb.smtp.password" . | b64enc }}"
-{{- end }}
+type: Opaque
+data:
+  {{- toYaml $data | nindent 2 }}

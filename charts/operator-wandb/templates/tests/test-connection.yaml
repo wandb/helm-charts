@@ -7,8 +7,18 @@ metadata:
   annotations:
     "helm.sh/hook": test
 spec:
+{{- $profile := include "wandb.testSecurityProfile" (dict "root" . "name" "connection") | fromYaml }}
+{{- if $profile.enabled }}
+  automountServiceAccountToken: {{ $profile.automountServiceAccountToken }}
+  securityContext:
+    {{- include "wandb-base.podSecurityProfile" (dict "context" dict "profile" $profile) | nindent 4 }}
+{{- end }}
   containers:
     - name: wandb-verify
+{{- if $profile.enabled }}
+      securityContext:
+        {{- include "wandb-base.containerSecurityProfile" (dict "context" dict "profile" $profile) | nindent 8 }}
+{{- end }}
       image: us-docker.pkg.dev/wandb-production/public/python:3.12
       env:
         - name: WANDB_BASE_URL
@@ -18,5 +28,8 @@ spec:
       command:
         - sh
         - -c
-        - "pip install wandb && wandb verify"
+        - |
+          pip install wandb==0.30.0 && python -u - <<'PYTHON'
+{{ .Files.Get "files/verify_connection.py" | indent 10 }}
+          PYTHON
   restartPolicy: Never

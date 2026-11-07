@@ -29,6 +29,49 @@ The W&B Operator Helm chart is made up of multiple subcharts and components, eac
 - **etcd**: Distributed key-value store (used by bufstream)
 
 
+## Agent Lens metric-threshold alert worker
+
+`weave-trace-alert-worker.install` defaults to `false`. Enable it alongside
+`weave-trace.install` to run `python -m src.workers.alert_worker.alert_worker`
+in a separate deployment using the `wandb/weave-trace` image. Set the worker's
+`image.tag` or `image.digest` to the compatible server release used by your
+installation; the chart's `latest` default is not a compatibility guarantee.
+
+The chart rejects enabling the alert worker without `weave-trace.install` or
+a configured broker (in-chart Kafka/Bufstream or `global.kafka.brokerHost`).
+
+The worker shares the trace ServiceAccount, ClickHouse connection selection,
+CA configuration and trace ConfigMap. Enabling it also enables finished-call
+event production through `WEAVE_ENABLE_ONLINE_EVAL`, even when
+`weave-trace-worker.install` is `false`; it does not install the scoring worker.
+The worker needs a reachable Kafka-compatible broker, ClickHouse and Gorilla,
+the existing `weave-worker-auth` secret, and Redis for cross-replica alert
+suppression. Provision `weave.call_ended` and, for server images that start the
+span consumer in the same process, `weave.score_agent_spans`, with suitable
+consumer permissions and retention. Span-based alerts additionally require
+the selected server release's span-event producer configuration; enabling this
+worker alone does not enable agent scoring. Confirm the broker's initial-offset and
+retained-backlog behavior before first enablement.
+
+Use `global.kafka.brokerHost` / `brokerPort` for an external broker, or the
+chart's Kafka/Bufstream configuration. If broker authentication is required,
+configure `KAFKA_CLIENT_USER` and `KAFKA_CLIENT_PASSWORD` for both the trace
+producer and worker using the server release's supported mechanism; reference
+existing Secrets for credentials. Rendering the chart does not establish
+broker reachability, topic availability, or notification delivery.
+
+Worker-specific environment overrides, such as `ALERT_WORKER_BATCH_SIZE`, go
+under `weave-trace-alert-worker.env`. Resource and scaling overrides belong to
+that worker's values block. The inherited sizing presets need validation
+against actual call volume and rule complexity.
+
+Validate a finished call through to the configured automation destination in a
+non-production environment before customer enablement. Disabling the worker
+stops consumption; retain shared topics, offsets, storage and credentials for
+other workers and subsequent re-enablement. This chart configures operator-v1;
+Operator v2 requires a separate application in the server manifest in
+`wandb/core/onprem/server-manifest`.
+
 ## Prerequisites
 
 ### Kubectl
@@ -50,6 +93,18 @@ The chart requires persistent storage for various components. By default, it use
 By default, the W&B Server chart includes an in-cluster MySQL deployment that is provided by bitnami/MySQL. This deployment is for trial purposes only and not recommended for use in production.
 
 For production deployments, you should use an external MySQL database. You can configure the chart to use an external MySQL database by setting the appropriate parameters in the `global.mysql` section.
+
+##### Aurora IAM authentication
+
+`global.mysql.rdsIamAuth` defaults to `false`. Enable it only with a server image containing the [Aurora IAM connector](https://github.com/wandb/core/pull/49035), an IAM-enabled Aurora cluster, and a dedicated database user configured for IAM authentication.
+
+Set `global.mysql.host` to the Aurora endpoint, `user` to the IAM database user, `awsRegion` to the cluster's region, and `caCert` to the regional RDS CA bundle. Leave `password` and `passwordSecret.name` empty. Disable `mysql.install`, `app.initContainers.init-db.enabled`, and `prometheus.mysql-exporter.install`. The chart rejects conflicting password configuration and renders a password-free DSN with certificate verification.
+
+The CA can be an inline PEM bundle or a `valueFrom.secretKeyRef` or `valueFrom.configMapKeyRef` mapping with `name` and `key`. References mount the existing object and use its key as the certificate filename; the chart does not create a CA Secret for them.
+
+Each database workload needs a service-account role authorized for that cluster resource ID and database user. Preserve its existing object-storage, queue, KMS, and Secrets Manager permissions when assigning the role. The [IAM render fixture](../../../test-configs/operator-wandb/mysql-aws-iam.yaml) shows the workload annotations; its CA and role ARN are test values. Weave and Weave Trace are excluded from these database-role annotations.
+
+The ClickHouse migration hook does not mount the MySQL CA Secret, which may not exist until the same upgrade creates it. Its global custom CA ConfigMap remains mounted. To return to password authentication, disable `rdsIamAuth`, restore the password configuration, and restore the initializer and exporter settings used before cutover.
 
 #### Redis
 
@@ -104,6 +159,55 @@ global:
   # Global priority class applied to all deployments/pods
   priorityClassName: ""
 ```
+
+### Datastore and license Secret precedence
+
+When `global.mysql.fromSecret` or `global.redis.fromSecret` is set, the named
+Secret supplies the connection settings instead of the corresponding inline
+`global.mysql` or `global.redis` values. Likewise, `global.licenseSecret.name`
+selects the external license Secret instead of `global.license`.
+
+These Secret-backed env entries also render `value: ""` so Helm clears any
+inline env value left by an earlier upgrade. This makes the Secret take effect
+while the old Terraform CR fields are still present, including after a partial
+upgrade. Render-time options such as MySQL CA certificates and IAM settings
+remain Helm values.
+
+### Azure managed storage workload identity
+
+Before setting `global.azureStorageIdentity`, deploy a server build containing
+[instance-level Azure identity support and blob-scoped SAS signing](https://github.com/wandb/core/pull/48160).
+Check the images running in every storage-consuming workload, including component
+image overrides. A chart upgrade or a projected Azure token does not make an older
+server use workload identity; it can still sign requests with an empty account key
+after the chart removes `AZURE_STORAGE_KEY`.
+
+Provision the instance managed identity, storage permissions, and federated
+credentials through Terraform before enabling the chart setting. For an initial
+rollout, set `global.azureStorageIdentity.serviceAccount.mode: component` to keep
+the existing Kubernetes service accounts. Consolidation with `grouped` is a separate
+migration.
+
+Set `global.defaultBucket.azureAuthMethod: workloadIdentity` to select the
+deployment identity for the managed bucket. Set it to `accessKey` to use the
+storage key while keeping the identity available. When omitted, the chart retains
+the previous behavior: a configured global or legacy default-bucket identity
+selects workload identity; otherwise it uses the key. A named `global.bucket`
+overrides the complete default bucket configuration, including authentication;
+its own `azureAuthMethod` selects the method independently.
+
+Inventory optional storage consumers and workloads left over from older chart
+releases. If parquet uses the metadata cache, keep
+`parquet-metadata-cache.install: true` and configure its service account for Azure
+identity too. It can reuse the parquet account when their permissions match.
+Check that every replacement pod is ready and every old replica has terminated;
+an available old pod can hide a replacement that is failing to start.
+
+Retain the storage key securely during validation so selecting `accessKey` and
+supplying the key restores key authentication. Verify actual run-file and artifact uploads
+and downloads, and check that server-issued SAS URLs use the intended managed
+identity with blob scope (`sr=b`). Pod readiness alone does not validate storage
+authentication.
 
 ### Global Pod Scheduling
 
@@ -202,6 +306,84 @@ api:
       memory: 1Gi
 ```
 
+### MCP Server
+
+The MCP Server is disabled by default for direct Helm and Self-Managed installs.
+Its supported configuration is intentionally small: Helm selects a named server
+profile and keeps deployment concerns such as routing and resources separate.
+
+```yaml
+mcp-server:
+  install: true
+  image:
+    repository: wandb/mcp-server
+    tag: "0.4.0"
+    # For an immutable release, set this to sha256: followed by 64 lowercase
+    # hexadecimal characters.
+    digest: ""
+  tools:
+    profile: auto # auto | models-only | models-weave
+  accessMode: read-write # read-write | read-only
+  traceBackend:
+    mode: auto # auto | disabled
+    url: "" # optional external HTTP(S) origin or /traces URL
+  routing:
+    internalBaseUrl: "" # derived from the split API or monolith Service
+  observability:
+    provider: none # none | datadog-agent | otel
+    privacy: standard # off | standard | strict
+  resources: {}
+```
+
+`tools.profile=auto` resolves during chart rendering to `models-only` when no
+trace backend is available and `models-weave` otherwise. The pod always receives
+the resolved profile, never `auto`. In v0.4 these correspond to exact 17/22
+read-write tool manifests (15/20 in read-only mode). Agent, ARIA, and raw GraphQL
+profiles cannot be enabled through this chart.
+
+For the v0.4 transition, the existing Managed Spec
+`datadog.enabled/mode/env/service/deploymentType` and `privacy.logLevel` fields
+remain as a narrow, validated compatibility bridge. They cannot enable direct
+forwarding, inject credentials, or override a conflicting non-default typed
+provider. New configurations should use `observability` only.
+
+The server-owned `dedicated` workload profile controls limits, admission,
+deadlines, sessions, and worker policy. Low-level environment overrides and
+opaque `envFrom` sources are rejected. MCP uses the internal ClusterIP for W&B
+API calls while `global.host` remains the public URL for user-facing links. It
+runs as one steady-state pod without HPA/VPA/KEDA, Kubernetes RBAC, or a mounted
+service-account token. Rolling updates retain `maxSurge: 1` for availability,
+so two independent process budgets can briefly overlap. Liveness uses
+`/mcp/livez`; readiness and the Helm health hook use `/mcp/health` so saturation
+does not restart a healthy process. Component-specific `nodeSelector`, `tolerations`, `affinity`, and
+`topologySpreadConstraints` remain supported scheduling controls.
+
+Capacity follows `global.size`: `default`, `testing`, and `small` select `small`;
+`medium` selects `medium`; `large`, `xlarge`, and `xxlarge` select `large`.
+These select server concurrency budgets, not CPU or memory requests. Resource
+settings remain explicit deployment controls; changing capacity does not resize
+the pod. The numeric defaults stay unchanged pending the release benchmarks.
+
+MCP uses its own ServiceAccount and disables automatic token mounting on both
+the account and Pod. Shared Weave/Azure identity selectors are rejected. Generic
+environment extensions must have literal names and cannot override the typed
+contract or SDK privacy flags, including through container templates. Final
+rendered environment entries must be unique. The inherited CA certificate
+mounts remain available for private upstream certificates.
+
+Ingress and the health hook follow the actual MCP Service name, including
+component name overrides. `mcp-server.service.ports` must contain exactly one
+named `http` TCP port from 1 to 65535 with `targetPort: 8080`. For example, a
+Service port of 9090 is supported while application and probe ports remain 8080.
+
+## Console routing
+
+The Ingress, Traefik Ingress and NGINX config route `/console` to the
+`<release>-console` Service by default, regardless of `console.install`, because
+the Console may be deployed separately from this chart. Set
+`ingress.console.enabled: false` for installs that run no Console. Rendering
+fails if `ingress.defaultBackend` is `console` while this is disabled.
+
 ## Use External Stateful Data
 
 You can configure the W&B Server Helm chart to point to external stateful storage for items like MySQL, Redis, and Storage.
@@ -213,6 +395,118 @@ The following Terraform (IaC) options use this approach:
 - [Azure](https://github.com/wandb/terraform-azurerm-wandb)
 
 For production-grade implementation, the appropriate chart parameters should be used to point to prebuilt, externalized state stores.
+
+## Customer-owned Slack configuration
+
+Helm always creates `<release>-slack-secret` from `global.slack.clientId` and
+`global.slack.secret`, with empty data when neither is configured. API and legacy
+app workloads import it through `envFrom`. The fixed keys are
+`GORILLA_SLACK_CLIENT_ID`, `GORILLA_SLACK_SECRET`, `SLACK_CLIENT_ID`, and
+`SLACK_SECRET`; the legacy aliases contain the same values. Slack keys are no
+longer rendered in the shared global Secret.
+
+Console patches the Secret and sets `wandb.ai/console-managed: "true"`. Helm
+preserves marked live data through `lookup`, including removed keys; unmarked
+Secrets continue following inline values. The `helm.sh/resource-policy: keep`
+annotation preserves the resource when switching to an external reference; it
+is not what protects data from reconciliation. Set
+`global.slack.slackSecret.name` to reference an existing Secret with the same
+fixed keys instead of rendering the default Secret. Argo CD requires separate
+sync ownership rules because offline templating does not resolve live `lookup`.
+
+Roll out this chart before the Console change. Dedicated Cloud Console patches
+the existing Secret and restarts the API deployment. The Secret reference is
+always present, so first credentials, replacements, and removals take effect on
+restart without another Helm update. Existing inline values remain supported;
+legacy/self-managed Console retains its user-spec path.
+
+## Customer-owned OIDC configuration
+
+By default, Helm creates `<release>-oidc-configmap` from the existing inline
+`global.auth.oidc` settings and CORS inputs. It still creates the ConfigMap when
+OIDC is unset; the data is empty unless extra CORS origins are configured.
+The app and API always import the selected ConfigMap through `envFrom`.
+
+To hand the chart-created ConfigMap over to Console, Console must set
+`wandb.ai/console-managed: "true"` on the ConfigMap when it starts managing its
+data. During Helm install/upgrade, `lookup` reads that annotation and reuses the
+live data, including an intentionally empty map. The chart continues rendering
+the ConfigMap and the annotation; no external name or install hook is needed.
+Until the annotation is set, inline values (including operator user-spec and
+Terraform inputs) continue to update the ConfigMap as before. Leave
+Terraform-controlled configuration unmarked. Removing the annotation returns
+data ownership to inline values on the next Helm upgrade.
+
+This preservation requires Helm to render with cluster access, as operator v1
+does. Offline `helm template`, including Argo CD rendering, cannot read the live
+ConfigMap and renders inline values. Argo therefore needs separate data ownership
+rules when it takes over deployment. `helm.sh/resource-policy: keep` protects
+against deletion; it does not prevent data updates.
+
+Set `global.auth.oidc.oidcConfigMap.name` to use an existing ConfigMap in the
+release namespace instead. Helm then references it without creating or reading
+it. Leaving the name empty selects the chart-created ConfigMap.
+
+```yaml
+global:
+  auth:
+    oidc:
+      oidcConfigMap:
+        name: customer-oidc
+```
+
+The keys are the application's fixed environment-variable names. Existing app
+versions still consume the `OIDC_*` aliases, so the chart-created ConfigMap
+preserves them alongside the API's `GORILLA_*` names. Each pair has one value:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: customer-oidc
+data:
+  GORILLA_OIDC_CLIENT_ID: "existing-client-id"
+  OIDC_CLIENT_ID: "existing-client-id"
+  GORILLA_OIDC_ISSUER: "https://idp.example.com"
+  OIDC_ISSUER: "https://idp.example.com"
+  GORILLA_AUTH_METHOD: "pkce"
+  OIDC_AUTH_METHOD: "pkce"
+  GORILLA_CORS_ORIGINS: "https://extra.example.com,https://wandb.example.com,null"
+```
+
+An API-only external ConfigMap needs only the `GORILLA_*` keys. For CORS, preserve
+`app.extraCors` and, while OIDC is enabled, append `global.host` and the literal
+`null` origin. An empty ConfigMap supplies no OIDC variables. Explicit environment
+overrides retain precedence over `envFrom`.
+
+By default, Helm always creates `<release>-oidc-secret`, using inline
+`global.auth.oidc.secret` when configured and `data: {}` otherwise. This gives
+Console an existing Secret to patch, including for customers without a client
+secret. Console can take ownership by setting `wandb.ai/console-managed: "true"`
+on that Secret along with its data. Helm then preserves the live data, including
+empty data, and keeps rendering the Secret after the inline value is removed.
+The app/API always reference the chart-created Secret with `optional: true`.
+A missing credential key does not add an environment variable or prevent startup;
+it does not enable OIDC. Adding the first credential, changing it, or removing
+its key takes effect when the consuming workload restarts, without needing a
+Helm render to change the Deployment's Secret references. To clear a credential,
+Console should remove its key from the Secret. Unmarked Secrets continue
+following inline values.
+
+An external `oidcSecret.name` still references an existing Secret without
+rendering or looking it up. `oidcSecret.secretKey` remains supported (default
+`OIDC_SECRET`), and both `GORILLA_OIDC_SECRET` and `OIDC_SECRET` reference that
+same key. Explicit external Secret references remain required, so a missing
+Secret or key prevents startup as before. No Secret format migration is required.
+As with the ConfigMap,
+preservation requires cluster access during Helm rendering; Argo needs separate
+ownership rules. Terraform-controlled Secrets must remain unmarked.
+
+Provision a named external ConfigMap before selecting it. A missing named
+resource prevents container startup; an empty name uses the inline values.
+After changing external data, restart the consuming workloads to pick it up.
+Helm's `keep` annotation retains a chart-created ConfigMap or Secret during a same-name
+ownership transfer. Console editing and Argo ownership rules are separate work.
 
 ## Using External Secrets
 
@@ -227,11 +521,48 @@ The following credentials can be pulled from external Kubernetes Secrets:
 | Component | Configuration Path | Secret Reference Method |
 |-----------|-------------------|------------------------|
 | **MySQL** | `global.mysql.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
+| **MySQL** | `global.mysql.fromSecret` | Secret name; host, port, database, user and password are read from keys of the same names |
 | **Redis** | `global.redis.secret` | `secretName`, `secretKey` |
-| **ClickHouse** | `global.clickhouse.*` | Each field (host, port, database, user, password) can be a string or a map with `valueFrom` |
+| **Redis** | `global.redis.fromSecret` | Secret name; host, port and password are read from keys of the same names. `params` and `caCert` stay in values |
+| **Environment** | `global.envFrom` | Map of Secret or ConfigMap name to `secretRef`/`configMapRef`; every key becomes an env var in every wandb-base container |
+| **Weave Trace ClickHouse** | `global.clickhouse.*` or an enabled `global.olap.weaveTrace.*` profile | `global.weaveTrace.clickhouseSource` defaults to `auto`; each connection field can be a string or a map with `valueFrom` |
 | **Kafka** | `global.kafka.passwordSecret` | `name`, `passwordKey` |
 | **OIDC** | `global.auth.oidc.oidcSecret` | `name`, `secretKey` |
+| **Session signing** | `global.auth.sessionKey`, `global.auth.sessionKeyPrevious` | Literal value or a map with `valueFrom` |
 | **SMTP** | `global.email.smtp.*` | Each field (host, port, user, password) can be a string or a map with `valueFrom` |
+
+`global.weaveTrace.clickhouseSource` defaults to `auto`. Once Weave is installed
+and its OLAP connection and credentials are provisioned, setting
+`global.olap.weaveTrace.enabled: true` selects that profile automatically if
+there is no customized `global.clickhouse` configuration and `clickhouse.install`
+is false. The stock chart defaults, including the templated bundled hostname,
+do not count as a configured legacy connection. Nonempty custom settings,
+including host or credential references, retain the legacy connection.
+
+| Source | Enabled OLAP profile | Customized legacy configuration or bundled ClickHouse | Selected connection |
+| --- | --- | --- | --- |
+| `auto` (default) | Yes | No | OLAP |
+| `auto` (default) | Yes | Yes | Legacy |
+| `auto` (default) | No | Either | Legacy |
+| `legacy` | Either | Either | Legacy |
+| `olap` | Yes | Either | OLAP |
+| `olap` | No | Either | Render error |
+
+Set `global.weaveTrace.clickhouseSource: olap` explicitly to cut over an existing
+legacy installation. An explicit `legacy` value, including a value retained in
+an older release or user spec, prevents automatic selection. Unknown source
+values fail rendering. These settings select a connection; they do not install
+Weave, create database users, or provision Secrets. Configure the Weave-specific
+credential references in the OLAP profile before enabling it; missing fields
+still inherit from `global.olap.default`.
+
+For a separate migration identity, enable
+`global.olap.weaveTrace.migrator` and provide its user and password through
+Kubernetes `valueFrom` references. Only the `weave-trace-migrate` init
+container receives those credentials. Runtime Weave containers continue to
+use `global.olap.weaveTrace.user` and `global.olap.weaveTrace.password`.
+During A/B rotation, update the runtime and migrator password references to
+the matching slot in the same rollout.
 
 ### Example: Using External Secrets with MySQL/ClickHouse/SMTP
 
@@ -270,6 +601,17 @@ For complete examples with secrets and additional configurations, see:
 - Values: [test-configs/operator-wandb/user-defined-secrets.yaml](../../test-configs/operator-wandb/user-defined-secrets.yaml)
 - Secrets: [test-configs/additional-resources/user-defined-secrets/](../../test-configs/additional-resources/user-defined-secrets/)
 
+### Session Key Rotation
+
+The chart generates `GORILLA_SESSION_KEY` on first install and retains it in the
+release's `gorilla-session-key` Secret. It can rotate that managed key without
+invalidating active sessions by using a three-phase workflow, or perform an
+explicit emergency hard cutover. External Secret users can force the required
+API and app rollouts with `global.auth.sessionKeyRolloutId`.
+
+See [Session Key Rotation](docs/session-key-rotation.md) for the managed
+workflow and external Secret examples.
+
 ## Chart Relationship
 
 The operator-wandb chart uses the wandb-base chart as a building block for deploying various W&B services. The wandb-base chart provides a consistent deployment pattern for different services, while allowing for service-specific configuration.
@@ -300,3 +642,69 @@ helm install wandb ./charts/operator-wandb \
 ## Additional Resources
 
 For more detailed information and advanced configuration options, please refer to the [W&B documentation](https://docs.wandb.ai/).
+
+## Workload security profile
+
+Enable the optional profile for W&B workloads and Helm test Pods:
+
+```yaml
+global:
+  workloadSecurityProfile:
+    enabled: true
+```
+
+The profile defaults to disabled. When enabled, it drops all Linux capabilities,
+disables privilege escalation and privileged mode, sets RuntimeDefault seccomp,
+and disables service-account token automount. Components that use the Kubernetes
+API explicitly retain tokens through their component values. Dependency charts
+use their own security settings.
+
+Settings merge from global to chart alias, then Job/CronJob, then container.
+Later values take precedence, including explicit `false` values and empty
+capability lists. Use `<alias>.workloadSecurityProfile.enabled: false` to opt a
+component out. Container overrides affect container fields only.
+Profile-controlled fields override existing security contexts; other fields
+remain unchanged.
+
+`runAsNonRoot` and `readOnlyRootFilesystem` are optional per-component or
+per-container settings. Enable them for compatible images and configure required
+writable paths with `volumes` and `volumeMounts`. The profile does not assign
+numeric UID/GID values or change existing identity settings.
+
+```yaml
+weave-trace:
+  workloadSecurityProfile:
+    runAsNonRoot: true
+    readOnlyRootFilesystem: true
+```
+
+See [image compatibility and writable paths](../wandb-base/README.md#image-compatibility-and-writable-paths)
+for volume configuration and image-user requirements.
+
+Direct Helm tests inherit the global profile. Override them with
+`testHooks.workloadSecurityProfile` or
+`testHooks.<connection|weave|mcp|olap>.workloadSecurityProfile`. Python verification
+hooks install packages and require writable installation paths.
+
+### Chart-managed bucket connection strings
+
+For chart-managed bucket credentials, Helm writes a complete connection string
+into application environment keys (`BUCKET`, `GORILLA_FILE_STORE`,
+`GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE`, `GORILLA_STORAGE_BUCKET`,
+and `SMJ_FILE_STORE`) in `<release>-bucket`. Bucket consumers load these keys with
+`envFrom`; they do not assemble the URL using Kubernetes environment variable
+expansion. Helm regenerates the value from the effective
+`global.bucket` or `global.defaultBucket` settings on each render. A pod-template
+checksum rolls consuming workloads when the URL changes, so existing Console
+versions can continue saving bucket settings through the user spec.
+
+The existing bucket ConfigMap fields and credential Secret keys remain available,
+including custom credential key names, for compatibility with older chart
+versions. Rolling back restores those versions' environment-variable expressions.
+Direct edits to individual credential keys do not rebuild the connection strings;
+use Helm values to update chart-managed settings.
+
+When `global.bucket.secret.secretName` is supplied, the chart keeps its existing
+external-Secret references and runtime URL expansion. It does not copy external
+credentials or create a replacement credential Secret. This change does not add
+Console ownership, lookups, or change Azure identity or ServiceAccount selection.

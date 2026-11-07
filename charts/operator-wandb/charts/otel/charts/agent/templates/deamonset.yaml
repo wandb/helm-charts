@@ -17,6 +17,9 @@ metadata:
     {{- end }}
   annotations:
     {{- include "wandb.deploymentAnnotations" $ | nindent 4 }}
+    {{- if include "wandb.globalEnvFrom" . | trim }}
+    reloader.stakater.com/auto: "true"
+    {{- end }}
     {{- if .Values.daemonSet.annotations -}}
     {{-   toYaml .Values.daemonSet.annotations | nindent 4 }}
     {{- end }}
@@ -73,6 +76,10 @@ spec:
               containerPort: 8125
               protocol: TCP
               hostPort: 8125
+          {{- with include "wandb.globalEnvFrom" . | trim }}
+          envFrom:
+            {{- . | nindent 12 }}
+          {{- end }}
           env:
             {{ include "wandb.mysqlConfigEnvs" . | nindent 12 }}
             - name: K8S_NODE_NAME

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - charts/operator-wandb/**
+      - charts/wandb-base/**
       - test-configs/operator-wandb/**
       - scripts/normalize_snapshot_chart_versions.py
       - snapshots.sh
@@ -27,8 +28,12 @@ jobs:
           helm repo add prometheus https://prometheus-community.github.io/helm-charts
           helm repo update stakater prometheus
           popd
-          helm plugin install https://github.com/origranot/helm-cascade
+          helm plugin install https://github.com/origranot/helm-cascade --version v1.1.1
           helm cascade build ./charts/operator-wandb/
+          python3 ./test-configs/operator-wandb/test-ip-allowlist-warning.py
+          ./test-configs/operator-wandb/test-mysql-aws-iam.sh
+          helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v1.1.1
+          helm unittest ./charts/operator-wandb/
           helm plugin install https://github.com/jlandowner/helm-chartsnap
           ./snapshots.sh run
       # currently this action always tries to install helm, so dont use it for now
@@ -50,6 +55,7 @@ jobs:
         configuration:
           [
             "default",
+            "security-profile",
             "fmb",
             "oidc-secret-from-k8s",
             "runs-v2-bufstream",

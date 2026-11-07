@@ -1,0 +1,308 @@
+suite: Weave Trace automatic ClickHouse selection
+templates:
+  - charts/weave-trace/templates/deployment.yaml
+  - charts/weave-trace-worker/templates/deployment.yaml
+  - charts/weave-evaluate-model-worker/templates/deployment.yaml
+  - charts/weave-trace-agent-scoring-worker/templates/deployment.yaml
+values:
+  - fixtures/weave_trace_olap.yaml
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: selects an enabled OLAP profile and dedicated identities without a legacy connection
+    template: charts/weave-trace/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: username
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: password
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-migrator
+                key: username
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-migrator
+                key: password
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+          count: 1
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+          count: 1
+          any: true
+
+  - it: uses the same automatic connection for the trace worker
+    template: charts/weave-trace-worker/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: username
+
+  - it: uses the same automatic connection for the evaluate-model worker
+    template: charts/weave-evaluate-model-worker/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: username
+
+  - it: uses the same automatic connection for the agent-scoring worker
+    template: charts/weave-trace-agent-scoring-worker/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave
+                key: username
+
+  - it: treats an empty legacy host as unconfigured
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.host: ""
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
+
+  - it: treats an empty legacy override block as unconfigured
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse: {}
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
+
+  - it: keeps the legacy connection when the OLAP profile is disabled
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.olap.weaveTrace.enabled: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: wandb-clickhouse-headless
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            value: default
+
+  - it: preserves a configured legacy host and migration identity
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.host: legacy-clickhouse.example.com
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: legacy-clickhouse.example.com
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            value: default
+
+  - it: preserves an explicitly configured in-cluster hostname
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.host: wandb-clickhouse-headless
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: wandb-clickhouse-headless
+
+  - it: preserves a legacy host supplied through a Secret
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.host:
+        valueFrom:
+          secretKeyRef:
+            name: legacy-clickhouse
+            key: host
+      global.clickhouse.port: "8443"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            valueFrom:
+              secretKeyRef:
+                name: legacy-clickhouse
+                key: host
+
+  - it: preserves a custom legacy password Secret even without a custom host
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.passwordSecret.name: legacy-clickhouse
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: legacy-clickhouse
+                key: CLICKHOUSE_PASSWORD
+
+  - it: preserves a legacy password supplied through valueFrom
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.password:
+        valueFrom:
+          secretKeyRef:
+            name: legacy-clickhouse
+            key: password
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PASS
+            valueFrom:
+              secretKeyRef:
+                name: legacy-clickhouse
+                key: password
+
+  - it: preserves a custom legacy port
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.port: "9000"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_PORT
+            value: "9000"
+
+  - it: preserves a custom legacy database
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.database: existing_weave
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_DATABASE
+            value: existing_weave
+
+  - it: preserves a custom legacy user
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.user: existing-user
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            value: existing-user
+
+  - it: preserves bundled ClickHouse even with an enabled OLAP profile
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      clickhouse.install: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: wandb-clickhouse-headless
+
+  - it: preserves self-managed replicated ClickHouse settings
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.replicated: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_REPLICATED
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: wandb-clickhouse-headless
+
+  - it: honors an explicit legacy selection even without legacy overrides
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.weaveTrace.clickhouseSource: legacy
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: wandb-clickhouse-headless
+
+  - it: lets an explicit OLAP selection override an existing legacy connection
+    template: charts/weave-trace/templates/deployment.yaml
+    set:
+      global.clickhouse.host: legacy-clickhouse.example.com
+      global.weaveTrace.clickhouseSource: olap
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WF_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: WF_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-migrator
+                key: username

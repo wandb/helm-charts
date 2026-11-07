@@ -5,12 +5,18 @@
 kind: Deployment
 
 global:
+  # Explicit opt-in; also accepted per chart, job/cronJob, and container.
+  workloadSecurityProfile:
+    enabled: false
   env: {}
   # If specified, the chart will prefix all image repositories with this value.
   repositoryPrefix: ""
   imagePullSecrets: []
   # DEPRECATED - Added for backwards compatibility with previous charts
   extraEnv: {}
+  # Sources whose keys become env vars in every container, e.g.
+  # my-secret: secretRef. Skipped with the global env opt-out.
+  envFrom: {}
 
   # Global volumes applied to all pods
   volumes: []
@@ -45,7 +51,14 @@ global:
   # Global priority class that can be inherited from parent charts
   priorityClassName: ""
 
+# Overrides global.workloadSecurityProfile. Empty inherits; enabled: false opts out.
+workloadSecurityProfile: {}
+
 replicaCount: 1
+
+# Optional Pod-level override. Null preserves the selected service account's
+# token mounting behavior; false disables mounting even on a shared account.
+automountServiceAccountToken: null
 
 # The default image to be used for containers in the deployment, can be overridden per container
 image:
@@ -71,9 +84,17 @@ helmHook:
 env: {}
 envTpls: []
 envFrom: {}
+# Additional envFrom entries rendered with the chart context; empty output is omitted.
+envFromTpls: []
 
 # DEPRECATED - Added for backwards compatibility with previous charts
 extraEnv: {}
+
+# Opt out of selected values inherited from the parent chart's global scope.
+# Existing charts continue to inherit both by default.
+globalOptOut:
+  env: false
+  volumes: false
 
 addReloaderAnnotations: true
 
@@ -84,6 +105,7 @@ common:
 
 serviceAccount:
   create: true
+  useWeaveTraceIdentity: false
   automount: true
   annotations: {}
   name: ""

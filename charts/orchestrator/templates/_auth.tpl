@@ -27,6 +27,13 @@ Generate Okta OAuth environment variables using the new valueFrom pattern
   {{- end -}}
 {{- end -}}
 
+{{/*
+Encryption key environment variables.
+VARIABLES_AES_256_KEY falls back to the chart-generated secret when no valueFrom
+reference is given. VARIABLES_AES_256_KEY_PREVIOUS is never generated: it is only
+emitted when global.secrets.encryptionKeyPrevious is set (e.g. an ExternalSecret
+reference during key rotation) and omitted otherwise.
+*/}}
 {{- define "orchestrator.encryptionKeyEnvVars" -}}
   {{- $encryptionKey := .Values.global.secrets.encryptionKey -}}
   {{- if not (include "orchestrator.isValueFrom" $encryptionKey) -}}
@@ -34,7 +41,8 @@ Generate Okta OAuth environment variables using the new valueFrom pattern
 {{ include "orchestrator.envVar" (dict "name" "VARIABLES_AES_256_KEY" "value" (dict "valueFrom" (dict "secretKeyRef" (dict "name" $secretName "key" "AES_256_KEY")))) }}
   {{- else }}
 {{ include "orchestrator.envVar" (dict "name" "VARIABLES_AES_256_KEY" "value" $encryptionKey) }}
-  {{- end -}}
+  {{- end }}
+{{ include "orchestrator.envVar" (dict "name" "VARIABLES_AES_256_KEY_PREVIOUS" "value" .Values.global.secrets.encryptionKeyPrevious) }}
 {{- end -}}
 
 {{- define "orchestrator.authSyncSecretEnvVars" -}}

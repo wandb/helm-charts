@@ -1,0 +1,279 @@
+---
+suite: Traefik ingress gates, TLS and middleware
+templates:
+- templates/ingress.yaml
+- templates/traefik-ingress.yaml
+- templates/ip-allowlist.yaml
+release:
+  name: customer
+  namespace: customer-ns
+set:
+  global.host: https://customer.example.com
+  global.traefikIngress: true
+  global.ipAllowList.enabled: true
+  global.ipAllowList.userCIDRs:
+  - 192.0.2.0/24
+tests:
+- it: legacy=False traefik=False
+  set:
+    global.legacyIngress: false
+    global.traefikIngress: false
+  asserts:
+  - hasDocuments:
+      count: 0
+    template: templates/ingress.yaml
+  - hasDocuments:
+      count: 0
+    template: templates/traefik-ingress.yaml
+  - hasDocuments:
+      count: 0
+    template: templates/ip-allowlist.yaml
+- it: legacy=False traefik=True
+  set:
+    global.legacyIngress: false
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 0
+    template: templates/ingress.yaml
+  - hasDocuments:
+      count: 1
+    template: templates/traefik-ingress.yaml
+  - hasDocuments:
+      count: 1
+    template: templates/ip-allowlist.yaml
+- it: legacy=True traefik=False
+  set:
+    global.legacyIngress: true
+    global.traefikIngress: false
+  asserts:
+  - hasDocuments:
+      count: 1
+    template: templates/ingress.yaml
+  - hasDocuments:
+      count: 0
+    template: templates/traefik-ingress.yaml
+  - hasDocuments:
+      count: 0
+    template: templates/ip-allowlist.yaml
+- it: legacy=True traefik=True
+  set:
+    global.legacyIngress: true
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+    template: templates/ingress.yaml
+  - hasDocuments:
+      count: 1
+    template: templates/traefik-ingress.yaml
+  - hasDocuments:
+      count: 1
+    template: templates/ip-allowlist.yaml
+- it: aws TLS ownership and protected HTTPS attachment
+  set:
+    global.cloudProvider: aws
+    ingress.annotations:
+      external-dns.alpha.kubernetes.io/hostname: do-not-publish.example.com
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      appgw.ingress.kubernetes.io/request-timeout: '300'
+      cert-manager.io/cluster-issuer: legacy-issuer
+  asserts:
+  - equal:
+      path: metadata.name
+      value: customer-traefik
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: metadata.namespace
+      value: customer-ns
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: metadata.annotations
+      value:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.tls: 'true'
+        traefik.ingress.kubernetes.io/router.middlewares: customer-ns-customer-ip-allowlist@kubernetescrd
+        cert-manager.io/cluster-issuer: cert-issuer
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: spec.ingressClassName
+      value: traefik
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: spec.tls
+      value:
+      - secretName: wandb-ssl-cert
+        hosts:
+        - customer.example.com
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: metadata.name
+      value: customer-ip-allowlist
+    template: templates/ip-allowlist.yaml
+  - equal:
+      path: metadata.namespace
+      value: customer-ns
+    template: templates/ip-allowlist.yaml
+- it: gcp TLS ownership and protected HTTPS attachment
+  set:
+    global.cloudProvider: gcp
+    ingress.annotations:
+      external-dns.alpha.kubernetes.io/hostname: do-not-publish.example.com
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      appgw.ingress.kubernetes.io/request-timeout: '300'
+      cert-manager.io/cluster-issuer: legacy-issuer
+  asserts:
+  - equal:
+      path: metadata.name
+      value: customer-traefik
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: metadata.namespace
+      value: customer-ns
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: metadata.annotations
+      value:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.tls: 'true'
+        traefik.ingress.kubernetes.io/router.middlewares: customer-ns-customer-ip-allowlist@kubernetescrd
+        cert-manager.io/cluster-issuer: cert-issuer
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: spec.ingressClassName
+      value: traefik
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: spec.tls
+      value:
+      - secretName: wandb-ssl-cert
+        hosts:
+        - customer.example.com
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: metadata.name
+      value: customer-ip-allowlist
+    template: templates/ip-allowlist.yaml
+  - equal:
+      path: metadata.namespace
+      value: customer-ns
+    template: templates/ip-allowlist.yaml
+- it: azure TLS ownership and protected HTTPS attachment
+  set:
+    global.cloudProvider: azure
+    ingress.annotations:
+      external-dns.alpha.kubernetes.io/hostname: do-not-publish.example.com
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      appgw.ingress.kubernetes.io/request-timeout: '300'
+      cert-manager.io/cluster-issuer: legacy-issuer
+  asserts:
+  - equal:
+      path: metadata.name
+      value: customer-traefik
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: metadata.namespace
+      value: customer-ns
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: metadata.annotations
+      value:
+        traefik.ingress.kubernetes.io/router.entrypoints: websecure
+        traefik.ingress.kubernetes.io/router.tls: 'true'
+        traefik.ingress.kubernetes.io/router.middlewares: customer-ns-customer-ip-allowlist@kubernetescrd
+        cert-manager.io/cluster-issuer: cert-issuer
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: spec.ingressClassName
+      value: traefik
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: spec.tls
+      value:
+      - secretName: wandb-ssl-cert
+        hosts:
+        - customer.example.com
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: metadata.name
+      value: customer-ip-allowlist
+    template: templates/ip-allowlist.yaml
+  - equal:
+      path: metadata.namespace
+      value: customer-ns
+    template: templates/ip-allowlist.yaml
+- it: keeps Traefik routing independent of all legacy creation flags
+  set:
+    ingress.install: false
+    ingress.create: false
+    ingress.secondary.create: false
+  asserts:
+  - hasDocuments:
+      count: 0
+    template: templates/ingress.yaml
+  - hasDocuments:
+      count: 1
+    template: templates/traefik-ingress.yaml
+  - hasDocuments:
+      count: 1
+    template: templates/ip-allowlist.yaml
+- it: allows all three distinctly named Ingress resources
+  set:
+    ingress.secondary.create: true
+    ingress.secondary.nameOverride: customer-private
+  asserts:
+  - hasDocuments:
+      count: 2
+    template: templates/ingress.yaml
+  - hasDocuments:
+      count: 1
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: metadata.name
+      value: customer-traefik
+    template: templates/traefik-ingress.yaml
+- it: aws retains TLS binding when legacy ingress is disabled
+  set:
+    global.legacyIngress: false
+    global.cloudProvider: aws
+  asserts:
+  - hasDocuments:
+      count: 0
+    template: templates/ingress.yaml
+  - hasDocuments:
+      count: 1
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: spec.tls[0].secretName
+      value: wandb-ssl-cert
+    template: templates/traefik-ingress.yaml
+- it: gcp retains TLS binding when legacy ingress is disabled
+  set:
+    global.legacyIngress: false
+    global.cloudProvider: gcp
+  asserts:
+  - hasDocuments:
+      count: 0
+    template: templates/ingress.yaml
+  - hasDocuments:
+      count: 1
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: spec.tls[0].secretName
+      value: wandb-ssl-cert
+    template: templates/traefik-ingress.yaml
+- it: azure retains TLS binding when legacy ingress is disabled
+  set:
+    global.legacyIngress: false
+    global.cloudProvider: azure
+  asserts:
+  - hasDocuments:
+      count: 0
+    template: templates/ingress.yaml
+  - hasDocuments:
+      count: 1
+    template: templates/traefik-ingress.yaml
+  - equal:
+      path: spec.tls[0].secretName
+      value: wandb-ssl-cert
+    template: templates/traefik-ingress.yaml

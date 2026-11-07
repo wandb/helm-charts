@@ -14,8 +14,16 @@
       {{- end -}}
     {{- end -}}
     {{- if $enabled -}}
+      {{- $globalOptOutEnv := false -}}
       {{- $globalOptOutVolumes := false -}}
       {{- $globalOptOut := (default dict $.root.Values.globalOptOut) -}}
+      {{- if hasKey $globalOptOut "env" -}}
+        {{- if kindIs "string" $globalOptOut.env -}}
+          {{- $globalOptOutEnv = eq (tpl $globalOptOut.env $.root | trim | lower) "true" -}}
+        {{- else -}}
+          {{- $globalOptOutEnv = $globalOptOut.env -}}
+        {{- end -}}
+      {{- end -}}
       {{- if and (hasKey $globalOptOut "volumes") -}}
         {{- if kindIs "string" $globalOptOut.volumes -}}
           {{- $globalOptOutVolumes = eq (tpl $globalOptOut.volumes $.root | trim) "true" -}}
@@ -23,6 +31,9 @@
           {{- $globalOptOutVolumes = $globalOptOut.volumes -}}
         {{- end -}}
       {{- end -}}
+      {{- $globalEnv := ternary dict (default dict $.root.Values.global.env) $globalOptOutEnv }}
+      {{- $globalExtraEnv := ternary dict (default dict $.root.Values.global.extraEnv) $globalOptOutEnv }}
+      {{- $globalEnvFrom := ternary dict (default dict $.root.Values.global.envFrom) $globalOptOutEnv }}
       {{- $globalVolumeMounts := ternary list (default list $.root.Values.global.volumeMounts) $globalOptOutVolumes }}
       {{- $globalVolumeMountTpls := ternary list (default list $.root.Values.global.volumeMountsTpls) $globalOptOutVolumes }}
       {{- $container := dict }}
@@ -31,9 +42,14 @@
       {{- $_ = set $container "globalVolumeMounts" $globalVolumeMounts -}}
       {{- $_ = set $container "globalVolumeMountsTpls" $globalVolumeMountTpls -}}
       {{- $_ = set $container "securityContext" (coalesce $container.securityContext (merge $.root.Values.securityContext $.root.Values.container.securityContext)) -}}
+      {{- $profile := include "wandb-base.securityProfile" (dict "root" $.root "podData" $.podData "container" $containerSource) | fromYaml -}}
+      {{- if $profile.enabled -}}
+        {{- $_ = set $container "securityContext" (include "wandb-base.containerSecurityProfile" (dict "context" $container.securityContext "profile" $profile) | fromYaml) -}}
+      {{- end -}}
       {{- $_ = set $container "image" (coalesce $container.image $.root.Values.image) }}
-      {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom))) -}}
-      {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $.root.Values.global.env $.root.Values.global.extraEnv) -}}
+      {{- $_ = set $container "envFrom" (merge (default (dict) ($container.envFrom)) (default (dict) ($.root.Values.envFrom)) $globalEnvFrom) -}}
+      {{- $_ = set $container "envFromTpls" (concat (default list $.root.Values.envFromTpls) (default list $container.envFromTpls)) -}}
+      {{- $_ = set $container "env" (merge (default (dict) ($container.env)) (default (dict) ($.root.Values.env)) $.root.Values.extraEnv $globalEnv $globalExtraEnv) -}}
       {{- $_ = set $container "root" $.root -}}
       {{- if eq $.source "containers" }}
         {{/* Merge in resources from .Values.resources to support legacy chart values */}}
@@ -49,7 +65,7 @@
         {{- end -}}
       {{- end -}}
 
-      {{- /* We prerender the envTpls and put them into an array for searching */ -}}
+      {{- /* Render shared and container-specific env templates. */ -}}
       {{- $envTpls := list }}
       {{- if $.root.Values.envTpls -}}
         {{- range $.root.Values.envTpls }}
@@ -57,7 +73,24 @@
         {{- end -}}
       {{- end -}}
 
-      {{- /* Iterate over the envvars rendered from envTpls, and remove any specified in env to avoid setElementOrder errors */ -}}
+      {{- $containerEnvTpls := list }}
+      {{- if $container.envTpls -}}
+        {{- range $container.envTpls }}
+          {{- $containerEnvTpls = concat $containerEnvTpls (tpl . $.root | fromYamlArray) -}}
+        {{- end -}}
+      {{- end -}}
+
+      {{- /* Container templates override shared templates by variable name. */ -}}
+      {{- range $containerEnvVar := $containerEnvTpls }}
+        {{- range $envVar := $envTpls }}
+          {{- if eq $containerEnvVar.name $envVar.name -}}
+            {{- $envTpls = without $envTpls $envVar -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $envTpls = concat $envTpls $containerEnvTpls -}}
+
+      {{- /* Explicit env values override all rendered env templates. */ -}}
       {{- range $index, $envVar := $envTpls }}
         {{- if hasKey $container.env $envVar.name -}}
           {{- $envTpls = without $envTpls $envVar -}}
@@ -96,6 +129,11 @@
   envFrom:
   {{- if .envFrom }}
     {{- tpl (include "wandb-base.envFrom" . | nindent 4) $.root }}
+  {{- end }}
+  {{- range .envFromTpls }}
+    {{- with tpl . $.root | trim }}
+      {{- . | nindent 4 }}
+    {{- end }}
   {{- end }}
   env:
   {{- if .envTpls }}

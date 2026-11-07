@@ -1,0 +1,35 @@
+{{- $policy := .Values.global.ipAllowList -}}
+{{- $hasCIDRs := or (not (empty $policy.systemCIDRs)) (not (empty $policy.userCIDRs)) -}}
+{{- if $policy.enabled -}}
+  {{- if not $hasCIDRs -}}
+    {{- fail "global.ipAllowList.enabled=true requires at least one CIDR in systemCIDRs or userCIDRs; add an explicit allowed range" -}}
+  {{- end -}}
+{{- else -}}
+  {{- if $hasCIDRs }}
+# WARNING: global.ipAllowList is disabled; configured systemCIDRs and userCIDRs are not enforced. Enable global.ipAllowList.enabled to use them, or remove the CIDRs.
+  {{- end -}}
+  {{- if .Values.global.traefikIngress -}}
+    {{- fail "global.traefikIngress=true requires global.ipAllowList.enabled=true and at least one allowed CIDR" -}}
+  {{- end -}}
+{{- end -}}
+{{- range $owner := list "systemCIDRs" "userCIDRs" -}}
+  {{- range $index, $cidr := index $policy $owner -}}
+    {{- if ne (include "wandb.ipAllowList.validCIDR" $cidr) "true" -}}
+      {{- fail (printf "global.ipAllowList.%s[%d]=%q is malformed; use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128" $owner $index $cidr) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if .Values.global.traefikIngress }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ .Release.Name }}-ip-allowlist
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+spec:
+  ipAllowList:
+    sourceRange:
+      {{- include "wandb.ipAllowList.sourceRanges" . | nindent 6 }}
+{{- end }}

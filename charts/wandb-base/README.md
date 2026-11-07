@@ -19,6 +19,15 @@ The chart is designed to be highly configurable while providing sensible default
 
 One of the key features of this chart is its hierarchical configuration system. Many values can be set at multiple levels, with a clear precedence order. Understanding this precedence is crucial for effective configuration.
 
+### Service-account tokens
+
+`automountServiceAccountToken` optionally controls token mounting on the Pod
+itself. Its default, `null`, leaves Kubernetes and the selected service account
+in control. Set it to `false` when a workload must never receive an automatically
+mounted token, including when it uses an existing service account. Only booleans
+and `null` are accepted; `serviceAccount.automount` still configures the chart's
+ServiceAccount resource independently.
+
 ### Environment Variables
 
 Environment variables can be defined at multiple levels, with the following precedence (highest to lowest):
@@ -59,6 +68,36 @@ envFrom:
   app-config: "configMapRef"
   app-secrets: "secretRef"
 ```
+
+`global.envFrom` takes the same shape and adds its sources to every container
+in every subchart. A chart-level or container-level entry with the same name
+wins.
+
+For conditional sources, use `envFromTpls` at chart or container level. Each
+entry renders a list of `envFrom` sources; empty output is omitted. Shared
+entries follow `envFrom`, then container entries follow shared entries. Explicit
+`env` values take precedence over all imported values.
+
+```yaml
+envFromTpls:
+  - '{{ if .Values.useSecret }}- secretRef: {name: "{{ .Release.Name }}-settings"}{{ end }}'
+```
+
+Subcharts inherit `global.env`, `global.envFrom` and the legacy `global.extraEnv` by default. A
+workload that must receive only its chart-local environment can disable that
+inheritance without changing other subcharts:
+
+```yaml
+globalOptOut:
+  env: true
+  volumes: true
+```
+
+`globalOptOut.env` excludes all three. It does not remove chart-local `env`, `extraEnv`, `envTpls`, or
+`envFrom` values. `globalOptOut.volumes` excludes inherited `global.volumes`
+and `global.volumesTpls` while retaining chart-local `volumes` and
+`volumesTpls`. Existing installations remain unchanged when either option is
+omitted.
 
 ### Volumes
 
@@ -816,3 +855,87 @@ For more information on Kubernetes concepts used in this chart:
 - [Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)
 - [Vertical Pod Autoscaling](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)
 - [KEDA (Kubernetes Event Driven Autoscaling)](https://keda.sh/)
+
+## Opt-in workload security profile
+
+`global.workloadSecurityProfile.enabled: true` enables dropped Linux capabilities
+(`ALL`), `allowPrivilegeEscalation: false`, `privileged: false`, and
+`seccompProfile.type: RuntimeDefault` for this chart's containers and init
+containers, including Jobs, CronJobs and StatefulSets. Omitted/disabled profiles
+preserve existing rendering.
+
+Settings merge in this order, with the last supplied value winning:
+`global.workloadSecurityProfile`, chart `workloadSecurityProfile`,
+`jobs.<name>.workloadSecurityProfile` or `cronJobs.<name>.workloadSecurityProfile`,
+and container `workloadSecurityProfile`. A component can set `enabled: false`.
+Container overrides affect container fields only. False values and empty
+capability lists are intentional overrides, not missing values.
+
+When enabled, profile-controlled fields override existing security contexts;
+other existing fields remain intact. Use named profile exceptions rather than
+expecting a legacy `securityContext` to override the profile. For example:
+
+```yaml
+global:
+  workloadSecurityProfile:
+    enabled: true
+containers:
+  listener:
+    workloadSecurityProfile:
+      capabilities:
+        drop: [ALL]
+        add: [NET_BIND_SERVICE]
+```
+
+The profile adds no numeric UID/GID. Existing chart identity settings remain in
+place. Use an image compatible with the configured user and group settings.
+
+Enabled profiles also set `automountServiceAccountToken: false` on Pods and
+chart-created service accounts. Pod-level control applies even to external,
+shared or default service accounts; it does not remove explicit projected
+workload-identity volumes. Kubernetes API consumers must explicitly set
+`workloadSecurityProfile.automountServiceAccountToken: true` at the component
+or Job level. An enabled profile takes precedence over the direct Pod
+`automountServiceAccountToken` setting. The renderer does not infer API
+requirements from RBAC creation.
+
+When a Job or CronJob disables an inherited profile but uses a chart-created
+ServiceAccount with the profile enabled, its Pod explicitly restores the legacy
+`serviceAccount.automount` setting. An explicit Job/CronJob
+`automountServiceAccountToken` still takes precedence. External or shared identity
+accounts retain their own policy when the Pod does not specify an override.
+
+### Image compatibility and writable paths
+
+`runAsNonRoot` and `readOnlyRootFilesystem` are optional profile booleans.
+They are applied only when explicitly supplied on an enabled profile. A child
+container can override either with `false`. These settings do not depend on the server version.
+Neither flag provisions writable paths or changes existing volumes.
+
+Use the existing per-workload/Job `volumes` and per-container `volumeMounts`
+controls for required writable paths, including init containers. For example,
+a component with a compatible image can use:
+
+```yaml
+workloadSecurityProfile:
+  enabled: true
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+# Use the image USER or a platform-assigned UID instead of chart defaults.
+podSecurityContext:
+  runAsUser: null
+  runAsGroup: null
+  fsGroup: null
+volumes:
+  - name: temporary
+    emptyDir: {}
+containers:
+  app:
+    volumeMounts:
+      - name: temporary
+        mountPath: /tmp
+```
+
+Configure writable mounts for the paths your image uses, and preserve any
+required persistent volumes. A non-root image USER or platform-assigned UID is
+required when removing the chart's numeric identity settings.

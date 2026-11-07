@@ -21,6 +21,14 @@
 /app/definitions/collector/managed-install.yaml
 {{- end -}}
 
+{{- define "wandb.lumen.remoteConfigEnabled" -}}
+{{- dig "lumen" "remoteConfig" "enabled" false .Values.global | toString -}}
+{{- end -}}
+
+{{- define "wandb.lumen.remoteConfigUrl" -}}
+{{- dig "lumen" "remoteConfig" "url" "" .Values.global -}}
+{{- end -}}
+
 {{- define "wandb.lumen.publish.envVars" -}}
   {{- if eq (dig "lumen" "publish" "envVars" false .Values.global | toString) "true" -}}
 true

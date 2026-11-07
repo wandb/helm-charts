@@ -1,0 +1,924 @@
+---
+suite: ip_allowlist
+templates:
+- templates/ip-allowlist.yaml
+tests:
+- it: preserves defaults without a Traefik custom resource
+  set: {}
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: stages a valid policy without middleware
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 10.0.0.0/8
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: rejects invalid policy state 2
+  set:
+    global.ipAllowList.enabled: true
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.enabled=true requires at least one CIDR in
+        systemCIDRs or userCIDRs; add an explicit allowed range
+- it: rejects invalid policy state 3
+  set:
+    global.traefikIngress: true
+  asserts:
+  - failedTemplate:
+      errorMessage: global.traefikIngress=true requires global.ipAllowList.enabled=true
+        and at least one allowed CIDR
+- it: warns without middleware when disabled with systemCIDRs
+  set:
+    global.ipAllowList.systemCIDRs:
+    - 10.0.0.0/8
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: warns without middleware when disabled with userCIDRs
+  set:
+    global.ipAllowList.userCIDRs:
+    - 10.0.0.0/8
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: accepts systemCIDRs 0.0.0.0/0
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 0.0.0.0/0
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 0.0.0.0/0
+- it: accepts systemCIDRs 255.255.255.255/32
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 255.255.255.255/32
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 255.255.255.255/32
+- it: accepts systemCIDRs 192.0.2.5/24
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 192.0.2.5/24
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 192.0.2.5/24
+- it: accepts systemCIDRs 192.0.2.1/08
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 192.0.2.1/08
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 192.0.2.1/08
+- it: accepts systemCIDRs ::/0
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - "::/0"
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - "::/0"
+- it: accepts systemCIDRs ::1/128
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - "::1/128"
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - "::1/128"
+- it: accepts systemCIDRs 2001:db8::/32
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 2001:db8::/32
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 2001:db8::/32
+- it: accepts systemCIDRs 2001:DB8:0:0:0:0:0:1/128
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 2001:DB8:0:0:0:0:0:1/128
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 2001:DB8:0:0:0:0:0:1/128
+- it: accepts systemCIDRs 1:2:3:4:5:6:7::/127
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 1:2:3:4:5:6:7::/127
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 1:2:3:4:5:6:7::/127
+- it: accepts systemCIDRs ::ffff:192.0.2.1/128
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - "::ffff:192.0.2.1/128"
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - "::ffff:192.0.2.1/128"
+- it: accepts systemCIDRs 1:2:3:4:5:6:192.0.2.1/96
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 1:2:3:4:5:6:192.0.2.1/96
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 1:2:3:4:5:6:192.0.2.1/96
+- it: rejects systemCIDRs ''
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - ''
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="" is malformed; use an IPv4
+        CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '*'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - "*"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="*" is malformed; use an IPv4
+        CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs 'example.com/24'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - example.com/24
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="example.com/24" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '192.0.2.1'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 192.0.2.1
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="192.0.2.1" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '256.1.1.1/32'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 256.1.1.1/32
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="256.1.1.1/32" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '192.00.2.1/24'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 192.00.2.1/24
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="192.00.2.1/24" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '192.0.2/24'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 192.0.2/24
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="192.0.2/24" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '192.0.2.1/33'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 192.0.2.1/33
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="192.0.2.1/33" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '192.0.2.1/-1'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 192.0.2.1/-1
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="192.0.2.1/-1" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '192.0.2.1/+1'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 192.0.2.1/+1
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="192.0.2.1/+1" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '192.0.2.1/8/1'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 192.0.2.1/8/1
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="192.0.2.1/8/1" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '192.0.2.1/24 '
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - '192.0.2.1/24 '
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="192.0.2.1/24 " is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '::/129'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - "::/129"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="::/129" is malformed; use an
+        IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '::/-1'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - "::/-1"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="::/-1" is malformed; use an
+        IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '2001:db8::'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - '2001:db8::'
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="2001:db8::" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '2001:db8::g/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 2001:db8::g/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="2001:db8::g/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '1:2:3:4:5:6:7/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 1:2:3:4:5:6:7/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="1:2:3:4:5:6:7/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '1:2:3:4:5:6:7:8:9/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 1:2:3:4:5:6:7:8:9/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="1:2:3:4:5:6:7:8:9/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '1:2:3:4:5:6:7:8::/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 1:2:3:4:5:6:7:8::/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="1:2:3:4:5:6:7:8::/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '1::2::3/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 1::2::3/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="1::2::3/64" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs ':::/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - ":::/64"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]=":::/64" is malformed; use an
+        IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs ':1:2:3:4:5:6:7:8/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - ":1:2:3:4:5:6:7:8/64"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]=":1:2:3:4:5:6:7:8/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '1::2:/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 1::2:/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="1::2:/64" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs 'fe80::1%eth0/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - fe80::1%eth0/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="fe80::1%eth0/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '::ffff:256.1.1.1/128'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - "::ffff:256.1.1.1/128"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="::ffff:256.1.1.1/128" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '::ffff:192.00.2.1/128'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - "::ffff:192.00.2.1/128"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="::ffff:192.00.2.1/128" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '1:2:3:4:5:6:7:192.0.2.1/128'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 1:2:3:4:5:6:7:192.0.2.1/128
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="1:2:3:4:5:6:7:192.0.2.1/128"
+        is malformed; use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '192.0.2.1::/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 192.0.2.1::/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="192.0.2.1::/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects systemCIDRs '[::1]/128'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - "[::1]/128"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.systemCIDRs[0]="[::1]/128" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: accepts userCIDRs 0.0.0.0/0
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 0.0.0.0/0
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 0.0.0.0/0
+- it: accepts userCIDRs 255.255.255.255/32
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 255.255.255.255/32
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 255.255.255.255/32
+- it: accepts userCIDRs 192.0.2.5/24
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 192.0.2.5/24
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 192.0.2.5/24
+- it: accepts userCIDRs 192.0.2.1/08
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 192.0.2.1/08
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 192.0.2.1/08
+- it: accepts userCIDRs ::/0
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - "::/0"
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - "::/0"
+- it: accepts userCIDRs ::1/128
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - "::1/128"
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - "::1/128"
+- it: accepts userCIDRs 2001:db8::/32
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 2001:db8::/32
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 2001:db8::/32
+- it: accepts userCIDRs 2001:DB8:0:0:0:0:0:1/128
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 2001:DB8:0:0:0:0:0:1/128
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 2001:DB8:0:0:0:0:0:1/128
+- it: accepts userCIDRs 1:2:3:4:5:6:7::/127
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 1:2:3:4:5:6:7::/127
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 1:2:3:4:5:6:7::/127
+- it: accepts userCIDRs ::ffff:192.0.2.1/128
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - "::ffff:192.0.2.1/128"
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - "::ffff:192.0.2.1/128"
+- it: accepts userCIDRs 1:2:3:4:5:6:192.0.2.1/96
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 1:2:3:4:5:6:192.0.2.1/96
+    global.traefikIngress: true
+  asserts:
+  - hasDocuments:
+      count: 1
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 1:2:3:4:5:6:192.0.2.1/96
+- it: rejects userCIDRs ''
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - ''
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="" is malformed; use an IPv4 CIDR
+        with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '*'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - "*"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="*" is malformed; use an IPv4
+        CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs 'example.com/24'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - example.com/24
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="example.com/24" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '192.0.2.1'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 192.0.2.1
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="192.0.2.1" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '256.1.1.1/32'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 256.1.1.1/32
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="256.1.1.1/32" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '192.00.2.1/24'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 192.00.2.1/24
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="192.00.2.1/24" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '192.0.2/24'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 192.0.2/24
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="192.0.2/24" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '192.0.2.1/33'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 192.0.2.1/33
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="192.0.2.1/33" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '192.0.2.1/-1'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 192.0.2.1/-1
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="192.0.2.1/-1" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '192.0.2.1/+1'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 192.0.2.1/+1
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="192.0.2.1/+1" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '192.0.2.1/8/1'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 192.0.2.1/8/1
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="192.0.2.1/8/1" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '192.0.2.1/24 '
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - '192.0.2.1/24 '
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="192.0.2.1/24 " is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '::/129'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - "::/129"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="::/129" is malformed; use an
+        IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '::/-1'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - "::/-1"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="::/-1" is malformed; use an IPv4
+        CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '2001:db8::'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - '2001:db8::'
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="2001:db8::" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '2001:db8::g/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 2001:db8::g/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="2001:db8::g/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '1:2:3:4:5:6:7/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 1:2:3:4:5:6:7/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="1:2:3:4:5:6:7/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '1:2:3:4:5:6:7:8:9/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 1:2:3:4:5:6:7:8:9/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="1:2:3:4:5:6:7:8:9/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '1:2:3:4:5:6:7:8::/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 1:2:3:4:5:6:7:8::/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="1:2:3:4:5:6:7:8::/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '1::2::3/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 1::2::3/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="1::2::3/64" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs ':::/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - ":::/64"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]=":::/64" is malformed; use an
+        IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs ':1:2:3:4:5:6:7:8/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - ":1:2:3:4:5:6:7:8/64"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]=":1:2:3:4:5:6:7:8/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '1::2:/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 1::2:/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="1::2:/64" is malformed; use an
+        IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs 'fe80::1%eth0/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - fe80::1%eth0/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="fe80::1%eth0/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '::ffff:256.1.1.1/128'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - "::ffff:256.1.1.1/128"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="::ffff:256.1.1.1/128" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '::ffff:192.00.2.1/128'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - "::ffff:192.00.2.1/128"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="::ffff:192.00.2.1/128" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '1:2:3:4:5:6:7:192.0.2.1/128'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 1:2:3:4:5:6:7:192.0.2.1/128
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="1:2:3:4:5:6:7:192.0.2.1/128"
+        is malformed; use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '192.0.2.1::/64'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - 192.0.2.1::/64
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="192.0.2.1::/64" is malformed;
+        use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: rejects userCIDRs '[::1]/128'
+  set:
+    global.ipAllowList.enabled: true
+    global.ipAllowList.userCIDRs:
+    - "[::1]/128"
+  asserts:
+  - failedTemplate:
+      errorMessage: global.ipAllowList.userCIDRs[0]="[::1]/128" is malformed; use
+        an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128
+- it: renders the stable deduplicated ownership union
+  set:
+    global.traefikIngress: true
+    global.ipAllowList.enabled: true
+    global.ipAllowList.systemCIDRs:
+    - 10.0.0.0/8
+    - "::/0"
+    global.ipAllowList.userCIDRs:
+    - "::/0"
+    - 192.0.2.0/24
+  asserts:
+  - hasDocuments:
+      count: 1
+  - isKind:
+      of: Middleware
+  - equal:
+      path: spec.ipAllowList.sourceRange
+      value:
+      - 10.0.0.0/8
+      - "::/0"
+      - 192.0.2.0/24
+  - notExists:
+      path: spec.ipAllowList.ipStrategy
+- it: rejects wrong type for global.legacyIngress
+  set:
+    global.legacyIngress: 'false'
+  asserts:
+  - failedTemplate: {}
+- it: rejects wrong type for global.traefikIngress
+  set:
+    global.traefikIngress: 'true'
+  asserts:
+  - failedTemplate: {}
+- it: rejects wrong type for global.ipAllowList.enabled
+  set:
+    global.ipAllowList.enabled: 'true'
+  asserts:
+  - failedTemplate: {}
+- it: rejects wrong type for global.ipAllowList.systemCIDRs
+  set:
+    global.ipAllowList.systemCIDRs: 10.0.0.0/8
+  asserts:
+  - failedTemplate: {}
+- it: rejects wrong type for global.ipAllowList.userCIDRs
+  set:
+    global.ipAllowList.userCIDRs:
+    - 7
+  asserts:
+  - failedTemplate: {}
+- it: accepts both CIDR lists with the policy explicitly disabled
+  set:
+    global.ipAllowList.enabled: false
+    global.ipAllowList.systemCIDRs: [10.0.0.0/8]
+    global.ipAllowList.userCIDRs: ['2001:db8::/32']
+  asserts:
+  - hasDocuments:
+      count: 0
+- it: rejects Traefik activation with disabled policy even when CIDRs are populated
+  set:
+    global.traefikIngress: true
+    global.ipAllowList.systemCIDRs: [10.0.0.0/8]
+  asserts:
+  - failedTemplate:
+      errorMessage: global.traefikIngress=true requires global.ipAllowList.enabled=true and at least one allowed CIDR
+- it: rejects malformed CIDRs even when the policy is disabled
+  set:
+    global.ipAllowList.userCIDRs: ['::/129']
+  asserts:
+  - failedTemplate:
+      errorMessage: 'global.ipAllowList.userCIDRs[0]="::/129" is malformed; use an IPv4 CIDR with prefix 0-32 or IPv6 CIDR with prefix 0-128'
