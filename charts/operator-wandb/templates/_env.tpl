@@ -313,10 +313,17 @@ Global values will override any chart-specific values.
   {{- end -}}
 {{- end -}}
 
-{{/* Managed specs can reference this Secret before GSM backfill; absent keys should leave env vars unset. */}}
 {{- define "wandb.weaveBillingClickhouseEnvs" -}}
   {{- $billing := .Values.global.weaveBillingClickhouse -}}
-  {{- if $billing.secretName }}
+  {{- $olapBilling := default (dict) $billing.olap -}}
+  {{- $useOlapBilling := false -}}
+  {{- if $olapBilling.enabled -}}
+    {{- $useOlapBilling = eq (include "wandb.weaveTraceClickhouseSource" .) "olap" -}}
+  {{- end -}}
+  {{- if $useOlapBilling }}
+{{ include "wandb.weaveBillingClickhouseOlapEnvs" . }}
+  {{- else if $billing.secretName }}
+    {{- /* Managed specs can reference this Secret before GSM backfill; absent keys should leave env vars unset. */}}
 - name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
   valueFrom:
     secretKeyRef:
@@ -330,6 +337,35 @@ Global values will override any chart-specific values.
       key: {{ $billing.secretKey | quote }}
       optional: true
   {{- end }}
+{{- end -}}
+
+{{- define "wandb.weaveBillingClickhouseOlapEnvs" -}}
+  {{- /*
+    Gorilla takes the billing connection as an address plus a separate secret.
+    Build the address from the Weave Trace OLAP host and database so billing
+    reads the service Weave writes to. The identity is read-only, so the
+    connection must not try to create a missing database.
+  */ -}}
+  {{- $config := include "wandb.olapConfig" (dict "root" . "featureName" "weaveTrace") | fromYaml -}}
+  {{- $billing := .Values.global.weaveBillingClickhouse.olap -}}
+  {{- range $field := list "user" "password" -}}
+    {{- $value := index $billing $field -}}
+    {{- if not (kindIs "map" $value) -}}
+      {{- fail (printf "global.weaveBillingClickhouse.olap.%s must use valueFrom" $field) -}}
+    {{- end -}}
+    {{- if not (hasKey $value "valueFrom") -}}
+      {{- fail (printf "global.weaveBillingClickhouse.olap.%s must use valueFrom" $field) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $address := "clickhouse://$(WEAVE_BILLING_CLICKHOUSE_USER)@$(WEAVE_BILLING_CLICKHOUSE_HOST):$(WEAVE_BILLING_CLICKHOUSE_PORT)/$(WEAVE_BILLING_CLICKHOUSE_DATABASE)?auto-create=false" -}}
+  {{- $envs := list -}}
+  {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WEAVE_BILLING_CLICKHOUSE_HOST" "value" $config.host) | fromYaml) -}}
+  {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WEAVE_BILLING_CLICKHOUSE_PORT" "value" $billing.port) | fromYaml) -}}
+  {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WEAVE_BILLING_CLICKHOUSE_DATABASE" "value" $config.database) | fromYaml) -}}
+  {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "WEAVE_BILLING_CLICKHOUSE_USER" "value" $billing.user) | fromYaml) -}}
+  {{- $envs = append $envs (dict "name" "GORILLA_WEAVE_CLICKHOUSE_ADDRESS" "value" $address) -}}
+  {{- $envs = append $envs (include "wandb.weaveTraceOlapEnv" (dict "root" . "name" "GORILLA_WEAVE_CLICKHOUSE_SECRET" "value" $billing.password) | fromYaml) -}}
+{{- toYaml $envs }}
 {{- end -}}
 
 {{- define "wandb.clickhouseEnvs" -}}
