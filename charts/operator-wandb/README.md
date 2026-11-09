@@ -72,6 +72,29 @@ other workers and subsequent re-enablement. This chart configures operator-v1;
 Operator v2 requires a separate application in the server manifest in
 `wandb/core/onprem/server-manifest`.
 
+## Upgrading to 0.45.0
+
+### Legacy settings migration for on-prem installations using operator-v1
+
+Chart `0.45.0` removes the settings migration job (SMJ), which copied legacy
+`settings.json` configuration from the `wandb-env.tar.gz` bucket object into the
+operator user spec. This guidance applies to on-prem customers using
+operator-v1 whose legacy configuration is not yet present in the user spec.
+
+SMJ is no longer a safe or recommended migration path. Before upgrading to
+chart `0.45.0` or a server release that removes SMJ, work with your W&B Field
+team to identify and port any missing configuration into the operator user
+spec, then verify that the installation retains its required settings. Do not
+install an intermediate server release solely to run SMJ; a version number
+alone does not establish that the legacy settings have been migrated. Customers
+whose configuration is already in the user spec do not need this migration
+step.
+
+The chart ignores the removed `settingsMigrationJob.*` and
+`global.settingsMigrationJob.*` values. Upgrading an installation that had
+`settingsMigrationJob.install: true` also removes the job and its chart-managed
+Secret, ServiceAccount, Role and RoleBinding.
+
 ## Prerequisites
 
 ### Kubectl
