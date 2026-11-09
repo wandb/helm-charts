@@ -1,0 +1,50 @@
+suite: Weave billing ClickHouse OLAP identity
+templates:
+  - charts/glue/templates/deployment.yaml
+values:
+  - fixtures/weave_trace_olap.yaml
+set:
+  global.glue.enabled: true
+  global.olap.default.host: managed-clickhouse.example.com
+  global.olap.weaveBilling.enabled: true
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: rejects billing that would inherit the default identity
+    asserts:
+      - failedTemplate:
+          errorMessage: global.olap.weaveBilling.user and password must be set; billing does not inherit global.olap.default credentials
+
+  - it: rejects billing without a dedicated password
+    set:
+      global.olap.weaveBilling.user:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-weave-billing
+            key: username
+    asserts:
+      - failedTemplate:
+          errorMessage: global.olap.weaveBilling.user and password must be set; billing does not inherit global.olap.default credentials
+
+  - it: rejects billing without a dedicated user
+    set:
+      global.olap.weaveBilling.password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-weave-billing
+            key: password
+    asserts:
+      - failedTemplate:
+          errorMessage: global.olap.weaveBilling.user and password must be set; billing does not inherit global.olap.default credentials
+
+  - it: does not require a billing identity when Weave Trace resolves to legacy ClickHouse
+    set:
+      global.clickhouse.host: legacy-clickhouse.example.com
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
