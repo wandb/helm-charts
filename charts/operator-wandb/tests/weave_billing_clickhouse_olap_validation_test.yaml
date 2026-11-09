@@ -1,0 +1,56 @@
+suite: Weave billing ClickHouse OLAP identity validation
+templates:
+  - charts/glue/templates/deployment.yaml
+values:
+  - fixtures/weave_trace_olap.yaml
+set:
+  global.glue.enabled: true
+  global.weaveBillingClickhouse.olap.enabled: true
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: rejects an inline billing user
+    set:
+      global.weaveBillingClickhouse.olap.user: gorilla_usage_stats
+      global.weaveBillingClickhouse.olap.password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-weave-billing
+            key: password
+    asserts:
+      - failedTemplate:
+          errorMessage: global.weaveBillingClickhouse.olap.user must use valueFrom
+
+  - it: rejects an inline billing password
+    set:
+      global.weaveBillingClickhouse.olap.user:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-weave-billing
+            key: username
+      global.weaveBillingClickhouse.olap.password: inline-password
+    asserts:
+      - failedTemplate:
+          errorMessage: global.weaveBillingClickhouse.olap.password must use valueFrom
+
+  - it: rejects a billing password map without valueFrom
+    set:
+      global.weaveBillingClickhouse.olap.user:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-weave-billing
+            key: username
+      global.weaveBillingClickhouse.olap.password:
+        secretKeyRef:
+          name: clickhouse-weave-billing
+          key: password
+    asserts:
+      - failedTemplate:
+          errorMessage: global.weaveBillingClickhouse.olap.password must use valueFrom
+
+  - it: rejects a missing billing identity
+    asserts:
+      - failedTemplate:
+          errorMessage: global.weaveBillingClickhouse.olap.user must use valueFrom

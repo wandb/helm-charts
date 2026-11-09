@@ -1,0 +1,214 @@
+suite: Weave billing ClickHouse connection from OLAP
+templates:
+  - charts/api/templates/deployment.yaml
+  - charts/glue/templates/deployment.yaml
+  - charts/app/templates/deployment.yaml
+values:
+  - fixtures/weave_trace_olap.yaml
+  - fixtures/weave_billing_olap.yaml
+set:
+  global.api.enabled: true
+  global.glue.enabled: true
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: builds the api billing connection from the Weave Trace OLAP service
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_CLICKHOUSE_HOST
+            value: managed-clickhouse.example.com
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_CLICKHOUSE_PORT
+            value: "9440"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_CLICKHOUSE_DATABASE
+            value: weave_trace_db
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-billing
+                key: username
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+            value: clickhouse://$(WEAVE_BILLING_CLICKHOUSE_USER)@$(WEAVE_BILLING_CLICKHOUSE_HOST):$(WEAVE_BILLING_CLICKHOUSE_PORT)/$(WEAVE_BILLING_CLICKHOUSE_DATABASE)?auto-create=false
+          count: 1
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-billing
+                key: password
+          count: 1
+          any: true
+
+  - it: builds the glue billing connection from the Weave Trace OLAP service
+    template: charts/glue/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_CLICKHOUSE_USER
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-billing
+                key: username
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+            value: clickhouse://$(WEAVE_BILLING_CLICKHOUSE_USER)@$(WEAVE_BILLING_CLICKHOUSE_HOST):$(WEAVE_BILLING_CLICKHOUSE_PORT)/$(WEAVE_BILLING_CLICKHOUSE_DATABASE)?auto-create=false
+          count: 1
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: clickhouse-weave-billing
+                key: password
+          count: 1
+          any: true
+
+  - it: reads the native port from a reference
+    template: charts/glue/templates/deployment.yaml
+    set:
+      global.weaveBillingClickhouse.olap.port:
+        valueFrom:
+          configMapKeyRef:
+            name: clickhouse-olap
+            key: port
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_CLICKHOUSE_PORT
+            valueFrom:
+              configMapKeyRef:
+                name: clickhouse-olap
+                key: port
+
+  - it: prefers the OLAP connection over the legacy billing Secret for OLAP installs
+    template: charts/glue/templates/deployment.yaml
+    set:
+      global.weaveBillingClickhouse.secretName: managed-spec-clickhouse-legacy
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+            value: clickhouse://$(WEAVE_BILLING_CLICKHOUSE_USER)@$(WEAVE_BILLING_CLICKHOUSE_HOST):$(WEAVE_BILLING_CLICKHOUSE_PORT)/$(WEAVE_BILLING_CLICKHOUSE_DATABASE)?auto-create=false
+          count: 1
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_SECRET
+          count: 1
+          any: true
+
+  - it: keeps the legacy billing Secret when Weave Trace resolves to legacy ClickHouse
+    template: charts/glue/templates/deployment.yaml
+    set:
+      global.clickhouse.host: legacy-clickhouse.example.com
+      global.weaveBillingClickhouse.secretName: managed-spec-clickhouse-legacy
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+            valueFrom:
+              secretKeyRef:
+                name: managed-spec-clickhouse-legacy
+                key: address
+                optional: true
+          count: 1
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_CLICKHOUSE_USER
+          any: true
+
+  - it: adds no billing env vars when Weave Trace resolves to legacy ClickHouse without a Secret
+    template: charts/glue/templates/deployment.yaml
+    set:
+      global.clickhouse.host: legacy-clickhouse.example.com
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_CLICKHOUSE_USER
+          any: true
+
+  - it: adds no billing env vars for OLAP installs until enabled
+    template: charts/glue/templates/deployment.yaml
+    set:
+      global.weaveBillingClickhouse.olap.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_CLICKHOUSE_USER
+          any: true
+
+  - it: lets an explicit billing address override the OLAP connection
+    template: charts/glue/templates/deployment.yaml
+    set:
+      global.extraEnv:
+        GORILLA_WEAVE_CLICKHOUSE_ADDRESS: inline-address
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+            value: inline-address
+          count: 1
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          count: 1
+          any: true
+
+  - it: does not add billing env vars to an unrelated app deployment
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_CLICKHOUSE_USER
+          any: true
