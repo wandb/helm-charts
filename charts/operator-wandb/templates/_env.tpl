@@ -323,15 +323,18 @@ Global values will override any chart-specific values.
     the whole render, matching how OLAP features avoid fail-fast validation.
   */ -}}
   {{- $hasBillingIdentity := and (not (empty $profile.user)) (not (empty $profile.password)) -}}
-  {{- $useOlapBilling := false -}}
-  {{- if and $olapBilling.enabled $hasBillingIdentity -}}
-    {{- /* Billing reads the schema Weave Trace writes, so it follows Weave Trace's source. */}}
-    {{- $useOlapBilling = eq (include "wandb.weaveTraceClickhouseSource" .) "olap" -}}
-  {{- end -}}
-  {{- if $useOlapBilling }}
+  {{- $billingConfigured := or $olapBilling.enabled $billing.secretName -}}
+  {{- if $billingConfigured }}
+    {{- /*
+      Billing reads the usage Weave Trace writes, so it follows Weave Trace's
+      source: an OLAP install never falls back to the legacy Secret.
+    */}}
+    {{- if eq (include "wandb.weaveTraceClickhouseSource" .) "olap" }}
+      {{- if and $olapBilling.enabled $hasBillingIdentity }}
 {{ include "wandb.olapFeatureEnvs" (dict "root" . "featureName" "weaveBilling" "envVarPrefix" "WEAVE_BILLING" "finalEnvName" "GORILLA_WEAVE_CLICKHOUSE_ADDRESS") }}
-  {{- else if $billing.secretName }}
-    {{- /* Managed specs can reference this Secret before GSM backfill; absent keys should leave env vars unset. */}}
+      {{- end }}
+    {{- else if $billing.secretName }}
+      {{- /* Managed specs can reference this Secret before GSM backfill; absent keys should leave env vars unset. */}}
 - name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
   valueFrom:
     secretKeyRef:
@@ -344,6 +347,7 @@ Global values will override any chart-specific values.
       name: {{ $billing.secretName | quote }}
       key: {{ $billing.secretKey | quote }}
       optional: true
+    {{- end }}
   {{- end }}
 {{- end -}}
 
