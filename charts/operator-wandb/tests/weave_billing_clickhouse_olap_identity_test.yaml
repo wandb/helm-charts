@@ -1,0 +1,70 @@
+suite: Weave billing ClickHouse OLAP identity
+templates:
+  - charts/glue/templates/deployment.yaml
+values:
+  - fixtures/weave_trace_olap.yaml
+set:
+  global.glue.enabled: true
+  global.olap.default.host: managed-clickhouse.example.com
+  global.olap.weaveBilling.enabled: true
+release:
+  name: wandb
+  namespace: default
+
+tests:
+  - it: leaves billing unset rather than inherit the default identity
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_USER
+          any: true
+
+  - it: leaves billing unset without a dedicated password
+    set:
+      global.olap.weaveBilling.user:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-weave-billing
+            key: username
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
+
+  - it: leaves billing unset without a dedicated user
+    set:
+      global.olap.weaveBilling.password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-weave-billing
+            key: password
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
+
+  - it: keeps the legacy billing Secret when the OLAP identity is incomplete
+    set:
+      global.weaveBillingClickhouse.secretName: managed-spec-clickhouse-legacy
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+            valueFrom:
+              secretKeyRef:
+                name: managed-spec-clickhouse-legacy
+                key: address
+                optional: true
+          count: 1
+          any: true
