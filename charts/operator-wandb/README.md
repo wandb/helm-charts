@@ -531,6 +531,56 @@ After changing external data, restart the consuming workloads to pick it up.
 Helm's `keep` annotation retains a chart-created ConfigMap or Secret during a same-name
 ownership transfer. Console editing and Argo ownership rules are separate work.
 
+## Console settings Secret
+
+Console stores environment settings, such as security flags, artifact GC and
+session length, in a `<release>-console-settings` Secret that it creates and
+marks with `wandb.ai/console-managed: "true"`. The chart only references the
+Secret; it never renders it or reads it with `lookup`, so offline rendering,
+including Argo CD, produces the same manifests. Console must not give the Secret
+the `app.kubernetes.io/managed-by: Helm` and `app.kubernetes.io/instance`
+labels: operator v1 adds an owner reference to objects with those labels, so
+deleting the WeightsAndBiases resource would delete the Secret.
+
+These workloads load it through `envFrom`: api, app, executor, filemeta,
+filestream, flat-run-fields-updater, history-updater,
+run-store-accelerator-run-updater, glue, metric-observer, parquet (including its
+backfill CronJob), parquet-metadata-cache and lumen-agent.
+The reference is its own `envFromTpls` entry, so it remains when
+`global.bucket.secret.secretName` replaces the chart's bucket Secret. An overlay
+that replaces one of these `envFromTpls` lists must keep the entry.
+
+The reference sets `optional: true`, so a missing or empty Secret adds no
+variables and never blocks pod start. It is always rendered, with no value to
+turn it off: only Console creates the Secret, so installs without Console see no
+change, and a toggle would only let an overlay disconnect Console's saves. To
+stop applying Console settings, delete the Secret and restart the consumers.
+
+Keys are application environment variable names. Precedence follows Kubernetes:
+
+- Explicit `env` beats `envFrom`. A key set through a service's `env` or
+  `extraEnv`, `global.env`, `global.extraEnv` or a chart env template hides the
+  Secret's value.
+- Among `envFrom` sources the last one wins. This entry renders after every
+  `envFrom` map entry, including `global.envFrom` (where managed spec loads its
+  env Secrets), and after the bucket Secret, so its keys override theirs. For
+  example, `GORILLA_SESSION_LENGTH` here overrides the chart default in
+  `<release>-api-configmap`.
+- Console must therefore not write a key that W&B sets for the install through
+  managed spec, Terraform or the WeightsAndBiases resource. Overriding a chart
+  default is intended.
+
+Pods read the Secret only when they start. wandb-base annotates Deployments with
+`reloader.stakater.com/auto: "true"`, so any Stakater Reloader that watches the
+namespace rolls the consuming Deployments when the Secret is edited. The bundled
+Reloader (`reloader.install`) sets `reloadOnCreate: true`, so it also rolls them
+when the Secret is created, and `reloadOnDelete: false`, so deleting the Secret
+rolls nothing. A Reloader installed outside this chart may handle creation and
+deletion differently. Where no Reloader handles an event, Console must restart
+the consumers itself. Jobs and CronJobs read the Secret on their next run.
+Adding the reference changes the pod templates above, so upgrading to this chart
+rolls those workloads once.
+
 ## Using External Secrets
 
 The chart supports referencing existing Kubernetes Secrets for sensitive credentials. This allows you to manage secrets externally using tools like External Secrets Operator, Sealed Secrets, or other secret management systems.
