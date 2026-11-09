@@ -12,12 +12,20 @@ release:
   namespace: default
 
 tests:
-  - it: rejects billing that would inherit the default identity
+  - it: leaves billing unset rather than inherit the default identity
     asserts:
-      - failedTemplate:
-          errorMessage: global.olap.weaveBilling.user and password must be set; billing does not inherit global.olap.default credentials
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_USER
+          any: true
 
-  - it: rejects billing without a dedicated password
+  - it: leaves billing unset without a dedicated password
     set:
       global.olap.weaveBilling.user:
         valueFrom:
@@ -25,10 +33,13 @@ tests:
             name: clickhouse-weave-billing
             key: username
     asserts:
-      - failedTemplate:
-          errorMessage: global.olap.weaveBilling.user and password must be set; billing does not inherit global.olap.default credentials
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
 
-  - it: rejects billing without a dedicated user
+  - it: leaves billing unset without a dedicated user
     set:
       global.olap.weaveBilling.password:
         valueFrom:
@@ -36,15 +47,24 @@ tests:
             name: clickhouse-weave-billing
             key: password
     asserts:
-      - failedTemplate:
-          errorMessage: global.olap.weaveBilling.user and password must be set; billing does not inherit global.olap.default credentials
-
-  - it: does not require a billing identity when Weave Trace resolves to legacy ClickHouse
-    set:
-      global.clickhouse.host: legacy-clickhouse.example.com
-    asserts:
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
+
+  - it: keeps the legacy billing Secret when the OLAP identity is incomplete
+    set:
+      global.weaveBillingClickhouse.secretName: managed-spec-clickhouse-legacy
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+            valueFrom:
+              secretKeyRef:
+                name: managed-spec-clickhouse-legacy
+                key: address
+                optional: true
+          count: 1
           any: true
