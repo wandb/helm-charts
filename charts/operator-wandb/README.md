@@ -545,7 +545,7 @@ deleting the WeightsAndBiases resource would delete the Secret.
 These workloads load it through `envFrom`: api, app, executor, filemeta,
 filestream, flat-run-fields-updater, history-updater,
 run-store-accelerator-run-updater, glue, metric-observer, parquet (including its
-backfill CronJob), parquet-metadata-cache, settingsMigrationJob and lumen-agent.
+backfill CronJob), parquet-metadata-cache and lumen-agent.
 The reference is its own `envFromTpls` entry, so it remains when
 `global.bucket.secret.secretName` replaces the chart's bucket Secret. An overlay
 that replaces one of these `envFromTpls` lists must keep the entry.
@@ -571,12 +571,15 @@ Keys are application environment variable names. Precedence follows Kubernetes:
   default is intended.
 
 Pods read the Secret only when they start. wandb-base annotates Deployments with
-`reloader.stakater.com/auto: "true"`, so where Reloader runs (Dedicated Cloud
-enables it on AWS and Azure), creating or editing the Secret rolls the consuming
-Deployments; `reloadOnDelete` is off, so deleting it does not. Where Reloader is
-off (Dedicated Cloud on GCP), Console restarts them itself. Jobs and CronJobs
-read the Secret on their next run. Adding the reference changes the pod
-templates above, so upgrading to this chart rolls those workloads once.
+`reloader.stakater.com/auto: "true"`, so any Stakater Reloader that watches the
+namespace rolls the consuming Deployments when the Secret is edited. The bundled
+Reloader (`reloader.install`) sets `reloadOnCreate: true`, so it also rolls them
+when the Secret is created, and `reloadOnDelete: false`, so deleting the Secret
+rolls nothing. A Reloader installed outside this chart may handle creation and
+deletion differently. Where no Reloader handles an event, Console must restart
+the consumers itself. Jobs and CronJobs read the Secret on their next run.
+Adding the reference changes the pod templates above, so upgrading to this chart
+rolls those workloads once.
 
 ## Using External Secrets
 
