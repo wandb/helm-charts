@@ -13,9 +13,19 @@ Return name of secret where clickhouse information is stored
   {{- tpl .Values.global.clickhouse.host . -}}
 {{- end }}
 
+{{- define "wandb.clickhouse.hostFromSecret" -}}
+  {{- $host := .Values.global.clickhouse.host -}}
+  {{- $defaultHost := "{{ .Release.Name }}-clickhouse-headless" -}}
+  {{- $isDefaultHost := and (kindIs "string" $host) (eq $host $defaultHost) -}}
+  {{- $canUseSecret := and (not (kindIs "map" $host)) (or (empty $host) $isDefaultHost) -}}
+  {{- if and $canUseSecret .Values.global.clickhouse.hostSecret.name -}}true{{- else -}}false{{- end -}}
+{{- end }}
+
 {{- define "wandb.clickhouse.port" -}}
   {{- if .Values.global.clickhouse.port }}
   {{- print $.Values.global.clickhouse.port -}}
+  {{- else if eq (include "wandb.clickhouse.hostFromSecret" .) "true" -}}
+  {{- print "8443" -}}
   {{- else -}}
     {{- $host := (include "wandb.clickhouse.host" .) -}}
     {{- if eq $host (print .Release.Name "-clickhouse-headless") }}
@@ -64,6 +74,7 @@ selection tests verify that untouched chart defaults do not count as enrollment.
     "port" ""
     "password" ""
     "passwordSecret" (dict "name" "" "passwordKey" "CLICKHOUSE_PASSWORD")
+    "hostSecret" (dict "name" "" "hostKey" "host")
     "database" "weave_trace_db"
     "user" "default"
     "replicated" false

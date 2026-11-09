@@ -258,6 +258,12 @@ Global values will override any chart-specific values.
   {{- if kindIs "map" .Values.global.clickhouse.host }}
 - name: WF_CLICKHOUSE_HOST
 {{- toYaml .Values.global.clickhouse.host | nindent 2 }}
+  {{- else if eq (include "wandb.clickhouse.hostFromSecret" .) "true" }}
+- name: WF_CLICKHOUSE_HOST
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.global.clickhouse.hostSecret.name | quote }}
+      key: {{ .Values.global.clickhouse.hostSecret.hostKey | quote }}
   {{- else }}
 - name: WF_CLICKHOUSE_HOST
   value: "{{ include "wandb.clickhouse.host" . }}"
@@ -305,6 +311,22 @@ Global values will override any chart-specific values.
       name: {{ include "wandb.clickhouse.passwordSecret" . | quote}}
       key: "{{ .Values.global.clickhouse.passwordSecret.passwordKey }}"
   {{- end -}}
+{{- end -}}
+
+{{- define "wandb.weaveBillingClickhouseEnvs" -}}
+  {{- $billing := .Values.global.weaveBillingClickhouse -}}
+  {{- if $billing.secretName }}
+- name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+  valueFrom:
+    secretKeyRef:
+      name: {{ $billing.secretName | quote }}
+      key: {{ $billing.addressKey | quote }}
+- name: GORILLA_WEAVE_CLICKHOUSE_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ $billing.secretName | quote }}
+      key: {{ $billing.secretKey | quote }}
+  {{- end }}
 {{- end -}}
 
 {{- define "wandb.clickhouseEnvs" -}}
