@@ -313,6 +313,7 @@ Global values will override any chart-specific values.
   {{- end -}}
 {{- end -}}
 
+{{/* Managed specs can reference this Secret before GSM backfill; absent keys should leave env vars unset. */}}
 {{- define "wandb.weaveBillingClickhouseEnvs" -}}
   {{- $billing := .Values.global.weaveBillingClickhouse -}}
   {{- if $billing.secretName }}
@@ -321,11 +322,13 @@ Global values will override any chart-specific values.
     secretKeyRef:
       name: {{ $billing.secretName | quote }}
       key: {{ $billing.addressKey | quote }}
+      optional: true
 - name: GORILLA_WEAVE_CLICKHOUSE_SECRET
   valueFrom:
     secretKeyRef:
       name: {{ $billing.secretName | quote }}
       key: {{ $billing.secretKey | quote }}
+      optional: true
   {{- end }}
 {{- end -}}
 
