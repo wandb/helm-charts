@@ -217,6 +217,9 @@ global:
   # This section configures how weave-trace connects to ClickHouse.
   # It does NOT control the ClickHouse server itself.
   #
+  # hostSecret.name can provide the default/empty legacy host from an ESO-synced
+  # Secret. A custom inline host or host valueFrom map takes precedence.
+  #
   # NOTE: When the bundled clickhouse subchart is installed (clickhouse.install: true),
   # the subchart's auth.existingSecret is wired to passwordSecret below via the
   # wandb.clickhouse.passwordSecret helper. This means passwordSecret.name controls
@@ -231,6 +234,9 @@ global:
     passwordSecret:
       name: ""
       passwordKey: "CLICKHOUSE_PASSWORD"
+    hostSecret:
+      name: ""
+      hostKey: "host"
     database: "weave_trace_db"
     user: "default"
     # Required when using replicated services on self-managed ClickHouse (not ClickHouse Cloud).
@@ -267,6 +273,19 @@ global:
   #       secretKeyRef:
   #         name: "clickhouse-settings-secret"
   #         key: "password"
+  #
+  # A hostSecret reference can be used instead of a literal/default host:
+  #   hostSecret:
+  #     name: "clickhouse-settings-secret"
+  #     hostKey: "endpoint"
+
+  # Weave usage billing connection for Gorilla API and Glue. When name is set,
+  # GORILLA_WEAVE_CLICKHOUSE_ADDRESS/_SECRET are read from this Secret unless
+  # an explicit env value (e.g. global.extraEnv) sets them.
+  weaveBillingClickhouse:
+    secretName: ""
+    addressKey: "address"
+    secretKey: "secret"
 
   weaveTrace:
     # Selects which ClickHouse connection is rendered into Weave Trace workloads.
@@ -825,6 +844,7 @@ api:
     - '{{ include "wandb.registrySearchEnvs" . }}'
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
+    - '{{ include "wandb.weaveBillingClickhouseEnvs" . }}'
   initContainers:
     init-db:
       enabled: false
@@ -2949,6 +2969,7 @@ glue:
     - '{{ include "wandb.registrySearchEnvs" . }}'
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
+    - '{{ include "wandb.weaveBillingClickhouseEnvs" . }}'
   initContainers:
     init-db:
       enabled: false
