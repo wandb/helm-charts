@@ -1,0 +1,103 @@
+suite: MySQL Microsoft Entra ID authentication
+templates:
+  - charts/api/templates/deployment.yaml
+  - templates/mysql.yaml
+  - templates/mysql-validation.yaml
+release:
+  name: wandb
+  namespace: default
+set:
+  global.api.enabled: true
+  global.mysql.azureEntraAuth: true
+  global.mysql.host: wandb.mysql.database.azure.com
+  global.mysql.user: wandb-identity
+  global.mysql.password: ""
+  mysql.install: false
+  app.initContainers.init-db.enabled: false
+  prometheus.mysql-exporter.install: false
+tests:
+  - it: renders a passwordless DSN with system-root TLS
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_METADATA_STORE
+            value: mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=true&azure-entra-auth=true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MYSQL_PASSWORD
+          any: true
+
+  - it: verifies against the configured CA certificate
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.mysql.caCert: test-ca
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_METADATA_STORE
+            value: mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&azure-entra-auth=true
+
+  - it: does not render the application password Secret
+    template: templates/mysql.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not require an AWS region or CA certificate
+    template: templates/mysql-validation.yaml
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects a non-boolean flag
+    template: templates/mysql-validation.yaml
+    set:
+      global.mysql.azureEntraAuth: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: global.mysql.azureEntraAuth must be a boolean
+
+  - it: rejects combining with RDS IAM
+    template: templates/mysql-validation.yaml
+    set:
+      global.mysql.rdsIamAuth: true
+      global.mysql.awsRegion: us-east-1
+      global.mysql.caCert: test-ca
+    asserts:
+      - failedTemplate:
+          errorMessage: global.mysql.rdsIamAuth and global.mysql.azureEntraAuth cannot both be true
+
+  - it: requires a database user
+    template: templates/mysql-validation.yaml
+    set:
+      global.mysql.user: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: global.mysql.user is required when global.mysql.azureEntraAuth=true
+
+  - it: rejects a database password
+    template: templates/mysql-validation.yaml
+    set:
+      global.mysql.password: must-be-empty
+    asserts:
+      - failedTemplate:
+          errorMessage: global.mysql.password must be empty when global.mysql.azureEntraAuth=true
+
+  - it: rejects the password-based init-db container
+    template: templates/mysql-validation.yaml
+    set:
+      app.initContainers.init-db.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: app.initContainers.init-db.enabled must be false when global.mysql.azureEntraAuth=true
+
+  - it: rejects the password-based mysql-exporter
+    template: templates/mysql-validation.yaml
+    set:
+      prometheus.mysql-exporter.install: true
+    asserts:
+      - failedTemplate:
+          errorMessage: prometheus.mysql-exporter.install must be false when global.mysql.azureEntraAuth=true
