@@ -36,14 +36,18 @@ the component account.
 {{- define "bufstream.azureStorageIdentityEnabled" -}}
   {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
   {{- $globalConfigured := and (not (empty $identity.tenantId)) (not (empty $identity.clientId)) -}}
-  {{- $bucket := default (dict) .Values.global.bucket -}}
-  {{- $hasCustomerBucket := not (empty $bucket.name) -}}
-  {{- $defaultBucket := default (dict) .Values.global.defaultBucket -}}
+  {{- $bucket := include "wandb.bucket" . | fromYaml -}}
+  {{- $hasCustomerBucket := $bucket.customerBucket -}}
   {{- $usesDeploymentIdentity := or
-  (and (not $hasCustomerBucket) (eq $defaultBucket.provider "az"))
+  (and (not $hasCustomerBucket) (eq $bucket.provider "az"))
   (and $hasCustomerBucket (eq $bucket.azureAuthMethod "workloadIdentity"))
   -}}
 {{- and $globalConfigured $usesDeploymentIdentity -}}
+{{- end -}}
+
+{{- define "bufstream.s3AccessKeyIdEnabled" -}}
+  {{- $bucket := include "wandb.bucket.effective" . | fromYaml -}}
+  {{- or (not $bucket.consoleManaged) (not (empty $bucket.accessKey)) -}}
 {{- end -}}
 
 {{- define "bufstream.serviceAccountName" -}}
