@@ -212,3 +212,11 @@ Return "true" when global.mysql.caCert is set inline or by reference.
     {{- print "true" -}}
   {{- end -}}
 {{- end -}}
+
+{{/*
+Return whether a MySQL workload needs the Azure workload identity token, either
+for storage or for Microsoft Entra ID MySQL authentication.
+*/}}
+{{- define "wandb.mysqlAzureWorkloadIdentityEnabled" -}}
+{{- or (eq (include "wandb.azureStorageIdentityEnabled" .) "true") (eq (toString .Values.global.mysql.azureEntraAuth) "true") -}}
+{{- end }}
