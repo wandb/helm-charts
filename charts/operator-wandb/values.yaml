@@ -147,8 +147,10 @@ global:
     azureEntraAuth: false
     # Run the Cloud SQL Auth Proxy v2 as a native sidecar in every MySQL
     # workload with automatic IAM database authentication. Pods connect to
-    # 127.0.0.1:3306 as global.mysql.user, the IAM database user of their GKE
-    # workload identity, without a password.
+    # 127.0.0.1:3306 as global.mysql.user without a password. Cloud SQL for
+    # MySQL signs a service account in under the part of its email before the
+    # "@", so for <gsa-name>@<project>.iam.gserviceaccount.com set
+    # global.mysql.user to <gsa-name>.
     cloudSqlProxy:
       enabled: false
       # project:region:instance
@@ -2736,8 +2738,6 @@ run-store-accelerator-run-updater:
 
 # history-reader is a gRPC service that serves run history from ClickHouse.
 history-reader:
-  initContainers:
-    cloud-sql-proxy: *cloudSqlProxySidecar
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.mysqlAzureWorkloadIdentityEnabled` . }}'
   install: false
@@ -3439,6 +3439,8 @@ parquet:
   cronJobs:
     parquet-backfill:
       enabled: false
+      initContainers:
+        cloud-sql-proxy: *cloudSqlProxySidecar
       containers:
         backfill-job:
           args: ["glue"]
