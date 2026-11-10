@@ -126,6 +126,8 @@ Return the db connection string
 {{- define "wandb.mysql" -}}
   {{- if .Values.global.mysql.rdsIamAuth -}}
 mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&rds-iam-auth=true&aws-region={{ .Values.global.mysql.awsRegion }}
+  {{- else if .Values.global.mysql.cloudSqlProxy.enabled -}}
+mysql://$(MYSQL_USER)@127.0.0.1:3306/$(MYSQL_DATABASE)?tls=false
   {{- else if .Values.global.mysql.azureEntraAuth -}}
     {{- if include "wandb.mysql.caCertConfigured" . -}}
 mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&azure-entra-auth=true
@@ -194,11 +196,12 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
 {{- end -}}
 
 {{/*
-Return "true" when MySQL authenticates with a short-lived token (RDS IAM or
-Microsoft Entra ID) instead of a password.
+Return "true" when workloads reach MySQL without a password: a short-lived
+token (RDS IAM or Microsoft Entra ID) or the Cloud SQL Auth Proxy's automatic
+IAM authentication.
 */}}
-{{- define "wandb.mysql.tokenAuth" -}}
-  {{- if or .Values.global.mysql.rdsIamAuth .Values.global.mysql.azureEntraAuth -}}
+{{- define "wandb.mysql.passwordless" -}}
+  {{- if or .Values.global.mysql.rdsIamAuth .Values.global.mysql.azureEntraAuth .Values.global.mysql.cloudSqlProxy.enabled -}}
     {{- print "true" -}}
   {{- end -}}
 {{- end -}}
@@ -220,3 +223,29 @@ for storage or for Microsoft Entra ID MySQL authentication.
 {{- define "wandb.mysqlAzureWorkloadIdentityEnabled" -}}
 {{- or (eq (include "wandb.azureStorageIdentityEnabled" .) "true") (eq (toString .Values.global.mysql.azureEntraAuth) "true") -}}
 {{- end }}
+
+{{/*
+Cloud SQL Auth Proxy v2 settings. The proxy reads each CSQL_PROXY_<FLAG>
+variable as the matching command-line flag. It listens on loopback only, so
+just the pod's own containers can use its IAM identity.
+*/}}
+{{- define "wandb.mysql.cloudSqlProxyEnvs" -}}
+- name: CSQL_PROXY_INSTANCE_CONNECTION_NAME
+  value: {{ .Values.global.mysql.cloudSqlProxy.instanceConnectionName | quote }}
+- name: CSQL_PROXY_AUTO_IAM_AUTHN
+  value: "true"
+- name: CSQL_PROXY_PRIVATE_IP
+  value: "true"
+- name: CSQL_PROXY_ADDRESS
+  value: "127.0.0.1"
+- name: CSQL_PROXY_PORT
+  value: "3306"
+- name: CSQL_PROXY_HEALTH_CHECK
+  value: "true"
+- name: CSQL_PROXY_HTTP_ADDRESS
+  value: "0.0.0.0"
+- name: CSQL_PROXY_HTTP_PORT
+  value: "9801"
+- name: CSQL_PROXY_EXIT_ZERO_ON_SIGTERM
+  value: "true"
+{{- end -}}

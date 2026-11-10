@@ -162,6 +162,9 @@
   image: "{{ $repository }}:latest"
   {{- end }}
   imagePullPolicy: {{ .image.pullPolicy }}
+  {{- with .restartPolicy }}
+  restartPolicy: {{ . }}
+  {{- end }}
   {{- with .ports }}
   ports:
     {{- toYaml . | nindent 4 }}

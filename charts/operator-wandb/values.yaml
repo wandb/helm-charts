@@ -145,6 +145,15 @@ global:
     # instead of password authentication. The pods' Azure workload identity
     # must be mapped to global.mysql.user on the server.
     azureEntraAuth: false
+    # Run the Cloud SQL Auth Proxy v2 as a native sidecar in every MySQL
+    # workload with automatic IAM database authentication. Pods connect to
+    # 127.0.0.1:3306 as global.mysql.user, the IAM database user of their GKE
+    # workload identity, without a password.
+    cloudSqlProxy:
+      enabled: false
+      # project:region:instance
+      instanceConnectionName: ""
+      image: "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.27.0"
     host: ""
     port: 3306
     database: "wandb_local"
@@ -857,6 +866,27 @@ api:
     - '{{ include "wandb.runStoreAcceleratorEnvs" . }}'
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
   initContainers:
+    cloud-sql-proxy: &cloudSqlProxySidecar
+      enabled: '{{ .Values.global.mysql.cloudSqlProxy.enabled }}'
+      imageTpl: '{{ .Values.global.mysql.cloudSqlProxy.image }}'
+      image:
+        pullPolicy: IfNotPresent
+      # A native sidecar starts before the other init containers, so
+      # migrate-db and init-db can reach MySQL through it.
+      restartPolicy: Always
+      envTpls:
+        - '{{ include "wandb.mysql.cloudSqlProxyEnvs" . }}'
+      startupProbe:
+        httpGet:
+          path: /startup
+          port: 9801
+        periodSeconds: 1
+        failureThreshold: 60
+      livenessProbe:
+        httpGet:
+          path: /liveness
+          port: 9801
+        periodSeconds: 10
     init-db:
       enabled: false
     migrate-db:
@@ -1093,6 +1123,7 @@ app:
         protocol: TCP
         name: local
   initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
     init-db:
       enabled: true
       command:
@@ -1369,6 +1400,8 @@ console:
         verbs: ["get"]
 
 executor:
+  initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.mysqlAzureWorkloadIdentityEnabled` . }}'
   install: false
@@ -1494,6 +1527,8 @@ executor:
           minReplicas: 2
 
 filemeta:
+  initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.mysqlAzureWorkloadIdentityEnabled` . }}'
   install: false
@@ -1676,6 +1711,8 @@ anaconda2:
           minReplicas: 2
 
 filestream:
+  initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.mysqlAzureWorkloadIdentityEnabled` . }}'
   install: false
@@ -1789,6 +1826,8 @@ filestream:
           minReplicas: 1
 
 flat-run-fields-updater:
+  initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.mysqlAzureWorkloadIdentityEnabled` . }}'
   install: false
@@ -2095,6 +2134,8 @@ flat-run-fields-updater:
           # triggers must be provided by user when enabling KEDA
 
 history-updater:
+  initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.mysqlAzureWorkloadIdentityEnabled` . }}'
   # Deprecated compatibility fallback for global.olap.history.enabled.
@@ -2385,6 +2426,8 @@ history-updater:
 # the run-store accelerator (ClickHouse). Enable only on instances that have the
 # run-store accelerator turned on (global.olap.runStoreAccelerator.enabled).
 run-store-accelerator-run-updater:
+  initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
   install: false
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.mysqlAzureWorkloadIdentityEnabled` . }}'
@@ -2693,6 +2736,8 @@ run-store-accelerator-run-updater:
 
 # history-reader is a gRPC service that serves run history from ClickHouse.
 history-reader:
+  initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.mysqlAzureWorkloadIdentityEnabled` . }}'
   install: false
@@ -2984,6 +3029,7 @@ glue:
     - '{{ include "wandb.lumen.gorillaEnvs" .}}'
     - '{{ include "wandb.weaveBillingClickhouseEnvs" . }}'
   initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
     init-db:
       enabled: false
     migrate-db:
@@ -3149,6 +3195,8 @@ internalSignerPreHook:
         verbs: ["get", "patch", "create", "update"]
 
 metric-observer:
+  initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
   # Reads application secrets and namespace metadata.
   workloadSecurityProfile:
     automountServiceAccountToken: true
@@ -3296,6 +3344,8 @@ metric-observer:
           minReplicas: 8
 
 parquet:
+  initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.mysqlAzureWorkloadIdentityEnabled` . }}'
   install: true
@@ -3503,6 +3553,8 @@ parquet:
           minReplicas: 2
 
 parquet-metadata-cache:
+  initContainers:
+    cloud-sql-proxy: *cloudSqlProxySidecar
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.mysqlAzureWorkloadIdentityEnabled` . }}'
   maxColumnChunks: "10000000"

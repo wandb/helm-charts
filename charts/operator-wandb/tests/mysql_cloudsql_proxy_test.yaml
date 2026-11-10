@@ -1,0 +1,115 @@
+suite: MySQL Cloud SQL Auth Proxy sidecar
+templates:
+  - charts/api/templates/deployment.yaml
+  - charts/glue/templates/deployment.yaml
+  - templates/mysql.yaml
+  - templates/mysql-validation.yaml
+release:
+  name: wandb
+  namespace: default
+set:
+  global.api.enabled: true
+  global.glue.enabled: true
+  global.mysql.cloudSqlProxy.enabled: true
+  global.mysql.cloudSqlProxy.instanceConnectionName: wandb-project:us-central1:wandb-instance
+  global.mysql.host: ""
+  global.mysql.user: wandb-sa@wandb-project.iam
+  global.mysql.password: ""
+  mysql.install: false
+  app.initContainers.init-db.enabled: false
+  prometheus.mysql-exporter.install: false
+tests:
+  - it: connects through the local proxy without a password
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_METADATA_STORE
+            value: mysql://$(MYSQL_USER)@127.0.0.1:3306/$(MYSQL_DATABASE)?tls=false
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MYSQL_PASSWORD
+          any: true
+
+  - it: starts the proxy as a native sidecar before migrate-db
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: cloud-sql-proxy
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.27.0
+      - equal:
+          path: spec.template.spec.initContainers[0].restartPolicy
+          value: Always
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: CSQL_PROXY_INSTANCE_CONNECTION_NAME
+            value: wandb-project:us-central1:wandb-instance
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: CSQL_PROXY_AUTO_IAM_AUTHN
+            value: "true"
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: migrate-db
+
+  - it: adds the sidecar to other MySQL workloads
+    template: charts/glue/templates/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: cloud-sql-proxy
+
+  - it: renders no sidecar when disabled
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.mysql.cloudSqlProxy.enabled: false
+      global.mysql.host: mysql.example
+      global.mysql.password: secret
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: cloud-sql-proxy
+          any: true
+
+  - it: does not render the application password Secret
+    template: templates/mysql.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not require a host
+    template: templates/mysql-validation.yaml
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: requires an instance connection name
+    template: templates/mysql-validation.yaml
+    set:
+      global.mysql.cloudSqlProxy.instanceConnectionName: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: global.mysql.cloudSqlProxy.instanceConnectionName is required when global.mysql.cloudSqlProxy.enabled=true
+
+  - it: rejects a database password
+    template: templates/mysql-validation.yaml
+    set:
+      global.mysql.password: must-be-empty
+    asserts:
+      - failedTemplate:
+          errorMessage: global.mysql.password must be empty when global.mysql.cloudSqlProxy.enabled=true
+
+  - it: rejects combining with Entra authentication
+    template: templates/mysql-validation.yaml
+    set:
+      global.mysql.azureEntraAuth: true
+    asserts:
+      - failedTemplate:
+          errorMessage: "only one of global.mysql.rdsIamAuth, global.mysql.azureEntraAuth and global.mysql.cloudSqlProxy.enabled can be true; got azureEntraAuth, cloudSqlProxy.enabled"

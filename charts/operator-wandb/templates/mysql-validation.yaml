@@ -4,26 +4,38 @@
   {{- end -}}
 {{- end -}}
 
-{{- if and .Values.global.mysql.rdsIamAuth .Values.global.mysql.azureEntraAuth -}}
-  {{- fail "global.mysql.rdsIamAuth and global.mysql.azureEntraAuth cannot both be true" -}}
+{{- $cloudSqlProxy := .Values.global.mysql.cloudSqlProxy -}}
+{{- if not (kindIs "bool" $cloudSqlProxy.enabled) -}}
+  {{- fail "global.mysql.cloudSqlProxy.enabled must be a boolean" -}}
 {{- end -}}
 
-{{- $tokenAuthKey := "" -}}
+{{- $passwordlessKeys := list -}}
 {{- if .Values.global.mysql.rdsIamAuth -}}
-  {{- $tokenAuthKey = "rdsIamAuth" -}}
-{{- else if .Values.global.mysql.azureEntraAuth -}}
-  {{- $tokenAuthKey = "azureEntraAuth" -}}
+  {{- $passwordlessKeys = append $passwordlessKeys "rdsIamAuth" -}}
+{{- end -}}
+{{- if .Values.global.mysql.azureEntraAuth -}}
+  {{- $passwordlessKeys = append $passwordlessKeys "azureEntraAuth" -}}
+{{- end -}}
+{{- if $cloudSqlProxy.enabled -}}
+  {{- $passwordlessKeys = append $passwordlessKeys "cloudSqlProxy.enabled" -}}
+{{- end -}}
+{{- if gt (len $passwordlessKeys) 1 -}}
+  {{- fail (printf "only one of global.mysql.rdsIamAuth, global.mysql.azureEntraAuth and global.mysql.cloudSqlProxy.enabled can be true; got %s" (join ", " $passwordlessKeys)) -}}
 {{- end -}}
 
-{{- if $tokenAuthKey -}}
-  {{- $when := printf "when global.mysql.%s=true" $tokenAuthKey -}}
+{{- if $passwordlessKeys -}}
+  {{- $when := printf "when global.mysql.%s=true" (first $passwordlessKeys) -}}
   {{- if not .Values.global.mysql.fromSecret -}}
-    {{- if empty .Values.global.mysql.host -}}
+    {{- /* The proxy dials Cloud SQL by instance connection name, not host. */ -}}
+    {{- if and (empty .Values.global.mysql.host) (not $cloudSqlProxy.enabled) -}}
       {{- fail (printf "global.mysql.host is required %s" $when) -}}
     {{- end -}}
     {{- if empty .Values.global.mysql.user -}}
       {{- fail (printf "global.mysql.user is required %s" $when) -}}
     {{- end -}}
+  {{- end -}}
+  {{- if and $cloudSqlProxy.enabled (empty $cloudSqlProxy.instanceConnectionName) -}}
+    {{- fail (printf "global.mysql.cloudSqlProxy.instanceConnectionName is required %s" $when) -}}
   {{- end -}}
   {{- if .Values.global.mysql.rdsIamAuth -}}
     {{- if empty .Values.global.mysql.awsRegion -}}
