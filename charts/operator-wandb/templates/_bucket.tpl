@@ -2,6 +2,24 @@
   Assorted bucket related helpers.
 */}}
 {{/*
+Use the Console snapshot so a customer bucket still resolves when the spec only
+points at the managed default-bucket Secret.
+*/}}
+{{- define "wandb.bucket.consoleSettings" -}}
+  {{- $secret := lookup "v1" "Secret" .Release.Namespace (printf "%s-bucket" .Release.Name) | default dict -}}
+  {{- $metadata := default (dict) $secret.metadata -}}
+  {{- $annotations := default (dict) $metadata.annotations -}}
+  {{- $isConsoleManaged := eq (get $annotations "wandb.ai/console-managed") "true" -}}
+  {{- if $isConsoleManaged -}}
+    {{- $settings := fromJson (get $annotations "wandb.ai/bucket-settings" | default "") -}}
+    {{- $hasValidSettings := and (kindIs "map" $settings) (not (hasKey $settings "Error")) (not (empty (get $settings "provider"))) (not (empty (get $settings "name"))) -}}
+    {{- if $hasValidSettings -}}
+{{- toYaml $settings -}}
+    {{- end -}}
+  {{- end -}}
+{{- end }}
+
+{{/*
 Return the bucket credential Secret reference. Inline keys on the effective
 bucket win over global.bucket.secret: a managed spec derives that reference
 from Terraform's bucket, while a user spec can select another bucket with its
@@ -9,17 +27,23 @@ own key. The chart then owns the Secret with its default key names. Azure
 needs only accessKey; other providers need the full key pair.
 */}}
 {{- define "wandb.bucket.secretRef" -}}
-  {{- $bucket := .Values.global.defaultBucket -}}
-  {{- if .Values.global.bucket.name -}}
-    {{- $bucket = .Values.global.bucket -}}
-  {{- end -}}
+  {{- $consoleSettings := include "wandb.bucket.consoleSettings" . | fromYaml -}}
+  {{- $hasConsoleSettings := not (empty $consoleSettings) -}}
   {{- $secretRef := .Values.global.bucket.secret -}}
-  {{- $hasInlineCredentials := and $bucket.accessKey $bucket.secretKey -}}
-  {{- if eq $bucket.provider "az" -}}
-    {{- $hasInlineCredentials = $bucket.accessKey -}}
-  {{- end -}}
-  {{- if and $secretRef.secretName $hasInlineCredentials -}}
+  {{- if $hasConsoleSettings -}}
     {{- $secretRef = dict "secretName" "" "accessKeyName" "ACCESS_KEY" "secretKeyName" "SECRET_KEY" -}}
+  {{- else -}}
+    {{- $bucket := .Values.global.defaultBucket -}}
+    {{- if .Values.global.bucket.name -}}
+      {{- $bucket = .Values.global.bucket -}}
+    {{- end -}}
+    {{- $hasInlineCredentials := and $bucket.accessKey $bucket.secretKey -}}
+    {{- if eq $bucket.provider "az" -}}
+      {{- $hasInlineCredentials = $bucket.accessKey -}}
+    {{- end -}}
+    {{- if and $secretRef.secretName $hasInlineCredentials -}}
+      {{- $secretRef = dict "secretName" "" "accessKeyName" "ACCESS_KEY" "secretKeyName" "SECRET_KEY" -}}
+    {{- end -}}
   {{- end -}}
 {{- $secretRef | toYaml -}}
 {{- end }}
@@ -44,7 +68,9 @@ key path unless they explicitly select workload identity.
 */}}
 {{- define "wandb.azureStorageIdentity" -}}
   {{- $bucket := include "wandb.bucket" . | fromYaml -}}
-  {{- $hasCustomerBucket := not (empty .Values.global.bucket.name) -}}
+  {{- $consoleSettings := include "wandb.bucket.consoleSettings" . | fromYaml -}}
+  {{- $hasConsoleSettings := not (empty $consoleSettings) -}}
+  {{- $hasCustomerBucket := or $hasConsoleSettings (not (empty .Values.global.bucket.name)) -}}
   {{- $globalIdentity := default (dict) .Values.global.azureStorageIdentity -}}
   {{- $globalTenantId := default "" $globalIdentity.tenantId -}}
   {{- $globalClientId := default "" $globalIdentity.clientId -}}
@@ -169,6 +195,8 @@ templates/weave-trace-serviceaccount.yaml. Must stay identical to
 
 {{- define "wandb.bucket" -}}
   {{- $secretRef := include "wandb.bucket.secretRef" . | fromYaml -}}
+  {{- $consoleSettings := include "wandb.bucket.consoleSettings" . | fromYaml -}}
+  {{- $hasConsoleSettings := not (empty $consoleSettings) -}}
   {{- $url := "" -}}
   {{- $path := "" -}}
   {{- $provider := "" -}}
@@ -177,7 +205,16 @@ templates/weave-trace-serviceaccount.yaml. Must stay identical to
   {{- $azureTenantId := "" -}}
   {{- $azureClientId := "" -}}
   {{- $azureAuthMethod := "" -}}
-  {{- if .Values.global.bucket.name -}}
+  {{- if $hasConsoleSettings -}}
+    {{- $provider = default "" $consoleSettings.provider -}}
+    {{- $path = default "" $consoleSettings.path -}}
+    {{- $azureTenantId = default "" $consoleSettings.azureTenantId -}}
+    {{- $azureClientId = default "" $consoleSettings.azureClientId -}}
+    {{- $azureAuthMethod = default "" $consoleSettings.azureAuthMethod -}}
+name: {{ default "" $consoleSettings.name }}
+region: {{ default "" $consoleSettings.region }}
+kmsKey: {{ default "" $consoleSettings.kmsKey }}
+  {{- else if .Values.global.bucket.name -}}
     {{- $provider = .Values.global.bucket.provider -}}
     {{- $path = .Values.global.bucket.path -}}
     {{- $accessKey = default "" .Values.global.bucket.accessKey -}}

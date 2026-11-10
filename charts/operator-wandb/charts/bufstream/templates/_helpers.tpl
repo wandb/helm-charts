@@ -20,6 +20,20 @@ Helpers to allow overriding the namespace
 {{- default .Release.Namespace .Values.namespaceOverride | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "bufstream.consoleBucketSettings" -}}
+  {{- $secret := lookup "v1" "Secret" .Release.Namespace (printf "%s-bucket" .Release.Name) | default dict -}}
+  {{- $metadata := default (dict) $secret.metadata -}}
+  {{- $annotations := default (dict) $metadata.annotations -}}
+  {{- $isConsoleManaged := eq (get $annotations "wandb.ai/console-managed") "true" -}}
+  {{- if $isConsoleManaged -}}
+    {{- $settings := fromJson (get $annotations "wandb.ai/bucket-settings" | default "") -}}
+    {{- $hasValidSettings := and (kindIs "map" $settings) (not (hasKey $settings "Error")) (not (empty (get $settings "provider"))) (not (empty (get $settings "name"))) -}}
+    {{- if $hasValidSettings -}}
+{{- toYaml $settings -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
 {{/*
 Select the umbrella chart's Azure storage ServiceAccount when Bufstream uses
 the deployment-wide identity. Bucket-scoped identity and key-based BYOB retain
@@ -36,8 +50,17 @@ the component account.
 {{- define "bufstream.azureStorageIdentityEnabled" -}}
   {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
   {{- $globalConfigured := and (not (empty $identity.tenantId)) (not (empty $identity.clientId)) -}}
-  {{- $bucket := default (dict) .Values.global.bucket -}}
-  {{- $hasCustomerBucket := not (empty $bucket.name) -}}
+  {{- $consoleSettings := include "bufstream.consoleBucketSettings" . | fromYaml -}}
+  {{- $hasConsoleSettings := not (empty $consoleSettings) -}}
+  {{- $bucket := dict -}}
+  {{- $hasCustomerBucket := false -}}
+  {{- if $hasConsoleSettings -}}
+    {{- $bucket = $consoleSettings -}}
+    {{- $hasCustomerBucket = true -}}
+  {{- else -}}
+    {{- $bucket = default (dict) .Values.global.bucket -}}
+    {{- $hasCustomerBucket = not (empty $bucket.name) -}}
+  {{- end -}}
   {{- $defaultBucket := default (dict) .Values.global.defaultBucket -}}
   {{- $usesDeploymentIdentity := or
   (and (not $hasCustomerBucket) (eq $defaultBucket.provider "az"))

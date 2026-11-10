@@ -1,0 +1,379 @@
+suite: Console-managed bucket settings
+templates:
+  - templates/bucket.yaml
+  - charts/app/templates/deployment.yaml
+  - charts/parquet/templates/deployment.yaml
+  - charts/bufstream/templates/deployment.yaml
+release:
+  name: customer
+  namespace: dedicated
+  isUpgrade: true
+set:
+  global:
+    defaultBucket:
+      provider: az
+      name: wbdefault
+      path: wbpath
+    bucket:
+      secret:
+        secretName: managed-spec-default-bucket
+        accessKeyName: accessKey
+        secretKeyName: secretKey
+kubernetesProvider:
+  scheme:
+    v1/Secret:
+      gvr:
+        version: v1
+        resource: secrets
+      namespaced: true
+    v1/ConfigMap:
+      gvr:
+        version: v1
+        resource: configmaps
+      namespaced: true
+tests:
+  - it: renders an inline Azure customer bucket with the customer Secret
+    template: charts/app/templates/deployment.yaml
+    set:
+      global:
+        bucket:
+          provider: az
+          name: custacct
+          path: custcontainer
+          accessKey: k
+          azureAuthMethod: accessKey
+    asserts: &customerBucketEnvironment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: customer-bucket
+                key: ACCESS_KEY
+                optional: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BUCKET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: customer-bucket
+                key: ACCESS_KEY
+                optional: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BUCKET
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STORE
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: customer-bucket
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_TENANT_ID
+          any: true
+
+  - it: uses the Console snapshot as an inline Azure customer bucket
+    template: charts/app/templates/deployment.yaml
+    kubernetesProvider:
+      objects:
+        - &consoleSecret
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider":"az","name":"custacct","path":"custcontainer","azureAuthMethod":"accessKey"}'
+          data:
+            BUCKET: YXo6Ly9jdXN0YWNjdC9jdXN0Y29udGFpbmVy
+            GORILLA_FILE_STORE: YXo6Ly9jdXN0YWNjdC9jdXN0Y29udGFpbmVy
+            GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE: YXo6Ly9jdXN0YWNjdC9jdXN0Y29udGFpbmVy
+            GORILLA_STORAGE_BUCKET: YXo6Ly9jdXN0YWNjdC9jdXN0Y29udGFpbmVy
+            SMJ_FILE_STORE: YXo6Ly9jdXN0YWNjdC9jdXN0Y29udGFpbmVy
+            ACCESS_KEY: c2VjcmV0LWFjY2Vzcy1rZXk=
+        - &consoleConfigMap
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-bucket-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider":"az","name":"custacct","path":"custcontainer","azureAuthMethod":"accessKey"}'
+          data:
+            BUCKET_NAME: custacct
+            BUCKET_PATH: custcontainer
+    asserts: *customerBucketEnvironment
+
+  - it: preserves Console-owned bucket Secret data
+    template: templates/bucket.yaml
+    documentIndex: 1
+    kubernetesProvider:
+      objects:
+        - *consoleSecret
+        - *consoleConfigMap
+    asserts:
+      - equal:
+          path: data
+          value:
+            BUCKET: YXo6Ly9jdXN0YWNjdC9jdXN0Y29udGFpbmVy
+            GORILLA_FILE_STORE: YXo6Ly9jdXN0YWNjdC9jdXN0Y29udGFpbmVy
+            GORILLA_RUN_UPDATE_SHADOW_QUEUE_OVERFLOW_BUCKET_STORE: YXo6Ly9jdXN0YWNjdC9jdXN0Y29udGFpbmVy
+            GORILLA_STORAGE_BUCKET: YXo6Ly9jdXN0YWNjdC9jdXN0Y29udGFpbmVy
+            SMJ_FILE_STORE: YXo6Ly9jdXN0YWNjdC9jdXN0Y29udGFpbmVy
+            ACCESS_KEY: c2VjcmV0LWFjY2Vzcy1rZXk=
+
+  - it: preserves Console-owned bucket ConfigMap data
+    template: templates/bucket.yaml
+    documentIndex: 0
+    kubernetesProvider:
+      objects:
+        - *consoleSecret
+        - *consoleConfigMap
+    asserts:
+      - equal:
+          path: data
+          value:
+            BUCKET_NAME: custacct
+            BUCKET_PATH: custcontainer
+
+  - it: keeps the managed-spec Secret reference when no Console annotation exists
+    template: charts/app/templates/deployment.yaml
+    kubernetesProvider:
+      objects:
+        - &unmanagedSecret
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations: {}
+          data: {}
+    asserts: &externalBucketEnvironment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BUCKET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: managed-spec-default-bucket
+                key: accessKey
+                optional: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BUCKET
+            value: 'az://$(BUCKET_NAME)/$(BUCKET_PATH)'
+
+  - it: does not render a bucket Secret without a valid Console snapshot
+    template: templates/bucket.yaml
+    kubernetesProvider:
+      objects:
+        - *unmanagedSecret
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: keeps the managed-spec Secret reference when the Console snapshot is missing
+    template: charts/app/templates/deployment.yaml
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+          data: {}
+    asserts: *externalBucketEnvironment
+
+  - it: keeps the managed-spec Secret reference when the Console snapshot is invalid JSON
+    template: charts/app/templates/deployment.yaml
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{'
+          data: {}
+    asserts: *externalBucketEnvironment
+
+  - it: keeps the managed-spec Secret reference when the Console snapshot has no name
+    template: charts/app/templates/deployment.yaml
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider":"az","path":"custcontainer"}'
+          data: {}
+    asserts: *externalBucketEnvironment
+
+  - it: rejects Console snapshots with an Error key
+    template: charts/app/templates/deployment.yaml
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider":"az","name":"custacct","Error":"invalid"}'
+          data: {}
+    asserts: *externalBucketEnvironment
+
+  - it: uses workload identity from the Console snapshot when configured
+    template: charts/app/templates/deployment.yaml
+    set:
+      global:
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    kubernetesProvider:
+      objects:
+        - &workloadIdentitySecret
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider":"az","name":"custacct","path":"custcontainer","azureAuthMethod":"workloadIdentity"}'
+          data: {}
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_TENANT_ID
+            value: tenant-id
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_CLIENT_ID
+            value: client-id
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_KEY
+          any: true
+
+  - it: keeps Azure key authentication for a Console snapshot despite global identity
+    template: charts/app/templates/deployment.yaml
+    set:
+      global:
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    kubernetesProvider:
+      objects:
+        - *consoleSecret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: customer-bucket
+                key: ACCESS_KEY
+                optional: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AZURE_STORAGE_TENANT_ID
+          any: true
+
+  - it: gives Bufstream the shared identity for a Console workload-identity bucket
+    template: charts/bufstream/templates/deployment.yaml
+    set:
+      bufstream:
+        install: true
+      global:
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    kubernetesProvider:
+      objects:
+        - *workloadIdentitySecret
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: wandb-bucket-access
+
+  - it: keeps Bufstream on its component identity for a Console access-key bucket
+    template: charts/bufstream/templates/deployment.yaml
+    set:
+      bufstream:
+        install: true
+      global:
+        azureStorageIdentity:
+          tenantId: tenant-id
+          clientId: client-id
+    kubernetesProvider:
+      objects:
+        - *consoleSecret
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: customer
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: bufstream-service-account
+
+  - it: uses the Console GCS bucket name for parquet gcsfuse volumes
+    template: charts/parquet/templates/deployment.yaml
+    set:
+      global:
+        cloudProvider: gcp
+      parquet:
+        fuse:
+          enabled: true
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider":"gcs","name":"customer-gcs","path":"files"}'
+          data: {}
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: fuse
+            csi:
+              driver: gcsfuse.csi.storage.gke.io
+              readOnly: true
+              volumeAttributes:
+                bucketName: customer-gcs
+                mountOptions: "implicit-dirs,file-cache:enable-parallel-downloads:true,metadata-cache:stat-cache-max-size-mb:-1,metadata-cache:type-cache-max-size-mb:-1,file-system:kernel-list-cache-ttl-secs:-1,metadata-cache:ttl-secs:-1"
+                fileCacheCapacity: "9.5Gi"
+                fileCacheForRangeRead: "true"
+                gcsfuseMetadataPrefetchOnMount: "true"
+          any: true
