@@ -15,8 +15,8 @@ release:
   namespace: default
 
 tests:
-  - it: builds the api billing connection from the weaveBilling OLAP profile
-    template: charts/api/templates/deployment.yaml
+  - it: builds the glue billing connection from the weaveBilling OLAP profile
+    template: charts/glue/templates/deployment.yaml
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
@@ -65,25 +65,6 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: GORILLA_WEAVE_CLICKHOUSE_SECRET
-          any: true
-
-  - it: builds the glue billing connection from the weaveBilling OLAP profile
-    template: charts/glue/templates/deployment.yaml
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: WEAVE_BILLING_USER
-            valueFrom:
-              secretKeyRef:
-                name: clickhouse-weave-billing
-                key: username
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
-            value: clickhouse://$(WEAVE_BILLING_USER):$(WEAVE_BILLING_PASSWORD)@$(WEAVE_BILLING_HOST):$(WEAVE_BILLING_PORT)/$(WEAVE_BILLING_DATABASE)$(WEAVE_BILLING_PARAMS)
-          count: 1
           any: true
 
   - it: inherits the default OLAP port reference
@@ -195,6 +176,25 @@ tests:
           content:
             name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
           count: 1
+          any: true
+
+  - it: keeps the billing connection off api, which never reads it
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_USER
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_BILLING_PASSWORD
           any: true
 
   - it: does not add billing env vars to an unrelated app deployment
