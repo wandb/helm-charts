@@ -2,10 +2,13 @@
   Assorted bucket related helpers.
 */}}
 {{/*
-Use the Console snapshot so a customer bucket still resolves when the spec only
-points at the managed default-bucket Secret.
+Resolve the bucket once for all consumers. A valid Console snapshot takes
+precedence over a customer bucket in values, which takes precedence over the
+default bucket. All consumers must use this configuration.
 */}}
-{{- define "wandb.bucket.consoleSettings" -}}
+{{- define "wandb.bucket.effective" -}}
+  {{- $globalBucket := default (dict) .Values.global.bucket -}}
+  {{- $consoleSettings := dict -}}
   {{- $secret := lookup "v1" "Secret" .Release.Namespace (printf "%s-bucket" .Release.Name) | default dict -}}
   {{- $metadata := default (dict) $secret.metadata -}}
   {{- $annotations := default (dict) $metadata.annotations -}}
@@ -14,9 +17,59 @@ points at the managed default-bucket Secret.
     {{- $settings := fromJson (get $annotations "wandb.ai/bucket-settings" | default "") -}}
     {{- $hasValidSettings := and (kindIs "map" $settings) (not (hasKey $settings "Error")) (not (empty (get $settings "provider"))) (not (empty (get $settings "name"))) -}}
     {{- if $hasValidSettings -}}
-{{- toYaml $settings -}}
+      {{- $consoleSettings = $settings -}}
     {{- end -}}
   {{- end -}}
+
+  {{- $bucket := default (dict) .Values.global.defaultBucket -}}
+  {{- $customerBucket := false -}}
+  {{- if not (empty $consoleSettings) -}}
+    {{- $bucket = $consoleSettings -}}
+    {{- $customerBucket = true -}}
+  {{- else if not (empty $globalBucket.name) -}}
+    {{- $bucket = $globalBucket -}}
+    {{- $customerBucket = true -}}
+  {{- end -}}
+
+  {{- $secretRef := default (dict) $globalBucket.secret -}}
+  {{- if not (empty $consoleSettings) -}}
+    {{- $secretRef = dict "secretName" "" "accessKeyName" "ACCESS_KEY" "secretKeyName" "SECRET_KEY" -}}
+  {{- else -}}
+    {{- $hasInlineCredentials := and $bucket.accessKey $bucket.secretKey -}}
+    {{- if eq $bucket.provider "az" -}}
+      {{- $hasInlineCredentials = $bucket.accessKey -}}
+    {{- end -}}
+    {{- if and $secretRef.secretName $hasInlineCredentials -}}
+      {{- $secretRef = dict "secretName" "" "accessKeyName" "ACCESS_KEY" "secretKeyName" "SECRET_KEY" -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $effectiveSecret := dict
+  "secretName" (default "" $secretRef.secretName)
+  "accessKeyName" (default "" $secretRef.accessKeyName)
+  "secretKeyName" (default "" $secretRef.secretKeyName)
+  -}}
+  {{- $accessKey := default "" $bucket.accessKey -}}
+  {{- $secretKey := default "" $bucket.secretKey -}}
+  {{- if not (empty $consoleSettings) -}}
+    {{- $accessKey = "" -}}
+    {{- $secretKey = "" -}}
+  {{- end -}}
+  {{- $effectiveBucket := dict
+  "provider" (default "" $bucket.provider)
+  "name" (default "" $bucket.name)
+  "path" (default "" $bucket.path)
+  "region" (default "" $bucket.region)
+  "kmsKey" (default "" $bucket.kmsKey)
+  "accessKey" $accessKey
+  "secretKey" $secretKey
+  "azureTenantId" (default "" $bucket.azureTenantId)
+  "azureClientId" (default "" $bucket.azureClientId)
+  "azureAuthMethod" (default "" $bucket.azureAuthMethod)
+  "customerBucket" $customerBucket
+  "secret" $effectiveSecret
+  -}}
+{{- $effectiveBucket | toYaml -}}
 {{- end }}
 
 {{/*
@@ -27,25 +80,8 @@ own key. The chart then owns the Secret with its default key names. Azure
 needs only accessKey; other providers need the full key pair.
 */}}
 {{- define "wandb.bucket.secretRef" -}}
-  {{- $consoleSettings := include "wandb.bucket.consoleSettings" . | fromYaml -}}
-  {{- $hasConsoleSettings := not (empty $consoleSettings) -}}
-  {{- $secretRef := .Values.global.bucket.secret -}}
-  {{- if $hasConsoleSettings -}}
-    {{- $secretRef = dict "secretName" "" "accessKeyName" "ACCESS_KEY" "secretKeyName" "SECRET_KEY" -}}
-  {{- else -}}
-    {{- $bucket := .Values.global.defaultBucket -}}
-    {{- if .Values.global.bucket.name -}}
-      {{- $bucket = .Values.global.bucket -}}
-    {{- end -}}
-    {{- $hasInlineCredentials := and $bucket.accessKey $bucket.secretKey -}}
-    {{- if eq $bucket.provider "az" -}}
-      {{- $hasInlineCredentials = $bucket.accessKey -}}
-    {{- end -}}
-    {{- if and $secretRef.secretName $hasInlineCredentials -}}
-      {{- $secretRef = dict "secretName" "" "accessKeyName" "ACCESS_KEY" "secretKeyName" "SECRET_KEY" -}}
-    {{- end -}}
-  {{- end -}}
-{{- $secretRef | toYaml -}}
+  {{- $bucket := include "wandb.bucket.effective" . | fromYaml -}}
+{{- $bucket.secret | toYaml -}}
 {{- end }}
 
 {{- define "wandb.bucket.secret" -}}
@@ -68,9 +104,7 @@ key path unless they explicitly select workload identity.
 */}}
 {{- define "wandb.azureStorageIdentity" -}}
   {{- $bucket := include "wandb.bucket" . | fromYaml -}}
-  {{- $consoleSettings := include "wandb.bucket.consoleSettings" . | fromYaml -}}
-  {{- $hasConsoleSettings := not (empty $consoleSettings) -}}
-  {{- $hasCustomerBucket := or $hasConsoleSettings (not (empty .Values.global.bucket.name)) -}}
+  {{- $hasCustomerBucket := $bucket.customerBucket -}}
   {{- $globalIdentity := default (dict) .Values.global.azureStorageIdentity -}}
   {{- $globalTenantId := default "" $globalIdentity.tenantId -}}
   {{- $globalClientId := default "" $globalIdentity.clientId -}}
@@ -194,59 +228,27 @@ templates/weave-trace-serviceaccount.yaml. Must stay identical to
 
 
 {{- define "wandb.bucket" -}}
-  {{- $secretRef := include "wandb.bucket.secretRef" . | fromYaml -}}
-  {{- $consoleSettings := include "wandb.bucket.consoleSettings" . | fromYaml -}}
-  {{- $hasConsoleSettings := not (empty $consoleSettings) -}}
+  {{- $bucket := include "wandb.bucket.effective" . | fromYaml -}}
+  {{- $secretRef := $bucket.secret -}}
   {{- $url := "" -}}
-  {{- $path := "" -}}
-  {{- $provider := "" -}}
-  {{- $accessKey := "" -}}
-  {{- $secretKey := "" -}}
-  {{- $azureTenantId := "" -}}
-  {{- $azureClientId := "" -}}
-  {{- $azureAuthMethod := "" -}}
-  {{- if $hasConsoleSettings -}}
-    {{- $provider = default "" $consoleSettings.provider -}}
-    {{- $path = default "" $consoleSettings.path -}}
-    {{- $azureTenantId = default "" $consoleSettings.azureTenantId -}}
-    {{- $azureClientId = default "" $consoleSettings.azureClientId -}}
-    {{- $azureAuthMethod = default "" $consoleSettings.azureAuthMethod -}}
-name: {{ default "" $consoleSettings.name }}
-region: {{ default "" $consoleSettings.region }}
-kmsKey: {{ default "" $consoleSettings.kmsKey }}
-  {{- else if .Values.global.bucket.name -}}
-    {{- $provider = .Values.global.bucket.provider -}}
-    {{- $path = .Values.global.bucket.path -}}
-    {{- $accessKey = default "" .Values.global.bucket.accessKey -}}
-    {{- $secretKey = default "" .Values.global.bucket.secretKey -}}
-    {{- $azureTenantId = default "" .Values.global.bucket.azureTenantId -}}
-    {{- $azureClientId = default "" .Values.global.bucket.azureClientId -}}
-    {{- $azureAuthMethod = default "" .Values.global.bucket.azureAuthMethod -}}
-name: {{ .Values.global.bucket.name }}
-region: {{ .Values.global.bucket.region }}
-kmsKey: {{ .Values.global.bucket.kmsKey }}
-  {{- else -}}
-    {{- $provider = .Values.global.defaultBucket.provider -}}
-    {{- $path = .Values.global.defaultBucket.path -}}
-    {{- $accessKey = default "" .Values.global.defaultBucket.accessKey -}}
-    {{- $secretKey = default "" .Values.global.defaultBucket.secretKey -}}
-    {{- $azureTenantId = default "" .Values.global.defaultBucket.azureTenantId -}}
-    {{- $azureClientId = default "" .Values.global.defaultBucket.azureClientId -}}
-    {{- $azureAuthMethod = default "" .Values.global.defaultBucket.azureAuthMethod -}}
-name: {{ .Values.global.defaultBucket.name }}
-region: {{ .Values.global.defaultBucket.region }}
-kmsKey: {{ .Values.global.defaultBucket.kmsKey }}
-  {{- end }}
-provider: {{ $provider }}
-path: {{ $path }}
-accessKey: {{ $accessKey }}
-secretKey: {{ $secretKey }}
-azureTenantId: {{ $azureTenantId | toJson }}
-azureClientId: {{ $azureClientId | toJson }}
-azureAuthMethod: {{ $azureAuthMethod | toJson }}
+  {{- $path := $bucket.path -}}
+  {{- $provider := $bucket.provider -}}
+  {{- $accessKey := $bucket.accessKey -}}
+  {{- $secretKey := $bucket.secretKey -}}
+name: {{ $bucket.name }}
+region: {{ $bucket.region }}
+kmsKey: {{ $bucket.kmsKey }}
+provider: {{ $bucket.provider }}
+path: {{ $bucket.path }}
+accessKey: {{ $bucket.accessKey }}
+secretKey: {{ $bucket.secretKey }}
+azureTenantId: {{ $bucket.azureTenantId | toJson }}
+azureClientId: {{ $bucket.azureClientId | toJson }}
+azureAuthMethod: {{ $bucket.azureAuthMethod | toJson }}
 accessKeyName: {{ $secretRef.accessKeyName }}
 secretKeyName: {{ $secretRef.secretKeyName }}
 secretName: {{ include "wandb.bucket.secret" . }}
+customerBucket: {{ $bucket.customerBucket }}
   {{- if not $path -}}
 
     {{- if eq $provider "cw" -}}
@@ -310,14 +312,11 @@ url: {{ $url }}
   {{- . | toString | urlquery | replace "+" "%20" -}}
 {{- end -}}
 
-{{/* Build the chart-owned Secret's URL from actual Helm values. External
+{{/* Build the chart-owned Secret's URL from the effective bucket. External
 Secrets retain their existing runtime interpolation and are never copied here.
 */}}
 {{- define "wandb.bucket.connectionString" -}}
-  {{- $bucket := .Values.global.defaultBucket -}}
-  {{- if .Values.global.bucket.name -}}
-    {{- $bucket = .Values.global.bucket -}}
-  {{- end -}}
+  {{- $bucket := include "wandb.bucket.effective" . | fromYaml -}}
   {{- $scheme := $bucket.provider -}}
   {{- if eq $scheme "gcs" -}}
     {{- $scheme = "gs" -}}
