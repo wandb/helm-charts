@@ -235,13 +235,13 @@ templates/weave-trace-serviceaccount.yaml. Must stay identical to
   {{- $provider := $bucket.provider -}}
   {{- $accessKey := $bucket.accessKey -}}
   {{- $secretKey := $bucket.secretKey -}}
-name: {{ $bucket.name }}
-region: {{ $bucket.region }}
-kmsKey: {{ $bucket.kmsKey }}
-provider: {{ $bucket.provider }}
-path: {{ $bucket.path }}
-accessKey: {{ $bucket.accessKey }}
-secretKey: {{ $bucket.secretKey }}
+name: {{ $bucket.name | toJson }}
+region: {{ $bucket.region | toJson }}
+kmsKey: {{ $bucket.kmsKey | toJson }}
+provider: {{ $bucket.provider | toJson }}
+path: {{ $bucket.path | toJson }}
+accessKey: {{ $bucket.accessKey | toJson }}
+secretKey: {{ $bucket.secretKey | toJson }}
 azureTenantId: {{ $bucket.azureTenantId | toJson }}
 azureClientId: {{ $bucket.azureClientId | toJson }}
 azureAuthMethod: {{ $bucket.azureAuthMethod | toJson }}
