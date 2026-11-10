@@ -9,10 +9,13 @@
 "registrySearch" (list "GORILLA_REGISTRY_SEARCH_ADDRESS" "MIGRATE_ARTIFACTS_DB")
 "runStoreAccelerator" (list "GORILLA_RUN_STORE_ACCELERATOR_ADDRESS" "MIGRATE_RUN_STORE_ACCELERATOR_DB" "MIGRATE_RUNS_ACCELERATOR_DB")
 -}}
-{{- /* Weave Trace runs its Python migrator in the workload's initContainer. */ -}}
-{{- $featuresWithOwnMigrator := list "weaveTrace" -}}
+{{- /*
+  Weave Trace runs its Python migrator in the workload's initContainer.
+  Weave billing only reads the schema Weave Trace migrates.
+*/ -}}
+{{- $featuresWithoutMigrateJob := list "weaveTrace" "weaveBilling" -}}
 {{- range $featureName, $featureConfig := .Values.global.olap -}}
-  {{- if and (ne $featureName "default") (not (has $featureName $featuresWithOwnMigrator)) -}}
+  {{- if and (ne $featureName "default") (not (has $featureName $featuresWithoutMigrateJob)) -}}
     {{- $config := include "wandb.olapConfig" (dict "root" $ "featureName" $featureName) | fromYaml -}}
     {{- if $config.enabled -}}
       {{- if not (hasKey $featureSpecificVars $featureName) -}}
