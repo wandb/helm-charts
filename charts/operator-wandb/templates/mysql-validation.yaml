@@ -1,35 +1,51 @@
-{{- if not (kindIs "bool" .Values.global.mysql.rdsIamAuth) -}}
-  {{- fail "global.mysql.rdsIamAuth must be a boolean" -}}
+{{- range $key := list "rdsIamAuth" "azureEntraAuth" -}}
+  {{- if not (kindIs "bool" (get $.Values.global.mysql $key)) -}}
+    {{- fail (printf "global.mysql.%s must be a boolean" $key) -}}
+  {{- end -}}
 {{- end -}}
 
+{{- if and .Values.global.mysql.rdsIamAuth .Values.global.mysql.azureEntraAuth -}}
+  {{- fail "global.mysql.rdsIamAuth and global.mysql.azureEntraAuth cannot both be true" -}}
+{{- end -}}
+
+{{- $tokenAuthKey := "" -}}
 {{- if .Values.global.mysql.rdsIamAuth -}}
+  {{- $tokenAuthKey = "rdsIamAuth" -}}
+{{- else if .Values.global.mysql.azureEntraAuth -}}
+  {{- $tokenAuthKey = "azureEntraAuth" -}}
+{{- end -}}
+
+{{- if $tokenAuthKey -}}
+  {{- $when := printf "when global.mysql.%s=true" $tokenAuthKey -}}
   {{- if not .Values.global.mysql.fromSecret -}}
     {{- if empty .Values.global.mysql.host -}}
-      {{- fail "global.mysql.host is required when global.mysql.rdsIamAuth=true" -}}
+      {{- fail (printf "global.mysql.host is required %s" $when) -}}
     {{- end -}}
     {{- if empty .Values.global.mysql.user -}}
-      {{- fail "global.mysql.user is required when global.mysql.rdsIamAuth=true" -}}
+      {{- fail (printf "global.mysql.user is required %s" $when) -}}
     {{- end -}}
   {{- end -}}
-  {{- if empty .Values.global.mysql.awsRegion -}}
-    {{- fail "global.mysql.awsRegion is required when global.mysql.rdsIamAuth=true" -}}
-  {{- end -}}
-  {{- if empty .Values.global.mysql.caCert -}}
-    {{- fail "global.mysql.caCert is required when global.mysql.rdsIamAuth=true" -}}
+  {{- if .Values.global.mysql.rdsIamAuth -}}
+    {{- if empty .Values.global.mysql.awsRegion -}}
+      {{- fail (printf "global.mysql.awsRegion is required %s" $when) -}}
+    {{- end -}}
+    {{- if empty .Values.global.mysql.caCert -}}
+      {{- fail (printf "global.mysql.caCert is required %s" $when) -}}
+    {{- end -}}
   {{- end -}}
   {{- if not (empty .Values.global.mysql.password) -}}
-    {{- fail "global.mysql.password must be empty when global.mysql.rdsIamAuth=true" -}}
+    {{- fail (printf "global.mysql.password must be empty %s" $when) -}}
   {{- end -}}
   {{- if not (empty .Values.global.mysql.passwordSecret.name) -}}
-    {{- fail "global.mysql.passwordSecret.name must be empty when global.mysql.rdsIamAuth=true" -}}
+    {{- fail (printf "global.mysql.passwordSecret.name must be empty %s" $when) -}}
   {{- end -}}
   {{- if .Values.mysql.install -}}
-    {{- fail "mysql.install must be false when global.mysql.rdsIamAuth=true" -}}
+    {{- fail (printf "mysql.install must be false %s" $when) -}}
   {{- end -}}
   {{- if and .Values.app.install (index .Values.app.initContainers "init-db").enabled -}}
-    {{- fail "app.initContainers.init-db.enabled must be false when global.mysql.rdsIamAuth=true" -}}
+    {{- fail (printf "app.initContainers.init-db.enabled must be false %s" $when) -}}
   {{- end -}}
   {{- if and .Values.prometheus.install (index .Values.prometheus "mysql-exporter").install -}}
-    {{- fail "prometheus.mysql-exporter.install must be false when global.mysql.rdsIamAuth=true" -}}
+    {{- fail (printf "prometheus.mysql-exporter.install must be false %s" $when) -}}
   {{- end -}}
 {{- end -}}
