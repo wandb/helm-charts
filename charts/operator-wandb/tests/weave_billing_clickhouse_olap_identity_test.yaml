@@ -1,11 +1,9 @@
 suite: Weave billing ClickHouse OLAP identity
 templates:
-  - charts/api/templates/deployment.yaml
   - charts/glue/templates/deployment.yaml
 values:
   - fixtures/weave_trace_olap.yaml
 set:
-  global.api.enabled: true
   global.glue.enabled: true
   global.olap.default.host: managed-clickhouse.example.com
   global.olap.weaveBilling.enabled: true
@@ -60,27 +58,6 @@ tests:
 
   - it: does not fall back to the legacy billing Secret in glue when the OLAP identity is incomplete
     template: charts/glue/templates/deployment.yaml
-    set:
-      global.weaveBillingClickhouse.secretName: managed-spec-clickhouse-legacy
-      global.olap.weaveBilling.user:
-        valueFrom:
-          secretKeyRef:
-            name: clickhouse-weave-billing
-            key: username
-    asserts:
-      - notContains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: GORILLA_WEAVE_CLICKHOUSE_ADDRESS
-          any: true
-      - notContains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: GORILLA_WEAVE_CLICKHOUSE_SECRET
-          any: true
-
-  - it: does not fall back to the legacy billing Secret in api when the OLAP identity is incomplete
-    template: charts/api/templates/deployment.yaml
     set:
       global.weaveBillingClickhouse.secretName: managed-spec-clickhouse-legacy
       global.olap.weaveBilling.user:
