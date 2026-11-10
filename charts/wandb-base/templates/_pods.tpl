@@ -58,9 +58,11 @@ spec:
     - name: {{ tpl $name $.root }}
     {{- end }}
   {{- end }}
-  {{- if .podData.initContainers }}
+  {{- /* Every init container can be disabled, so check the rendered list. */}}
+  {{- $initContainers := include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers" "podData" .podData) | trim }}
+  {{- if $initContainers }}
   initContainers:
-    {{- include "wandb-base.containers" (dict "containers" .podData.initContainers "root" $.root "source" "initContainers" "podData" .podData) | nindent 4 }}
+    {{- $initContainers | nindent 4 }}
   {{- end }}
   {{- $nodeSelector := coalesce .podData.nodeSelector $.root.Values.nodeSelector $.root.Values.global.nodeSelector -}}
   {{- if $nodeSelector }}
