@@ -187,7 +187,7 @@ Global values will override any chart-specific values.
           ...
   */ -}}
 
-  {{- if not (include "wandb.mysql.tokenAuth" .) }}
+  {{- if not (include "wandb.mysql.passwordless" .) }}
     {{- include "wandb.mysql.passwordEnv" . | nindent 0 }}
   {{- end }}
   {{- include "wandb.mysql.settingEnv" (dict "root" . "name" "MYSQL_PORT" "key" "port") | nindent 0 }}
