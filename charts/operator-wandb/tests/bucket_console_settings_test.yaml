@@ -4,6 +4,7 @@ templates:
   - charts/app/templates/deployment.yaml
   - charts/parquet/templates/deployment.yaml
   - charts/bufstream/templates/deployment.yaml
+  - charts/bufstream/templates/config.yaml
 release:
   name: customer
   namespace: dedicated
@@ -377,3 +378,166 @@ tests:
                 fileCacheForRangeRead: "true"
                 gcsfuseMetadataPrefetchOnMount: "true"
           any: true
+
+  - it: keeps inline S3 bucket URL envs for a user-specified bucket
+    template: charts/app/templates/deployment.yaml
+    set:
+      global:
+        bucket:
+          provider: s3
+          name: s3-user-bucket
+          path: files
+          accessKey: inline-access-key
+          secretKey: inline-secret-key
+    asserts: &s3BucketEnvironment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BUCKET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: customer-bucket
+                key: ACCESS_KEY
+                optional: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BUCKET_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: customer-bucket
+                key: SECRET_KEY
+                optional: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BUCKET
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STORE
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: customer-bucket
+
+  - it: uses credentials from the Console Secret in Bufstream's S3 config
+    template: charts/bufstream/templates/config.yaml
+    set:
+      bufstream:
+        install: true
+      global:
+        bufstream:
+          enabled: true
+        bucket:
+          provider: s3
+          name: s3-user-bucket
+          path: files
+          region: us-east-1
+          accessKey: inline-access-key
+          secretKey: inline-secret-key
+    kubernetesProvider:
+      objects:
+        - &consoleS3Secret
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider":"s3","name":"console-s3-bucket","path":"console-files","region":"us-west-2"}'
+          data:
+            ACCESS_KEY: Y29uc29sZS1hY2Nlc3Mta2V5
+            SECRET_KEY: Y29uc29sZS1zZWNyZXQta2V5
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: '(?s)access_key_id:\s+string: console-access-key'
+
+  - it: keeps the Console S3 app bucket URL envs equivalent to inline S3
+    template: charts/app/templates/deployment.yaml
+    set:
+      global:
+        bucket:
+          provider: s3
+          name: s3-user-bucket
+          path: files
+          accessKey: inline-access-key
+          secretKey: inline-secret-key
+    kubernetesProvider:
+      objects:
+        - *consoleS3Secret
+    asserts: *s3BucketEnvironment
+
+  - it: mounts the Console S3 Secret for Bufstream
+    template: charts/bufstream/templates/deployment.yaml
+    set:
+      bufstream:
+        install: true
+      global:
+        bufstream:
+          enabled: true
+        bucket:
+          provider: s3
+          name: s3-user-bucket
+          path: files
+          region: us-east-1
+          accessKey: inline-access-key
+          secretKey: inline-secret-key
+    kubernetesProvider:
+      objects:
+        - *consoleS3Secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: storage
+            mountPath: /config/secrets/storage
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: storage
+            secret:
+              secretName: customer-bucket
+              items:
+                - key: SECRET_KEY
+                  path: secret_access_key
+
+  - it: omits Bufstream's S3 access key when the Console Secret lacks ACCESS_KEY
+    template: charts/bufstream/templates/config.yaml
+    set:
+      bufstream:
+        install: true
+      global:
+        bufstream:
+          enabled: true
+        bucket:
+          provider: s3
+          name: s3-user-bucket
+          path: files
+          region: us-east-1
+          accessKey: inline-access-key
+          secretKey: inline-secret-key
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: Secret
+          metadata:
+            name: customer-bucket
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: 'true'
+              wandb.ai/bucket-settings: '{"provider":"s3","name":"console-s3-bucket","path":"console-files","region":"us-west-2"}'
+          data:
+            SECRET_KEY: Y29uc29sZS1zZWNyZXQta2V5
+    asserts:
+      - hasDocuments:
+          count: 1
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: '(?s)access_key_id:'

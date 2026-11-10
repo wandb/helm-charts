@@ -52,8 +52,9 @@ default bucket. All consumers must use this configuration.
   {{- $accessKey := default "" $bucket.accessKey -}}
   {{- $secretKey := default "" $bucket.secretKey -}}
   {{- if not (empty $consoleSettings) -}}
-    {{- $accessKey = "" -}}
-    {{- $secretKey = "" -}}
+    {{- $secretData := default (dict) $secret.data -}}
+    {{- $accessKey = get $secretData "ACCESS_KEY" | default "" | b64dec -}}
+    {{- $secretKey = get $secretData "SECRET_KEY" | default "" | b64dec -}}
   {{- end -}}
   {{- $effectiveBucket := dict
   "provider" (default "" $bucket.provider)
@@ -67,6 +68,7 @@ default bucket. All consumers must use this configuration.
   "azureClientId" (default "" $bucket.azureClientId)
   "azureAuthMethod" (default "" $bucket.azureAuthMethod)
   "customerBucket" $customerBucket
+  "consoleManaged" (not (empty $consoleSettings))
   "secret" $effectiveSecret
   -}}
 {{- $effectiveBucket | toYaml -}}

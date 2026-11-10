@@ -45,6 +45,11 @@ the component account.
 {{- and $globalConfigured $usesDeploymentIdentity -}}
 {{- end -}}
 
+{{- define "bufstream.s3AccessKeyIdEnabled" -}}
+  {{- $bucket := include "wandb.bucket.effective" . | fromYaml -}}
+  {{- or (not $bucket.consoleManaged) (not (empty $bucket.accessKey)) -}}
+{{- end -}}
+
 {{- define "bufstream.serviceAccountName" -}}
 {{- if include "bufstream.azureStorageServiceAccountEnabled" . | trim | eq "true" -}}
   {{- $identity := default (dict) .Values.global.azureStorageIdentity -}}
