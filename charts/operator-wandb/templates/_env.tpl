@@ -187,7 +187,7 @@ Global values will override any chart-specific values.
           ...
   */ -}}
 
-  {{- if not .Values.global.mysql.rdsIamAuth }}
+  {{- if not (include "wandb.mysql.tokenAuth" .) }}
     {{- include "wandb.mysql.passwordEnv" . | nindent 0 }}
   {{- end }}
   {{- include "wandb.mysql.settingEnv" (dict "root" . "name" "MYSQL_PORT" "key" "port") | nindent 0 }}
@@ -195,7 +195,7 @@ Global values will override any chart-specific values.
   {{- include "wandb.mysql.settingEnv" (dict "root" . "name" "MYSQL_DATABASE" "key" "database") | nindent 0 }}
   {{- include "wandb.mysql.settingEnv" (dict "root" . "name" "MYSQL_USER" "key" "user") | nindent 0 }}
 
-  {{- if or (kindIs "map" .Values.global.mysql.caCert) (and (kindIs "string" .Values.global.mysql.caCert) (ne .Values.global.mysql.caCert "")) }}
+  {{- if include "wandb.mysql.caCertConfigured" . }}
 - name: MYSQL_CA_CERT_PATH
   value: "/etc/ssl/certs/{{ include "wandb.mysql.certFileName" . }}"
   {{- end }}

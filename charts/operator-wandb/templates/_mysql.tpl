@@ -126,6 +126,12 @@ Return the db connection string
 {{- define "wandb.mysql" -}}
   {{- if .Values.global.mysql.rdsIamAuth -}}
 mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&rds-iam-auth=true&aws-region={{ .Values.global.mysql.awsRegion }}
+  {{- else if .Values.global.mysql.azureEntraAuth -}}
+    {{- if include "wandb.mysql.caCertConfigured" . -}}
+mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=custom&ssl-ca=$(MYSQL_CA_CERT_PATH)&azure-entra-auth=true
+    {{- else -}}
+mysql://$(MYSQL_USER)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=true&azure-entra-auth=true
+    {{- end -}}
   {{- else -}}
 mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATABASE)?tls=preferred
   {{- end -}}
@@ -185,4 +191,24 @@ mysql://$(MYSQL_USER):$(MYSQL_PASSWORD)@$(MYSQL_HOST):$(MYSQL_PORT)/$(MYSQL_DATA
   mountPath: /etc/ssl/certs/{{ $file }}
   subPath: {{ $file }}
   {{- end }}
+{{- end -}}
+
+{{/*
+Return "true" when MySQL authenticates with a short-lived token (RDS IAM or
+Microsoft Entra ID) instead of a password.
+*/}}
+{{- define "wandb.mysql.tokenAuth" -}}
+  {{- if or .Values.global.mysql.rdsIamAuth .Values.global.mysql.azureEntraAuth -}}
+    {{- print "true" -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Return "true" when global.mysql.caCert is set inline or by reference.
+*/}}
+{{- define "wandb.mysql.caCertConfigured" -}}
+  {{- $caCert := .Values.global.mysql.caCert -}}
+  {{- if or (kindIs "map" $caCert) (and (kindIs "string" $caCert) (ne $caCert "")) -}}
+    {{- print "true" -}}
+  {{- end -}}
 {{- end -}}
