@@ -61,6 +61,13 @@ containers:
 
 In this example, the `LOG_LEVEL` for the `app` container would be set to `trace`.
 
+`global.envTpls` adds inherited env templates to main and init containers, jobs
+and cronjobs. They receive the chart context and `.container`, containing the
+merged container configuration. `globalOptOut.env` skips these templates.
+Chart-level `envTpls`, container `envTpls`, and explicit env values override
+inherited templates by variable name, in that order. Existing template order
+within each level is retained.
+
 Additionally, environment variables can be sourced from ConfigMaps and Secrets using the `envFrom` field:
 
 ```yaml

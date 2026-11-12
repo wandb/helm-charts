@@ -65,6 +65,15 @@
         {{- end -}}
       {{- end -}}
 
+      {{- /* Render inherited templates with the merged container's envFrom scope. */ -}}
+      {{- $globalEnvTpls := list -}}
+      {{- if not $globalOptOutEnv -}}
+        {{- $envContext := merge (dict "container" $container) $.root -}}
+        {{- range $.root.Values.global.envTpls -}}
+          {{- $globalEnvTpls = concat $globalEnvTpls (tpl . $envContext | fromYamlArray) -}}
+        {{- end -}}
+      {{- end -}}
+
       {{- /* Render shared and container-specific env templates. */ -}}
       {{- $envTpls := list }}
       {{- if $.root.Values.envTpls -}}
@@ -72,6 +81,16 @@
           {{- $envTpls = concat $envTpls (tpl . $.root | fromYamlArray) -}}
         {{- end -}}
       {{- end -}}
+
+      {{- /* Shared templates override inherited templates by variable name. */ -}}
+      {{- range $envVar := $envTpls -}}
+        {{- range $globalEnvVar := $globalEnvTpls -}}
+          {{- if eq $envVar.name $globalEnvVar.name -}}
+            {{- $globalEnvTpls = without $globalEnvTpls $globalEnvVar -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $envTpls = concat $globalEnvTpls $envTpls -}}
 
       {{- $containerEnvTpls := list }}
       {{- if $container.envTpls -}}

@@ -1,0 +1,202 @@
+suite: Security references and existing env precedence
+templates:
+  - charts/api/templates/deployment.yaml
+  - charts/app/templates/deployment.yaml
+  - charts/glue/templates/deployment.yaml
+  - charts/parquet/templates/cronjob.yaml
+  - charts/console/templates/deployment.yaml
+release:
+  name: wandb
+set:
+  global.api.enabled: true
+  global.glue.enabled: true
+tests:
+  - it: adds an optional Security key and only the API session key to api
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_ALLOW_USER_TEAM_CREATION
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-security-configmap
+                key: GORILLA_ALLOW_USER_TEAM_CREATION
+                optional: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_SESSION_LENGTH
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-security-configmap
+                key: GORILLA_SESSION_LENGTH
+                optional: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_GLUE_SESSION_LENGTH}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef: {name: wandb-security-configmap}
+
+  - it: follows both existing session sources on the combined app
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_SESSION_LENGTH}
+          any: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_GLUE_SESSION_LENGTH}
+          any: true
+
+  - it: adds only the Glue session key to glue
+    template: charts/glue/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_GLUE_SESSION_LENGTH}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_SESSION_LENGTH}
+          any: true
+
+  - it: follows container-local Glue sources on parquet jobs without leaking API session length
+    template: charts/parquet/templates/cronjob.yaml
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_GLUE_SESSION_LENGTH
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-security-configmap
+                key: GORILLA_GLUE_SESSION_LENGTH
+                optional: true
+      - notContains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].env
+          content: {name: GORILLA_SESSION_LENGTH}
+          any: true
+
+  - it: gives init containers the same inherited settings and session sources
+    template: charts/api/templates/deployment.yaml
+    set:
+      api.initContainers.security-check:
+        image: {repository: busybox, tag: "1.37"}
+        command: ["true"]
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: GORILLA_DISABLE_CODE_SAVING}
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content: {name: GORILLA_SESSION_LENGTH}
+          any: true
+
+  - it: retains container over service over global env and extraEnv precedence
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.extraEnv.GORILLA_ALLOW_USER_TEAM_CREATION: "true"
+      global.env.GORILLA_ALLOW_USER_TEAM_CREATION: {value: global}
+      api.env.GORILLA_ALLOW_USER_TEAM_CREATION: {value: service}
+      api.containers.api.env.GORILLA_ALLOW_USER_TEAM_CREATION: {value: container}
+      api.env.GORILLA_SESSION_LENGTH: {value: 48h}
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_ALLOW_USER_TEAM_CREATION, value: container}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_ALLOW_USER_TEAM_CREATION
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-security-configmap
+                key: GORILLA_ALLOW_USER_TEAM_CREATION
+                optional: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_SESSION_LENGTH, value: 48h}
+
+  - it: retains explicit global env ahead of global extraEnv without adding duplicates
+    template: charts/api/templates/deployment.yaml
+    set:
+      global.extraEnv.GORILLA_DISABLE_CODE_SAVING: "true"
+      global.env.GORILLA_DISABLE_CODE_SAVING: {value: "false"}
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_DISABLE_CODE_SAVING, value: "false"}
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_DISABLE_CODE_SAVING, value: "true"}
+
+  - it: retains empty explicit settings over the optional references
+    template: charts/app/templates/deployment.yaml
+    set:
+      global.extraEnv.GORILLA_DATA_RETENTION_PERIOD: ""
+      global.extraEnv.GORILLA_SESSION_LENGTH: 0.25h
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_DATA_RETENTION_PERIOD, value: ""}
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_SESSION_LENGTH, value: 0.25h}
+
+  - it: does not add session variables to unrelated services
+    template: charts/console/templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_SESSION_LENGTH}
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_GLUE_SESSION_LENGTH}
+          any: true
+
+  - it: skips inherited references when global env is opted out
+    template: charts/api/templates/deployment.yaml
+    set:
+      api.globalOptOut.env: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_ALLOW_USER_TEAM_CREATION}
+          any: true
+
+  - it: follows conditional envFrom templates without duplicate session references
+    template: charts/api/templates/deployment.yaml
+    set:
+      api.envFromTpls:
+        - '- configMapRef: {name: "{{ .Release.Name }}-glue-configmap"}'
+        - '- configMapRef: {name: "{{ .Release.Name }}-api-configmap"}'
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_GLUE_SESSION_LENGTH
+            valueFrom:
+              configMapKeyRef:
+                name: wandb-security-configmap
+                key: GORILLA_GLUE_SESSION_LENGTH
+                optional: true
+
+  - it: does not introduce an unprefixed session key from a prefixed source
+    template: charts/api/templates/deployment.yaml
+    set:
+      api.envFromTpls:
+        - |
+          - prefix: CUSTOM_
+            configMapRef: {name: "{{ .Release.Name }}-glue-configmap"}
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: {name: GORILLA_GLUE_SESSION_LENGTH}
+          any: true
