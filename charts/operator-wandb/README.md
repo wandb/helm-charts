@@ -445,31 +445,23 @@ legacy/self-managed Console retains its user-spec path.
 
 ## Console-owned Security and session settings
 
-The chart creates `<release>-security-configmap` for the seven Security switches,
-artifact GC enablement/retention, and session length. It seeds only present
-Security/GC keys from `global.extraEnv`, using their existing environment names.
-`global.auth.sessionLengthHours` supplies `GORILLA_SESSION_LENGTH` and
+The chart creates `<release>-security-configmap` for the nine Security/GC
+switches and the session lengths. It seeds only keys already present in
+`global.extraEnv`, using their existing environment names; unset flags stay
+absent. `global.auth.sessionLengthHours` supplies `GORILLA_SESSION_LENGTH` and
 `GORILLA_GLUE_SESSION_LENGTH` as duration strings, including fractional hours.
-It does not add defaults for unset flags or copy hand-set flags into this resource.
 
 Until the ConfigMap has `wandb.ai/console-managed: "true"`, Helm continues
-rendering these inline settings. Once Console sets that annotation, Helm preserves
-the complete live data map, including empty or missing keys. This follows the
-OIDC ownership pattern and uses `helm.sh/resource-policy: keep`.
+rendering these inline settings. Once Console sets that annotation, Helm
+preserves the complete live data map, including empty or missing keys. This
+follows the OIDC ownership pattern and uses `helm.sh/resource-policy: keep`.
 
-Optional `configMapKeyRef` entries reach containers and init containers through
-`global.envTpls`, respecting `globalOptOut.env`. Session references follow each
-container's existing API/Glue ConfigMap sources, including Glue jobs. The generated
-API/Glue ConfigMaps remain as fallbacks when a session key is absent. Explicit
-container, service and global env values keep their existing precedence over the
-references; the ownership annotation does not override them.
-
-Legacy MySQL and OTel containers also retain their existing global flag inputs.
-Base-chart deployments and statefulsets retain their Reloader annotations.
-Console must restart actual consumers when saving; new jobs read the current data
-when they start. Roll out the chart before the Console writer. Backfill exact live
-settings and verify parity before removing their user-spec entries. This chart
-does not perform that migration or remove scoped/manual overrides.
+The api, app, glue and parquet workloads import the ConfigMap through `envFrom`,
+the same mechanism as the OIDC ConfigMap. The Security ConfigMap is listed after
+the api/glue ConfigMaps in each `envFrom` map, so its session keys take
+precedence over the copies seeded into those ConfigMaps. Explicit env entries
+(container, service and `global.extraEnv`/`global.env` values) still win over
+`envFrom`, so user-specified overrides are unaffected.
 
 ## Customer-owned OIDC configuration
 
