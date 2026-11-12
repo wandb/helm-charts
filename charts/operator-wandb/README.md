@@ -443,6 +443,26 @@ always present, so first credentials, replacements, and removals take effect on
 restart without another Helm update. Existing inline values remain supported;
 legacy/self-managed Console retains its user-spec path.
 
+## Console-owned Security and session settings
+
+The chart creates `<release>-security-configmap` for the nine Security/GC
+switches and the session lengths. It seeds only keys already present in
+`global.extraEnv`, using their existing environment names; unset flags stay
+absent. `global.auth.sessionLengthHours` supplies `GORILLA_SESSION_LENGTH` and
+`GORILLA_GLUE_SESSION_LENGTH` as duration strings, including fractional hours.
+
+Until the ConfigMap has `wandb.ai/console-managed: "true"`, Helm continues
+rendering these inline settings. Once Console sets that annotation, Helm
+preserves the complete live data map, including empty or missing keys. This
+follows the OIDC ownership pattern and uses `helm.sh/resource-policy: keep`.
+
+The api, app, glue and parquet workloads import the ConfigMap through `envFrom`,
+the same mechanism as the OIDC ConfigMap. The Security ConfigMap is listed after
+the api/glue ConfigMaps in each `envFrom` map, so its session keys take
+precedence over the copies seeded into those ConfigMaps. Explicit env entries
+(container, service and `global.extraEnv`/`global.env` values) still win over
+`envFrom`, so user-specified overrides are unaffected.
+
 ## Customer-owned OIDC configuration
 
 By default, Helm creates `<release>-oidc-configmap` from the existing inline

@@ -1,0 +1,93 @@
+suite: Security ConfigMap envFrom consumption
+templates:
+  - charts/api/templates/deployment.yaml
+  - charts/app/templates/deployment.yaml
+  - charts/glue/templates/deployment.yaml
+  - charts/parquet/templates/cronjob.yaml
+  - charts/console/templates/deployment.yaml
+release:
+  name: wandb
+set:
+  global.api.enabled: true
+  global.glue.enabled: true
+tests:
+  - it: imports the Security ConfigMap after the API ConfigMap in api
+    template: charts/api/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-security-configmap
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[8]
+          value:
+            configMapRef:
+              name: wandb-security-configmap
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: wandb-api-configmap
+
+  - it: imports the Security ConfigMap after the API and Glue ConfigMaps in app
+    template: charts/app/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-security-configmap
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: wandb-api-configmap
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[6].configMapRef.name
+          value: wandb-glue-configmap
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[12]
+          value:
+            configMapRef:
+              name: wandb-security-configmap
+
+  - it: imports the Security ConfigMap after the Glue ConfigMap in glue
+    template: charts/glue/templates/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-security-configmap
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[3].configMapRef.name
+          value: wandb-glue-configmap
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[6]
+          value:
+            configMapRef:
+              name: wandb-security-configmap
+
+  - it: imports the Security ConfigMap after the Glue ConfigMap in parquet jobs
+    template: charts/parquet/templates/cronjob.yaml
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-security-configmap
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].envFrom[3].configMapRef.name
+          value: wandb-glue-configmap
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].envFrom[7]
+          value:
+            configMapRef:
+              name: wandb-security-configmap
+
+  - it: does not import the Security ConfigMap in unrelated services
+    template: charts/console/templates/deployment.yaml
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            configMapRef:
+              name: wandb-security-configmap
+          any: true

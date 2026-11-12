@@ -1,0 +1,25 @@
+{{- $name := include "wandb.security.configMapName" . -}}
+{{- $existing := lookup "v1" "ConfigMap" .Release.Namespace $name | default dict -}}
+{{- $metadata := get $existing "metadata" | default dict -}}
+{{- $annotations := get $metadata "annotations" | default dict -}}
+{{- $consoleManaged := eq (get $annotations "wandb.ai/console-managed") "true" -}}
+{{- $data := dict -}}
+{{- if $consoleManaged -}}
+  {{- /* Preserve missing keys and future Console keys as well as set values. */ -}}
+  {{- $data = get $existing "data" | default dict -}}
+{{- else -}}
+  {{- $data = include "wandb.security.inlineData" . | fromYaml -}}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  annotations:
+    "helm.sh/resource-policy": "keep"
+{{- if $consoleManaged }}
+    "wandb.ai/console-managed": "true"
+{{- end }}
+  labels:
+    {{- include "wandb.commonLabels" . | nindent 4 }}
+data:
+  {{- $data | toYaml | nindent 2 }}

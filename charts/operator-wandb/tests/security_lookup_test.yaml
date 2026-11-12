@@ -1,0 +1,187 @@
+suite: Console-owned security settings
+templates:
+  - templates/security.yaml
+release:
+  name: customer
+  namespace: dedicated
+set:
+  global.auth.sessionLengthHours: 0.1
+  global.extraEnv.GORILLA_ALLOW_USER_TEAM_CREATION: "true"
+  global.extraEnv.GORILLA_DISABLE_CODE_SAVING: "false"
+  global.extraEnv.GORILLA_DATA_RETENTION_PERIOD: ""
+kubernetesProvider:
+  scheme:
+    "v1/ConfigMap":
+      gvr:
+        version: v1
+        resource: configmaps
+      namespaced: true
+tests:
+  - it: seeds only present flags and both fractional session durations
+    asserts:
+      - equal:
+          path: metadata.name
+          value: customer-security-configmap
+      - equal:
+          path: data
+          value:
+            GORILLA_ALLOW_USER_TEAM_CREATION: "true"
+            GORILLA_DISABLE_CODE_SAVING: "false"
+            GORILLA_DATA_RETENTION_PERIOD: ""
+            GORILLA_SESSION_LENGTH: 0.1h
+            GORILLA_GLUE_SESSION_LENGTH: 0.1h
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+      - equal:
+          path: metadata.annotations["helm.sh/resource-policy"]
+          value: keep
+
+  - it: leaves unset Security and GC flags absent
+    set:
+      global.extraEnv: null
+    asserts:
+      - equal:
+          path: data
+          value:
+            GORILLA_SESSION_LENGTH: 0.1h
+            GORILLA_GLUE_SESSION_LENGTH: 0.1h
+
+  - it: preserves boolean false and duration strings without adding hand-set flags
+    set:
+      global.extraEnv.GORILLA_DISABLE_CODE_SAVING: false
+      global.extraEnv.GORILLA_DATA_RETENTION_PERIOD: 1.5h
+      global.extraEnv.GORILLA_DISABLE_PERSONAL_ENTITY: "true"
+      global.extraEnv.GORILLA_ALLOW_TEAM_CREATION: "false"
+    asserts:
+      - equal:
+          path: data.GORILLA_DISABLE_CODE_SAVING
+          value: "false"
+      - equal:
+          path: data.GORILLA_DATA_RETENTION_PERIOD
+          value: 1.5h
+      - notExists:
+          path: data.GORILLA_DISABLE_PERSONAL_ENTITY
+      - notExists:
+          path: data.GORILLA_ALLOW_TEAM_CREATION
+
+  - it: continues tracking inline values before ownership transfer
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-security-configmap
+            namespace: dedicated
+          data:
+            GORILLA_ALLOW_USER_TEAM_CREATION: "false"
+            GORILLA_SESSION_LENGTH: 24h
+    asserts:
+      - equal:
+          path: data.GORILLA_ALLOW_USER_TEAM_CREATION
+          value: "true"
+      - equal:
+          path: data.GORILLA_SESSION_LENGTH
+          value: 0.1h
+
+  - it: preserves the complete Console-owned data map on upgrade
+    release:
+      isUpgrade: true
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-security-configmap
+            namespace: dedicated
+            resourceVersion: "123"
+            annotations:
+              wandb.ai/console-managed: "true"
+          data:
+            GORILLA_ALLOW_USER_TEAM_CREATION: "false"
+            GORILLA_SESSION_LENGTH: 1.5h
+            FUTURE_CONSOLE_KEY: ""
+    asserts:
+      - equal:
+          path: data
+          value:
+            GORILLA_ALLOW_USER_TEAM_CREATION: "false"
+            GORILLA_SESSION_LENGTH: 1.5h
+            FUTURE_CONSOLE_KEY: ""
+      - equal:
+          path: metadata.annotations["wandb.ai/console-managed"]
+          value: "true"
+      - notExists:
+          path: metadata.resourceVersion
+
+  - it: keeps an empty owned map empty instead of restoring defaults
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-security-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: "true"
+          data: {}
+    asserts:
+      - equal:
+          path: data
+          value: {}
+
+  - it: treats absent owned data as empty
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-security-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: "true"
+    asserts:
+      - equal:
+          path: data
+          value: {}
+
+  - it: tracks inline values when the marker is false
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-security-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: "false"
+          data: {}
+    asserts:
+      - equal:
+          path: data.GORILLA_SESSION_LENGTH
+          value: 0.1h
+      - notExists:
+          path: metadata.annotations["wandb.ai/console-managed"]
+
+  - it: does not reuse another release or namespace
+    kubernetesProvider:
+      objects:
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: customer-security-configmap
+            namespace: another-namespace
+            annotations:
+              wandb.ai/console-managed: "true"
+          data: {}
+        - apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: another-security-configmap
+            namespace: dedicated
+            annotations:
+              wandb.ai/console-managed: "true"
+          data: {}
+    asserts:
+      - equal:
+          path: data.GORILLA_SESSION_LENGTH
+          value: 0.1h
