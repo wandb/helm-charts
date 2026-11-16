@@ -210,6 +210,15 @@ true
       port:
         number: {{ include "wandb.mcpServicePort" $ }}
   {{- end }}
+  {{- if index .Values "sdk-telemetry" "install" }}
+- pathType: Prefix
+  path: /sdk/otel
+  backend:
+    service:
+      name: {{ include "wandb.sdkTelemetryServiceName" $ }}
+      port:
+        number: 8080
+  {{- end }}
   {{- if include "wandb.ingress.consoleEnabled" $ }}
 - pathType: Prefix
   path: /console
@@ -233,4 +242,11 @@ true
       port:
         number: 8722
   {{- end }}
+{{- end -}}
+
+{{/* The sdk-telemetry Service name, honoring wandb-base fullname rules. */}}
+{{- define "wandb.sdkTelemetryServiceName" -}}
+  {{- $context := deepCopy (index .Subcharts "sdk-telemetry") -}}
+  {{- $name := $context.Values.service.name | default (include "wandb-base.fullname" $context) -}}
+{{- tpl $name $context | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
