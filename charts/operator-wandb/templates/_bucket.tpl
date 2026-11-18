@@ -68,7 +68,6 @@ default bucket. All consumers must use this configuration.
   "azureClientId" (default "" $bucket.azureClientId)
   "azureAuthMethod" (default "" $bucket.azureAuthMethod)
   "customerBucket" $customerBucket
-  "consoleManaged" (not (empty $consoleSettings))
   "secret" $effectiveSecret
   -}}
 {{- $effectiveBucket | toYaml -}}

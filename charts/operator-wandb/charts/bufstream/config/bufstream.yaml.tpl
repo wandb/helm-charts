@@ -22,7 +22,7 @@ storage:
   {{- if .Values.storage.s3.endpoint }}
   endpoint: {{ tpl .Values.storage.s3.endpoint . }}
   {{- end }}
-  {{- if (include "bufstream.s3AccessKeyIdEnabled" . | trim | eq "true") }}
+  {{- if .Values.storage.s3.accessKeyId }}
   access_key_id:
     string: {{ tpl .Values.storage.s3.accessKeyId . | quote }}
   secret_access_key:

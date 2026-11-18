@@ -508,7 +508,7 @@ tests:
                 - key: SECRET_KEY
                   path: secret_access_key
 
-  - it: omits Bufstream's S3 access key when the Console Secret lacks ACCESS_KEY
+  - it: keeps Bufstream's empty S3 access key when the Console Secret lacks ACCESS_KEY
     template: charts/bufstream/templates/config.yaml
     set:
       bufstream:
@@ -525,7 +525,8 @@ tests:
           secretKey: inline-secret-key
     kubernetesProvider:
       objects:
-        - apiVersion: v1
+        - &consoleS3SecretWithoutAccessKey
+          apiVersion: v1
           kind: Secret
           metadata:
             name: customer-bucket
@@ -538,6 +539,41 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
-      - notMatchRegex:
+      - matchRegex:
           path: data["config.yaml"]
-          pattern: '(?s)access_key_id:'
+          pattern: '(?s)access_key_id:\s+string: ""'
+
+  - it: mounts Bufstream's storage Secret when the Console Secret lacks ACCESS_KEY
+    template: charts/bufstream/templates/deployment.yaml
+    set:
+      bufstream:
+        install: true
+      global:
+        bufstream:
+          enabled: true
+        bucket:
+          provider: s3
+          name: s3-user-bucket
+          path: files
+          region: us-east-1
+          accessKey: inline-access-key
+          secretKey: inline-secret-key
+    kubernetesProvider:
+      objects:
+        - *consoleS3SecretWithoutAccessKey
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: storage
+            mountPath: /config/secrets/storage
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: storage
+            secret:
+              secretName: customer-bucket
+              items:
+                - key: SECRET_KEY
+                  path: secret_access_key
