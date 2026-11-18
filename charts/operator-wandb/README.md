@@ -399,6 +399,26 @@ component name overrides. `mcp-server.service.ports` must contain exactly one
 named `http` TCP port from 1 to 65535 with `targetPort: 8080`. For example, a
 Service port of 9090 is supported while application and probe ports remain 8080.
 
+### SDK telemetry
+
+`sdk-telemetry` receives the wandb SDK's own OpenTelemetry metrics and logs on
+`/sdk/otel/v1/*` and forwards them to the release's OTel collector
+(`<release>-otel-daemonset:4318`). Without it, the SDK gets a 404 from
+`/sdk/otel` and drops its telemetry. It's disabled by default: the data includes
+SDK error messages with run IDs, project names and server URLs, so enable it
+only where the customer has agreed to send it.
+
+```yaml
+sdk-telemetry:
+  install: true
+```
+
+When installed, the chart routes `/sdk/otel` to the service in the Ingress and
+in the bundled NGINX config. The service rate-limits each caller through the
+release's Redis (`GORILLA_SDK_TELEMETRY_RATE_LIMIT_REQUESTS_PER_SECOND`,
+default `10`). Its pods don't mount a service-account token. The collector must
+export logs for the SDK's log records to leave the cluster.
+
 ## Console routing
 
 The Ingress, Traefik Ingress and NGINX config route `/console` to the

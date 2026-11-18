@@ -3289,6 +3289,90 @@ metric-observer:
           maxReplicas: 20
           minReplicas: 8
 
+sdk-telemetry:
+  # Receives the wandb SDK's own OpenTelemetry metrics and logs on /sdk/otel/v1/*
+  # and forwards them to the in-cluster OTLP collector. Off by default: the SDK
+  # data includes error messages with run IDs, project names and URLs, so enable
+  # it only where the customer agreed to send it.
+  install: false
+  # Does not call the Kubernetes API, so no service-account token is mounted.
+  serviceAccount:
+    create: true
+    automount: false
+  automountServiceAccountToken: false
+  role:
+    create: false
+  image:
+    repository: wandb/megabinary
+    tag: latest
+  service:
+    enabled: true
+    type: ClusterIP
+    ports:
+      - port: 8080
+        targetPort: http
+        protocol: TCP
+        name: http
+  env:
+    GORILLA_OTEL_FORWARDER_ENABLED:
+      value: "true"
+    GORILLA_OTEL_FORWARDER_ADDRESS:
+      value: '{{ printf "http://%s-otel-daemonset:4318" .Release.Name }}'
+    GORILLA_SDK_TELEMETRY_RATE_LIMIT_ENABLED:
+      value: "true"
+    GORILLA_SDK_TELEMETRY_RATE_LIMIT_CACHE:
+      value: '{{ include "wandb.redis.connectionString" . | trim }}'
+    GORILLA_SDK_TELEMETRY_RATE_LIMIT_REQUESTS_PER_SECOND:
+      value: "10"
+  envFrom:
+    "{{ .Release.Name }}-redis-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-configmap": "configMapRef"
+    "{{ .Release.Name }}-global-secret": "secretRef"
+  envTpls:
+    - '{{ include "wandb.downwardEnvs" . }}'
+    - '{{ include "wandb.redisEnvs" . }}'
+    - '{{ include "wandb.observabilityEnvs" . }}'
+    - '{{ include "wandb.statsigEnvs" . }}'
+    - '{{ include "wandb.sslCertEnvs" . }}'
+  containers:
+    sdk-telemetry:
+      args: ["sdk-telemetry"]
+      env: {}
+      envFrom: {}
+      ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+      livenessProbe:
+        httpGet:
+          path: /healthz
+          port: http
+        initialDelaySeconds: 10
+        periodSeconds: 5
+        timeoutSeconds: 1
+        failureThreshold: 3
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: http
+        periodSeconds: 5
+        failureThreshold: 5
+  size: ""
+  sizing:
+    default:
+      autoscaling:
+        horizontal:
+          enabled: true
+          minReplicas: 2
+          maxReplicas: 6
+          targetCPUUtilizationPercentage: 70
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          memory: 2Gi
+
 parquet:
   podLabels:
     azure.workload.identity/use: '{{ include `wandb.azureStorageIdentityEnabled` . }}'

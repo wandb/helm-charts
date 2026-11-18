@@ -1,0 +1,80 @@
+suite: SDK telemetry service
+templates:
+  - templates/ingress.yaml
+  - templates/nginx.yaml
+  - charts/sdk-telemetry/templates/deployment.yaml
+  - charts/api/templates/service.yaml
+  - charts/app/templates/service.yaml
+release:
+  name: customer-a
+
+tests:
+  - it: is not installed by default
+    template: charts/sdk-telemetry/templates/deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: adds no ingress path by default
+    template: templates/ingress.yaml
+    set:
+      ingress.install: true
+      ingress.create: true
+    asserts:
+      - notContains:
+          path: spec.rules[0].http.paths
+          any: true
+          content:
+            path: /sdk/otel
+
+  - it: routes /sdk/otel to the service when installed
+    template: templates/ingress.yaml
+    set:
+      sdk-telemetry.install: true
+      ingress.install: true
+      ingress.create: true
+    asserts:
+      - contains:
+          path: spec.rules[0].http.paths
+          content:
+            pathType: Prefix
+            path: /sdk/otel
+            backend:
+              service:
+                name: customer-a-sdk-telemetry
+                port:
+                  number: 8080
+
+  - it: proxies /sdk/otel through NGINX with the OTLP body limit
+    template: templates/nginx.yaml
+    set:
+      sdk-telemetry.install: true
+    asserts:
+      - matchRegex:
+          path: data["nginx.conf"]
+          pattern: 'location /sdk/otel \{\s+proxy_pass http://customer-a-sdk-telemetry:8080;'
+      - matchRegex:
+          path: data["nginx.conf"]
+          pattern: 'client_max_body_size 10m;'
+
+  - it: runs the sdk-telemetry command and forwards to the in-cluster collector
+    template: charts/sdk-telemetry/templates/deployment.yaml
+    set:
+      sdk-telemetry.install: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value: ["sdk-telemetry"]
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OTEL_FORWARDER_ADDRESS
+            value: http://customer-a-otel-daemonset:4318
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_OTEL_FORWARDER_ENABLED
+            value: "true"
