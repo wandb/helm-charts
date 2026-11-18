@@ -295,7 +295,7 @@ tests:
           path: data.STALE
       - notExists:
           path: metadata.annotations["wandb.ai/console-managed"]
-  - it: preserves a managed Secret during a partial Console save while ConfigMap still follows spec
+  - it: uses the managed Secret snapshot for the ConfigMap during a partial Console save
     template: templates/bucket.yaml
     documentIndex: 0
     kubernetesProvider:
@@ -304,7 +304,7 @@ tests:
     asserts:
       - equal:
           path: data.BUCKET_NAME
-          value: inline-bucket
+          value: console-bucket
   - it: does not take ownership of the Secret when only ConfigMap is managed
     template: templates/bucket.yaml
     documentIndex: 1
@@ -359,7 +359,7 @@ tests:
       - equal:
           path: spec.template.metadata.annotations["checksum/bucket"]
           value: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-  - it: keeps the external Secret path and its ConfigMap driven by spec
+  - it: prefers the managed bucket snapshot over an external Secret pointer
     template: templates/bucket.yaml
     documentIndex: 0
     kubernetesProvider:
@@ -368,12 +368,13 @@ tests:
         - *consoleConfig
     asserts:
       - hasDocuments:
-          count: 1
+          count: 2
       - equal:
           path: data.BUCKET_NAME
-          value: inline-bucket
-      - notExists:
+          value: console-bucket
+      - equal:
           path: metadata.annotations["wandb.ai/console-managed"]
+          value: 'true'
     set:
       global.bucket.accessKey: ""
       global.bucket.secretKey: ""
