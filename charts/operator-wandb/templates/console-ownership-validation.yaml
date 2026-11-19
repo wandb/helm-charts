@@ -1,0 +1,13 @@
+{{- if and .Values.console.install .Values.console.service.enabled -}}
+  {{- $defaultServiceName := printf "%s-console" .Release.Name -}}
+  {{- $rawServiceName := (dig "service" "name" "" .Values.console) | default $defaultServiceName -}}
+  {{- $serviceName := tpl $rawServiceName . | trunc 63 | trimSuffix "-" -}}
+  {{- $service := (lookup "v1" "Service" .Release.Namespace $serviceName) | default dict -}}
+  {{- $metadata := (get $service "metadata") | default dict -}}
+  {{- $annotations := (get $metadata "annotations") | default dict -}}
+  {{- $owningRelease := (get $annotations "meta.helm.sh/release-name") | default "" -}}
+  {{- $standaloneConsoleOwnsService := and (eq $owningRelease "console") (ne .Release.Name "console") -}}
+  {{- if $standaloneConsoleOwnsService -}}
+    {{- fail (printf "bundled Console cannot use Service %s/%s because Helm release console owns it; keep console.install=false while standalone Console is installed" .Release.Namespace $serviceName) -}}
+  {{- end -}}
+{{- end -}}
