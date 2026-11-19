@@ -112,8 +112,7 @@ the port through JSON to preserve its Helm type.
   operator-provided free-form tags are deliberately excluded.
 */}}
 {{- define "wandb.mcpDatadogTags" -}}
-  {{- $legacyDatadog := index .Values "datadog" | default dict -}}
-  {{- $deploymentType := index $legacyDatadog "deploymentType" | default "self-managed" -}}
+  {{- $deploymentType := include "wandb.mcpDatadogLabel" (dict "Values" .Values "field" "deploymentType" "default" "self-managed") -}}
 {{ list "product:wandb" "component:mcp-server" (printf "deployment_type:%s" $deploymentType) | toJson }}
 {{- end -}}
 
@@ -139,13 +138,28 @@ the port through JSON to preserve its Helm type.
   SCOPE NOTE: same as wandb.mcpDatadogTags -- .Values is the "mcp-server"
   subtree at call time.
 */}}
+{{/*
+  One Datadog label (service, env, deploymentType): the typed
+  observability.datadog value wins, the legacy datadog.* bridge is the fallback,
+  then the chart default. Validation rejects a typed/legacy conflict.
+*/}}
+{{- define "wandb.mcpDatadogLabel" -}}
+  {{- $observability := index .Values "observability" | default dict -}}
+  {{- $typed := index (index $observability "datadog" | default dict) .field | default "" | toString | trim -}}
+  {{- $legacy := index (index .Values "datadog" | default dict) .field | default "" | toString | trim -}}
+  {{- if ne $typed "" -}}
+    {{- $typed -}}
+  {{- else if ne $legacy "" -}}
+    {{- $legacy -}}
+  {{- else -}}
+    {{- .default -}}
+  {{- end -}}
+{{- end -}}
 {{- define "wandb.mcpDDService" -}}
-  {{- $legacyDatadog := index .Values "datadog" | default dict -}}
-{{- index $legacyDatadog "service" | default "wandb-mcp-server-onprem" -}}
+{{- include "wandb.mcpDatadogLabel" (dict "Values" .Values "field" "service" "default" "wandb-mcp-server-onprem") -}}
 {{- end -}}
 {{- define "wandb.mcpDDEnv" -}}
-  {{- $legacyDatadog := index .Values "datadog" | default dict -}}
-{{- index $legacyDatadog "env" | default "production" -}}
+{{- include "wandb.mcpDatadogLabel" (dict "Values" .Values "field" "env" "default" "production") -}}
 {{- end -}}
 
 {{/*
@@ -212,6 +226,36 @@ the port through JSON to preserve its Helm type.
   {{- end -}}
 {{- end -}}
 
+{{/*
+  Dedicated product surface for tool selection. Both lists mirror the server's
+  runtime contract (`tool_groups.*.managed_workloads` for `dedicated`); a group
+  the contract does not approve for Dedicated must not be selectable here, or
+  the server refuses to start. Approving a new base profile or extension for
+  Dedicated is a contract change first and a one-line edit here second.
+*/}}
+{{- define "wandb.mcpDedicatedToolProfiles" -}}
+{{- list "auto" "models-only" "models-weave" | toJson -}}
+{{- end -}}
+
+{{/* Extension groups the server knows (WANDB_MCP_TOOL_EXTENSIONS values). */}}
+{{- define "wandb.mcpKnownToolExtensions" -}}
+{{- list "agent-lens" "aria" "raw-graphql" | toJson -}}
+{{- end -}}
+
+{{/* Extensions the runtime contract approves for the dedicated workload: none in 0.4.4. */}}
+{{- define "wandb.mcpDedicatedToolExtensions" -}}
+{{- list | toJson -}}
+{{- end -}}
+
+{{/* Canonical comma-separated extension selector: sorted, de-duplicated, trimmed. */}}
+{{- define "wandb.resolveMcpToolExtensions" -}}
+  {{- $names := list -}}
+  {{- range .extensions -}}
+    {{- $names = append $names (. | toString | trim | lower) -}}
+  {{- end -}}
+  {{- $names | uniq | sortAlpha | join "," -}}
+{{- end -}}
+
 {{/* Resolve the chart-only `auto` selector to a server-owned exact profile. */}}
 {{- define "wandb.resolveMcpToolProfile" -}}
   {{- if eq .profile "auto" -}}
@@ -246,7 +290,9 @@ small
   "WF_TRACE_SERVER_URL"
   "WEAVE_TRACE_SERVER_URL"
   "WB_AGENT_BASE_URL"
+  "AGENT_LENS_BASE_URL"
   "WANDB_MCP_TOOL_PROFILE"
+  "WANDB_MCP_TOOL_EXTENSIONS"
   "WANDB_MCP_ACCESS_MODE"
   "WANDB_MCP_ENABLE_WEAVE_TOOLS"
   "WANDB_MCP_ENABLE_WEAVE_AGENT_TOOLS"
@@ -337,7 +383,10 @@ directly; .Values.global.* is auto-propagated by helm. Do NOT use
 fails helm render with "index of nil pointer".
 
 Resolves:
-- WANDB_MCP_TOOL_PROFILE: exact server-owned tool profile (never `auto`).
+- WANDB_MCP_TOOL_PROFILE: exact server-owned base tool profile (never `auto`).
+- WANDB_MCP_TOOL_EXTENSIONS: canonical additive extension set (empty when none).
+- WB_AGENT_BASE_URL / AGENT_LENS_BASE_URL: typed endpoints, emitted only for the
+  `aria` / `agent-lens` extensions that need them.
 - WANDB_MCP_ACCESS_MODE: orthogonal read-write/read-only selector.
 - MCP_WORKLOAD_PROFILE and MCP_CAPACITY_CLASS: server-owned Dedicated policy.
 - WF_TRACE_SERVER_URL: public weave-trace URL via ingress (global.host + /traces).
@@ -360,6 +409,13 @@ Resolves:
   {{- $globalWeaveTrace := index .Values.global "weave-trace" | default dict -}}
   {{- $hasTraceBackend := and (eq $traceMode "auto") (or $hasExplicitTraceURL (index $globalWeaveTrace "enabled")) -}}
   {{- $resolvedProfile := include "wandb.resolveMcpToolProfile" (dict "profile" $profile "hasTraceBackend" $hasTraceBackend) -}}
+  {{- $extensionList := index $tools "extensions" | default list -}}
+  {{- $extensions := include "wandb.resolveMcpToolExtensions" (dict "extensions" $extensionList) -}}
+  {{- $extensionNames := splitList "," $extensions -}}
+  {{- $aria := index $tools "aria" | default dict -}}
+  {{- $ariaBaseURL := tpl (index $aria "baseUrl" | default "" | toString) . | trim -}}
+  {{- $agentLens := index $tools "agentLens" | default dict -}}
+  {{- $agentLensBaseURL := tpl (index $agentLens "baseUrl" | default "" | toString) . | trim -}}
   {{- $routing := index .Values "routing" | default dict -}}
   {{- $internalBaseURL := tpl (index $routing "internalBaseUrl" | default "" | toString) . | trim -}}
   {{- $provider := include "wandb.mcpObservabilityProvider" . | trim -}}
@@ -371,6 +427,16 @@ Resolves:
   {{- end -}}
 - name: WANDB_MCP_TOOL_PROFILE
   value: {{ $resolvedProfile | quote }}
+- name: WANDB_MCP_TOOL_EXTENSIONS
+  value: {{ $extensions | quote }}
+  {{- if has "aria" $extensionNames }}
+- name: WB_AGENT_BASE_URL
+  value: {{ $ariaBaseURL | quote }}
+  {{- end }}
+  {{- if has "agent-lens" $extensionNames }}
+- name: AGENT_LENS_BASE_URL
+  value: {{ $agentLensBaseURL | quote }}
+  {{- end }}
 - name: WANDB_MCP_ACCESS_MODE
   value: {{ $accessMode | quote }}
 - name: MCP_WORKLOAD_PROFILE

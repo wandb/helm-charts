@@ -285,6 +285,148 @@ tests:
     asserts:
       - notFailedTemplate: {}
 
+  - it: accepts typed Datadog labels
+    set:
+      mcp-server.install: true
+      mcp-server.observability.provider: datadog-agent
+      mcp-server.observability.datadog.service: wandb-mcp-server-dedicated
+      mcp-server.observability.datadog.env: production
+      mcp-server.observability.datadog.deploymentType: dedicated
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects an unbounded typed Datadog label
+    set:
+      mcp-server.install: true
+      mcp-server.observability.datadog.service: "has spaces"
+    asserts:
+      - failedTemplate:
+          errorPattern: "observability/datadog/service"
+
+  - it: rejects a legacy Datadog label that disagrees with the typed one
+    set:
+      mcp-server.install: true
+      mcp-server.datadog.enabled: true
+      mcp-server.datadog.service: wandb-mcp-server-dedicated
+      mcp-server.observability.datadog.service: other-service
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.datadog.service conflicts with mcp-server.observability.datadog.service
+
+  - it: accepts a legacy Datadog label that matches the typed one
+    set:
+      mcp-server.install: true
+      mcp-server.datadog.enabled: true
+      mcp-server.datadog.service: wandb-mcp-server-dedicated
+      mcp-server.observability.provider: datadog-agent
+      mcp-server.observability.datadog.service: wandb-mcp-server-dedicated
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: accepts an explicitly empty extension set
+    set:
+      mcp-server.install: true
+      mcp-server.tools.extensions: []
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: rejects a scalar extension selector at the values schema
+    set:
+      mcp-server.install: true
+      mcp-server.tools.extensions: aria
+    asserts:
+      - failedTemplate:
+          errorPattern: "/mcp-server/tools/extensions': got string, want array"
+
+  - it: rejects an extension the server does not know at the values schema
+    set:
+      mcp-server.install: true
+      mcp-server.tools.extensions:
+        - sweeps
+    asserts:
+      - failedTemplate:
+          errorPattern: "/mcp-server/tools/extensions/0': value must be one of 'agent-lens', 'aria', 'raw-graphql'"
+
+  - it: rejects ARIA because no extension is approved for Dedicated
+    set:
+      global.weave-trace.enabled: true
+      mcp-server.install: true
+      mcp-server.tools.extensions:
+        - aria
+      mcp-server.tools.aria.baseUrl: https://agent.example.com
+    asserts:
+      - failedTemplate:
+          errorMessage: 'mcp-server.tools.extensions: aria is not approved for the dedicated workload by the MCP runtime contract (none is approved for Dedicated in this chart release)'
+
+  - it: rejects Agent Lens because no extension is approved for Dedicated
+    set:
+      global.weave-trace.enabled: true
+      mcp-server.install: true
+      mcp-server.tools.extensions:
+        - agent-lens
+      mcp-server.tools.agentLens.baseUrl: https://agent-lens.example.com
+    asserts:
+      - failedTemplate:
+          errorMessage: 'mcp-server.tools.extensions: agent-lens is not approved for the dedicated workload by the MCP runtime contract (none is approved for Dedicated in this chart release)'
+
+  - it: rejects raw GraphQL because no extension is approved for Dedicated
+    set:
+      global.weave-trace.enabled: true
+      mcp-server.install: true
+      mcp-server.tools.extensions:
+        - raw-graphql
+    asserts:
+      - failedTemplate:
+          errorMessage: 'mcp-server.tools.extensions: raw-graphql is not approved for the dedicated workload by the MCP runtime contract (none is approved for Dedicated in this chart release)'
+
+  - it: rejects an ARIA endpoint without the aria extension
+    set:
+      mcp-server.install: true
+      mcp-server.tools.aria.baseUrl: https://agent.example.com
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.tools.aria.baseUrl requires the aria extension in mcp-server.tools.extensions
+
+  - it: rejects an Agent Lens endpoint without the agent-lens extension
+    set:
+      mcp-server.install: true
+      mcp-server.tools.agentLens.baseUrl: https://agent-lens.example.com
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.tools.agentLens.baseUrl requires the agent-lens extension in mcp-server.tools.extensions
+
+  - it: rejects a malformed ARIA endpoint before the extension check
+    set:
+      mcp-server.install: true
+      mcp-server.tools.aria.baseUrl: agent.example.com/api
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.tools.aria.baseUrl requires the aria extension in mcp-server.tools.extensions
+
+  - it: rejects the extension selector in generic env
+    set:
+      mcp-server.install: true
+      mcp-server.env.WANDB_MCP_TOOL_EXTENSIONS: aria
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.env.WANDB_MCP_TOOL_EXTENSIONS is release-controlled; use the typed MCP values
+
+  - it: rejects the Agent Lens endpoint in extraEnv
+    set:
+      mcp-server.install: true
+      mcp-server.extraEnv.AGENT_LENS_BASE_URL: https://agent-lens.example.com
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.extraEnv cannot set release-controlled MCP variable AGENT_LENS_BASE_URL
+
+  - it: rejects future Agent Lens settings by prefix in the container environment
+    set:
+      mcp-server.install: true
+      mcp-server.containers.mcp-server.env.AGENT_LENS_TIMEOUT_SECONDS: "30"
+    asserts:
+      - failedTemplate:
+          errorMessage: mcp-server.containers.mcp-server.env cannot set release-controlled MCP variable AGENT_LENS_TIMEOUT_SECONDS
+
   - it: rejects an unknown deployment size instead of guessing a capacity class
     set:
       global.size: enormous

@@ -19,6 +19,20 @@ class OperatorMcpSchemaTest(unittest.TestCase):
             ["auto", "models-only", "models-weave"],
         )
 
+    def test_tool_extensions_are_a_typed_unique_set(self) -> None:
+        extensions = self.mcp["tools"]["properties"]["extensions"]
+        self.assertEqual(extensions["type"], "array")
+        self.assertTrue(extensions["uniqueItems"])
+        self.assertEqual(
+            extensions["items"]["enum"],
+            ["agent-lens", "aria", "raw-graphql"],
+        )
+        for extension in ("aria", "agentLens"):
+            self.assertEqual(
+                self.mcp["tools"]["properties"][extension]["properties"]["baseUrl"],
+                {"type": "string"},
+            )
+
     def test_access_and_observability_are_typed(self) -> None:
         self.assertEqual(
             self.mcp["accessMode"]["enum"],
@@ -32,6 +46,13 @@ class OperatorMcpSchemaTest(unittest.TestCase):
             self.mcp["observability"]["properties"]["privacy"]["enum"],
             ["off", "standard", "strict"],
         )
+
+    def test_datadog_labels_are_bounded(self) -> None:
+        datadog = self.mcp["observability"]["properties"]["datadog"]["properties"]
+        for field in ("service", "env", "deploymentType"):
+            self.assertEqual(
+                datadog[field]["pattern"], "^(|[A-Za-z0-9][A-Za-z0-9._-]{0,62})$"
+            )
 
     def test_trace_backend_mode_is_typed(self) -> None:
         self.assertEqual(
