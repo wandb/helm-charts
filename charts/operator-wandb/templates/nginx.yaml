@@ -4,6 +4,14 @@ metadata:
   name: {{ .Release.Name }}-nginx-configmap
   labels:
     {{- include "wandb.labels" . | nindent 4 }}
+{{- $app := printf "%s-app:8080" .Release.Name }}
+{{- $api := printf "%s-api:8081" .Release.Name }}
+{{- $frontend := printf "%s-frontend:8080" .Release.Name }}
+{{- if .Values.nginx.upstreamKeepalive }}
+{{- $app = "wandb_app" }}
+{{- $api = "wandb_api" }}
+{{- $frontend = "wandb_frontend" }}
+{{- end }}
 data:
   nginx.conf: |
     worker_processes  auto;
@@ -17,17 +25,44 @@ data:
     }
 
     http {
+{{- if .Values.nginx.upstreamKeepalive }}
+  {{- if not .Values.frontend.install }}
+      upstream wandb_app {
+        server {{ .Release.Name }}-app:8080;
+        keepalive 64;
+        keepalive_timeout 30s;
+      }
+  {{- end }}
+  {{- if .Values.global.api.enabled }}
+      upstream wandb_api {
+        server {{ .Release.Name }}-api:8081;
+        keepalive 64;
+        keepalive_timeout 30s;
+      }
+  {{- end }}
+  {{- if .Values.frontend.install }}
+      upstream wandb_frontend {
+        server {{ .Release.Name }}-frontend:8080;
+        keepalive 64;
+        keepalive_timeout 30s;
+      }
+  {{- end }}
+{{- end }}
       server {
         listen 8080;
         proxy_set_header Host $host:8080;
+{{- if .Values.nginx.upstreamKeepalive }}
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+{{- end }}
         client_max_body_size 0;
 {{- if .Values.frontend.install }}
         location / {
-          proxy_pass http://{{ .Release.Name }}-frontend:8080;
+          proxy_pass http://{{ $frontend }};
         }
 {{- else }}
         location / {
-          proxy_pass http://{{ .Release.Name }}-app:8080;
+          proxy_pass http://{{ $app }};
         }
 {{- end }}
 {{- if include "wandb.ingress.consoleEnabled" . }}
@@ -38,82 +73,82 @@ data:
 {{- if .Values.global.api.enabled }}
   {{- if .Values.global.api.additionalPaths.analytics }}
         location /analytics {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 
   {{- if .Values.global.api.additionalPaths.analytics }}
         location /analytics {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 
         location /api {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- if .Values.global.api.additionalPaths.artifacts }}
         location /artifacts {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
 
         location /artifactsV2 {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 
   {{- if .Values.global.api.additionalPaths.admin }}
         location /admin/audit_logs {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 
   {{- if .Values.global.api.additionalPaths.debug }}
         location /debug {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 
   {{- if .Values.global.api.additionalPaths.files }}
         location /files {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 
         location /graphql {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
 
         location /graphql2 {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
 
   {{- if .Values.global.api.additionalPaths.oidc }}
         location /oidc {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 
   {{- if .Values.global.api.additionalPaths.proxy }}
         location /proxy {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 
   {{- if .Values.global.api.additionalPaths.scim }}
         location /scim {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 
   {{- if .Values.global.api.additionalPaths.service_dangerzone }}
         location /service-dangerzone {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 
   {{- if .Values.global.api.additionalPaths.service_redirect }}
         location /service-redirect {
-          proxy_pass http://{{ .Release.Name }}-api:8081;
+          proxy_pass http://{{ $api }};
         }
   {{- end }}
 {{- end }}
