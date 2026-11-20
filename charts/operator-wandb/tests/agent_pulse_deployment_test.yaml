@@ -1,0 +1,96 @@
+suite: Agent Pulse Dedicated workload
+templates:
+  - charts/agent-pulse/templates/deployment.yaml
+  - charts/agent-pulse/templates/service.yaml
+release:
+  name: customer-a
+  namespace: customer-a
+tests:
+  - it: requires an explicit image version when enabled
+    template: charts/agent-pulse/templates/deployment.yaml
+    set:
+      agent-pulse.install: true
+    asserts:
+      - failedTemplate:
+          errorMessage: agent-pulse requires an explicit image.tag or image.digest
+  - it: requires a connection secret when enabled
+    template: charts/agent-pulse/templates/deployment.yaml
+    set:
+      agent-pulse.install: true
+      agent-pulse.image.tag: test-release
+    asserts:
+      - failedTemplate:
+          errorMessage: agent-pulse.connectionSecret is required
+  - it: connects to the local split API and mounts customer CA trust
+    template: charts/agent-pulse/templates/deployment.yaml
+    set:
+      agent-pulse.install: true
+      agent-pulse.image.tag: test-release
+      agent-pulse.connectionSecret: lens-connections
+      global.api.enabled: true
+      global.extraEnv:
+        GORILLA_ADMIN_API_KEY: must-not-be-inherited
+      global.caCertsConfigMap: customer-roots
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_CLIENT_BASE_URL
+            value: http://customer-a-api:8081
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEAVE_CLIENT_BASE_URL
+            value: http://customer-a-weave-trace:8080/traces
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: lens-connections
+                key: DATABASE_URL
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_ADMIN_API_KEY
+            value: must-not-be-inherited
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value: [/usr/local/bin/wandb-entrypoint]
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wandb-ca-certs-user
+            configMap:
+              name: customer-roots
+              optional: true
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+  - it: supports a monolithic Gorilla installation
+    template: charts/agent-pulse/templates/deployment.yaml
+    set:
+      agent-pulse.install: true
+      agent-pulse.image.tag: test-release
+      agent-pulse.connectionSecret: lens-connections
+      global.api.enabled: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WANDB_CLIENT_BASE_URL
+            value: http://customer-a-app:8080
+  - it: exposes only a ClusterIP service
+    template: charts/agent-pulse/templates/service.yaml
+    set:
+      agent-pulse.install: true
+      agent-pulse.image.tag: test-release
+      agent-pulse.connectionSecret: lens-connections
+    asserts:
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - equal:
+          path: spec.ports[0].port
+          value: 4000
