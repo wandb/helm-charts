@@ -340,7 +340,7 @@ mcp-server:
   install: true
   image:
     repository: wandb/mcp-server
-    tag: "0.4.0" # Managed Spec pins the Dedicated fleet version over this
+    tag: "0.4.5" # Managed Spec pins the Dedicated fleet version over this
     # For an immutable release, set this to sha256: followed by 64 lowercase
     # hexadecimal characters.
     digest: ""
