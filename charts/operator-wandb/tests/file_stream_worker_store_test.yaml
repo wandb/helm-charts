@@ -1,0 +1,35 @@
+suite: file stream worker store
+templates:
+  - charts/app/templates/deployment.yaml
+  - charts/parquet/templates/deployment.yaml
+release:
+  name: wandb
+  namespace: default
+
+# The API server drops an env var whose value is empty, so rendering one leaves
+# server-side-applied resources permanently out of sync (e.g. in Argo CD).
+tests:
+  - it: omits the variable when no Bigtable store is enabled
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
+          any: true
+
+  - it: lists every enabled Bigtable store
+    set:
+      global:
+        bigtable:
+          project: example-project
+          instance: example-instance
+          v2:
+            enabled: true
+          v3:
+            enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
+            value: bigtablev2://example-project/example-instance,bigtablev3://example-project/example-instance
