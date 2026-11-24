@@ -787,3 +787,7 @@ The shared `wandb-base` HPA is available through
 setting `minReplicas`, `maxReplicas`, and utilization targets renders an HPA for
 the Pulse Deployment. Choose production scaling settings from service/load
 validation rather than treating the initial baseline as a capacity guarantee.
+
+`APP_ENV=production` is temporarily retained for image-only rollbacks to binaries
+predating wandb/agent-lens#1449. New binaries ignore it. Remove this compatibility
+setting after those images are no longer rollback targets.
