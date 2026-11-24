@@ -2,6 +2,7 @@ suite: Agent Pulse Dedicated workload
 templates:
   - charts/agent-pulse/templates/deployment.yaml
   - charts/agent-pulse/templates/service.yaml
+  - charts/agent-pulse/templates/hpa.yaml
 release:
   name: customer-a
   namespace: customer-a
@@ -9,14 +10,14 @@ tests:
   - it: requires an explicit image version when enabled
     template: charts/agent-pulse/templates/deployment.yaml
     set:
-      agent-pulse.install: true
+      agent-lens.install: true
     asserts:
       - failedTemplate:
           errorMessage: agent-pulse requires an explicit image.tag or image.digest
   - it: requires a connection secret when enabled
     template: charts/agent-pulse/templates/deployment.yaml
     set:
-      agent-pulse.install: true
+      agent-lens.install: true
       agent-pulse.image.tag: test-release
     asserts:
       - failedTemplate:
@@ -24,7 +25,7 @@ tests:
   - it: connects to the local split API and mounts customer CA trust
     template: charts/agent-pulse/templates/deployment.yaml
     set:
-      agent-pulse.install: true
+      agent-lens.install: true
       agent-pulse.image.tag: test-release
       agent-pulse.connectionSecret: lens-connections
       global.api.enabled: true
@@ -71,7 +72,7 @@ tests:
   - it: supports a monolithic Gorilla installation
     template: charts/agent-pulse/templates/deployment.yaml
     set:
-      agent-pulse.install: true
+      agent-lens.install: true
       agent-pulse.image.tag: test-release
       agent-pulse.connectionSecret: lens-connections
       global.api.enabled: false
@@ -84,7 +85,7 @@ tests:
   - it: exposes only a ClusterIP service
     template: charts/agent-pulse/templates/service.yaml
     set:
-      agent-pulse.install: true
+      agent-lens.install: true
       agent-pulse.image.tag: test-release
       agent-pulse.connectionSecret: lens-connections
     asserts:
@@ -94,3 +95,43 @@ tests:
       - equal:
           path: spec.ports[0].port
           value: 4000
+  - it: permits multiple Pulse replicas
+    template: charts/agent-pulse/templates/deployment.yaml
+    set:
+      agent-lens.install: true
+      agent-pulse.image.tag: test-release
+      agent-pulse.connectionSecret: lens-connections
+      agent-pulse.replicaCount: 2
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+  - it: renders the shared HPA when explicitly configured
+    template: charts/agent-pulse/templates/hpa.yaml
+    set:
+      agent-lens.install: true
+      agent-pulse.image.tag: test-release
+      agent-pulse.connectionSecret: lens-connections
+      agent-pulse.autoscaling.horizontal.enabled: true
+      agent-pulse.autoscaling.horizontal.minReplicas: 2
+      agent-pulse.autoscaling.horizontal.maxReplicas: 4
+      agent-pulse.autoscaling.horizontal.targetCPUUtilizationPercentage: 70
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: customer-a-agent-pulse
+      - equal:
+          path: spec.minReplicas
+          value: 2
+      - equal:
+          path: spec.maxReplicas
+          value: 4
+      - contains:
+          path: spec.metrics
+          content:
+            type: Resource
+            resource:
+              name: cpu
+              target:
+                type: Utilization
+                averageUtilization: 70

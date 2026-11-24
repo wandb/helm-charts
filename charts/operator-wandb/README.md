@@ -734,7 +734,21 @@ Console ownership, lookups, or change Azure identity or ServiceAccount selection
 
 ## Agent Pulse on Dedicated
 
-`agent-pulse.install` defaults to `false`. The optional workload adds the Pulse
+`agent-lens.install` defaults to `false`. Set it to `true` to enable the Lens
+workloads available in this chart release (currently Pulse). Per-service install
+settings are optional opt-outs: `agent-pulse.install: false` excludes Pulse.
+Omit the per-service setting to follow the master switch; `install: true` is not
+supported for individual Lens services, so it cannot bypass the master switch.
+
+```yaml
+agent-lens:
+  install: true
+# Optional exclusion:
+# agent-pulse:
+#   install: false
+```
+
+The optional workload adds the Pulse
 API/UI process and a ClusterIP Service. It does not expose an ingress, install
 workers, create databases/users, or change the existing migration mechanism.
 
@@ -762,3 +776,14 @@ Existing generic `env`, `extraEnvFrom` and `envFrom` channels remain available t
 that integration. Retain the application team's existing schema prerequisites.
 The service image is released separately from Gorilla; select its actual published
 repository and version, accounting for `global.repositoryPrefix` where used.
+
+Pulse defaults to one replica with explicit resource requests/limits; it is not
+restricted to one pod. Override `agent-pulse.replicaCount` and
+`agent-pulse.resources` as needed. Pulse-specific t-shirt presets have not been
+qualified, so `global.size` does not automatically scale this service.
+
+The shared `wandb-base` HPA is available through
+`agent-pulse.autoscaling.horizontal`; it is disabled by default. Enabling it and
+setting `minReplicas`, `maxReplicas`, and utilization targets renders an HPA for
+the Pulse Deployment. Choose production scaling settings from service/load
+validation rather than treating the initial baseline as a capacity guarantee.
