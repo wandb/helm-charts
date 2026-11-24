@@ -731,3 +731,34 @@ When `global.bucket.secret.secretName` is supplied, the chart keeps its existing
 external-Secret references and runtime URL expansion. It does not copy external
 credentials or create a replacement credential Secret. This change does not add
 Console ownership, lookups, or change Azure identity or ServiceAccount selection.
+
+## Agent Pulse on Dedicated
+
+`agent-pulse.install` defaults to `false`. The optional workload adds the Pulse
+API/UI process and a ClusterIP Service. It does not expose an ingress, install
+workers, create databases/users, or change the existing migration mechanism.
+
+Before enabling it, supply an approved Agent Lens image tag/digest and
+`agent-pulse.connectionSecret`. The existing Kubernetes Secret must contain
+`DATABASE_URL`, `CLICKHOUSE_URL`, `CLICKHOUSE_USERNAME` and `CLICKHOUSE_PASSWORD`.
+Use a Lens logical database/user on the qualified existing MI MySQL instance;
+use the same Trace ClickHouse cluster, with its HTTP(S) endpoint. Database/user
+provisioning and credential delivery stay with the installation's infrastructure
+owner. For MySQL TLS, the URL must enable verification (`tls=true`); CA mounts do
+not turn TLS on. The current application still has hardcoded `weave_trace_db`
+queries; custom database names need application-team support before activation.
+
+The workload derives Gorilla and Trace URLs using the installation's standard
+Service names. Override `routing.apiBaseUrl` or `routing.traceBaseUrl` when the
+installation changes them. The chart preserves global customer-CA mounts and
+runs the approved image's CA entrypoint with writable `/tmp` as UID 65534.
+`/health` is the existing process probe; deployment validation must separately
+check database, Gorilla and Trace connectivity.
+
+Michael owns inference configuration. This change supplies no inference defaults,
+keys or BYO implementation. Complete his supported wiring before enabling a
+production Pulse image, which currently requires inference settings at startup.
+Existing generic `env`, `extraEnvFrom` and `envFrom` channels remain available to
+that integration. Retain the application team's existing schema prerequisites.
+The service image is released separately from Gorilla; select its actual published
+repository and version, accounting for `global.repositoryPrefix` where used.

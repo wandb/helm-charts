@@ -3905,6 +3905,101 @@ weave:
 ## profiles are intentionally unavailable from this chart.
 ## Disabled by default. Enable with: mcp-server.install: true
 ## Docs: https://github.com/wandb/wandb-mcp-server
+agent-pulse:
+  install: false
+  # Supply the approved service release. Pulse is released separately from Gorilla.
+  image:
+    repository: wandb/agent-pulse
+    tag: ""
+    digest: ""
+  globalOptOut:
+    env: true
+  replicaCount: 1
+  autoscaling:
+    horizontal:
+      enabled: false
+    vertical:
+      enabled: false
+    keda:
+      enabled: false
+  serviceAccount:
+    create: true
+    automount: false
+  automountServiceAccountToken: false
+  role:
+    create: false
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    fsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  # Existing Secret, populated by the installation's secret-delivery owner.
+  # DATABASE_URL must select a separate Lens database/user on the MI MySQL server.
+  # CLICKHOUSE_URL is the Trace cluster's HTTP(S) endpoint, not its native port.
+  connectionSecret: ""
+  routing:
+    apiBaseUrl: ""
+    traceBaseUrl: ""
+    cookieName: wandb
+  envFrom: {}
+  env:
+    PORT: "4000"
+    POOL_SIZE: "5"
+  envTpls:
+    - '{{ include "wandb.agentPulseEnvs" . }}'
+  containers:
+    agent-pulse:
+      command: [/usr/local/bin/wandb-entrypoint]
+      args: [/app/bin/agent-pulse-server]
+      ports:
+        - name: http
+          containerPort: 4000
+          protocol: TCP
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      startupProbe:
+        httpGet:
+          path: /health
+          port: http
+        failureThreshold: 30
+        periodSeconds: 2
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: http
+        periodSeconds: 5
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: http
+        periodSeconds: 10
+      volumeMounts:
+        - name: temp-dir
+          mountPath: /tmp
+  volumes:
+    - name: temp-dir
+      emptyDir: {}
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  service:
+    enabled: true
+    type: ClusterIP
+    ports:
+      - name: http
+        port: 4000
+        targetPort: 4000
+        protocol: TCP
+
 mcp-server:
   install: false
   image:
