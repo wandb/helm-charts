@@ -14,8 +14,6 @@
   {{- end -}}
 - name: WANDB_ORIGIN
   value: {{ .Values.global.host | quote }}
-- name: WANDB_LOGIN_URL
-  value: {{ printf "%s/oidc/login" (trimSuffix "/" .Values.global.host) | quote }}
 - name: WANDB_COOKIE_NAME
   value: {{ .Values.routing.cookieName | quote }}
 - name: WANDB_CLIENT_BASE_URL
