@@ -577,8 +577,10 @@ Global values will override any chart-specific values.
   value: {{ include "wandb.historyStore" . | quote }}
 - name: GORILLA_PARQUET_LIVE_HISTORY_STORE
   value: {{ include "wandb.liveHistoryStore" . | quote }}
+  {{- with include "wandb.fileStreamWorkerStore" . }}
 - name: GORILLA_FILE_STREAM_WORKER_STORE_ADDRESS
-  value: {{ include "wandb.fileStreamWorkerStore" . | quote }}
+  value: {{ . | quote }}
+  {{- end }}
 {{- end -}}
 
 {{- define "wandb.queueEnvs" -}}
